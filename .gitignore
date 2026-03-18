@@ -1,0 +1,14 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.venv/
+node_modules/
+.next/
+.cursor/
+.DS_Store
+dist/
+.coverage
+htmlcov/

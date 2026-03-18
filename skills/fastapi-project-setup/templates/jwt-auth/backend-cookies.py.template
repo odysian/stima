@@ -1,0 +1,57 @@
+import secrets
+from typing import Literal
+
+from fastapi import Response
+
+
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str, production: bool = False) -> str:
+    secure = production
+    samesite: Literal["lax", "strict", "none"] = "none" if production else "lax"
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+        path="/api/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+        path="/api/auth/",
+    )
+
+    csrf_value = secrets.token_hex(16)
+    response.set_cookie(
+        key="csrf_token",
+        value=csrf_value,
+        httponly=False,
+        secure=secure,
+        samesite=samesite,
+        path="/",
+    )
+    return csrf_value
+
+
+def clear_auth_cookies(response: Response, production: bool = False) -> None:
+    secure = production
+    samesite: Literal["lax", "strict", "none"] = "none" if production else "lax"
+
+    for key, path, httponly in [
+        ("access_token", "/api/", True),
+        ("refresh_token", "/api/auth/", True),
+        ("csrf_token", "/", False),
+    ]:
+        response.set_cookie(
+            key=key,
+            value="",
+            max_age=0,
+            httponly=httponly,
+            secure=secure,
+            samesite=samesite,
+            path=path,
+        )

@@ -1,0 +1,35 @@
+.
+├── backend
+│   ├── app
+│   │   ├── api
+│   │   │   ├── auth.py
+│   │   │   └── dependencies.py
+│   │   ├── core
+│   │   │   ├── config.py
+│   │   │   ├── security.py
+│   │   │   └── database.py
+│   │   ├── crud
+│   │   │   └── user.py
+│   │   ├── models
+│   │   │   ├── user.py
+│   │   │   └── refresh_token.py
+│   │   ├── schemas
+│   │   │   └── user.py
+│   │   ├── services
+│   │   └── main.py
+│   └── tests
+│       ├── conftest.py
+│       └── test_auth.py
+├── frontend
+│   ├── app
+│   │   ├── login
+│   │   │   └── page.tsx
+│   │   ├── register
+│   │   │   └── page.tsx
+│   │   └── dashboard
+│   │       └── page.tsx
+│   └── lib
+│       ├── api.ts
+│       └── api.types.ts
+└── skills
+    └── fastapi-project-setup

@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stima-postgres
+    environment:
+      POSTGRES_USER: stima
+      POSTGRES_PASSWORD: stima
+      POSTGRES_DB: stima
+    ports:
+      - "5432:5432"
+    volumes:
+      - stima_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  stima_postgres_data:

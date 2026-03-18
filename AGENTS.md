@@ -1,0 +1,201 @@
+# AGENTS.md — Stima
+
+## Start Here (Canonical Entrypoint)
+
+`AGENTS.md` is the canonical entrypoint for agents and contributors in this repository.
+
+Must-read in this order:
+1. `AGENTS.md` (this file)
+2. `ISSUES_WORKFLOW.md`
+3. `docs/template/KICKOFF.md` (if present)
+4. `WORKFLOW.md`
+
+Read conditionally (only when relevant):
+- `GREENFIELD_BLUEPRINT.md` for greenfield repos or explicit restructuring tasks
+- `docs/README.md`, `docs/ARCHITECTURE.md`, `docs/PATTERNS.md`, `docs/REVIEW_CHECKLIST.md` for domain/contract/pattern changes
+- `skills/*` playbooks only when explicitly requested or clearly required by the task
+
+## Unit of Work Rule
+
+- **Default unit of work is a GitHub Issue.**
+- Use `single` mode by default: one feature -> one Task issue -> one PR.
+- Use `gated` or `fast` only when the user explicitly requests it.
+- In `fast` mode, no issue creation is required (per `ISSUES_WORKFLOW.md` criteria).
+- Convert freeform requests into the selected issue mode before implementation.
+- For issue-backed work, work one Task issue at a time.
+- PRs close Task issues (`Closes #123`), not Specs.
+- Specs close only when all child Tasks are done or explicitly deferred.
+- Detailed control-plane rules are canonical in `ISSUES_WORKFLOW.md`.
+- For one-shot issue body + `gh` command generation, use `skills/spec-workflow-gh.md`.
+- Canonical kickoff types:
+  - Planning kickoff (issue planning only): `Run kickoff for feature <feature-id> from <filename> mode=<single|gated|fast>, planning-only (no code changes, no PR).`
+  - Execution kickoff (implementation): `Run kickoff for existing Task #<task-id> mode=single.`
+  - If `mode` is omitted, default to `single`.
+  - Do not switch to `gated` or `fast` unless explicitly requested.
+  - Planning kickoff output: issue body file(s), `gh issue create` command(s) when applicable, created issue link(s), and a 3-5 step implementation plan.
+  - Execution kickoff output: implementation + verification + PR + standardized reviewer follow-up prompt + required learning handoff after explicit `APPROVED`.
+
+## Agent Operating Loop
+
+1. Whiteboard scope in `plans/YYYY-MM-DD/*.md` or spec docs (scratch only). New planning files should follow `plans/YYYY-MM-DD/<type>-<slug>.md`.
+2. Choose execution mode and create required issue(s) (`single` unless explicitly asked for `gated`/`fast`; `fast` can skip issue creation).
+3. Restate goal and acceptance criteria.
+4. Plan minimal files and scope.
+5. Implement with tight, surgical changes.
+6. Run verification commands once (or once per code change set).
+7. For issue-backed work, open PR that closes the Task issue; close Spec after child Tasks are done/deferred.
+8. Provide a lean reviewer follow-up prompt for a separate review pass.
+9. Patch only actionable findings, rerun relevant verification, and repeat review only if explicitly requested.
+10. After explicit reviewer verdict `APPROVED` is relayed back, generate a learning handoff file in `docs/learning/` (format defined below).
+11. Finalize: include handoff path in completion output and then close/complete the Task or Spec as applicable.
+
+## Project Context
+
+- **Project:** `Stima`
+- **Stack:** `FastAPI + SQLAlchemy + Alembic + PostgreSQL + Vite + React + TypeScript + Tailwind CSS v4`
+- **Repo layout:** `Feature-first monorepo with backend/ and frontend/ modules`
+
+## Operating Rules
+
+- Keep solutions simple and explicit.
+- Make surgical changes only.
+- Match existing style and conventions.
+- Follow `docs/CODE_COMMENTING_CONTRACT.md` for in-code comment/docstring standards.
+- Do not install dependencies without approval.
+- Do not change unrelated files.
+- Do not modify applied migrations; create a new migration.
+- Keep code review lean: focus on major bugs/regressions and missing tests.
+- In review mode, avoid environment triage loops, worktree setup, and repeated full-suite verification unless a blocker requires it.
+- For no-contract refactors, use the parity lock checklist (status/shape/error/side-effects) before merge.
+- Keep runtime/toolchain contracts explicit and consistent across README, local verify commands, and CI.
+
+## Codebase Modularity Defaults
+
+- Default for greenfield repos: follow `GREENFIELD_BLUEPRINT.md`.
+- Backend layering default: `api -> services -> repositories -> integrations/libs`.
+- Frontend layering default: `src/app` route shells + `src/features/<feature>` + `src/shared`.
+- Keep feature boundaries explicit: feature internals stay private; cross-feature usage should go through public exports.
+- If a repo already uses a different structure, preserve it unless a dedicated migration task explicitly scopes restructuring.
+- Practical file-size budgets:
+  - frontend components target `<=250` LOC
+  - frontend hooks/services target `<=180` LOC
+  - backend route/service/repository modules target `<=220` LOC
+  - split or create linked follow-up when any frontend module exceeds `450/300` LOC (component vs hook/service) or backend route/service/repository exceeds `350` LOC
+
+## Decision Brief (Conditional)
+
+For non-trivial fixes/features, include a short decision brief only when behavior/contracts/architecture decisions changed:
+
+- **Chosen approach:** what was implemented.
+- **Alternative considered:** one realistic alternative.
+- **Tradeoff:** why this choice won (complexity/risk/perf/security).
+- **Revisit trigger:** when the alternative should be reconsidered.
+
+For tiny quick fixes with no contract change, decision brief is optional.
+
+## Workflow Order
+
+1. Read `ISSUES_WORKFLOW.md`
+2. Read `docs/template/KICKOFF.md`
+3. Read `WORKFLOW.md`
+4. Read `GREENFIELD_BLUEPRINT.md` only for greenfield/restructure tasks
+5. Read project docs in `docs/README.md, docs/ARCHITECTURE.md, docs/PATTERNS.md, docs/REVIEW_CHECKLIST.md, backend/TESTPLAN.md` only when needed for touched scope
+6. Execute one ready Task issue
+
+## Reviewer Handoff Contract
+
+After implementation PR is open, the implementation agent provides a reviewer prompt containing:
+
+- Task/PR identifier and branch/base
+- verification already run
+- explicit request for `APPROVED` or `ACTIONABLE`
+
+Reviewer pass default constraints:
+
+- use local diff context first
+- no broad environment triage by default
+- no worktree creation by default
+- no rerun of broad verification already reported green
+- no command transcript in output unless a command failed
+- default to one review pass; run a second pass only if the user explicitly requests it
+
+Use the exact reviewer prompt/output contract from `docs/template/KICKOFF.md`.
+
+## Learning Handoff Contract
+
+Required completion gate:
+
+- Generate a learning handoff whenever a Task is finished and whenever a Spec is closed.
+- Trigger only after explicit reviewer verdict `APPROVED` is provided back to the implementation agent.
+- Write to `docs/learning/YYYY-MM-DD-feature-slug-learning.md` (create `docs/learning/` if missing).
+- The static tutoring header from `docs/template/KICKOFF.md` is mandatory and must be copied verbatim at the top of the file; never modify it.
+- Audience and writing style are fixed by that header: senior-to-junior explanation for web chat with no IDE access; plain English, no agent shorthand.
+
+Required sections below the static header:
+
+- `## What Was Built` (2-3 sentences)
+- `## Top 3 Decisions and Why`
+- `## Non-Obvious Patterns Used`
+- `## Tradeoffs Evaluated`
+- `## What I'm Uncertain About`
+  - Any decisions that felt like a coin flip
+  - Anything I'd do differently with more context
+  - Edge cases I didn't handle and why
+- `## Relevant Code Pointers` using `filename > line number` format so the handoff works in web chat contexts
+
+## Verification
+
+### Full
+
+```bash
+cd backend && ruff check . && mypy . && bandit -r app/ && pytest && cd ../frontend && npx tsc --noEmit && npx eslint src/ && npx vitest run && npm run build
+```
+
+### Frontend
+
+```bash
+cd frontend && npx tsc --noEmit && npx eslint src/ && npx vitest run && npm run build
+```
+
+### Backend
+
+```bash
+cd backend && ruff check . && mypy . && bandit -r app/ && pytest
+```
+
+### DB
+
+```bash
+cd backend && alembic upgrade head
+```
+
+If the repo defines a Makefile verification contract, prefer canonical `make` targets (for example: `make verify`, `make backend-verify`, `make frontend-verify`) over ad-hoc command variants.
+
+## Documentation Discipline
+
+Treat doc updates like failing tests. Keep architecture, patterns, checklists, and ADRs current.
+
+## Skills Note
+
+`skills/*.md` are portable procedural playbooks unless your runtime explicitly loads them.
+
+## Skill Governance
+
+Keep external skills high-signal and conflict-free:
+
+- Rule ownership:
+  - execution control plane (modes/DoR/DoD/branching): `ISSUES_WORKFLOW.md` (authoritative)
+  - kickoff and reviewer output contract: `docs/template/KICKOFF.md` (authoritative)
+  - implementation loop and quality defaults: `WORKFLOW.md`
+  - onboarding and operating constraints: `AGENTS.md`
+- For skills, precedence order is: repo docs above -> local `skills/*` -> external installed skills.
+- Install external skills globally in Codex home, not inside project repos.
+- Keep a small baseline (about 4-6 active external skills).
+- Use skills intentionally (named skill or clear task match), not by default for every request.
+- Avoid overlap: keep one primary skill per domain (API design, DB design, security, TypeScript).
+- If an external skill conflicts with repo docs, follow repo docs and treat the skill as advisory.
+- Review and prune unused or low-value skills regularly.
+
+## Optional Later
+
+MCP is out of scope for v1. It can be added later to automate issue creation/labeling/CI summaries.

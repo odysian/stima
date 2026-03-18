@@ -1,0 +1,111 @@
+import type { AuthResponse, LoginCredentials, RegisterData, User } from "./api.types";
+import { ApiError } from "./api.types";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function getCsrfToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("csrf_token");
+}
+
+function saveTokens(tokens: AuthResponse): void {
+  localStorage.setItem("csrf_token", tokens.csrf_token);
+}
+
+function clearTokens(): void {
+  localStorage.removeItem("csrf_token");
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function doRefresh(): Promise<boolean> {
+  const csrf = getCsrfToken();
+  const response = await fetch(`${API_URL}/api/auth/refresh`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    },
+  });
+
+  if (!response.ok) return false;
+
+  const data: AuthResponse = await response.json();
+  saveTokens(data);
+  return true;
+}
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = doRefresh();
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+async function apiRequest(path: string, options: RequestInit = {}): Promise<any> {
+  const csrf = getCsrfToken();
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    ...options.headers,
+  };
+
+  let response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) {
+      clearTokens();
+      if (typeof window !== "undefined") window.location.href = "/login";
+      throw new ApiError(401, "Session expired");
+    }
+
+    const newCsrf = getCsrfToken();
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(newCsrf ? { "X-CSRF-Token": newCsrf } : {}),
+        ...options.headers,
+      },
+      credentials: "include",
+    });
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: "Request failed" }));
+    throw new ApiError(response.status, errorData.detail || "Request failed");
+  }
+
+  return response.json();
+}
+
+export const api = {
+  register: (data: RegisterData) => apiRequest("/api/auth/register", { method: "POST", body: JSON.stringify(data) }),
+  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+    const data = await apiRequest("/api/auth/login", { method: "POST", body: JSON.stringify(credentials) });
+    saveTokens(data);
+    return data;
+  },
+  logout: async (): Promise<void> => {
+    const csrf = getCsrfToken();
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+      },
+    }).catch(() => {});
+    clearTokens();
+  },
+  getCurrentUser: (): Promise<User> => apiRequest("/api/auth/me"),
+};

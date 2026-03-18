@@ -1,0 +1,71 @@
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.dependencies import get_current_user
+from app.core.database import get_db
+from app.core.security import create_access_token, create_refresh_token, validate_refresh_token, verify_password
+from app.models.refresh_token import RefreshToken
+from app.models.user import User
+from app.schemas.user import RefreshRequest, Token, UserLogin, UserResponse
+from app.utils.cookies import clear_auth_cookies, set_auth_cookies
+
+router = APIRouter()
+
+
+@router.post("/login", response_model=Token)
+async def login(request: Request, response: Response, user: UserLogin, db: AsyncSession = Depends(get_db)):
+    db_user = ...  # load by username/email
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
+
+    access_token = create_access_token(data={"sub": str(db_user.id)})
+    refresh_token = await create_refresh_token(db_user.id, db)
+    await db.commit()
+
+    csrf_value = set_auth_cookies(response, access_token, refresh_token)
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "csrf_token": csrf_value,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh(request: Request, response: Response, body: RefreshRequest | None = Body(default=None), db: AsyncSession = Depends(get_db)):
+    incoming = request.cookies.get("refresh_token") or (body.refresh_token if body else None)
+    if not incoming:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
+
+    row = await validate_refresh_token(incoming, db)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
+
+    await db.delete(row)
+    new_refresh = await create_refresh_token(row.user_id, db)
+    await db.commit()
+
+    access_token = create_access_token(data={"sub": str(row.user_id)})
+    csrf_value = set_auth_cookies(response, access_token, new_refresh)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh,
+        "csrf_token": csrf_value,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/logout")
+async def logout(request: Request, response: Response, body: RefreshRequest | None = Body(default=None), db: AsyncSession = Depends(get_db)):
+    incoming = request.cookies.get("refresh_token") or (body.refresh_token if body else None)
+    if incoming:
+        ...  # delete matching refresh token row idempotently
+        await db.commit()
+    clear_auth_cookies(response)
+    return {"message": "Logged out"}
+
+
+@router.get("/me", response_model=UserResponse)
+async def me(current_user: User = Depends(get_current_user)):
+    return current_user

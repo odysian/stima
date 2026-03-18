@@ -1,0 +1,41 @@
+"use client";
+
+import { useState } from "react";
+
+interface ComponentProps {
+  title: string;
+  onAction?: () => Promise<void>;
+}
+
+export default function ComponentName({ title, onAction }: ComponentProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleClick = async () => {
+    if (!onAction) return;
+    setError("");
+    setLoading(true);
+    try {
+      await onAction();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="rounded-lg border p-4">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={loading}
+        className="mt-3 rounded border px-3 py-2 text-sm"
+      >
+        {loading ? "Working..." : "Run"}
+      </button>
+    </section>
+  );
+}

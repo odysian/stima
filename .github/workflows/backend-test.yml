@@ -1,0 +1,43 @@
+name: Backend Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: stima
+          POSTGRES_PASSWORD: stima
+          POSTGRES_DB: stima
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stima"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Ruff
+        run: ruff check .
+      - name: Mypy
+        run: mypy .
+      - name: Bandit
+        run: bandit -r app/
+      - name: Pytest
+        run: pytest

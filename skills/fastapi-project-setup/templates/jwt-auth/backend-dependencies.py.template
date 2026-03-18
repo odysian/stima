@@ -1,0 +1,52 @@
+import secrets
+
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.core.security import decode_access_token
+
+security = HTTPBearer(auto_error=False)
+
+
+async def get_current_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+):
+    cookie_token = request.cookies.get("access_token")
+    bearer_token = credentials.credentials if credentials else None
+    token = cookie_token or bearer_token
+
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    user_id = decode_access_token(token)
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
+
+    ...  # load user by ID and return
+
+
+_CSRF_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register"}
+
+
+async def verify_csrf(request: Request) -> None:
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+
+    if request.url.path in _CSRF_EXEMPT_PATHS:
+        return
+
+    if not request.cookies.get("access_token"):
+        return
+
+    cookie_csrf = request.cookies.get("csrf_token")
+    header_csrf = request.headers.get("X-CSRF-Token")
+
+    if not cookie_csrf or not header_csrf:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token missing")
+
+    if not secrets.compare_digest(cookie_csrf, header_csrf):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token mismatch")
