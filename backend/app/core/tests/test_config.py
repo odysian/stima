@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import get_settings
+from app.core.config import get_database_url, get_settings
 
 
 def test_cookie_domain_blank_is_normalized(monkeypatch) -> None:
@@ -39,3 +39,20 @@ def test_secret_key_must_be_non_empty(monkeypatch) -> None:
         get_settings()
 
     get_settings.cache_clear()
+
+
+def test_get_database_url_resolves_without_secret_key(monkeypatch) -> None:
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://db-user:db-pass@localhost:5432/stima")
+
+    db_url = get_database_url("postgresql+asyncpg://fallback:pass@localhost:5432/fallback")
+
+    assert db_url == "postgresql+asyncpg://db-user:db-pass@localhost:5432/stima"
+
+
+def test_get_database_url_uses_default_when_env_missing(monkeypatch) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    db_url = get_database_url("postgresql+asyncpg://fallback:pass@localhost:5432/fallback")
+
+    assert db_url == "postgresql+asyncpg://fallback:pass@localhost:5432/fallback"

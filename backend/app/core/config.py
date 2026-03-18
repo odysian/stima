@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from typing import Annotated, Any, Literal
 
@@ -85,3 +86,13 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return cached settings for module-level use."""
     return Settings()
+
+
+def get_database_url(default_url: str | None = None) -> str:
+    """Resolve DATABASE_URL without constructing full app settings."""
+    env_url = os.getenv("DATABASE_URL")
+    if env_url and env_url.strip():
+        return env_url.strip()
+    if default_url and default_url.strip():
+        return default_url.strip()
+    return "postgresql+asyncpg://user:pass@localhost:5432/stima"
