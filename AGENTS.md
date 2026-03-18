@@ -60,6 +60,7 @@ Read conditionally (only when relevant):
 - Keep solutions simple and explicit.
 - Make surgical changes only.
 - Match existing style and conventions.
+- Use SQLAlchemy 2.0 style only in backend code (`Mapped`/`mapped_column`, `select()` + async session methods). Do not use SQLAlchemy 1.x `Column()` model style or `db.query(...)`.
 - Follow `docs/CODE_COMMENTING_CONTRACT.md` for in-code comment/docstring standards.
 - Do not install dependencies without approval.
 - Do not change unrelated files.

@@ -11,6 +11,11 @@ Record conventions that already exist in code.
 - Public service functions must add value (orchestration/validation/policy/transactions), not pass-through wrappers.
 - Repositories contain persistence/query logic only, no transport concerns.
 
+## SQLAlchemy 2.0 Style (Mandatory)
+- Use SQLAlchemy 2.0 typed ORM style: `Mapped[...]` with `mapped_column(...)`.
+- Use async 2.0 query style with `select(...)` and async session methods (`scalar`, `scalars`, `execute`) with `await`.
+- Do not use SQLAlchemy 1.x model/query style (`Column(...)` model fields, `db.query(...)`, or sync-only session patterns).
+
 ## File-Size Budgets
 - Frontend leaf components: target `<=250` LOC.
 - Frontend hooks/services: target `<=180` LOC.
