@@ -16,7 +16,7 @@ def test_session_maker_uses_async_sessions() -> None:
 @pytest.mark.asyncio
 async def test_get_db_yields_async_session() -> None:
     session_generator = get_db()
-    session = await anext(session_generator)
+    session = await session_generator.__anext__()
 
     assert isinstance(session, AsyncSession)
 
