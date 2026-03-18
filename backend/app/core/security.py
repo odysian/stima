@@ -9,12 +9,13 @@ from typing import Any
 
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from jwt import InvalidTokenError
 
 from app.core.config import get_settings
 
 _password_hasher = PasswordHasher()
+_RESERVED_TOKEN_CLAIMS = frozenset({"sub", "type", "exp"})
 
 
 def hash_password(password: str) -> str:
@@ -26,7 +27,7 @@ def verify_password(password: str, password_hash: str) -> bool:
     """Verify a plain-text password against an Argon2id hash."""
     try:
         return _password_hasher.verify(password_hash, password)
-    except VerifyMismatchError:
+    except (VerifyMismatchError, InvalidHashError, VerificationError):
         return False
 
 
@@ -44,13 +45,12 @@ def create_access_token(
     effective_expiry = expires_delta or timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    payload: dict[str, Any] = {
-        "sub": subject,
-        "type": "access",
-        "exp": _expiry(effective_expiry),
-    }
-    if extra_claims:
-        payload.update(extra_claims)
+    payload = _build_payload(
+        subject=subject,
+        token_type="access",
+        expires_delta=effective_expiry,
+        extra_claims=extra_claims,
+    )
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 
@@ -62,14 +62,29 @@ def create_refresh_token(
     """Create a signed refresh token."""
     settings = get_settings()
     effective_expiry = expires_delta or timedelta(days=settings.refresh_token_expire_days)
-    payload: dict[str, Any] = {
-        "sub": subject,
-        "type": "refresh",
-        "exp": _expiry(effective_expiry),
-    }
-    if extra_claims:
-        payload.update(extra_claims)
+    payload = _build_payload(
+        subject=subject,
+        token_type="refresh",
+        expires_delta=effective_expiry,
+        extra_claims=extra_claims,
+    )
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+
+
+def _build_payload(
+    *,
+    subject: str,
+    token_type: str,
+    expires_delta: timedelta,
+    extra_claims: dict[str, Any] | None,
+) -> dict[str, Any]:
+    payload = dict(extra_claims or {})
+    for claim_name in _RESERVED_TOKEN_CLAIMS:
+        payload.pop(claim_name, None)
+    payload["sub"] = subject
+    payload["type"] = token_type
+    payload["exp"] = _expiry(expires_delta)
+    return payload
 
 
 def decode_token(token: str) -> dict[str, Any]:

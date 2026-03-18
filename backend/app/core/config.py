@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://user:pass@localhost:5432/stima",
         validation_alias="DATABASE_URL",
     )
-    secret_key: str = Field(default="", validation_alias="SECRET_KEY")
+    secret_key: str = Field(validation_alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(
         default=15,
@@ -61,6 +61,14 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return str(value)
+
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, value: str) -> str:
+        """Fail fast when SECRET_KEY is missing or blank."""
+        if not value.strip():
+            raise ValueError("SECRET_KEY must be set and non-empty")
+        return value
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

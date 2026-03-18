@@ -1,5 +1,8 @@
 """Settings tests for auth and cookie configuration."""
 
+import pytest
+from pydantic import ValidationError
+
 from app.core.config import get_settings
 
 
@@ -24,5 +27,15 @@ def test_allowed_origins_csv_parses_to_list(monkeypatch) -> None:
         "http://localhost:5173",
         "https://app.stima.dev",
     ]
+
+    get_settings.cache_clear()
+
+
+def test_secret_key_must_be_non_empty(monkeypatch) -> None:
+    monkeypatch.setenv("SECRET_KEY", "")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValidationError):
+        get_settings()
 
     get_settings.cache_clear()

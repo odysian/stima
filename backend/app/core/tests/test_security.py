@@ -17,6 +17,10 @@ def test_password_hash_and_verify_round_trip() -> None:
     assert security.verify_password("incorrect", hashed) is False
 
 
+def test_verify_password_returns_false_for_invalid_hash() -> None:
+    assert security.verify_password("any-password", "not-a-valid-hash") is False
+
+
 def test_token_hash_helpers() -> None:
     token = "refresh-token-value"
     token_hash = security.hash_token(token)
@@ -37,6 +41,25 @@ def test_access_token_round_trip() -> None:
     assert payload["sub"] == "user-123"
     assert payload["type"] == "access"
     assert payload["role"] == "owner"
+
+
+def test_access_token_reserved_claims_cannot_be_overridden() -> None:
+    token = security.create_access_token(
+        subject="user-123",
+        expires_delta=timedelta(minutes=5),
+        extra_claims={
+            "sub": "attacker",
+            "type": "refresh",
+            "exp": 0,
+            "scope": "quotes:read",
+        },
+    )
+
+    payload = security.decode_token(token)
+
+    assert payload["sub"] == "user-123"
+    assert payload["type"] == "access"
+    assert payload["scope"] == "quotes:read"
 
 
 def test_refresh_token_round_trip() -> None:
