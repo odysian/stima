@@ -47,7 +47,7 @@ def create_access_token(
     )
     payload = _build_payload(
         subject=subject,
-        token_type="access",
+        kind="access",
         expires_delta=effective_expiry,
         extra_claims=extra_claims,
     )
@@ -64,7 +64,7 @@ def create_refresh_token(
     effective_expiry = expires_delta or timedelta(days=settings.refresh_token_expire_days)
     payload = _build_payload(
         subject=subject,
-        token_type="refresh",
+        kind="refresh",
         expires_delta=effective_expiry,
         extra_claims=extra_claims,
     )
@@ -74,7 +74,7 @@ def create_refresh_token(
 def _build_payload(
     *,
     subject: str,
-    token_type: str,
+    kind: str,
     expires_delta: timedelta,
     extra_claims: dict[str, Any] | None,
 ) -> dict[str, Any]:
@@ -82,7 +82,7 @@ def _build_payload(
     for claim_name in _RESERVED_TOKEN_CLAIMS:
         payload.pop(claim_name, None)
     payload["sub"] = subject
-    payload["type"] = token_type
+    payload["type"] = kind
     payload["exp"] = _expiry(expires_delta)
     return payload
 

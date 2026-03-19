@@ -1,5 +1,8 @@
 """Database runtime setup tests."""
 
+from collections.abc import AsyncGenerator
+from typing import cast
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -15,9 +18,7 @@ def test_session_maker_uses_async_sessions() -> None:
 
 @pytest.mark.asyncio
 async def test_get_db_yields_async_session() -> None:
-    session_generator = get_db()
+    session_generator = cast(AsyncGenerator[AsyncSession, None], get_db())
     session = await session_generator.__anext__()
-
     assert isinstance(session, AsyncSession)
-
     await session_generator.aclose()

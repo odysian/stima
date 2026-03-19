@@ -24,7 +24,11 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://user:pass@localhost:5432/stima",
         validation_alias="DATABASE_URL",
     )
-    secret_key: str = Field(validation_alias="SECRET_KEY")
+    secret_key: str = Field(
+        default="",
+        validation_alias="SECRET_KEY",
+        validate_default=True,
+    )
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(
         default=15,

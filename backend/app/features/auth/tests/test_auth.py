@@ -5,8 +5,8 @@ from app.features.auth.models import RefreshToken, User
 
 
 def test_auth_tables_registered_in_metadata() -> None:
-    assert User.__table__.name == "users"
-    assert RefreshToken.__table__.name == "refresh_tokens"
+    assert User.__tablename__ == "users"
+    assert RefreshToken.__tablename__ == "refresh_tokens"
     assert "users" in Base.metadata.tables
     assert "refresh_tokens" in Base.metadata.tables
 
