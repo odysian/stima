@@ -6,7 +6,7 @@ import os
 from functools import lru_cache
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -56,6 +56,10 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173"],
         validation_alias="ALLOWED_ORIGINS",
     )
+    trusted_proxy_ips: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        validation_alias="TRUSTED_PROXY_IPS",
+    )
 
     @field_validator("cookie_domain", mode="before")
     @classmethod
@@ -84,6 +88,25 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return [str(origin).strip() for origin in value if str(origin).strip()]
         return ["http://localhost:5173"]
+
+    @field_validator("trusted_proxy_ips", mode="before")
+    @classmethod
+    def normalize_trusted_proxy_ips(cls, value: Any) -> list[str]:
+        """Allow TRUSTED_PROXY_IPS as CSV string or list."""
+        if isinstance(value, str):
+            return [ip.strip() for ip in value.split(",") if ip.strip()]
+        if isinstance(value, list):
+            return [str(ip).strip() for ip in value if str(ip).strip()]
+        return []
+
+    @model_validator(mode="after")
+    def validate_cookie_samesite_secure_combination(self) -> Settings:
+        """Enforce browser-compatible SameSite=None cookie settings."""
+        if self.cookie_samesite == "none" and not self.cookie_secure:
+            raise ValueError(
+                "COOKIE_SECURE must be true when COOKIE_SAMESITE is 'none'"
+            )
+        return self
 
 
 @lru_cache(maxsize=1)

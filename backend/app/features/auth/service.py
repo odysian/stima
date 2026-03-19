@@ -17,6 +17,7 @@ from app.core.security import (
     verify_password,
 )
 from app.features.auth.models import User
+from app.features.auth.repository import RefreshRotationOutcome, RefreshRotationResult
 
 ACCESS_COOKIE_NAME = "stima_access_token"
 REFRESH_COOKIE_NAME = "stima_refresh_token"
@@ -81,7 +82,7 @@ class AuthRepositoryProtocol(Protocol):
         replacement_expires_at: datetime,
         user_id: UUID,
         now: datetime,
-    ) -> User | None: ...
+    ) -> RefreshRotationResult: ...
 
     async def revoke_refresh_token(self, *, token_hash: str, revoked_at: datetime) -> None: ...
 
@@ -113,7 +114,7 @@ class AuthService:
         if user is None or not verify_password(password, user.password_hash):
             raise InvalidCredentialsError()
         if not user.is_active:
-            raise InvalidCredentialsError("Inactive account")
+            raise InvalidCredentialsError()
 
         access_token = create_access_token(subject=str(user.id))
         refresh_token = self._create_refresh_token(subject=str(user.id))
@@ -146,19 +147,23 @@ class AuthService:
             decode_token(replacement_refresh_token)["exp"]
         )
 
-        user = await self._repository.consume_and_rotate_refresh_token(
+        rotation_result = await self._repository.consume_and_rotate_refresh_token(
             consumed_token_hash=hash_token(refresh_token),
             replacement_token_hash=hash_token(replacement_refresh_token),
             replacement_expires_at=replacement_expires_at,
             user_id=user_id,
             now=_utcnow(),
         )
-        if user is None:
+        await self._repository.commit()
+
+        if rotation_result.outcome != RefreshRotationOutcome.ROTATED:
+            raise InvalidCredentialsError("Invalid or expired refresh token")
+        if rotation_result.user is None:
             raise InvalidCredentialsError("Invalid or expired refresh token")
 
         return AuthSession(
-            user=user,
-            access_token=create_access_token(subject=str(user.id)),
+            user=rotation_result.user,
+            access_token=create_access_token(subject=str(rotation_result.user.id)),
             refresh_token=replacement_refresh_token,
             csrf_token=token_urlsafe(32),
         )
@@ -177,6 +182,7 @@ class AuthService:
             token_hash=hash_token(refresh_token),
             revoked_at=_utcnow(),
         )
+        await self._repository.commit()
 
     async def get_authenticated_user(self, *, access_token: str | None) -> User:
         """Resolve the current user from an access cookie token."""

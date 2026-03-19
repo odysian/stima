@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.database import get_engine, get_session_maker
 from app.core.security import hash_token
-from app.features.auth.models import RefreshToken
+from app.features.auth.models import RefreshToken, User
 from app.features.auth.service import ACCESS_COOKIE_NAME, CSRF_COOKIE_NAME, REFRESH_COOKIE_NAME
 
 pytestmark = pytest.mark.asyncio
@@ -134,6 +134,56 @@ async def test_refresh_rotates_token_and_soft_revokes_consumed_token(
     assert replacement_row.revoked_at is None
 
 
+async def test_refresh_replay_revokes_token_family(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    await _register_and_login(client, _credentials())
+    original_refresh_token = client.cookies.get(REFRESH_COOKIE_NAME)
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert original_refresh_token is not None
+    assert csrf_token is not None
+
+    first_refresh = await client.post(
+        "/api/auth/refresh",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert first_refresh.status_code == 200
+    rotated_refresh_token = client.cookies.get(REFRESH_COOKIE_NAME)
+    rotated_csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert rotated_refresh_token is not None
+    assert rotated_csrf_token is not None
+
+    client.cookies.set(REFRESH_COOKIE_NAME, original_refresh_token, path="/api/auth/")
+    replay_response = await client.post(
+        "/api/auth/refresh",
+        headers={"X-CSRF-Token": rotated_csrf_token},
+    )
+    assert replay_response.status_code == 401
+
+    client.cookies.set(REFRESH_COOKIE_NAME, rotated_refresh_token, path="/api/auth/")
+    second_response = await client.post(
+        "/api/auth/refresh",
+        headers={"X-CSRF-Token": rotated_csrf_token},
+    )
+    assert second_response.status_code == 401
+
+    token_rows = (
+        await db_session.scalars(
+            select(RefreshToken).where(
+                RefreshToken.token_hash.in_(
+                    [
+                        hash_token(original_refresh_token),
+                        hash_token(rotated_refresh_token),
+                    ]
+                )
+            )
+        )
+    ).all()
+    assert token_rows
+    assert all(row.revoked_at is not None for row in token_rows)
+
+
 async def test_logout_clears_auth_cookies_and_revokes_refresh_token(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -190,6 +240,33 @@ async def test_me_returns_authenticated_user(client: AsyncClient) -> None:
     payload = me_response.json()
     assert payload["email"] == credentials["email"]
     assert payload["is_active"] is True
+
+
+async def test_me_requires_authentication(client: AsyncClient) -> None:
+    client.cookies.clear()
+
+    response = await client.get("/api/auth/me")
+
+    assert response.status_code == 401
+
+
+async def test_login_rejects_inactive_user_with_generic_error(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+
+    user = await db_session.scalar(select(User).where(User.email == credentials["email"]))
+    assert user is not None
+    user.is_active = False
+    await db_session.flush()
+
+    login_response = await client.post("/api/auth/login", json=credentials)
+
+    assert login_response.status_code == 401
+    assert login_response.json() == {"detail": "Invalid credentials"}
 
 
 async def _register_and_login(

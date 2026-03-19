@@ -3,13 +3,33 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.features.auth.models import RefreshToken, User
+
+
+class RefreshRotationOutcome(str, Enum):
+    """Classify refresh rotation attempts for service-level handling."""
+
+    ROTATED = "rotated"
+    NOT_FOUND = "not_found"
+    REPLAY_DETECTED = "replay_detected"
+    EXPIRED = "expired"
+    USER_MISMATCH = "user_mismatch"
+    INACTIVE_USER = "inactive_user"
+
+
+class RefreshRotationResult:
+    """Container for refresh rotation results."""
+
+    def __init__(self, *, outcome: RefreshRotationOutcome, user: User | None = None) -> None:
+        self.outcome = outcome
+        self.user = user
 
 
 class AuthRepository:
@@ -65,54 +85,70 @@ class AuthRepository:
         replacement_expires_at: datetime,
         user_id: UUID,
         now: datetime,
-    ) -> User | None:
+    ) -> RefreshRotationResult:
         """Soft-revoke a consumed refresh token and issue a replacement atomically."""
-        async with self._session.begin():
-            stmt = (
-                select(RefreshToken)
-                .options(selectinload(RefreshToken.user))
-                .where(RefreshToken.token_hash == consumed_token_hash)
-                .with_for_update()
-            )
-            result = await self._session.execute(stmt)
-            current_token = result.scalar_one_or_none()
-            if current_token is None:
-                return None
-            if current_token.revoked_at is not None:
-                return None
-            if current_token.expires_at <= now:
-                return None
-            if current_token.user_id != user_id:
-                return None
-            if not current_token.user.is_active:
-                return None
+        stmt = (
+            select(RefreshToken)
+            .options(selectinload(RefreshToken.user))
+            .where(RefreshToken.token_hash == consumed_token_hash)
+            .with_for_update()
+        )
+        result = await self._session.execute(stmt)
+        current_token = result.scalar_one_or_none()
+        if current_token is None:
+            return RefreshRotationResult(outcome=RefreshRotationOutcome.NOT_FOUND)
+        if current_token.revoked_at is not None:
+            await self.revoke_all_user_tokens(user_id=current_token.user_id, revoked_at=now)
+            return RefreshRotationResult(outcome=RefreshRotationOutcome.REPLAY_DETECTED)
+        if current_token.expires_at <= now:
+            return RefreshRotationResult(outcome=RefreshRotationOutcome.EXPIRED)
+        if current_token.user_id != user_id:
+            return RefreshRotationResult(outcome=RefreshRotationOutcome.USER_MISMATCH)
+        if not current_token.user.is_active:
+            return RefreshRotationResult(outcome=RefreshRotationOutcome.INACTIVE_USER)
 
-            current_token.revoked_at = now
-            replacement_token = RefreshToken(
-                user_id=current_token.user_id,
-                token_hash=replacement_token_hash,
-                expires_at=replacement_expires_at,
-            )
-            self._session.add(replacement_token)
-            await self._session.flush()
+        current_token.revoked_at = now
+        replacement_token = RefreshToken(
+            user_id=current_token.user_id,
+            token_hash=replacement_token_hash,
+            expires_at=replacement_expires_at,
+        )
+        self._session.add(replacement_token)
+        await self._session.flush()
 
-            return current_token.user
+        return RefreshRotationResult(
+            outcome=RefreshRotationOutcome.ROTATED,
+            user=current_token.user,
+        )
 
     async def revoke_refresh_token(self, *, token_hash: str, revoked_at: datetime) -> None:
         """Soft-revoke a refresh token when present and active."""
-        async with self._session.begin():
-            stmt = (
-                select(RefreshToken)
-                .where(RefreshToken.token_hash == token_hash)
-                .with_for_update()
+        stmt = (
+            select(RefreshToken)
+            .where(RefreshToken.token_hash == token_hash)
+            .with_for_update()
+        )
+        result = await self._session.execute(stmt)
+        refresh_token = result.scalar_one_or_none()
+        if refresh_token is None:
+            return
+        if refresh_token.revoked_at is not None:
+            return
+        refresh_token.revoked_at = revoked_at
+        await self._session.flush()
+
+    async def revoke_all_user_tokens(self, *, user_id: UUID, revoked_at: datetime) -> None:
+        """Revoke every active refresh token for a user."""
+        stmt = (
+            update(RefreshToken)
+            .where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked_at.is_(None),
             )
-            result = await self._session.execute(stmt)
-            refresh_token = result.scalar_one_or_none()
-            if refresh_token is None:
-                return
-            if refresh_token.revoked_at is not None:
-                return
-            refresh_token.revoked_at = revoked_at
+            .values(revoked_at=revoked_at)
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     async def commit(self) -> None:
         """Commit pending repository writes."""
