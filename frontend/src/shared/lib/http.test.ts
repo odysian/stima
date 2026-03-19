@@ -72,4 +72,72 @@ describe("http request helper", () => {
     const refreshInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
     expect(new Headers(refreshInit.headers).get("X-CSRF-Token")).toBe("boot-token");
   });
+
+  it("clears CSRF and throws when refresh itself fails with 401", async () => {
+    const fetchMock = vi.mocked(fetch);
+
+    document.cookie = "stima_csrf_token=boot-token; path=/";
+
+    // original → 401, refresh → 401
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ detail: "Unauthorized" }, 401))
+      .mockResolvedValueOnce(jsonResponse({ detail: "Unauthorized" }, 401));
+
+    await expect(request("/api/auth/me")).rejects.toThrow("Unauthorized");
+
+    // CSRF should be cleared — clear cookie too so hydrate doesn't re-read it
+    clearCsrfCookie();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await request("/api/quotes", { method: "POST", body: { a: 1 }, skipRefresh: true });
+
+    const postInit = fetchMock.mock.calls[2]?.[1] as RequestInit;
+    expect(new Headers(postInit.headers).get("X-CSRF-Token")).toBeNull();
+  });
+
+  it("deduplicates concurrent 401 refreshes into a single flight", async () => {
+    const fetchMock = vi.mocked(fetch);
+
+    document.cookie = "stima_csrf_token=boot-token; path=/";
+
+    // Two original requests both get 401, then one refresh succeeds,
+    // then both replays succeed.
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ detail: "Unauthorized" }, 401)) // req A original
+      .mockResolvedValueOnce(jsonResponse({ detail: "Unauthorized" }, 401)) // req B original
+      .mockResolvedValueOnce(jsonResponse({ csrf_token: "new-token" }))     // single refresh
+      .mockResolvedValueOnce(jsonResponse({ id: "a" }))                     // req A replay
+      .mockResolvedValueOnce(jsonResponse({ id: "b" }));                    // req B replay
+
+    const [resultA, resultB] = await Promise.all([
+      request<{ id: string }>("/api/auth/me"),
+      request<{ id: string }>("/api/auth/me"),
+    ]);
+
+    expect(resultA).toEqual({ id: "a" });
+    expect(resultB).toEqual({ id: "b" });
+
+    // Exactly one call to /api/auth/refresh
+    const refreshCalls = fetchMock.mock.calls.filter(
+      (call) => call[0] === "/api/auth/refresh",
+    );
+    expect(refreshCalls).toHaveLength(1);
+  });
+
+  it("uses the rotated CSRF token from refresh on the replayed request", async () => {
+    const fetchMock = vi.mocked(fetch);
+
+    document.cookie = "stima_csrf_token=boot-token; path=/";
+
+    // original → 401, refresh returns rotated token, replay
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ detail: "Unauthorized" }, 401))
+      .mockResolvedValueOnce(jsonResponse({ csrf_token: "rotated-token" }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    await request("/api/quotes", { method: "POST", body: { x: 1 } });
+
+    // The replayed request (call index 2) must carry the rotated token
+    const replayInit = fetchMock.mock.calls[2]?.[1] as RequestInit;
+    expect(new Headers(replayInit.headers).get("X-CSRF-Token")).toBe("rotated-token");
+  });
 });
