@@ -52,7 +52,7 @@ def test_secret_key_must_be_at_least_32_characters(monkeypatch) -> None:
 
 
 def test_secret_key_rejects_known_placeholder_values(monkeypatch) -> None:
-    monkeypatch.setenv("SECRET_KEY", "replace-me")
+    monkeypatch.setenv("SECRET_KEY", "replace-with-strong-random-value")
     get_settings.cache_clear()
 
     with pytest.raises(ValidationError):

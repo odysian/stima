@@ -23,6 +23,8 @@ class ImportRef:
 
     module: str
     lineno: int
+    is_relative: bool = False
+    relative_level: int = 0
 
 
 def _iter_imports(tree: ast.AST) -> list[ImportRef]:
@@ -35,6 +37,16 @@ def _iter_imports(tree: ast.AST) -> list[ImportRef]:
             continue
 
         if not isinstance(node, ast.ImportFrom):
+            continue
+        if node.level > 0:
+            refs.append(
+                ImportRef(
+                    module=node.module or "",
+                    lineno=node.lineno,
+                    is_relative=True,
+                    relative_level=node.level,
+                )
+            )
             continue
         if node.module is None:
             continue
@@ -75,6 +87,14 @@ def _validate_file(path: Path, layer: str) -> list[str]:
 
     violations: list[str] = []
     for ref in refs:
+        if ref.is_relative:
+            module_segment = ref.module if ref.module else "."
+            violations.append(
+                f"{path}:{ref.lineno}: Relative imports are not allowed in "
+                f"boundary-checked modules (level={ref.relative_level}, module={module_segment})"
+            )
+            continue
+
         if layer == "api" and _module_contains_layer(ref.module, "repository"):
             violations.append(
                 f"{path}:{ref.lineno}: API layer cannot import repositories ({ref.module})"
@@ -134,4 +154,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
-
