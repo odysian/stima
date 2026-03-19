@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     )
 
     database_url: str = Field(
-        default="postgresql+asyncpg://user:pass@localhost:5432/stima",
+        default="postgresql+asyncpg://stima:stima@localhost:5432/stima",
         validation_alias="DATABASE_URL",
     )
     secret_key: str = Field(
