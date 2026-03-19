@@ -5,10 +5,10 @@ import { RegisterForm } from "@/features/auth/components/RegisterForm";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 
 function ProtectedRoute(): React.ReactElement {
-  const { user, isLoading } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
 
-  if (!user && !isLoading) {
+  if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -16,9 +16,9 @@ function ProtectedRoute(): React.ReactElement {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }): React.ReactElement {
-  const { user, isLoading } = useAuth();
+  const { user } = useAuth();
 
-  if (user && !isLoading) {
+  if (user) {
     return <Navigate to="/" replace />;
   }
 

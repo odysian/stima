@@ -1,6 +1,7 @@
 export interface User {
-  id: number;
+  id: string;
   email: string;
+  is_active: boolean;
 }
 
 export interface LoginRequest {
@@ -15,4 +16,8 @@ export interface RegisterRequest {
 
 export interface AuthResponse {
   csrf_token: string;
+}
+
+export interface RegisterResponse {
+  user: User;
 }

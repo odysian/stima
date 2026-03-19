@@ -2,6 +2,7 @@ import type {
   AuthResponse,
   LoginRequest,
   RegisterRequest,
+  RegisterResponse,
   User,
 } from "@/features/auth/types/auth.types";
 import { clearCsrfToken, request, setCsrfToken } from "@/shared/lib/http";
@@ -15,11 +16,10 @@ async function login(credentials: LoginRequest): Promise<void> {
 }
 
 async function register(credentials: RegisterRequest): Promise<void> {
-  const response = await request<AuthResponse>("/api/auth/register", {
+  await request<RegisterResponse>("/api/auth/register", {
     method: "POST",
     body: credentials,
   });
-  setCsrfToken(response.csrf_token);
 }
 
 async function logout(): Promise<void> {

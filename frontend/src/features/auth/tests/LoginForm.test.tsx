@@ -41,7 +41,11 @@ describe("LoginForm", () => {
   it("submits credentials and redirects to root when no from state is present", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
     mockedAuthService.login.mockResolvedValueOnce();
-    mockedAuthService.me.mockResolvedValueOnce({ id: 1, email: "user@example.com" });
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-1",
+      email: "user@example.com",
+      is_active: true,
+    });
 
     renderLogin();
 
@@ -66,7 +70,11 @@ describe("LoginForm", () => {
   it("redirects to state.from when provided", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
     mockedAuthService.login.mockResolvedValueOnce();
-    mockedAuthService.me.mockResolvedValueOnce({ id: 2, email: "user@example.com" });
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-2",
+      email: "user@example.com",
+      is_active: true,
+    });
 
     renderLogin({
       pathname: "/login",

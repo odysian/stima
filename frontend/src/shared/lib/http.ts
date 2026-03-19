@@ -1,6 +1,7 @@
 import type { AuthResponse } from "@/features/auth/types/auth.types";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const CSRF_COOKIE_NAME = "stima_csrf_token";
 
 let csrfToken: string | null = null;
 let refreshInFlight: Promise<void> | null = null;
@@ -13,6 +14,34 @@ export function clearCsrfToken(): void {
   csrfToken = null;
 }
 
+function getCookieValue(name: string): string | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const tokenEntry = document.cookie
+    .split(";")
+    .map((cookiePart) => cookiePart.trim())
+    .find((cookiePart) => cookiePart.startsWith(`${name}=`));
+
+  if (!tokenEntry) {
+    return null;
+  }
+
+  return decodeURIComponent(tokenEntry.slice(name.length + 1));
+}
+
+export function hydrateCsrfTokenFromCookie(): void {
+  if (csrfToken) {
+    return;
+  }
+
+  const cookieToken = getCookieValue(CSRF_COOKIE_NAME);
+  if (cookieToken) {
+    setCsrfToken(cookieToken);
+  }
+}
+
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: BodyInit | object | null;
   skipRefresh?: boolean;
@@ -20,6 +49,28 @@ interface RequestOptions extends Omit<RequestInit, "body"> {
 
 function isMutatingMethod(method: string): boolean {
   return MUTATING_METHODS.has(method.toUpperCase());
+}
+
+function isJsonBody(body: RequestOptions["body"]): body is object {
+  if (typeof body !== "object" || body === null) {
+    return false;
+  }
+
+  if (
+    body instanceof FormData ||
+    body instanceof URLSearchParams ||
+    body instanceof Blob ||
+    body instanceof ArrayBuffer ||
+    ArrayBuffer.isView(body)
+  ) {
+    return false;
+  }
+
+  if (typeof ReadableStream !== "undefined" && body instanceof ReadableStream) {
+    return false;
+  }
+
+  return true;
 }
 
 function buildHeaders(method: string, headers?: HeadersInit, hasJsonBody?: boolean): Headers {
@@ -65,6 +116,8 @@ async function requestRefresh(): Promise<void> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
+        hydrateCsrfTokenFromCookie();
+
         const authResponse = await request<AuthResponse>("/api/auth/refresh", {
           method: "POST",
           skipRefresh: true,
@@ -84,12 +137,12 @@ async function requestRefresh(): Promise<void> {
 
 export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
-  const bodyIsJson =
-    options.body !== undefined &&
-    options.body !== null &&
-    !(options.body instanceof FormData) &&
-    !(options.body instanceof URLSearchParams) &&
-    !(options.body instanceof Blob);
+  const bodyIsJson = isJsonBody(options.body);
+
+  if (!csrfToken && isMutatingMethod(method)) {
+    hydrateCsrfTokenFromCookie();
+  }
+
   let requestBody: BodyInit | null | undefined;
 
   if (options.body === undefined) {

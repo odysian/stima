@@ -40,7 +40,12 @@ describe("RegisterForm", () => {
   it("submits credentials and redirects to onboarding", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
     mockedAuthService.register.mockResolvedValueOnce();
-    mockedAuthService.me.mockResolvedValueOnce({ id: 1, email: "new@example.com" });
+    mockedAuthService.login.mockResolvedValueOnce();
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-1",
+      email: "new@example.com",
+      is_active: true,
+    });
 
     renderRegister();
 
@@ -57,6 +62,10 @@ describe("RegisterForm", () => {
         email: "new@example.com",
         password: "strong-password",
       });
+    });
+    expect(mockedAuthService.login).toHaveBeenCalledWith({
+      email: "new@example.com",
+      password: "strong-password",
     });
 
     expect(await screen.findByText("Onboarding Route")).toBeInTheDocument();

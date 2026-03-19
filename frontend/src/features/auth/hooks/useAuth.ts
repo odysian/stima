@@ -11,6 +11,7 @@ import {
 import { authService } from "@/features/auth/services/authService";
 import type { LoginRequest, RegisterRequest, User } from "@/features/auth/types/auth.types";
 import { LoadingScreen } from "@/shared/components/LoadingScreen";
+import { hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
 
 interface AuthContextValue {
   user: User | null;
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
 
     const bootstrapAuth = async () => {
       try {
+        hydrateCsrfTokenFromCookie();
         const currentUser = await authService.me();
         if (active) {
           setUser(currentUser);
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
 
   const register = useCallback(async (credentials: RegisterRequest) => {
     await authService.register(credentials);
+    await authService.login(credentials);
     const currentUser = await authService.me();
     setUser(currentUser);
   }, []);
