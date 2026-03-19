@@ -57,6 +57,7 @@ Read conditionally (only when relevant):
 
 ## Operating Rules
 
+- Do not add co-author attribution to commits or PRs. Do not append `Co-Authored-By:` trailers, AI attribution lines, or any agent/tool credit to commit messages or PR descriptions.
 - Keep solutions simple and explicit.
 - Make surgical changes only.
 - Match existing style and conventions.

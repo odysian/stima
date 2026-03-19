@@ -11,8 +11,4 @@ Use this index to keep template docs easy to traverse.
 
 ## Template Maintenance Docs
 
-- `template/START_HERE.md`
 - `template/KICKOFF.md`
-- `template/MIGRATION_GUIDE.md`
-- `template/RELEASE_STRATEGY.md`
-- `template/VERSION.md`
