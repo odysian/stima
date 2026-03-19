@@ -76,6 +76,18 @@ Split only when it clearly improves delivery or risk control:
 - parallel work or staged rollout is needed
 - a module exceeds file-size thresholds and needs intentional extraction
 
+## Hardening Pass
+
+After a `gated` spec completes, budget a follow-up hardening task for gaps found during execution. This is expected, not a failure — execution surfaces real issues that planning cannot anticipate (config guardrails, CI alignment, boundary checks, dev tooling). Scope this as a standalone task with its own PR.
+
+## Test Task Scoping
+
+Test-focused tasks must include a **"Do NOT duplicate"** section listing what is already covered by other tasks. This prevents regression test overlap and keeps each test layer focused on its own failure modes.
+
+## Cross-Cutting Infra
+
+Dev tooling, CI fixes, proxy config, and startup scripts that don't fit cleanly in a feature task should be scoped into the task where they are discovered or into the hardening pass. Don't leave them unowned — if the work is needed to make the feature work end-to-end, it belongs in a task.
+
 ## Definition Of Ready
 
 A Task is ready when:

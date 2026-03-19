@@ -8,6 +8,12 @@ Use this index to keep template docs easy to traverse.
 - `PATTERNS.md`
 - `REVIEW_CHECKLIST.md`
 - `CODE_COMMENTING_CONTRACT.md`
+- `ISSUES_WORKFLOW.md`
+
+## Architecture Decision Records
+
+- `adr/000-template.md` — ADR format template
+- ADRs are numbered sequentially (`001`, `002`, ...) per `ISSUES_WORKFLOW.md`
 
 ## Template Maintenance Docs
 

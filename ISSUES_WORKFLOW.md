@@ -106,9 +106,11 @@ A Task is done when:
 - Default: Decision Locks live in the controlling issue (Task in `single`, Spec in `gated`).
 - Use a separate Decision issue only for non-trivial or cross-Spec discussion.
 - If a decision has lasting architecture/security/performance impact:
-  - create an ADR (`NNN-*.md`)
+  - create an ADR in `docs/adr/NNN-slug.md` using `docs/adr/000-template.md` as the format
   - link it from the Spec or Task
   - link it from the implementing PR
+- ADR numbering is sequential (`001`, `002`, ...). Use `Accepted` status for active decisions, `Superseded by ADR-NNN` when replaced.
+- Write ADRs during the hardening pass or as part of the implementing Task — not retroactively months later when context is lost.
 
 ## Verification Template
 
