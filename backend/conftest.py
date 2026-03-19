@@ -11,6 +11,8 @@ from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+os.environ.setdefault("SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes")
+
 from app.core.database import Base, get_db
 from app.features.auth import models as auth_models  # noqa: F401
 from app.main import app

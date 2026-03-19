@@ -9,6 +9,18 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+MIN_SECRET_KEY_LENGTH = 32
+FORBIDDEN_SECRET_KEY_VALUES = frozenset(
+    {
+        "dev-secret-key-change-in-production",
+        "changeme",
+        "change-me",
+        "replace-me",
+        "replace-with-strong-random-value",
+        "your-secret-key",
+    }
+)
+
 
 class Settings(BaseSettings):
     """Environment-backed runtime settings."""
@@ -74,10 +86,17 @@ class Settings(BaseSettings):
     @field_validator("secret_key")
     @classmethod
     def validate_secret_key(cls, value: str) -> str:
-        """Fail fast when SECRET_KEY is missing or blank."""
-        if not value.strip():
+        """Fail fast when SECRET_KEY is missing, weak, or clearly placeholder text."""
+        normalized_value = value.strip()
+        if not normalized_value:
             raise ValueError("SECRET_KEY must be set and non-empty")
-        return value
+        if len(normalized_value) < MIN_SECRET_KEY_LENGTH:
+            raise ValueError(
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters"
+            )
+        if normalized_value.lower() in FORBIDDEN_SECRET_KEY_VALUES:
+            raise ValueError("SECRET_KEY cannot use placeholder/dev values")
+        return normalized_value
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

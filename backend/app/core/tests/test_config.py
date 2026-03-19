@@ -41,6 +41,26 @@ def test_secret_key_must_be_non_empty(monkeypatch) -> None:
     get_settings.cache_clear()
 
 
+def test_secret_key_must_be_at_least_32_characters(monkeypatch) -> None:
+    monkeypatch.setenv("SECRET_KEY", "short-secret")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+    get_settings.cache_clear()
+
+
+def test_secret_key_rejects_known_placeholder_values(monkeypatch) -> None:
+    monkeypatch.setenv("SECRET_KEY", "replace-me")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+    get_settings.cache_clear()
+
+
 def test_get_database_url_resolves_without_secret_key(monkeypatch) -> None:
     monkeypatch.delenv("SECRET_KEY", raising=False)
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://db-user:db-pass@localhost:5432/stima")
