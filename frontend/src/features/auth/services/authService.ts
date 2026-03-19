@@ -11,6 +11,7 @@ async function login(credentials: LoginRequest): Promise<void> {
   const response = await request<AuthResponse>("/api/auth/login", {
     method: "POST",
     body: credentials,
+    skipRefresh: true,
   });
   setCsrfToken(response.csrf_token);
 }
@@ -19,6 +20,7 @@ async function register(credentials: RegisterRequest): Promise<void> {
   await request<RegisterResponse>("/api/auth/register", {
     method: "POST",
     body: credentials,
+    skipRefresh: true,
   });
 }
 
