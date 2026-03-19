@@ -45,23 +45,21 @@ def _resolve_forwarded_client_ip(
     peer_ip: str,
     trusted_networks: list[IpNetwork],
 ) -> str | None:
-    forwarded_chain = [entry.strip() for entry in forwarded_for.split(",") if entry.strip()]
-    if not forwarded_chain:
+    raw_chain = [entry.strip() for entry in forwarded_for.split(",") if entry.strip()]
+    if not raw_chain:
         return None
 
-    normalized_chain: list[str] = []
-    for hop in forwarded_chain:
+    # Walk right-to-left: peer_ip is guaranteed trusted by the caller.
+    # Stop and return None at the first unparsable entry — anything to its
+    # left is client-controlled and unverifiable.
+    for hop in reversed(raw_chain):
         parsed_hop = _parse_ip(hop)
         if parsed_hop is None:
             return None
-        normalized_chain.append(parsed_hop)
-    normalized_chain.append(peer_ip)
+        if not _is_trusted_proxy(parsed_hop, trusted_networks):
+            return parsed_hop
 
-    for hop in reversed(normalized_chain):
-        if _is_trusted_proxy(hop, trusted_networks):
-            continue
-        return hop
-    return None
+    return None  # Every XFF hop was also a trusted proxy
 
 
 def get_ip_key(request: Request) -> str:

@@ -38,6 +38,6 @@ jobs:
       - name: Mypy
         run: mypy .
       - name: Bandit
-        run: bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/quotes/tests
+        run: bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/quotes/tests,app/shared/tests
       - name: Pytest
         run: pytest

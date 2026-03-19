@@ -12,3 +12,11 @@ node_modules/
 dist/
 .coverage
 htmlcov/
+.vscode
+
+.pytest_cache/
+*.tsbuildinfo
+frontend/coverage/
+npm-debug.log*
+*.pem
+venv/
