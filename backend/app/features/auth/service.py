@@ -8,6 +8,8 @@ from secrets import token_urlsafe
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from sqlalchemy.exc import IntegrityError
+
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -101,11 +103,14 @@ class AuthService:
         if existing_user is not None:
             raise ConflictError(detail="Email is already registered")
 
-        user = await self._repository.create_user(
-            email=email,
-            password_hash=hash_password(password),
-        )
-        await self._repository.commit()
+        try:
+            user = await self._repository.create_user(
+                email=email,
+                password_hash=hash_password(password),
+            )
+            await self._repository.commit()
+        except IntegrityError as exc:
+            raise ConflictError(detail="Email is already registered") from exc
         return user
 
     async def login(self, *, email: str, password: str) -> AuthSession:
