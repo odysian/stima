@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import timedelta
 from uuid import uuid4
 
 import pytest
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_engine, get_session_maker
-from app.core.security import hash_token
+from app.core.security import create_refresh_token, hash_token
 from app.features.auth.models import RefreshToken, User
 from app.features.auth.service import ACCESS_COOKIE_NAME, CSRF_COOKIE_NAME, REFRESH_COOKIE_NAME
 
@@ -228,6 +229,36 @@ async def test_logout_clears_auth_cookies_and_revokes_refresh_token(
     )
     assert revoked_row is not None
     assert revoked_row.revoked_at is not None
+
+
+async def test_logout_with_expired_refresh_token_still_clears_cookies(
+    client: AsyncClient,
+) -> None:
+    await _register_and_login(client, _credentials())
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token is not None
+
+    expired_refresh_token = create_refresh_token(
+        subject=str(uuid4()),
+        expires_delta=timedelta(minutes=-5),
+    )
+    client.cookies.set(REFRESH_COOKIE_NAME, expired_refresh_token, path="/api/auth/")
+
+    logout_response = await client.post(
+        "/api/auth/logout",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert logout_response.status_code == 204
+    set_cookie_values = logout_response.headers.get_list("set-cookie")
+    assert any(
+        f"{REFRESH_COOKIE_NAME}=" in value and "Path=/api/auth/" in value
+        for value in set_cookie_values
+    )
+    assert any(
+        f"{REFRESH_COOKIE_NAME}=" in value and "Path=/" in value
+        for value in set_cookie_values
+    )
 
 
 async def test_me_returns_authenticated_user(client: AsyncClient) -> None:

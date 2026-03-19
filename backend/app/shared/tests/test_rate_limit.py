@@ -64,6 +64,52 @@ def test_get_ip_key_falls_back_to_peer_ip_when_forwarded_for_is_invalid(
     assert ip_key == "10.10.0.5"
 
 
+def test_get_ip_key_uses_rightmost_valid_untrusted_hop_when_xff_has_injected_invalid_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Client injects garbage at the start; proxy appends the real client IP."""
+    monkeypatch.setenv("TRUSTED_PROXY_IPS", "10.0.0.0/8")
+    get_settings.cache_clear()
+    request = _build_request(
+        peer_ip="10.10.0.5",
+        headers={"X-Forwarded-For": "not-an-ip, 1.2.3.4"},
+    )
+
+    ip_key = get_ip_key(request)
+
+    assert ip_key == "1.2.3.4"
+
+
+def test_get_ip_key_uses_x_real_ip_when_trusted_peer_has_no_usable_xff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRUSTED_PROXY_IPS", "10.0.0.0/8")
+    get_settings.cache_clear()
+    request = _build_request(
+        peer_ip="10.10.0.5",
+        headers={"X-Real-IP": "198.51.100.9"},
+    )
+
+    ip_key = get_ip_key(request)
+
+    assert ip_key == "198.51.100.9"
+
+
+def test_get_ip_key_falls_back_to_peer_ip_when_xff_chain_is_all_trusted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRUSTED_PROXY_IPS", "10.0.0.0/8")
+    get_settings.cache_clear()
+    request = _build_request(
+        peer_ip="10.10.0.5",
+        headers={"X-Forwarded-For": "10.20.0.1, 10.30.0.2"},
+    )
+
+    ip_key = get_ip_key(request)
+
+    assert ip_key == "10.10.0.5"
+
+
 def _build_request(peer_ip: str, headers: dict[str, str]) -> Request:
     raw_headers = [
         (name.lower().encode("latin-1"), value.encode("latin-1"))
