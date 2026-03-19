@@ -9,6 +9,8 @@ on:
 jobs:
   backend-test:
     runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: "test-secret-key-that-is-at-least-32-bytes"
     services:
       postgres:
         image: postgres:16-alpine
@@ -31,6 +33,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Cache mypy results
+        uses: actions/cache@v4
+        with:
+          path: backend/.mypy_cache
+          key: mypy-${{ runner.os }}-${{ hashFiles('backend/**/*.py', 'backend/pyproject.toml') }}
+          restore-keys: |
+            mypy-${{ runner.os }}-
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Ruff
@@ -38,6 +47,6 @@ jobs:
       - name: Mypy
         run: mypy .
       - name: Bandit
-        run: bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/quotes/tests
+        run: bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/quotes/tests,app/shared/tests
       - name: Pytest
         run: pytest

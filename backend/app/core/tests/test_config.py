@@ -56,3 +56,14 @@ def test_get_database_url_uses_default_when_env_missing(monkeypatch) -> None:
     db_url = get_database_url("postgresql+asyncpg://fallback:pass@localhost:5432/fallback")
 
     assert db_url == "postgresql+asyncpg://fallback:pass@localhost:5432/fallback"
+
+
+def test_cookie_samesite_none_requires_secure(monkeypatch) -> None:
+    monkeypatch.setenv("COOKIE_SAMESITE", "none")
+    monkeypatch.setenv("COOKIE_SECURE", "false")
+    get_settings.cache_clear()
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+    get_settings.cache_clear()
