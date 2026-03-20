@@ -64,6 +64,14 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         validation_alias="FRONTEND_URL",
     )
+    anthropic_api_key: str = Field(
+        default="",
+        validation_alias="ANTHROPIC_API_KEY",
+    )
+    extraction_model: str = Field(
+        default="claude-haiku-4-5-20251001",
+        validation_alias="EXTRACTION_MODEL",
+    )
     allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"],
         validation_alias="ALLOWED_ORIGINS",

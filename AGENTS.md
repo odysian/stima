@@ -147,6 +147,12 @@ Required sections below the static header:
 
 ## Verification
 
+### Agent Runtime Note
+
+- Do **not** run `make db-verify` from agent sessions. It can hang/long-run in this environment and block execution.
+- For Task verification in agent runs, use `make backend-verify` and/or `make frontend-verify` per issue scope.
+- Only run DB migration verification when explicitly requested by a human operator outside agent flow.
+
 ### Full
 
 ```bash
