@@ -25,7 +25,7 @@ frontend/src/
   features/auth/    — auth types, services, hooks, components, tests
   features/customers/ — customer select/create screen + services/types/tests
   features/profile/ — onboarding form + profile service/types/tests
-  features/quotes/  — quote capture/review (stubbed)
+  features/quotes/  — quote extraction + quote CRUD
 ```
 
 ## Auth Model
@@ -77,6 +77,37 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | address | Text | nullable |
 | created_at, updated_at | DateTime(tz) | server defaults |
 
+### `documents`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → users) | indexed, cascade delete |
+| customer_id | UUID (FK → customers) | indexed, cascade delete |
+| doc_type | String(20) | default `"quote"` |
+| doc_sequence | Integer | per-user sequence counter |
+| doc_number | String(20) | stored display ID, format `Q-001` |
+| status | String(20) | `draft \| ready \| shared` with DB check constraint |
+| source_type | String(20) | currently `"text"` (audio in future task) |
+| transcript | Text | raw typed notes |
+| total_amount | Numeric(10,2) | nullable, user-editable |
+| notes | Text | nullable, customer-facing notes |
+| pdf_url | Text | nullable (future PDF task) |
+| shared_at | DateTime(tz) | nullable (future sharing task) |
+| created_at, updated_at | DateTime(tz) | server defaults |
+
+Unique constraint: `(user_id, doc_sequence)`.
+
+### `line_items`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| document_id | UUID (FK → documents) | indexed, cascade delete |
+| description | Text | required |
+| details | Text | nullable |
+| price | Numeric(10,2) | nullable (`null` means not stated) |
+| sort_order | Integer | deterministic display order |
+| created_at, updated_at | DateTime(tz) | server defaults |
+
 ## API Contracts
 
 ### Auth endpoints (`/api/auth/`)
@@ -104,6 +135,42 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | `/customers` | POST | yes | cookie | `{ name, phone?, email?, address? }` | `201 Customer` |
 | `/customers/{id}` | GET | no | cookie | — | `200 Customer` or `404 { detail: "Not found" }` |
 | `/customers/{id}` | PATCH | yes | cookie | partial `{ name?, phone?, email?, address? }` | `200 Customer` or `404 { detail: "Not found" }` |
+
+### Quote extraction + CRUD endpoints (`/api/quotes`)
+
+#### `ExtractionResult` contract (flat, no envelope)
+
+```json
+{
+  "transcript": "string",
+  "line_items": [
+    {
+      "description": "string",
+      "details": "string | null",
+      "price": "number | null"
+    }
+  ],
+  "total": "number | null",
+  "confidence_notes": ["string"]
+}
+```
+
+Rules:
+- `line_items` is always an array (may be empty).
+- Missing prices remain `null` (never auto-filled to `0`).
+- `total` is nullable (`null` = not stated).
+
+| Endpoint | Method | CSRF | Auth | Request | Response |
+|---|---|---|---|---|---|
+| `/quotes/convert-notes` | POST | yes | cookie | `{ notes }` | `200 ExtractionResult` |
+| `/quotes` | POST | yes | cookie | `{ customer_id, transcript, line_items, total_amount, notes }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
+| `/quotes` | GET | no | cookie | — | `200 Quote[]` ordered `created_at DESC` (owned by current user) |
+| `/quotes/{id}` | GET | no | cookie | — | `200 Quote` or `404 { detail: "Not found" }` |
+| `/quotes/{id}` | PATCH | yes | cookie | partial `{ line_items?, total_amount?, notes? }` | `200 Quote` or `404 { detail: "Not found" }` |
+
+`PATCH /quotes/{id}` behavior:
+- If `line_items` is present, existing rows are fully replaced.
+- If `line_items` is omitted, existing rows are preserved.
 
 ### Error format
 ```json

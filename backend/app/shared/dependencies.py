@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.repository import AuthRepository
@@ -21,6 +22,9 @@ from app.features.customers.repository import CustomerRepository
 from app.features.customers.service import CustomerService
 from app.features.profile.repository import ProfileRepository
 from app.features.profile.service import ProfileService
+from app.features.quotes.repository import QuoteRepository
+from app.features.quotes.service import QuoteService
+from app.integrations.extraction import ExtractionIntegration
 
 
 def get_auth_service(
@@ -42,6 +46,20 @@ def get_customer_service(
 ) -> CustomerService:
     """Build a request-scoped customer service wired to the DB session."""
     return CustomerService(repository=CustomerRepository(db))
+
+
+def get_quote_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> QuoteService:
+    """Build a request-scoped quote service wired to DB and extraction integration."""
+    settings = get_settings()
+    return QuoteService(
+        repository=QuoteRepository(db),
+        extraction_integration=ExtractionIntegration(
+            api_key=settings.anthropic_api_key,
+            model=settings.extraction_model,
+        ),
+    )
 
 
 async def get_current_user(
