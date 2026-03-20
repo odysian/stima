@@ -5,6 +5,15 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type { Quote } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 
+function isShareAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
 export function QuotePreview(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -139,6 +148,9 @@ export function QuotePreview(): React.ReactElement {
 
       setShareMessage("Share this link with your customer.");
     } catch (error) {
+      if (isShareAbortError(error)) {
+        return;
+      }
       const message = error instanceof Error ? error.message : "Unable to share quote";
       setShareError(message);
     } finally {

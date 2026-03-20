@@ -163,4 +163,28 @@ describe("QuotePreview", () => {
     });
     expect(await screen.findByText(/copied to clipboard/i)).toBeInTheDocument();
   });
+
+  it("does not show an error when native share is dismissed", async () => {
+    const shareAbortError = Object.assign(new Error("Share canceled"), {
+      name: "AbortError",
+    });
+    const shareMock = vi.fn().mockRejectedValue(shareAbortError);
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      writable: true,
+      value: shareMock,
+    });
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ status: "ready" }));
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
+    });
+    expect(screen.queryByText("Share canceled")).not.toBeInTheDocument();
+    expect(await screen.findByText(/share\/share-token-1/i)).toBeInTheDocument();
+  });
 });
