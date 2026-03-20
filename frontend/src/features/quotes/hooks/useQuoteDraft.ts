@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import type { LineItemDraft } from "@/features/quotes/types/quote.types";
 
@@ -80,30 +80,32 @@ function readDraftFromStorage(): QuoteDraft | null {
   return parseStoredDraft(window.sessionStorage.getItem(DRAFT_STORAGE_KEY));
 }
 
+function persistDraftToStorage(draft: QuoteDraft): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+}
+
+function removeDraftFromStorage(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+}
+
 export function useQuoteDraft(): UseQuoteDraftResult {
   const [draft, setDraftState] = useState<QuoteDraft | null>(() => readDraftFromStorage());
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    if (draft === null) {
-      window.sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-      return;
-    }
-
-    window.sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  }, [draft]);
-
   const setDraft = useCallback((nextDraft: QuoteDraft) => {
+    persistDraftToStorage(nextDraft);
     setDraftState(nextDraft);
   }, []);
 
   const clearDraft = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-    }
+    removeDraftFromStorage();
     setDraftState(null);
   }, []);
 
