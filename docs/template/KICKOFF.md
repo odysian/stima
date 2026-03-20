@@ -24,6 +24,14 @@ Constraints:
 - Keep output concise and findings-first.
 ```
 
+
+
+## Whiteboard
+
+Lets whiteboard out feature Task <TaskNumber> from <FileLocation>
+
+I'd like to talk through the specifics and get the plan concrete enough to draw out the task and gh issue
+
 ## 2) Planning-Only Kickoff (No Code Changes)
 
 ```text
