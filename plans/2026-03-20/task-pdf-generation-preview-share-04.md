@@ -178,7 +178,8 @@ and `shared_at` so frontend can construct the URL without a second call).
   - Constructs URL: `${window.location.origin}/share/${share_token}`
   - `navigator.share({ url, title: \`Quote ${doc_number}\` })` if available
   - Clipboard copy fallback if share API unavailable
-- "Back to Edit" link → `/quotes/review` (only if status is still `draft`)
+- No "Back to Edit" link — draft is cleared after `createQuote()` so navigating back to
+  `/quotes/review` would redirect to `/`. Deferred to Task 6 when persistent quote access exists.
 - Optimistic local state: after `generatePdf` succeeds, set local status to `ready`
   without refetching
 
@@ -245,7 +246,7 @@ and `shared_at` so frontend can construct the URL without a second call).
 - [ ] Share calls `POST /share`, constructs URL from `share_token`
 - [ ] `navigator.share({ url })` called when available; clipboard/download fallback otherwise
 - [ ] Optimistic status update to `ready` after successful PDF generation
-- [ ] "Back to Edit" visible when status is `draft`
+- [ ] No "Back to Edit" link — deferred to Task 6
 - [ ] All component tests pass (`vi.mock` layer)
 - [ ] Integration tests pass (MSW layer)
 - [ ] `make frontend-verify` passes
