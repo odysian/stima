@@ -116,6 +116,23 @@ async def test_patch_customer_updates_customer(client: AsyncClient) -> None:
     assert response.json()["name"] == "Alice Smith"
 
 
+async def test_patch_customer_rejects_null_name(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    created_customer = await _create_customer(
+        client,
+        csrf_token,
+        {"name": "Alice Johnson"},
+    )
+
+    response = await client.patch(
+        f"/api/customers/{created_customer['id']}",
+        json={"name": None},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+
+
 async def test_get_customers_requires_authentication(client: AsyncClient) -> None:
     client.cookies.clear()
 
