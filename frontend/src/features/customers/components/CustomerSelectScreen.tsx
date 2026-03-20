@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { customerService } from "@/features/customers/services/customerService";
 import type {
   Customer,
@@ -13,6 +14,7 @@ type ScreenMode = "search" | "create";
 
 export function CustomerSelectScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const { clearDraft } = useQuoteDraft();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<ScreenMode>("search");
@@ -25,6 +27,10 @@ export function CustomerSelectScreen(): React.ReactElement {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
+
+  useEffect(() => {
+    clearDraft();
+  }, [clearDraft]);
 
   useEffect(() => {
     let mounted = true;

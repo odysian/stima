@@ -2,6 +2,7 @@ import { http, HttpResponse } from "msw";
 
 import type { CustomerCreateRequest } from "@/features/customers/types/customer.types";
 import type { ProfileUpdateRequest } from "@/features/profile/types/profile.types";
+import type { QuoteCreateRequest } from "@/features/quotes/types/quote.types";
 
 function requireCsrf(request: Request): Response | null {
   if (!request.headers.get("X-CSRF-Token")) {
@@ -129,6 +130,51 @@ export const handlers = [
         phone: body.phone ?? null,
         email: body.email ?? null,
         address: body.address ?? null,
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
+      { status: 201 },
+    );
+  }),
+
+  http.post("/api/quotes/convert-notes", async ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const body = (await request.json()) as { notes: string };
+    return HttpResponse.json(
+      {
+        transcript: body.notes,
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total: 120,
+        confidence_notes: [],
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.post("/api/quotes", async ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const body = (await request.json()) as QuoteCreateRequest;
+    return HttpResponse.json(
+      {
+        id: "quote-1",
+        customer_id: body.customer_id,
+        doc_number: "Q-001",
+        status: "draft",
+        source_type: "text",
+        transcript: body.transcript,
+        total_amount: body.total_amount,
+        notes: body.notes,
+        line_items: body.line_items.map((lineItem, index) => ({
+          id: `line-${index + 1}`,
+          description: lineItem.description,
+          details: lineItem.details,
+          price: lineItem.price,
+          sort_order: index,
+        })),
         created_at: "2026-03-20T00:00:00.000Z",
         updated_at: "2026-03-20T00:00:00.000Z",
       },
