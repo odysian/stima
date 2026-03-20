@@ -1,9 +1,11 @@
-import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { RegisterForm } from "@/features/auth/components/RegisterForm";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { CustomerSelectScreen } from "@/features/customers/components/CustomerSelectScreen";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
+import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 
 function ProtectedRoute(): React.ReactElement {
   const { user, isOnboarded } = useAuth();
@@ -43,9 +45,20 @@ function OnboardingRoute(): React.ReactElement {
 }
 
 function AppShell(): React.ReactElement {
+  const navigate = useNavigate();
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50">
-      <h1 className="text-2xl font-semibold text-slate-900">Authenticated App Shell</h1>
+      <section className="flex flex-col items-center gap-4">
+        <h1 className="text-2xl font-semibold text-slate-900">Authenticated App Shell</h1>
+        <button
+          type="button"
+          onClick={() => navigate("/quotes/new")}
+          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+        >
+          New Quote
+        </button>
+      </section>
     </main>
   );
 }
@@ -74,6 +87,8 @@ export default function App(): React.ReactElement {
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<AppShell />} />
+        <Route path="/quotes/new" element={<CustomerSelectScreen />} />
+        <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

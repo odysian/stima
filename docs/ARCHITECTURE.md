@@ -23,6 +23,7 @@ frontend/src/
   shared/components/ — Button, Input, LoadingScreen
   shared/tests/     — MSW server, handlers, setup
   features/auth/    — auth types, services, hooks, components, tests
+  features/customers/ — customer select/create screen + services/types/tests
   features/profile/ — onboarding form + profile service/types/tests
   features/quotes/  — quote capture/review (stubbed)
 ```
@@ -65,6 +66,17 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | created_at | DateTime(tz) | server default |
 | revoked_at | DateTime(tz) | nullable, soft-revoke |
 
+### `customers`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → users) | indexed, cascade delete |
+| name | String(255) | required |
+| phone | String(30) | nullable |
+| email | String(320) | nullable |
+| address | Text | nullable |
+| created_at, updated_at | DateTime(tz) | server defaults |
+
 ## API Contracts
 
 ### Auth endpoints (`/api/auth/`)
@@ -83,6 +95,15 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 |---|---|---|---|---|---|
 | `/profile` | GET | no | cookie | — | `200 { id, email, first_name, last_name, business_name, trade_type, is_active, is_onboarded }` |
 | `/profile` | PATCH | yes | cookie | `{ business_name, first_name, last_name, trade_type }` | `200` with updated profile payload |
+
+### Customer endpoints (`/api/customers`)
+
+| Endpoint | Method | CSRF | Auth | Request | Response |
+|---|---|---|---|---|---|
+| `/customers` | GET | no | cookie | — | `200 Customer[]` (authenticated user's customers only) |
+| `/customers` | POST | yes | cookie | `{ name, phone?, email?, address? }` | `201 Customer` |
+| `/customers/{id}` | GET | no | cookie | — | `200 Customer` or `404 { detail: "Not found" }` |
+| `/customers/{id}` | PATCH | yes | cookie | partial `{ name?, phone?, email?, address? }` | `200 Customer` or `404 { detail: "Not found" }` |
 
 ### Error format
 ```json

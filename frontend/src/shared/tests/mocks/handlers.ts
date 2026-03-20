@@ -1,5 +1,6 @@
 import { http, HttpResponse } from "msw";
 
+import type { CustomerCreateRequest } from "@/features/customers/types/customer.types";
 import type { ProfileUpdateRequest } from "@/features/profile/types/profile.types";
 
 function requireCsrf(request: Request): Response | null {
@@ -87,6 +88,51 @@ export const handlers = [
         ...body,
       },
       { status: 200 },
+    );
+  }),
+
+  http.get("/api/customers", () => {
+    return HttpResponse.json(
+      [
+        {
+          id: "cust-1",
+          name: "Alice Johnson",
+          phone: "555-0101",
+          email: "alice@example.com",
+          address: null,
+          created_at: "2026-03-20T00:00:00.000Z",
+          updated_at: "2026-03-20T00:00:00.000Z",
+        },
+        {
+          id: "cust-2",
+          name: "Bob Brown",
+          phone: null,
+          email: "bob@example.com",
+          address: null,
+          created_at: "2026-03-20T00:00:00.000Z",
+          updated_at: "2026-03-20T00:00:00.000Z",
+        },
+      ],
+      { status: 200 },
+    );
+  }),
+
+  http.post("/api/customers", async ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const body = (await request.json()) as CustomerCreateRequest;
+    return HttpResponse.json(
+      {
+        id: "cust-new",
+        name: body.name,
+        phone: body.phone ?? null,
+        email: body.email ?? null,
+        address: body.address ?? null,
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
+      { status: 201 },
     );
   }),
 ];

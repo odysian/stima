@@ -11,14 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.repository import AuthRepository
-from app.features.profile.repository import ProfileRepository
-from app.features.profile.service import ProfileService
 from app.features.auth.service import (
     ACCESS_COOKIE_NAME,
     CSRF_COOKIE_NAME,
     AuthService,
     AuthServiceError,
 )
+from app.features.customers.repository import CustomerRepository
+from app.features.customers.service import CustomerService
+from app.features.profile.repository import ProfileRepository
+from app.features.profile.service import ProfileService
 
 
 def get_auth_service(
@@ -33,6 +35,13 @@ def get_profile_service(
 ) -> ProfileService:
     """Build a request-scoped profile service wired to the DB session."""
     return ProfileService(repository=ProfileRepository(db))
+
+
+def get_customer_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CustomerService:
+    """Build a request-scoped customer service wired to the DB session."""
+    return CustomerService(repository=CustomerRepository(db))
 
 
 async def get_current_user(
