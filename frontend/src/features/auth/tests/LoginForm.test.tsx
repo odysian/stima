@@ -45,6 +45,7 @@ describe("LoginForm", () => {
       id: "user-1",
       email: "user@example.com",
       is_active: true,
+      is_onboarded: true,
     });
 
     renderLogin();
@@ -74,6 +75,7 @@ describe("LoginForm", () => {
       id: "user-2",
       email: "user@example.com",
       is_active: true,
+      is_onboarded: true,
     });
 
     renderLogin({

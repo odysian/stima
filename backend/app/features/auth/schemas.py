@@ -27,6 +27,7 @@ class AuthUserResponse(BaseModel):
     id: UUID
     email: EmailStr
     is_active: bool
+    is_onboarded: bool
 
 
 class RegisterResponse(BaseModel):

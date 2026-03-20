@@ -23,6 +23,7 @@ frontend/src/
   shared/components/ — Button, Input, LoadingScreen
   shared/tests/     — MSW server, handlers, setup
   features/auth/    — auth types, services, hooks, components, tests
+  features/profile/ — onboarding form + profile service/types/tests
   features/quotes/  — quote capture/review (stubbed)
 ```
 
@@ -49,6 +50,8 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | first_name | String(100) | nullable (onboarding) |
 | last_name | String(100) | nullable (onboarding) |
 | phone_number | String(30) | nullable (onboarding) |
+| business_name | String(255) | nullable (onboarding) |
+| trade_type | String(50) | nullable (onboarding enum string) |
 | is_active | Boolean | default true |
 | created_at, updated_at | DateTime(tz) | server defaults |
 
@@ -68,11 +71,18 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 
 | Endpoint | Method | Rate Limit | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|---|
-| `/register` | POST | 3/hr | no | no | `{ email, password }` | `201 { user: { id, email, is_active } }` |
-| `/login` | POST | 5/min | no | no | `{ email, password }` | `200 { user: { id, email, is_active }, csrf_token }` + sets cookies |
-| `/refresh` | POST | 10/min | yes | cookie | — | `200 { user: { id, email, is_active }, csrf_token }` + rotates cookies |
+| `/register` | POST | 3/hr | no | no | `{ email, password }` | `201 { user: { id, email, is_active, is_onboarded } }` |
+| `/login` | POST | 5/min | no | no | `{ email, password }` | `200 { user: { id, email, is_active, is_onboarded }, csrf_token }` + sets cookies |
+| `/refresh` | POST | 10/min | yes | cookie | — | `200 { user: { id, email, is_active, is_onboarded }, csrf_token }` + rotates cookies |
 | `/logout` | POST | 10/min | yes | cookie | — | `204` + clears cookies |
-| `/me` | GET | — | no | cookie | — | `200 { id, email, is_active }` |
+| `/me` | GET | — | no | cookie | — | `200 { id, email, is_active, is_onboarded }` |
+
+### Profile endpoints (`/api/profile`)
+
+| Endpoint | Method | CSRF | Auth | Request | Response |
+|---|---|---|---|---|---|
+| `/profile` | GET | no | cookie | — | `200 { id, email, first_name, last_name, business_name, trade_type, is_active, is_onboarded }` |
+| `/profile` | PATCH | yes | cookie | `{ business_name, first_name, last_name, trade_type }` | `200` with updated profile payload |
 
 ### Error format
 ```json
@@ -84,8 +94,9 @@ FastAPI validation errors use `422` with array-style `detail`.
 
 - **`http.ts`**: shared fetch wrapper. Handles `credentials: 'include'`, CSRF header injection, JSON serialization, single-flight refresh, error parsing.
 - **`authService.ts`**: thin service layer calling `request()`. Owns `setCsrfToken`/`clearCsrfToken` lifecycle.
-- **`useAuth.ts`**: `AuthProvider` bootstraps session via `GET /me` on mount. Exposes `{ user, isLoading, login, register, logout }` via context. Shows `LoadingScreen` during bootstrap.
-- **`ProtectedRoute`**: redirects to `/login` with return-path state when unauthenticated. Public routes redirect authenticated users to `/`.
+- **`useAuth.ts`**: `AuthProvider` bootstraps session via `GET /me` on mount. Exposes `{ user, isLoading, isOnboarded, refreshUser, login, register, logout }` via context. Shows `LoadingScreen` during bootstrap.
+- **`ProtectedRoute`**: unauthenticated users are redirected to `/login`; authenticated users with `is_onboarded: false` are redirected to `/onboarding`.
+- **`OnboardingRoute`**: unauthenticated users are redirected to `/login`; already-onboarded users are redirected to `/`.
 
 ## Deployment
 

@@ -15,6 +15,23 @@ def test_onboarding_fields_are_nullable() -> None:
     assert User.__table__.c["first_name"].nullable is True
     assert User.__table__.c["last_name"].nullable is True
     assert User.__table__.c["phone_number"].nullable is True
+    assert User.__table__.c["business_name"].nullable is True
+    assert User.__table__.c["trade_type"].nullable is True
+
+
+def test_is_onboarded_requires_all_profile_fields() -> None:
+    user = User(
+        email="user@example.com",
+        password_hash="hashed-password",
+        first_name="Sam",
+        last_name="Lee",
+        business_name="Acme Outdoors",
+        trade_type="Landscaping",
+    )
+    assert user.is_onboarded is True
+
+    user.trade_type = None
+    assert user.is_onboarded is False
 
 
 def test_refresh_tokens_support_soft_revocation() -> None:

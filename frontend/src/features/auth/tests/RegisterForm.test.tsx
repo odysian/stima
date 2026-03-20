@@ -45,6 +45,7 @@ describe("RegisterForm", () => {
       id: "user-1",
       email: "new@example.com",
       is_active: true,
+      is_onboarded: false,
     });
 
     renderRegister();

@@ -57,6 +57,7 @@ describe("http request helper", () => {
           id: "user-9",
           email: "user@example.com",
           is_active: true,
+          is_onboarded: true,
         }),
       );
 
@@ -66,6 +67,7 @@ describe("http request helper", () => {
       id: "user-9",
       email: "user@example.com",
       is_active: true,
+      is_onboarded: true,
     });
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/auth/refresh");
 

@@ -60,6 +60,7 @@ describe("useAuth", () => {
       id: "user-1",
       email: "user@example.com",
       is_active: true,
+      is_onboarded: true,
     });
 
     render(
@@ -80,6 +81,7 @@ describe("useAuth", () => {
       id: "user-2",
       email: "new@example.com",
       is_active: true,
+      is_onboarded: false,
     });
     mockedAuthService.logout.mockResolvedValueOnce();
 
