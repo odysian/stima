@@ -134,9 +134,7 @@ class QuoteRepository:
         document_id: UUID,
         items: list[LineItemDraft],
     ) -> None:
-        await self._session.execute(
-            delete(LineItem).where(LineItem.document_id == document_id)
-        )
+        await self._session.execute(delete(LineItem).where(LineItem.document_id == document_id))
 
         for index, item in enumerate(items):
             self._session.add(

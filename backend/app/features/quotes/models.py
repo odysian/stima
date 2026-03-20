@@ -25,7 +25,9 @@ class Document(Base):
     """Quote document persisted for an authenticated user."""
 
     __tablename__ = "documents"
-    __table_args__ = (sa.UniqueConstraint("user_id", "doc_sequence", name="uq_documents_user_sequence"),)
+    __table_args__ = (
+        sa.UniqueConstraint("user_id", "doc_sequence", name="uq_documents_user_sequence"),
+    )
 
     id: Mapped[UUID] = mapped_column(sa.Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(

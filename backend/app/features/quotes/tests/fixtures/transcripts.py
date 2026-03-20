@@ -15,8 +15,8 @@ TRANSCRIPTS: dict[str, str] = {
         "Replace cracked driveway section and reseal the whole driveway. Total job is 2100."
     ),
     "partial_ambiguous": (
-        "Power wash deck and back siding. Deck wash is 225, siding should be whatever normal rate is, "
-        "plus maybe gutter touch-up if needed."
+        "Power wash deck and back siding. Deck wash is 225, "
+        "siding should be whatever normal rate is, plus maybe gutter touch-up if needed."
     ),
     "noisy_with_hesitation": (
         "Um, okay, so like, we need five yards of brown mulch, uh edge the front beds, and maybe "

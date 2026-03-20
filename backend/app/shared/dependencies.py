@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.repository import AuthRepository
@@ -24,7 +25,6 @@ from app.features.profile.service import ProfileService
 from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.service import QuoteService
 from app.integrations.extraction import ExtractionIntegration
-from app.core.config import get_settings
 
 
 def get_auth_service(
