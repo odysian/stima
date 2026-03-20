@@ -268,6 +268,29 @@ async def test_patch_quote_requires_csrf(client: AsyncClient) -> None:
     assert response.json() == {"detail": "CSRF token missing"}
 
 
+async def test_create_quote_returns_404_for_different_users_customer(
+    client: AsyncClient,
+) -> None:
+    csrf_token_user_a = await _register_and_login(client, _credentials())
+    customer_id_user_a = await _create_customer(client, csrf_token_user_a)
+
+    csrf_token_user_b = await _register_and_login(client, _credentials())
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id_user_a,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": None,
+        },
+        headers={"X-CSRF-Token": csrf_token_user_b},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
 async def test_get_quote_returns_404_for_different_users_quote(client: AsyncClient) -> None:
     csrf_token_user_a = await _register_and_login(client, _credentials())
     customer_id_user_a = await _create_customer(client, csrf_token_user_a)
