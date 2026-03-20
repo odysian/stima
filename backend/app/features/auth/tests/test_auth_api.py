@@ -203,29 +203,24 @@ async def test_logout_clears_auth_cookies_and_revokes_refresh_token(
     assert logout_response.status_code == 204
     set_cookie_values = logout_response.headers.get_list("set-cookie")
     assert any(
-        f"{ACCESS_COOKIE_NAME}=" in value and "Path=/api/" in value
-        for value in set_cookie_values
+        f"{ACCESS_COOKIE_NAME}=" in value and "Path=/api/" in value for value in set_cookie_values
     )
     assert any(
-        f"{ACCESS_COOKIE_NAME}=" in value and "Path=/" in value
-        for value in set_cookie_values
+        f"{ACCESS_COOKIE_NAME}=" in value and "Path=/" in value for value in set_cookie_values
     )
     assert any(
         f"{REFRESH_COOKIE_NAME}=" in value and "Path=/api/auth/" in value
         for value in set_cookie_values
     )
     assert any(
-        f"{REFRESH_COOKIE_NAME}=" in value and "Path=/" in value
-        for value in set_cookie_values
+        f"{REFRESH_COOKIE_NAME}=" in value and "Path=/" in value for value in set_cookie_values
     )
     assert ACCESS_COOKIE_NAME not in client.cookies
     assert REFRESH_COOKIE_NAME not in client.cookies
     assert CSRF_COOKIE_NAME not in client.cookies
 
     revoked_row = await db_session.scalar(
-        select(RefreshToken).where(
-            RefreshToken.token_hash == hash_token(active_refresh_token)
-        )
+        select(RefreshToken).where(RefreshToken.token_hash == hash_token(active_refresh_token))
     )
     assert revoked_row is not None
     assert revoked_row.revoked_at is not None
@@ -256,8 +251,7 @@ async def test_logout_with_expired_refresh_token_still_clears_cookies(
         for value in set_cookie_values
     )
     assert any(
-        f"{REFRESH_COOKIE_NAME}=" in value and "Path=/" in value
-        for value in set_cookie_values
+        f"{REFRESH_COOKIE_NAME}=" in value and "Path=/" in value for value in set_cookie_values
     )
 
 

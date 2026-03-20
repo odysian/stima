@@ -1,7 +1,6 @@
 """Shared fixtures for core module unit tests."""
 
 import pytest
-
 from app.core.config import get_settings
 from app.core.database import get_engine, get_session_maker
 

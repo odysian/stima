@@ -123,11 +123,7 @@ class AuthRepository:
 
     async def revoke_refresh_token(self, *, token_hash: str, revoked_at: datetime) -> None:
         """Soft-revoke a refresh token when present and active."""
-        stmt = (
-            select(RefreshToken)
-            .where(RefreshToken.token_hash == token_hash)
-            .with_for_update()
-        )
+        stmt = select(RefreshToken).where(RefreshToken.token_hash == token_hash).with_for_update()
         result = await self._session.execute(stmt)
         refresh_token = result.scalar_one_or_none()
         if refresh_token is None:

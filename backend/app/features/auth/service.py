@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from secrets import token_urlsafe
 from typing import Protocol
 from uuid import UUID, uuid4
@@ -148,9 +148,7 @@ class AuthService:
         user_id = _parse_user_id(payload)
 
         replacement_refresh_token = self._create_refresh_token(subject=str(user_id))
-        replacement_expires_at = _exp_to_datetime(
-            decode_token(replacement_refresh_token)["exp"]
-        )
+        replacement_expires_at = _exp_to_datetime(decode_token(replacement_refresh_token)["exp"])
 
         rotation_result = await self._repository.consume_and_rotate_refresh_token(
             consumed_token_hash=hash_token(refresh_token),
@@ -232,12 +230,12 @@ def _parse_user_id(payload: dict[str, object]) -> UUID:
 def _exp_to_datetime(exp: object) -> datetime:
     if isinstance(exp, datetime):
         if exp.tzinfo is None:
-            return exp.replace(tzinfo=timezone.utc)
-        return exp.astimezone(timezone.utc)
-    if isinstance(exp, (int, float)):
-        return datetime.fromtimestamp(exp, tz=timezone.utc)
+            return exp.replace(tzinfo=UTC)
+        return exp.astimezone(UTC)
+    if isinstance(exp, int | float):
+        return datetime.fromtimestamp(exp, tz=UTC)
     raise InvalidCredentialsError("Invalid token expiry")
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

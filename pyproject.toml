@@ -1,5 +1,13 @@
 [tool.ruff]
 cache-dir = ".ruff_cache"
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.mypy]
 cache_dir = ".mypy_cache"

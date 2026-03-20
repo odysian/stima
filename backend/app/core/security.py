@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from hmac import compare_digest
 from typing import Any
@@ -32,7 +32,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def _expiry(expires_delta: timedelta) -> datetime:
-    return datetime.now(timezone.utc) + expires_delta
+    return datetime.now(UTC) + expires_delta
 
 
 def create_access_token(
@@ -42,9 +42,7 @@ def create_access_token(
 ) -> str:
     """Create a signed short-lived access token."""
     settings = get_settings()
-    effective_expiry = expires_delta or timedelta(
-        minutes=settings.access_token_expire_minutes
-    )
+    effective_expiry = expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
     payload = _build_payload(
         subject=subject,
         kind="access",

@@ -41,7 +41,7 @@ class User(Base):
         onupdate=sa.func.now(),
     )
 
-    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
@@ -49,9 +49,7 @@ class User(Base):
     @property
     def is_onboarded(self) -> bool:
         """Return true when all required onboarding profile fields are populated."""
-        return bool(
-            self.business_name and self.first_name and self.last_name and self.trade_type
-        )
+        return bool(self.business_name and self.first_name and self.last_name and self.trade_type)
 
 
 class RefreshToken(Base):

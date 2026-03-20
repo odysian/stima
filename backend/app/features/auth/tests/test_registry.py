@@ -12,4 +12,3 @@ def test_feature_registry_import_loads_auth_models() -> None:
 
     assert "users" in Base.metadata.tables
     assert "refresh_tokens" in Base.metadata.tables
-

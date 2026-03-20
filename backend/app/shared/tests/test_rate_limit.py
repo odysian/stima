@@ -5,10 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-from starlette.requests import Request
-
 from app.core.config import get_settings
 from app.shared.rate_limit import get_ip_key
+from starlette.requests import Request
 
 
 @pytest.fixture(autouse=True)
@@ -112,8 +111,7 @@ def test_get_ip_key_falls_back_to_peer_ip_when_xff_chain_is_all_trusted(
 
 def _build_request(peer_ip: str, headers: dict[str, str]) -> Request:
     raw_headers = [
-        (name.lower().encode("latin-1"), value.encode("latin-1"))
-        for name, value in headers.items()
+        (name.lower().encode("latin-1"), value.encode("latin-1")) for name, value in headers.items()
     ]
     scope = {
         "type": "http",

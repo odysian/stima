@@ -9,7 +9,6 @@ from slowapi import Limiter
 
 from app.core.config import get_settings
 
-
 IpNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 

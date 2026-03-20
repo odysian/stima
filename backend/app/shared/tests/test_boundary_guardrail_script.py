@@ -30,4 +30,3 @@ def test_scan_flags_relative_imports_in_boundary_checked_files(tmp_path: Path) -
     violations = boundary_module.scan(tmp_path)
 
     assert any("Relative imports are not allowed" in violation for violation in violations)
-

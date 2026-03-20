@@ -3,7 +3,6 @@
 from datetime import timedelta
 
 import pytest
-
 from app.core import security
 
 

@@ -4,9 +4,8 @@ from collections.abc import AsyncGenerator
 from typing import cast
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 from app.core.database import get_db, get_session_maker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
 def test_session_maker_uses_async_sessions() -> None:

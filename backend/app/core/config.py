@@ -91,9 +91,7 @@ class Settings(BaseSettings):
         if not normalized_value:
             raise ValueError("SECRET_KEY must be set and non-empty")
         if len(normalized_value) < MIN_SECRET_KEY_LENGTH:
-            raise ValueError(
-                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters"
-            )
+            raise ValueError(f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters")
         if normalized_value.lower() in FORBIDDEN_SECRET_KEY_VALUES:
             raise ValueError("SECRET_KEY cannot use placeholder/dev values")
         return normalized_value
@@ -122,9 +120,7 @@ class Settings(BaseSettings):
     def validate_cookie_samesite_secure_combination(self) -> Settings:
         """Enforce browser-compatible SameSite=None cookie settings."""
         if self.cookie_samesite == "none" and not self.cookie_secure:
-            raise ValueError(
-                "COOKIE_SECURE must be true when COOKIE_SAMESITE is 'none'"
-            )
+            raise ValueError("COOKIE_SECURE must be true when COOKIE_SAMESITE is 'none'")
         return self
 
 

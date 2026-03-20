@@ -42,9 +42,7 @@ async def setup_test_database() -> AsyncGenerator[None, None]:
         await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {TEST_SCHEMA}"))
 
     original_metadata_schema = Base.metadata.schema
-    original_table_schemas = {
-        table.name: table.schema for table in Base.metadata.tables.values()
-    }
+    original_table_schemas = {table.name: table.schema for table in Base.metadata.tables.values()}
 
     Base.metadata.schema = TEST_SCHEMA
     for table in Base.metadata.tables.values():

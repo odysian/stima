@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 

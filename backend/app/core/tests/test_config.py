@@ -1,9 +1,8 @@
 """Settings tests for auth and cookie configuration."""
 
 import pytest
-from pydantic import ValidationError
-
 from app.core.config import get_database_url, get_settings
+from pydantic import ValidationError
 
 
 def test_cookie_domain_blank_is_normalized(monkeypatch) -> None:

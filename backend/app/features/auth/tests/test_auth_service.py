@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from typing import cast
+
+import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.features.auth.models import User
@@ -55,9 +56,7 @@ class _IntegrityErrorRepository:
 @pytest.mark.asyncio
 async def test_register_translates_race_duplicate_to_conflict() -> None:
     """Handle duplicate email races even when pre-check misses in the same window."""
-    service = AuthService(
-        repository=cast(AuthRepositoryProtocol, _IntegrityErrorRepository())
-    )
+    service = AuthService(repository=cast(AuthRepositoryProtocol, _IntegrityErrorRepository()))
 
     with pytest.raises(ConflictError) as exc:
         await service.register(email="user@example.com", password="StrongPass123!")
