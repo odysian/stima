@@ -6,6 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
 from app.features.quotes.schemas import (
@@ -19,6 +20,7 @@ from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.shared.dependencies import get_current_user, get_quote_service, require_csrf
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
+public_router = APIRouter(tags=["quotes"])
 
 
 @router.post(
@@ -99,3 +101,67 @@ async def update_quote(
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return QuoteResponse.model_validate(quote)
+
+
+@router.post(
+    "/{quote_id}/pdf",
+    dependencies=[Depends(require_csrf)],
+)
+async def generate_quote_pdf(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> StreamingResponse:
+    """Render a user-owned quote to PDF and stream bytes inline."""
+    try:
+        doc_number, pdf_bytes = await quote_service.generate_pdf(user, quote_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    return StreamingResponse(
+        iter((pdf_bytes,)),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="quote-{doc_number}.pdf"',
+        },
+    )
+
+
+@router.post(
+    "/{quote_id}/share",
+    response_model=QuoteResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def share_quote(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> QuoteResponse:
+    """Create/reuse a share token and mark quote as shared."""
+    try:
+        quote = await quote_service.share_quote(user, quote_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return QuoteResponse.model_validate(quote)
+
+
+@public_router.get("/share/{share_token}")
+async def get_shared_quote_pdf(
+    share_token: str,
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> StreamingResponse:
+    """Render and stream a public quote PDF without auth."""
+    try:
+        doc_number, pdf_bytes = await quote_service.generate_shared_pdf(share_token)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    return StreamingResponse(
+        iter((pdf_bytes,)),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="quote-{doc_number}.pdf"',
+            "Cache-Control": "no-store",
+            "X-Robots-Tag": "noindex",
+        },
+    )

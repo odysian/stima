@@ -135,7 +135,13 @@ async function requestRefresh(): Promise<void> {
   return refreshInFlight;
 }
 
-export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
+type ResponseParser<T> = (response: Response, payload: unknown) => Promise<T> | T;
+
+async function requestWithParser<T>(
+  url: string,
+  options: RequestOptions,
+  parseResponse: ResponseParser<T>,
+): Promise<T> {
   const method = options.method ?? "GET";
   const bodyIsJson = isJsonBody(options.body);
 
@@ -166,10 +172,10 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
   if (response.status === 401 && !options.skipRefresh && url !== "/api/auth/refresh") {
     await requestRefresh();
 
-    return request<T>(url, {
+    return requestWithParser(url, {
       ...options,
       skipRefresh: true,
-    });
+    }, parseResponse);
   }
 
   const payload = await parsePayload(response);
@@ -179,5 +185,13 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
     throw new Error(getErrorMessage(payload, fallbackMessage));
   }
 
-  return payload as T;
+  return parseResponse(response, payload);
+}
+
+export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  return requestWithParser(url, options, (_, payload) => payload as T);
+}
+
+export async function requestBlob(url: string, options: RequestOptions = {}): Promise<Blob> {
+  return requestWithParser(url, options, (response) => response.blob());
 }

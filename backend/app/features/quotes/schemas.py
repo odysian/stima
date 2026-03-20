@@ -81,6 +81,8 @@ class QuoteResponse(BaseModel):
     transcript: str
     total_amount: float | None
     notes: str | None
+    shared_at: datetime | None
+    share_token: str | None
     line_items: list[LineItemResponse]
     created_at: datetime
     updated_at: datetime

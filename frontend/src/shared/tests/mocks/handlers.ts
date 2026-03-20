@@ -168,6 +168,8 @@ export const handlers = [
         transcript: body.transcript,
         total_amount: body.total_amount,
         notes: body.notes,
+        shared_at: null,
+        share_token: null,
         line_items: body.line_items.map((lineItem, index) => ({
           id: `line-${index + 1}`,
           description: lineItem.description,
@@ -179,6 +181,82 @@ export const handlers = [
         updated_at: "2026-03-20T00:00:00.000Z",
       },
       { status: 201 },
+    );
+  }),
+
+  http.get("/api/quotes/:id", ({ params }) => {
+    const quoteId = String(params.id);
+
+    return HttpResponse.json(
+      {
+        id: quoteId,
+        customer_id: "cust-1",
+        doc_number: "Q-001",
+        status: "draft",
+        source_type: "text",
+        transcript: "5 yards brown mulch and edge front beds",
+        total_amount: 120,
+        notes: "Thanks for your business",
+        shared_at: null,
+        share_token: null,
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.post("/api/quotes/:id/pdf", ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    return new HttpResponse("mock-pdf-bytes", {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+      },
+    });
+  }),
+
+  http.post("/api/quotes/:id/share", ({ request, params }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const quoteId = String(params.id);
+    return HttpResponse.json(
+      {
+        id: quoteId,
+        customer_id: "cust-1",
+        doc_number: "Q-001",
+        status: "shared",
+        source_type: "text",
+        transcript: "5 yards brown mulch and edge front beds",
+        total_amount: 120,
+        notes: "Thanks for your business",
+        shared_at: "2026-03-20T00:05:00.000Z",
+        share_token: "share-token-1",
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:05:00.000Z",
+      },
+      { status: 200 },
     );
   }),
 ];

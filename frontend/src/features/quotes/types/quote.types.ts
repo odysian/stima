@@ -30,6 +30,8 @@ export interface Quote {
   transcript: string;
   total_amount: number | null;
   notes: string | null;
+  shared_at: string | null;
+  share_token: string | null;
   line_items: LineItem[];
   created_at: string;
   updated_at: string;

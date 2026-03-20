@@ -69,6 +69,8 @@ describe("quoteService integration (MSW)", () => {
           transcript: body.transcript,
           total_amount: body.total_amount,
           notes: body.notes,
+          shared_at: null,
+          share_token: null,
           line_items: body.line_items.map((lineItem, index) => ({
             id: `line-${index + 1}`,
             description: lineItem.description,
@@ -102,9 +104,69 @@ describe("quoteService integration (MSW)", () => {
       transcript: "Mulch and edging",
       total_amount: 120,
       notes: "Thank you",
+      shared_at: null,
+      share_token: null,
       line_items: [{ id: "line-1", description: "Mulch", details: "5 yards", price: 120, sort_order: 0 }],
       created_at: "2026-03-20T00:00:00.000Z",
       updated_at: "2026-03-20T00:00:00.000Z",
     });
+  });
+
+  it("generatePdf returns Blob and sends CSRF header", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.post("/api/quotes/:id/pdf", ({ request }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        return new HttpResponse("mock-pdf-content", {
+          status: 200,
+          headers: { "Content-Type": "application/pdf" },
+        });
+      }),
+    );
+
+    const blob = await quoteService.generatePdf("quote-1");
+
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(await blob.text()).toBe("mock-pdf-content");
+  });
+
+  it("shareQuote returns updated quote with share token", async () => {
+    setCsrfToken("integration-csrf-token");
+
+    server.use(
+      http.post("/api/quotes/:id/share", ({ params }) =>
+        HttpResponse.json({
+          id: String(params.id),
+          customer_id: "cust-1",
+          doc_number: "Q-001",
+          status: "shared",
+          source_type: "text",
+          transcript: "Mulch and edging",
+          total_amount: 120,
+          notes: "Thank you",
+          shared_at: "2026-03-20T01:00:00.000Z",
+          share_token: "share-token-1",
+          line_items: [
+            {
+              id: "line-1",
+              description: "Mulch",
+              details: "5 yards",
+              price: 120,
+              sort_order: 0,
+            },
+          ],
+          created_at: "2026-03-20T00:00:00.000Z",
+          updated_at: "2026-03-20T01:00:00.000Z",
+        }),
+      ),
+    );
+
+    const shared = await quoteService.shareQuote("quote-1");
+
+    expect(shared.status).toBe("shared");
+    expect(shared.share_token).toBe("share-token-1");
+    expect(shared.shared_at).toBe("2026-03-20T01:00:00.000Z");
   });
 });

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.features.auth.service import CSRF_COOKIE_NAME
-from app.features.quotes.repository import QuoteRepository
+from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult, LineItemDraft
 from app.features.quotes.service import QuoteService
 from app.integrations.extraction import ExtractionError
@@ -43,6 +43,11 @@ class _MockExtractionIntegration:
         )
 
 
+class _MockPdfIntegration:
+    def render(self, context: QuoteRenderContext) -> bytes:
+        return f"PDF for {context.doc_number}".encode()
+
+
 @pytest.fixture(autouse=True)
 def _override_quote_service_dependency() -> Iterator[None]:
     async def _override_get_quote_service(
@@ -51,6 +56,7 @@ def _override_quote_service_dependency() -> Iterator[None]:
         return QuoteService(
             repository=QuoteRepository(db),
             extraction_integration=_MockExtractionIntegration(),
+            pdf_integration=_MockPdfIntegration(),
         )
 
     app.dependency_overrides[get_quote_service] = _override_get_quote_service
@@ -189,6 +195,8 @@ async def test_convert_notes_returns_422_for_extraction_errors(client: AsyncClie
             "/api/quotes/00000000-0000-0000-0000-000000000000",
             {"notes": "updated"},
         ),
+        ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/pdf", None),
+        ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/share", None),
     ],
 )
 async def test_all_quote_endpoints_require_authentication(
