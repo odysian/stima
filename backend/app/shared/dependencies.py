@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from hmac import compare_digest
 from typing import Annotated
 
@@ -26,6 +27,12 @@ from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.service import QuoteService
 from app.integrations.extraction import ExtractionIntegration
 from app.integrations.pdf import PdfIntegration
+
+
+@lru_cache(maxsize=1)
+def get_pdf_integration() -> PdfIntegration:
+    """Return shared PDF integration instance for request-scoped quote services."""
+    return PdfIntegration()
 
 
 def get_auth_service(
@@ -60,7 +67,7 @@ def get_quote_service(
             api_key=settings.anthropic_api_key,
             model=settings.extraction_model,
         ),
-        pdf_integration=PdfIntegration(),
+        pdf_integration=get_pdf_integration(),
     )
 
 

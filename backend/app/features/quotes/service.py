@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Protocol, cast
 from uuid import UUID, uuid4
@@ -190,7 +191,7 @@ class QuoteService:
             raise QuoteServiceError(detail="Not found", status_code=404)
 
         try:
-            pdf_bytes = self._pdf.render(context)
+            pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
         except PdfRenderError as exc:
             raise QuoteServiceError(detail=str(exc), status_code=422) from exc
 
@@ -205,7 +206,7 @@ class QuoteService:
             raise QuoteServiceError(detail="Not found", status_code=404)
 
         try:
-            pdf_bytes = self._pdf.render(context)
+            pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
         except PdfRenderError as exc:
             raise QuoteServiceError(detail=str(exc), status_code=422) from exc
 
