@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
@@ -23,11 +23,30 @@ function formatCurrency(value: number): string {
   });
 }
 
+function normalizeLineItem(item: LineItemDraft): LineItemDraft {
+  const normalizedDetails = item.details?.trim() ?? "";
+  return {
+    description: item.description.trim(),
+    details: normalizedDetails.length > 0 ? normalizedDetails : null,
+    price: item.price,
+  };
+}
+
+function isBlankLineItem(item: LineItemDraft): boolean {
+  return item.description.length === 0 && item.details === null && item.price === null;
+}
+
+function isInvalidLineItem(item: LineItemDraft): boolean {
+  return item.description.length === 0 && !isBlankLineItem(item);
+}
+
 export function ReviewScreen(): React.ReactElement | null {
   const navigate = useNavigate();
   const { draft, setDraft, clearDraft } = useQuoteDraft();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const rowIdSequenceRef = useRef(0);
+  const [lineItemRowIds, setLineItemRowIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!draft) {
@@ -35,15 +54,35 @@ export function ReviewScreen(): React.ReactElement | null {
     }
   }, [draft, navigate]);
 
+  useEffect(() => {
+    if (!draft) {
+      return;
+    }
+
+    setLineItemRowIds((currentIds) => {
+      if (currentIds.length === draft.lineItems.length) {
+        return currentIds;
+      }
+
+      const nextIds = currentIds.slice(0, draft.lineItems.length);
+      while (nextIds.length < draft.lineItems.length) {
+        nextIds.push(`line-item-${rowIdSequenceRef.current}`);
+        rowIdSequenceRef.current += 1;
+      }
+      return nextIds;
+    });
+  }, [draft]);
+
   if (!draft) {
     return null;
   }
 
   const currentDraft: QuoteDraft = draft;
-  const hasLineItemWithDescription = currentDraft.lineItems.some(
-    (lineItem) => lineItem.description.trim().length > 0,
-  );
-  const lineItemSum = currentDraft.lineItems.reduce((runningTotal, lineItem) => {
+  const normalizedLineItems = currentDraft.lineItems.map(normalizeLineItem);
+  const lineItemsForSubmit = normalizedLineItems.filter((lineItem) => lineItem.description.length > 0);
+  const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
+  const canSubmit = lineItemsForSubmit.length > 0 && !hasInvalidLineItems;
+  const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
       return runningTotal;
     }
@@ -55,6 +94,7 @@ export function ReviewScreen(): React.ReactElement | null {
   }
 
   function onLineItemChange(index: number, updated: LineItemDraft): void {
+    setSaveError(null);
     updateDraft((currentDraft) => ({
       ...currentDraft,
       lineItems: currentDraft.lineItems.map((lineItem, currentIndex) =>
@@ -64,6 +104,8 @@ export function ReviewScreen(): React.ReactElement | null {
   }
 
   function onLineItemDelete(index: number): void {
+    setSaveError(null);
+    setLineItemRowIds((currentIds) => currentIds.filter((_, currentIndex) => currentIndex !== index));
     updateDraft((currentDraft) => ({
       ...currentDraft,
       lineItems: currentDraft.lineItems.filter((_, currentIndex) => currentIndex !== index),
@@ -71,6 +113,12 @@ export function ReviewScreen(): React.ReactElement | null {
   }
 
   function onLineItemAdd(): void {
+    setSaveError(null);
+    setLineItemRowIds((currentIds) => {
+      const nextIds = [...currentIds, `line-item-${rowIdSequenceRef.current}`];
+      rowIdSequenceRef.current += 1;
+      return nextIds;
+    });
     updateDraft((currentDraft) => ({
       ...currentDraft,
       lineItems: [...currentDraft.lineItems, { ...EMPTY_LINE_ITEM }],
@@ -80,13 +128,24 @@ export function ReviewScreen(): React.ReactElement | null {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setSaveError(null);
+
+    if (lineItemsForSubmit.length === 0) {
+      setSaveError("Add at least one line item description before generating the quote.");
+      return;
+    }
+
+    if (hasInvalidLineItems) {
+      setSaveError("Each line item with details or price needs a description.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
       const createdQuote = await quoteService.createQuote({
         customer_id: currentDraft.customerId,
         transcript: currentDraft.transcript,
-        line_items: currentDraft.lineItems,
+        line_items: lineItemsForSubmit,
         total_amount: currentDraft.total,
         notes: currentDraft.notes,
       });
@@ -124,8 +183,8 @@ export function ReviewScreen(): React.ReactElement | null {
             <section className="rounded-md border border-amber-200 bg-amber-50 p-4">
               <h2 className="text-sm font-semibold text-amber-900">Confidence notes</h2>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
-                {currentDraft.confidenceNotes.map((note) => (
-                  <li key={note}>{note}</li>
+                {currentDraft.confidenceNotes.map((note, index) => (
+                  <li key={`${index}-${note}`}>{note}</li>
                 ))}
               </ul>
             </section>
@@ -142,8 +201,14 @@ export function ReviewScreen(): React.ReactElement | null {
             {currentDraft.lineItems.length > 0 ? (
               currentDraft.lineItems.map((lineItem, index) => (
                 <LineItemRow
-                  key={`${index}-${lineItem.description}`}
+                  key={lineItemRowIds[index] ?? `line-item-fallback-${index}`}
+                  rowId={lineItemRowIds[index] ?? `line-item-fallback-${index}`}
                   item={lineItem}
+                  descriptionError={
+                    isInvalidLineItem(normalizedLineItems[index])
+                      ? "Description is required for this row."
+                      : null
+                  }
                   onChange={(updatedItem) => onLineItemChange(index, updatedItem)}
                   onDelete={() => onLineItemDelete(index)}
                 />
@@ -210,7 +275,7 @@ export function ReviewScreen(): React.ReactElement | null {
           <div className="flex items-center gap-3">
             <Button
               type="submit"
-              disabled={!hasLineItemWithDescription}
+              disabled={!canSubmit}
               isLoading={isSaving}
             >
               Generate Quote PDF
