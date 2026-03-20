@@ -46,10 +46,11 @@ export function ReviewScreen(): React.ReactElement | null {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const rowIdSequenceRef = useRef(0);
+  const hasSubmittedRef = useRef(false);
   const [lineItemRowIds, setLineItemRowIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!draft) {
+    if (!draft && !hasSubmittedRef.current) {
       navigate("/", { replace: true });
     }
   }, [draft, navigate]);
@@ -149,6 +150,7 @@ export function ReviewScreen(): React.ReactElement | null {
         total_amount: currentDraft.total,
         notes: currentDraft.notes,
       });
+      hasSubmittedRef.current = true;
       clearDraft();
       navigate(`/quotes/${createdQuote.id}/preview`);
     } catch (submitError) {
