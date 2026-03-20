@@ -40,9 +40,10 @@ Add `shared_at` (nullable datetime) and `share_token` (nullable string).
 Skip `pdf_url` — no S3, PDFs rendered on demand, field would be permanently null.
 
 ### Template data loading
-Single joined repository method `get_quote_render_context` returns a plain dataclass
-with everything WeasyPrint needs: user profile fields, customer fields, quote fields,
-line items. No separate per-table loads. Avoids async SQLAlchemy lazy-load traps.
+Single repository method `get_render_context` returns a plain dataclass with everything
+WeasyPrint needs: user profile fields, customer fields, quote fields, line items. All
+loading happens inside one method call — typically `selectinload` for relationships, not
+necessarily a single SQL JOIN. The contract is one method, one await, no lazy-load traps.
 
 ### PDF endpoint
 Single `POST /api/quotes/:id/pdf` — renders PDF, flips status `draft → ready`,
@@ -54,6 +55,16 @@ return JSON metadata.
 `POST /api/quotes/:id/share` — generates `share_token` if not set, sets `shared_at`,
 sets `status = 'shared'`. Returns full updated `QuoteResponse` (includes `share_token`
 and `shared_at` so frontend can construct the URL without a second call).
+
+### Status transition rules (locked)
+- `draft → ready`: only via `POST /pdf`. `/pdf` must not downgrade `shared → ready`.
+- `ready → shared`: only via `POST /share`.
+- `POST /share` called while still `draft`: auto-advance — sets both `ready` and `shared`
+  in one call (tradesperson may skip preview and share directly).
+- Repeated `POST /share`: idempotent on `share_token` (reuse existing token),
+  updates `shared_at` to latest call time.
+- `POST /pdf` called on an already-`shared` quote: re-renders and streams PDF bytes
+  but does **not** change status back to `ready`.
 
 ---
 
@@ -73,6 +84,12 @@ and `shared_at` so frontend can construct the URL without a second call).
   with the `updated_at` date on the PDF as the only signal. If pilot users raise this
   as a concern, revisit with link invalidation on edit or explicit reshare flow.
 
+- **Local dev: `/share` route not proxied.** Vite proxies only `/api`. In local dev,
+  `window.location.origin/share/:token` hits the Vite server and 404s. Fix: add
+  `/share` to the Vite proxy config (`vite.config.ts`), or test the public endpoint
+  directly against the backend port (`localhost:8000/share/:token`). The issue should
+  call this out so the agent doesn't mistake a proxy gap for a backend bug.
+
 ---
 
 ## Scope
@@ -88,11 +105,13 @@ and `shared_at` so frontend can construct the URL without a second call).
 - `share_token: str | None`
 
 **Render context dataclass + repository method:**
-- `QuoteRenderContext` dataclass: `business_name`, `owner_name`, `customer_name`,
-  `customer_phone`, `customer_email`, `customer_address`, `doc_number`, `status`,
-  `total_amount`, `notes`, `line_items`, `created_at`, `updated_at`
-- `QuoteRepository.get_render_context(quote_id, user_id)` — single joined query
-  across `documents`, `line_items`, `users`, `customers`. Returns `QuoteRenderContext`
+- `QuoteRenderContext` dataclass: `business_name`, `first_name`, `last_name`,
+  `customer_name`, `customer_phone`, `customer_email`, `customer_address`, `doc_number`,
+  `status`, `total_amount`, `notes`, `line_items`, `created_at`, `updated_at`
+- Note: user model has `first_name` + `last_name`, not `owner_name`. Template composes
+  them as `{{ first_name }} {{ last_name }}`. Do not add a new DB column.
+- `QuoteRepository.get_render_context(quote_id, user_id)` — loads across `documents`,
+  `line_items`, `users`, `customers` in one method call. Returns `QuoteRenderContext`
   or `None`.
 
 **`integrations/pdf.py`** (implement from stub):
@@ -101,7 +120,7 @@ and `shared_at` so frontend can construct the URL without a second call).
 - Returns raw PDF bytes
 
 **`quote.html` template** (implement from stub):
-- Business name + owner name (top header)
+- Business name + `{{ first_name }} {{ last_name }}` (top header)
 - Customer name, phone, email, address (if present)
 - Quote number and issued date
 - Updated date row — only rendered if `updated_at` differs from `created_at` by >5min
@@ -120,6 +139,8 @@ and `shared_at` so frontend can construct the URL without a second call).
   set, sets `shared_at`, sets `status = 'shared'`. Returns full `QuoteResponse`.
 - `GET /share/{token}` — **no auth**. Loads quote by `share_token`, renders and streams
   PDF. Returns 404 if token not found. Mounted outside `/api/` prefix.
+  Must include `Cache-Control: no-store` and `X-Robots-Tag: noindex` response headers
+  (PDF contains customer PII; must not be cached or indexed).
 
 **Service layer:**
 - `QuoteService.generate_pdf(user, quote_id)` — loads render context, delegates to
@@ -135,10 +156,17 @@ and `shared_at` so frontend can construct the URL without a second call).
 **`quote.types.ts` additions:**
 - `shared_at: string | null` and `share_token: string | null` on `Quote`
 
+**`http.ts` addition:**
+- `requestBlob(url, options): Promise<Blob>` — new export alongside `request()`.
+  Same auth/CSRF/refresh logic, but returns `response.blob()` instead of parsing JSON.
+  Required because `request()` calls `parsePayload()` which returns `null` for
+  non-JSON content types — PDF bytes would be silently dropped without this.
+
 **`quoteService.ts` additions:**
-- `generatePdf(id: string): Promise<Blob>` — calls `POST /api/quotes/:id/pdf`,
-  returns response as `Blob`
+- `generatePdf(id: string): Promise<Blob>` — calls `requestBlob()` on
+  `POST /api/quotes/:id/pdf`
 - `shareQuote(id: string): Promise<Quote>` — calls `POST /api/quotes/:id/share`
+  via standard `request()`
 
 **`QuotePreview` screen** (implement `QuotePreviewPlaceholder` in `App.tsx`):
 - Reads `:id` from URL params, fetches quote via `quoteService.getQuote(id)` on mount
@@ -174,11 +202,12 @@ and `shared_at` so frontend can construct the URL without a second call).
 | `backend/app/features/quotes/repository.py` | Modify | Add `get_render_context` joined query |
 | `backend/app/features/quotes/service.py` | Modify | Add `generate_pdf`, `share_quote` methods |
 | `backend/app/features/quotes/api.py` | Modify | Add `POST /:id/pdf`, `POST /:id/share` |
-| `backend/app/api.py` (or router entrypoint) | Modify | Mount `GET /share/{token}` outside `/api/` prefix |
+| `backend/app/main.py` | Modify | Mount `GET /share/{token}` router outside `/api/` prefix |
 | `backend/app/integrations/pdf.py` | Implement | WeasyPrint render from `QuoteRenderContext` |
 | `backend/app/templates/quote.html` | Implement | Professional PDF template |
 | `backend/app/features/quotes/tests/test_pdf.py` | Create | PDF endpoint + share endpoint tests |
 | `frontend/src/features/quotes/types/quote.types.ts` | Modify | Add `shared_at`, `share_token` to `Quote` |
+| `frontend/src/shared/lib/http.ts` | Modify | Add `requestBlob()` export for binary responses |
 | `frontend/src/features/quotes/services/quoteService.ts` | Modify | Add `generatePdf`, `shareQuote` |
 | `frontend/src/features/quotes/components/QuotePreview.tsx` | Create | PDF preview + share screen |
 | `frontend/src/features/quotes/tests/QuotePreview.test.tsx` | Create | Component tests |
@@ -194,9 +223,14 @@ and `shared_at` so frontend can construct the URL without a second call).
 - [ ] `POST /api/quotes/:id/pdf` returns `application/pdf` with correct `Content-Disposition` header
 - [ ] `POST /api/quotes/:id/pdf` sets quote status to `ready`
 - [ ] `POST /api/quotes/:id/share` sets `status = 'shared'`, `shared_at`, generates `share_token`
+- [ ] `POST /api/quotes/:id/share` called while `draft`: auto-advances to `shared` (skips `ready`)
+- [ ] Repeated `POST /share`: reuses existing `share_token`, updates `shared_at`
+- [ ] `POST /pdf` on a `shared` quote: re-renders PDF but does not downgrade status to `ready`
 - [ ] `POST /api/quotes/:id/share` returns full `QuoteResponse` with `share_token` and `shared_at`
 - [ ] `GET /share/:token` returns PDF without auth; 404 on unknown token
-- [ ] PDF template renders business name, owner name, customer details, line items, total
+- [ ] `GET /share/:token` includes `Cache-Control: no-store` and `X-Robots-Tag: noindex` headers
+- [ ] PDF template renders business name, `first_name last_name`, customer details, line items, total
+- [ ] No `owner_name` DB column added — template composes from existing `first_name` + `last_name`
 - [ ] PDF template shows "Updated" date only when `updated_at` meaningfully differs from `created_at`
 - [ ] Null prices render as blank cells, never `$0.00`
 - [ ] Both endpoints enforce auth + CSRF; public share endpoint enforces neither
