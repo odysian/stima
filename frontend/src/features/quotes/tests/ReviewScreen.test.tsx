@@ -29,6 +29,8 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     createQuote: vi.fn(),
     getQuote: vi.fn(),
     updateQuote: vi.fn(),
+    generatePdf: vi.fn(),
+    shareQuote: vi.fn(),
   },
 }));
 
@@ -98,6 +100,8 @@ beforeEach(() => {
     transcript: "5 yards brown mulch and edge front beds",
     total_amount: 120,
     notes: "",
+    shared_at: null,
+    share_token: null,
     line_items: [],
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",

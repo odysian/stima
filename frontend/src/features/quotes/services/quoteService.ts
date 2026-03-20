@@ -4,7 +4,7 @@ import type {
   QuoteCreateRequest,
   QuoteUpdateRequest,
 } from "@/features/quotes/types/quote.types";
-import { request } from "@/shared/lib/http";
+import { request, requestBlob } from "@/shared/lib/http";
 
 function convertNotes(notes: string): Promise<ExtractionResult> {
   return request<ExtractionResult>("/api/quotes/convert-notes", {
@@ -31,9 +31,23 @@ function updateQuote(id: string, data: QuoteUpdateRequest): Promise<Quote> {
   });
 }
 
+function generatePdf(id: string): Promise<Blob> {
+  return requestBlob(`/api/quotes/${id}/pdf`, {
+    method: "POST",
+  });
+}
+
+function shareQuote(id: string): Promise<Quote> {
+  return request<Quote>(`/api/quotes/${id}/share`, {
+    method: "POST",
+  });
+}
+
 export const quoteService = {
   convertNotes,
   createQuote,
   getQuote,
   updateQuote,
+  generatePdf,
+  shareQuote,
 };

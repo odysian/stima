@@ -65,6 +65,7 @@ class Document(Base):
     total_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
     notes: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     pdf_url: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    share_token: Mapped[str | None] = mapped_column(sa.Text, nullable=True, unique=True)
     shared_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True),
         nullable=True,

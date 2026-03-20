@@ -2,16 +2,53 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.features.auth.models import User
 from app.features.customers.models import Customer
-from app.features.quotes.models import Document, LineItem
+from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.schemas import LineItemDraft
+
+
+@dataclass(slots=True)
+class QuoteRenderLineItem:
+    """Line item payload required by PDF rendering."""
+
+    description: str
+    details: str | None
+    price: Decimal | None
+
+
+@dataclass(slots=True)
+class QuoteRenderContext:
+    """Template context loaded in one repository call for PDF rendering."""
+
+    business_name: str | None
+    first_name: str | None
+    last_name: str | None
+    customer_name: str
+    customer_phone: str | None
+    customer_email: str | None
+    customer_address: str | None
+    doc_number: str
+    status: str
+    total_amount: Decimal | None
+    notes: str | None
+    line_items: list[QuoteRenderLineItem]
+    created_at: datetime
+    updated_at: datetime
+
+    @property
+    def has_meaningful_update(self) -> bool:
+        """Return true when updated timestamp differs from created by > 5 minutes."""
+        return (self.updated_at - self.created_at).total_seconds() > 300
 
 
 class QuoteRepository:
@@ -51,6 +88,55 @@ class QuoteRepository:
             .options(selectinload(Document.line_items))
         )
         return result.scalar_one_or_none()
+
+    async def get_render_context(self, quote_id: UUID, user_id: UUID) -> QuoteRenderContext | None:
+        """Return PDF render context for a user-owned quote."""
+        result = await self._session.execute(
+            select(Document, Customer, User)
+            .join(Customer, Customer.id == Document.customer_id)
+            .join(User, User.id == Document.user_id)
+            .where(
+                Document.id == quote_id,
+                Document.user_id == user_id,
+            )
+            .options(selectinload(Document.line_items))
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+
+        document, customer, user = row
+        return _build_render_context(document=document, customer=customer, user=user)
+
+    async def get_render_context_by_share_token(
+        self, share_token: str
+    ) -> QuoteRenderContext | None:
+        """Return PDF render context for a public share token."""
+        result = await self._session.execute(
+            select(Document, Customer, User)
+            .join(Customer, Customer.id == Document.customer_id)
+            .join(User, User.id == Document.user_id)
+            .where(Document.share_token == share_token)
+            .options(selectinload(Document.line_items))
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+
+        document, customer, user = row
+        return _build_render_context(document=document, customer=customer, user=user)
+
+    async def mark_ready_if_not_shared(self, *, quote_id: UUID, user_id: UUID) -> None:
+        """Transition quote status to ready unless the quote is already shared."""
+        await self._session.execute(
+            update(Document)
+            .where(
+                Document.id == quote_id,
+                Document.user_id == user_id,
+                Document.status != QuoteStatus.SHARED,
+            )
+            .values(status=QuoteStatus.READY)
+        )
 
     async def create(
         self,
@@ -115,6 +201,12 @@ class QuoteRepository:
         """Commit pending quote writes."""
         await self._session.commit()
 
+    async def refresh(self, document: Document) -> Document:
+        """Refresh a quote instance with line items."""
+        await self._session.refresh(document)
+        await self._session.refresh(document, attribute_names=["line_items"])
+        return document
+
     async def rollback(self) -> None:
         """Rollback pending quote writes."""
         await self._session.rollback()
@@ -152,3 +244,34 @@ def _to_decimal(value: float | None) -> Decimal | None:
     if value is None:
         return None
     return Decimal(str(value))
+
+
+def _build_render_context(
+    *,
+    document: Document,
+    customer: Customer,
+    user: User,
+) -> QuoteRenderContext:
+    return QuoteRenderContext(
+        business_name=user.business_name,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        customer_name=customer.name,
+        customer_phone=customer.phone,
+        customer_email=customer.email,
+        customer_address=customer.address,
+        doc_number=document.doc_number,
+        status=document.status.value,
+        total_amount=document.total_amount,
+        notes=document.notes,
+        line_items=[
+            QuoteRenderLineItem(
+                description=line_item.description,
+                details=line_item.details,
+                price=line_item.price,
+            )
+            for line_item in document.line_items
+        ],
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+    )

@@ -31,6 +31,8 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     createQuote: vi.fn(),
     getQuote: vi.fn(),
     updateQuote: vi.fn(),
+    generatePdf: vi.fn(),
+    shareQuote: vi.fn(),
   },
 }));
 

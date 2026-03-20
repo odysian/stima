@@ -4,11 +4,186 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stima Quote</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #111827;
+        background: #ffffff;
+      }
+
+      .header {
+        border-bottom: 2px solid #e5e7eb;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+      }
+
+      .company-name {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 700;
+      }
+
+      .owner-name {
+        margin: 6px 0 0;
+        font-size: 14px;
+        color: #4b5563;
+      }
+
+      .meta-grid {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+
+      .meta-grid td {
+        width: 50%;
+        vertical-align: top;
+        padding: 0 0 12px;
+      }
+
+      .label {
+        margin: 0 0 4px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6b7280;
+      }
+
+      .value {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      table.line-items {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      table.line-items thead th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6b7280;
+        border-bottom: 1px solid #d1d5db;
+        padding: 10px 8px;
+      }
+
+      table.line-items tbody td {
+        border-bottom: 1px solid #e5e7eb;
+        padding: 10px 8px;
+        font-size: 13px;
+      }
+
+      .price-col {
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .details {
+        color: #4b5563;
+      }
+
+      .total-row td {
+        border-top: 2px solid #9ca3af;
+        border-bottom: none;
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      .notes {
+        margin-top: 24px;
+        padding: 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        background: #f9fafb;
+      }
+
+      .notes p {
+        margin: 0;
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+    </style>
   </head>
   <body>
-    <!-- TODO: Implement quote PDF template content. -->
     <main>
-      <h1>Quote Template Stub</h1>
+      <header class="header">
+        <h1 class="company-name">{{ business_name or "Stima Quote" }}</h1>
+        <p class="owner-name">{{ first_name or "" }} {{ last_name or "" }}</p>
+      </header>
+
+      <table class="meta-grid">
+        <tbody>
+          <tr>
+            <td>
+              <p class="label">Prepared For</p>
+              <p class="value">{{ customer_name }}</p>
+              {% if customer_phone %}
+              <p class="value">{{ customer_phone }}</p>
+              {% endif %}
+              {% if customer_email %}
+              <p class="value">{{ customer_email }}</p>
+              {% endif %}
+              {% if customer_address %}
+              <p class="value">{{ customer_address }}</p>
+              {% endif %}
+            </td>
+            <td>
+              <p class="label">Quote Number</p>
+              <p class="value">{{ doc_number }}</p>
+              <p class="label" style="margin-top: 10px">Issued</p>
+              <p class="value">{{ created_at.strftime("%b %d, %Y") }}</p>
+              {% if show_updated_date %}
+              <p class="label" style="margin-top: 10px">Updated</p>
+              <p class="value">{{ updated_at.strftime("%b %d, %Y") }}</p>
+              {% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table class="line-items">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Details</th>
+            <th class="price-col">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line_item in line_items %}
+          <tr>
+            <td>{{ line_item.description }}</td>
+            <td class="details">{{ line_item.details or "" }}</td>
+            <td class="price-col">
+              {% if line_item.price is not none %}
+              ${{ "{:,.2f}".format(line_item.price) }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          <tr class="total-row">
+            <td colspan="2">Total</td>
+            <td class="price-col">
+              {% if total_amount is not none %}
+              ${{ "{:,.2f}".format(total_amount) }}
+              {% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {% if notes %}
+      <section class="notes">
+        <p class="label">Notes</p>
+        <p>{{ notes }}</p>
+      </section>
+      {% endif %}
     </main>
   </body>
 </html>

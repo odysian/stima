@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { User } from "@/features/auth/types/auth.types";
-import { clearCsrfToken, request } from "@/shared/lib/http";
+import { clearCsrfToken, request, requestBlob } from "@/shared/lib/http";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -141,5 +141,23 @@ describe("http request helper", () => {
     // The replayed request (call index 2) must carry the rotated token
     const replayInit = fetchMock.mock.calls[2]?.[1] as RequestInit;
     expect(new Headers(replayInit.headers).get("X-CSRF-Token")).toBe("rotated-token");
+  });
+
+  it("requestBlob returns binary payload for PDF endpoints", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response("mock-pdf-content", {
+        status: 200,
+        headers: { "Content-Type": "application/pdf" },
+      }),
+    );
+
+    const blob = await requestBlob("/api/quotes/quote-1/pdf", {
+      method: "POST",
+      body: { regenerate: true },
+    });
+
+    expect(blob.type).toBe("application/pdf");
+    expect(await blob.text()).toBe("mock-pdf-content");
   });
 });

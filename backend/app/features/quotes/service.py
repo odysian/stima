@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
+from datetime import UTC, datetime
 from typing import Protocol, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
 from app.features.auth.models import User
-from app.features.quotes.models import Document
+from app.features.quotes.models import Document, QuoteStatus
+from app.features.quotes.repository import QuoteRenderContext
 from app.features.quotes.schemas import (
     ExtractionResult,
     LineItemDraft,
@@ -17,6 +20,7 @@ from app.features.quotes.schemas import (
     QuoteUpdateRequest,
 )
 from app.integrations.extraction import ExtractionError
+from app.integrations.pdf import PdfRenderError
 
 
 class QuoteServiceError(Exception):
@@ -36,6 +40,16 @@ class QuoteRepositoryProtocol(Protocol):
     async def list_by_user(self, user_id: UUID) -> list[Document]: ...
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
+
+    async def get_render_context(
+        self, quote_id: UUID, user_id: UUID
+    ) -> QuoteRenderContext | None: ...
+
+    async def get_render_context_by_share_token(
+        self, share_token: str
+    ) -> QuoteRenderContext | None: ...
+
+    async def mark_ready_if_not_shared(self, *, quote_id: UUID, user_id: UUID) -> None: ...
 
     async def create(
         self,
@@ -63,6 +77,8 @@ class QuoteRepositoryProtocol(Protocol):
 
     async def commit(self) -> None: ...
 
+    async def refresh(self, document: Document) -> Document: ...
+
     async def rollback(self) -> None: ...
 
 
@@ -70,6 +86,12 @@ class ExtractionIntegrationProtocol(Protocol):
     """Structural protocol for extraction integration dependency."""
 
     async def extract(self, notes: str) -> ExtractionResult: ...
+
+
+class PdfIntegrationProtocol(Protocol):
+    """Structural protocol for PDF rendering integration dependency."""
+
+    def render(self, context: QuoteRenderContext) -> bytes: ...
 
 
 class QuoteService:
@@ -80,9 +102,11 @@ class QuoteService:
         *,
         repository: QuoteRepositoryProtocol,
         extraction_integration: ExtractionIntegrationProtocol,
+        pdf_integration: PdfIntegrationProtocol,
     ) -> None:
         self._repository = repository
         self._extraction = extraction_integration
+        self._pdf = pdf_integration
 
     async def convert_notes(self, notes: str) -> ExtractionResult:
         """Extract structured line items from freeform notes."""
@@ -159,6 +183,49 @@ class QuoteService:
         await self._repository.commit()
         return updated_quote
 
+    async def generate_pdf(self, user: User, quote_id: UUID) -> tuple[str, bytes]:
+        """Render and return quote PDF bytes while applying ready transition rules."""
+        user_id = _resolve_user_id(user)
+        context = await self._repository.get_render_context(quote_id, user_id)
+        if context is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        try:
+            pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
+        except PdfRenderError as exc:
+            raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+
+        await self._repository.mark_ready_if_not_shared(quote_id=quote_id, user_id=user_id)
+        await self._repository.commit()
+        return context.doc_number, pdf_bytes
+
+    async def generate_shared_pdf(self, share_token: str) -> tuple[str, bytes]:
+        """Render and return a publicly shared quote PDF by token."""
+        context = await self._repository.get_render_context_by_share_token(share_token)
+        if context is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        try:
+            pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
+        except PdfRenderError as exc:
+            raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+
+        return context.doc_number, pdf_bytes
+
+    async def share_quote(self, user: User, quote_id: UUID) -> Document:
+        """Set share token/timestamp and transition quote status to shared."""
+        quote = await self._repository.get_by_id(quote_id, _resolve_user_id(user))
+        if quote is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        if quote.share_token is None:
+            quote.share_token = str(uuid4())
+
+        quote.shared_at = _utcnow()
+        quote.status = QuoteStatus.SHARED
+        await self._repository.commit()
+        return await self._repository.refresh(quote)
+
 
 def _resolve_user_id(user: User) -> UUID:
     """Resolve user id without triggering async lazy loads on detached ORM instances."""
@@ -172,3 +239,7 @@ def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
     """Return true when IntegrityError was caused by doc-sequence uniqueness collision."""
     message = str(exc.orig)
     return "uq_documents_user_sequence" in message
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
