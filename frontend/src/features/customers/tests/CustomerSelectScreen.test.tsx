@@ -7,6 +7,7 @@ import { customerService } from "@/features/customers/services/customerService";
 import type { Customer } from "@/features/customers/types/customer.types";
 
 const navigateMock = vi.fn();
+const clearDraftMock = vi.fn();
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -23,6 +24,14 @@ vi.mock("@/features/customers/services/customerService", () => ({
     getCustomer: vi.fn(),
     updateCustomer: vi.fn(),
   },
+}));
+
+vi.mock("@/features/quotes/hooks/useQuoteDraft", () => ({
+  useQuoteDraft: () => ({
+    draft: null,
+    setDraft: vi.fn(),
+    clearDraft: clearDraftMock,
+  }),
 }));
 
 const mockedCustomerService = vi.mocked(customerService);
@@ -87,6 +96,7 @@ describe("CustomerSelectScreen", () => {
 
     expect(screen.getByLabelText(/search customers/i)).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Loading customers...");
+    expect(clearDraftMock).toHaveBeenCalledTimes(1);
 
     resolveList?.(customersFixture);
     expect(await screen.findByText("Alice Johnson")).toBeInTheDocument();
