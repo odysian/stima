@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe("App routes", () => {
-  it("redirects unauthenticated users from protected route to login", async () => {
+  it("redirects unauthenticated users from onboarding route to login", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
 
     renderApp("/onboarding");
@@ -45,10 +45,45 @@ describe("App routes", () => {
       id: "user-3",
       email: "user@example.com",
       is_active: true,
+      is_onboarded: true,
     });
 
     renderApp("/login");
 
     expect(await screen.findByText("Authenticated App Shell")).toBeInTheDocument();
+  });
+
+  it("redirects authenticated users who are not onboarded to onboarding", async () => {
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-4",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: false,
+    });
+
+    renderApp("/");
+
+    expect(await screen.findByRole("heading", { name: /complete your business profile/i })).toBeInTheDocument();
+  });
+
+  it("redirects onboarded users away from /onboarding", async () => {
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-5",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: true,
+    });
+
+    renderApp("/onboarding");
+
+    expect(await screen.findByText("Authenticated App Shell")).toBeInTheDocument();
+  });
+
+  it("redirects unauthenticated users from protected route to login", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderApp("/");
+
+    expect(await screen.findByRole("heading", { name: /sign in/i })).toBeInTheDocument();
   });
 });

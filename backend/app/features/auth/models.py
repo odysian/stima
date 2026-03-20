@@ -22,6 +22,8 @@ class User(Base):
     first_name: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
     phone_number: Mapped[str | None] = mapped_column(sa.String(30), nullable=True)
+    business_name: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    trade_type: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     is_active: Mapped[bool] = mapped_column(
         sa.Boolean,
         nullable=False,
@@ -43,6 +45,13 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def is_onboarded(self) -> bool:
+        """Return true when all required onboarding profile fields are populated."""
+        return bool(
+            self.business_name and self.first_name and self.last_name and self.trade_type
+        )
 
 
 class RefreshToken(Base):

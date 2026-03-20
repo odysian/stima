@@ -271,6 +271,7 @@ async def test_me_returns_authenticated_user(client: AsyncClient) -> None:
     payload = me_response.json()
     assert payload["email"] == credentials["email"]
     assert payload["is_active"] is True
+    assert payload["is_onboarded"] is False
 
 
 async def test_me_requires_authentication(client: AsyncClient) -> None:

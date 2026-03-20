@@ -1,5 +1,7 @@
 import { http, HttpResponse } from "msw";
 
+import type { ProfileUpdateRequest } from "@/features/profile/types/profile.types";
+
 function requireCsrf(request: Request): Response | null {
   if (!request.headers.get("X-CSRF-Token")) {
     return HttpResponse.json({ detail: "CSRF token missing" }, { status: 403 }) as unknown as Response;
@@ -24,6 +26,7 @@ export const handlers = [
           id: "user-1",
           email: body.email,
           is_active: true,
+          is_onboarded: false,
         },
       },
       { status: 201 },
@@ -49,7 +52,40 @@ export const handlers = [
 
   http.get("/api/auth/me", () => {
     return HttpResponse.json(
-      { id: "user-1", email: "test@example.com", is_active: true },
+      { id: "user-1", email: "test@example.com", is_active: true, is_onboarded: true },
+      { status: 200 },
+    );
+  }),
+
+  http.get("/api/profile", () => {
+    return HttpResponse.json(
+      {
+        id: "user-1",
+        email: "test@example.com",
+        is_active: true,
+        is_onboarded: true,
+        business_name: "Summit Exterior Care",
+        first_name: "Alex",
+        last_name: "Stone",
+        trade_type: "Landscaping",
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.patch("/api/profile", async ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const body = (await request.json()) as ProfileUpdateRequest;
+    return HttpResponse.json(
+      {
+        id: "user-1",
+        email: "test@example.com",
+        is_active: true,
+        is_onboarded: true,
+        ...body,
+      },
       { status: 200 },
     );
   }),

@@ -141,6 +141,7 @@ def _serialize_user(user: User) -> AuthUserResponse:
         id=user.id,
         email=user.email,
         is_active=user.is_active,
+        is_onboarded=user.is_onboarded,
     )
 
 

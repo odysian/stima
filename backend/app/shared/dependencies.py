@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.repository import AuthRepository
+from app.features.profile.repository import ProfileRepository
+from app.features.profile.service import ProfileService
 from app.features.auth.service import (
     ACCESS_COOKIE_NAME,
     CSRF_COOKIE_NAME,
@@ -24,6 +26,13 @@ def get_auth_service(
 ) -> AuthService:
     """Build a request-scoped auth service wired to the DB session."""
     return AuthService(repository=AuthRepository(db))
+
+
+def get_profile_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ProfileService:
+    """Build a request-scoped profile service wired to the DB session."""
+    return ProfileService(repository=ProfileRepository(db))
 
 
 async def get_current_user(

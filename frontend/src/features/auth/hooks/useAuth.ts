@@ -16,6 +16,8 @@ import { hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
 interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
+  isOnboarded: boolean;
+  refreshUser: () => Promise<void>;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (credentials: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
@@ -26,6 +28,11 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const refreshUser = useCallback(async () => {
+    const currentUser = await authService.me();
+    setUser(currentUser);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -57,16 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
 
   const login = useCallback(async (credentials: LoginRequest) => {
     await authService.login(credentials);
-    const currentUser = await authService.me();
-    setUser(currentUser);
-  }, []);
+    await refreshUser();
+  }, [refreshUser]);
 
   const register = useCallback(async (credentials: RegisterRequest) => {
     await authService.register(credentials);
     await authService.login(credentials);
-    const currentUser = await authService.me();
-    setUser(currentUser);
-  }, []);
+    await refreshUser();
+  }, [refreshUser]);
 
   const logout = useCallback(async () => {
     await authService.logout();
@@ -77,11 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     () => ({
       user,
       isLoading,
+      isOnboarded: user?.is_onboarded ?? false,
+      refreshUser,
       login,
       register,
       logout,
     }),
-    [isLoading, login, logout, register, user],
+    [isLoading, login, logout, refreshUser, register, user],
   );
 
   if (isLoading) {

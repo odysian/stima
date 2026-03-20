@@ -11,7 +11,7 @@ backend-verify: ## Run backend lint, type checks, security scan, and tests
 	@cd backend && \
 		.venv/bin/ruff check . --cache-dir .ruff_cache && \
 		.venv/bin/mypy . --cache-dir .mypy_cache && \
-		.venv/bin/bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/quotes/tests,app/shared/tests && \
+		.venv/bin/bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/profile/tests,app/features/quotes/tests,app/shared/tests && \
 		.venv/bin/pytest -v -o cache_dir=.pytest_cache
 
 frontend-verify: ## Run frontend type checks, lint, tests, and build

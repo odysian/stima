@@ -32,6 +32,7 @@ describe("authService integration (MSW)", () => {
               id: "user-42",
               email: capturedBody.email,
               is_active: true,
+              is_onboarded: false,
             },
           },
           { status: 201 },
@@ -81,7 +82,7 @@ describe("authService integration (MSW)", () => {
           return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
         }
         return HttpResponse.json(
-          { id: "user-1", email: "test@example.com", is_active: true },
+          { id: "user-1", email: "test@example.com", is_active: true, is_onboarded: true },
           { status: 200 },
         );
       }),
@@ -93,6 +94,7 @@ describe("authService integration (MSW)", () => {
       id: "user-1",
       email: "test@example.com",
       is_active: true,
+      is_onboarded: true,
     });
     expect(meCallCount).toBe(2);
   });
