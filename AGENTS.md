@@ -150,6 +150,7 @@ Required sections below the static header:
 ### Agent Runtime Note
 
 - Do **not** run `make db-verify` from agent sessions. It can hang/long-run in this environment and block execution.
+- Do **not** run `make extraction-live` from agent sessions. If live validation is needed, request the human operator to run it manually and share the output.
 - For Task verification in agent runs, use `make backend-verify` and/or `make frontend-verify` per issue scope.
 - Only run DB migration verification when explicitly requested by a human operator outside agent flow.
 

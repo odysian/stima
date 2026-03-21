@@ -21,6 +21,7 @@ Then execute the full Task flow end-to-end:
 Constraints:
 - Keep mode `single` unless explicitly requested otherwise.
 - No environment triage loops, no worktree setup, no broad verification reruns.
+- For live/provider-backed checks (for example `make extraction-live`), ask the human operator to run them manually and share output instead of running them in agent sessions.
 - Keep output concise and findings-first.
 ```
 
