@@ -52,7 +52,9 @@ async def test_live_clean_with_total() -> None:
 
     assert result.total == pytest.approx(435)
     assert result.line_items
-    assert all(item.price is not None for item in result.line_items)
+    priced_items = [item.price for item in result.line_items if item.price is not None]
+    assert priced_items
+    assert sum(priced_items) == pytest.approx(435)
 
 
 @pytest.mark.live
