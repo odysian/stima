@@ -40,6 +40,18 @@ class _ConfigurablePdfIntegration:
         return f"PDF for {context.doc_number}".encode()
 
 
+class _NoopAudioIntegration:
+    def normalize_and_stitch(self, clips: object) -> bytes:
+        del clips
+        raise AssertionError("Audio normalization is not expected in PDF/share endpoint tests")
+
+
+class _NoopTranscriptionIntegration:
+    async def transcribe(self, audio_wav: bytes) -> str:
+        del audio_wav
+        raise AssertionError("Transcription is not expected in PDF/share endpoint tests")
+
+
 @pytest.fixture(autouse=True)
 def _override_quote_service_dependency() -> Iterator[_ConfigurablePdfIntegration]:
     pdf_integration = _ConfigurablePdfIntegration()
@@ -50,6 +62,8 @@ def _override_quote_service_dependency() -> Iterator[_ConfigurablePdfIntegration
         return QuoteService(
             repository=QuoteRepository(db),
             extraction_integration=_NoopExtractionIntegration(),
+            audio_integration=_NoopAudioIntegration(),
+            transcription_integration=_NoopTranscriptionIntegration(),
             pdf_integration=pdf_integration,
         )
 
@@ -269,6 +283,7 @@ async def _create_quote(client: AsyncClient, csrf_token: str, customer_id: str) 
             ],
             "total_amount": 125,
             "notes": "Schedule for next Tuesday",
+            "source_type": "text",
         },
         headers={"X-CSRF-Token": csrf_token},
     )

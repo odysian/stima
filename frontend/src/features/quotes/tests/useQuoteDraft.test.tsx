@@ -12,6 +12,7 @@ const draftFixture: QuoteDraft = {
   total: 120,
   confidenceNotes: [],
   notes: "Thanks for your business",
+  sourceType: "text",
 };
 
 function HookHarness(): React.ReactElement {

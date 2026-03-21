@@ -13,3 +13,6 @@ Stima is a mobile-first quote drafting platform for solo tradespeople.
 2. Copy backend and frontend env examples into local env files.
 3. Start local dependencies with `docker-compose up -d`.
 4. Run backend and frontend dev servers.
+
+## Voice Capture Prerequisite
+- Install `ffmpeg` locally so backend audio normalization can decode browser-recorded clips.

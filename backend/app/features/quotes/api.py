@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
@@ -16,7 +16,7 @@ from app.features.quotes.schemas import (
     QuoteResponse,
     QuoteUpdateRequest,
 )
-from app.features.quotes.service import QuoteService, QuoteServiceError
+from app.features.quotes.service import CaptureAudioClip, QuoteService, QuoteServiceError
 from app.shared.dependencies import get_current_user, get_quote_service, require_csrf
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
@@ -58,6 +58,35 @@ async def create_quote(
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return QuoteResponse.model_validate(quote)
+
+
+@router.post(
+    "/capture-audio",
+    response_model=ExtractionResult,
+    dependencies=[Depends(require_csrf)],
+)
+async def capture_audio(
+    clips: Annotated[list[UploadFile], File(...)],
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> ExtractionResult:
+    """Convert uploaded audio clips into structured quote extraction output."""
+    del user
+    clip_inputs: list[CaptureAudioClip] = []
+    for clip in clips:
+        clip_inputs.append(
+            CaptureAudioClip(
+                filename=clip.filename,
+                content_type=clip.content_type,
+                content=await clip.read(),
+            )
+        )
+        await clip.close()
+
+    try:
+        return await quote_service.capture_audio(clip_inputs)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("", response_model=list[QuoteResponse])

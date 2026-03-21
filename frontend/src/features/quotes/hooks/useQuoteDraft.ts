@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import type { LineItemDraft } from "@/features/quotes/types/quote.types";
+import type { LineItemDraft, QuoteSourceType } from "@/features/quotes/types/quote.types";
 
 const DRAFT_STORAGE_KEY = "stima_quote_draft";
 
@@ -11,6 +11,7 @@ export interface QuoteDraft {
   total: number | null;
   confidenceNotes: string[];
   notes: string;
+  sourceType: QuoteSourceType;
 }
 
 interface UseQuoteDraftResult {
@@ -41,6 +42,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
       total,
       confidenceNotes,
       notes,
+      sourceType,
     } = parsed;
 
     if (
@@ -57,6 +59,9 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
       return null;
     }
 
+    const parsedSourceType: QuoteSourceType =
+      sourceType === "voice" || sourceType === "text" ? sourceType : "text";
+
     return {
       customerId,
       transcript,
@@ -66,6 +71,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
         (entry): entry is string => typeof entry === "string",
       ),
       notes,
+      sourceType: parsedSourceType,
     };
   } catch {
     return null;

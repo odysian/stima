@@ -87,7 +87,7 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | doc_sequence | Integer | per-user sequence counter |
 | doc_number | String(20) | stored display ID, format `Q-001` |
 | status | String(20) | `draft \| ready \| shared` with DB check constraint |
-| source_type | String(20) | currently `"text"` (audio in future task) |
+| source_type | String(20) | `"text"` or `"voice"` based on capture mode |
 | transcript | Text | raw typed notes |
 | total_amount | Numeric(10,2) | nullable, user-editable |
 | notes | Text | nullable, customer-facing notes |
@@ -163,7 +163,8 @@ Rules:
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
 | `/quotes/convert-notes` | POST | yes | cookie | `{ notes }` | `200 ExtractionResult` |
-| `/quotes` | POST | yes | cookie | `{ customer_id, transcript, line_items, total_amount, notes }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
+| `/quotes/capture-audio` | POST | yes | cookie | multipart form-data `clips` files | `200 ExtractionResult` |
+| `/quotes` | POST | yes | cookie | `{ customer_id, transcript, line_items, total_amount, notes, source_type }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
 | `/quotes` | GET | no | cookie | — | `200 Quote[]` ordered `created_at DESC` (owned by current user) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 Quote` or `404 { detail: "Not found" }` |
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ line_items?, total_amount?, notes? }` | `200 Quote` or `404 { detail: "Not found" }` |

@@ -26,6 +26,7 @@ vi.mock("@/features/quotes/hooks/useQuoteDraft", () => ({
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
     convertNotes: vi.fn(),
+    captureAudio: vi.fn(),
     createQuote: vi.fn(),
     getQuote: vi.fn(),
     updateQuote: vi.fn(),
@@ -45,6 +46,7 @@ function makeDraft(overrides: Partial<QuoteDraft> = {}): QuoteDraft {
     total: 120,
     confidenceNotes: [],
     notes: "",
+    sourceType: "text",
     ...overrides,
   };
 }
@@ -139,6 +141,7 @@ describe("ReviewScreen", () => {
       total: 120,
       confidenceNotes: [],
       notes: "",
+      sourceType: "text",
     });
   });
 
@@ -161,6 +164,7 @@ describe("ReviewScreen", () => {
       total: 120,
       confidenceNotes: [],
       notes: "",
+      sourceType: "text",
     });
   });
 
@@ -179,6 +183,7 @@ describe("ReviewScreen", () => {
       total: 120,
       confidenceNotes: [],
       notes: "",
+      sourceType: "text",
     });
   });
 
@@ -222,6 +227,7 @@ describe("ReviewScreen", () => {
       total: 120,
       confidenceNotes: [],
       notes: "Thanks for your business",
+      sourceType: "text",
     });
   });
 
@@ -237,6 +243,7 @@ describe("ReviewScreen", () => {
         line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
         total_amount: 120,
         notes: "See you next week",
+        source_type: "text",
       });
     });
     expect(clearDraftMock).toHaveBeenCalledTimes(1);
@@ -275,6 +282,7 @@ describe("ReviewScreen", () => {
         line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
         total_amount: 120,
         notes: "See you next week",
+        source_type: "text",
       });
     });
   });

@@ -20,13 +20,14 @@ export interface LineItem {
 }
 
 export type QuoteStatus = "draft" | "ready" | "shared";
+export type QuoteSourceType = "text" | "voice";
 
 export interface Quote {
   id: string;
   customer_id: string;
   doc_number: string;
   status: QuoteStatus;
-  source_type: string;
+  source_type: QuoteSourceType;
   transcript: string;
   total_amount: number | null;
   notes: string | null;
@@ -43,6 +44,7 @@ export interface QuoteCreateRequest {
   line_items: LineItemDraft[];
   total_amount: number | null;
   notes: string;
+  source_type: QuoteSourceType;
 }
 
 export interface QuoteUpdateRequest {

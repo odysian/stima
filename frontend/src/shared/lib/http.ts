@@ -56,7 +56,13 @@ function isJsonBody(body: RequestOptions["body"]): body is object {
     return false;
   }
 
+  const objectTag = Object.prototype.toString.call(body);
+
   if (
+    objectTag === "[object FormData]" ||
+    objectTag === "[object URLSearchParams]" ||
+    objectTag === "[object Blob]" ||
+    objectTag === "[object ArrayBuffer]" ||
     body instanceof FormData ||
     body instanceof URLSearchParams ||
     body instanceof Blob ||
@@ -161,7 +167,12 @@ async function requestWithParser<T>(
     requestBody = options.body as BodyInit;
   }
 
-  const response = await fetch(url, {
+  const fetchImpl =
+    typeof window !== "undefined" && typeof window.fetch === "function"
+      ? window.fetch.bind(window)
+      : fetch;
+
+  const response = await fetchImpl(url, {
     ...options,
     method,
     credentials: "include",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -39,6 +40,7 @@ class QuoteCreateRequest(BaseModel):
     line_items: list[LineItemDraft] = Field(default_factory=list)
     total_amount: float | None = None
     notes: str | None = None
+    source_type: Literal["text", "voice"]
 
 
 class QuoteUpdateRequest(BaseModel):
@@ -77,7 +79,7 @@ class QuoteResponse(BaseModel):
     customer_id: UUID
     doc_number: str
     status: str
-    source_type: str
+    source_type: Literal["text", "voice"]
     transcript: str
     total_amount: float | None
     notes: str | None

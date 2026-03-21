@@ -13,6 +13,18 @@ function convertNotes(notes: string): Promise<ExtractionResult> {
   });
 }
 
+function captureAudio(clips: Blob[]): Promise<ExtractionResult> {
+  const formData = new FormData();
+  clips.forEach((clip, index) => {
+    formData.append("clips", clip, `clip-${index + 1}.webm`);
+  });
+
+  return request<ExtractionResult>("/api/quotes/capture-audio", {
+    method: "POST",
+    body: formData,
+  });
+}
+
 function createQuote(data: QuoteCreateRequest): Promise<Quote> {
   return request<Quote>("/api/quotes", {
     method: "POST",
@@ -45,6 +57,7 @@ function shareQuote(id: string): Promise<Quote> {
 
 export const quoteService = {
   convertNotes,
+  captureAudio,
   createQuote,
   getQuote,
   updateQuote,
