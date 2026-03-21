@@ -15,7 +15,7 @@ from app.core.database import get_db
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes import api as quote_api
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
-from app.features.quotes.schemas import ExtractionResult, LineItemDraft
+from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
 from app.features.quotes.service import QuoteService
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
@@ -32,10 +32,28 @@ class _MockExtractionIntegration:
             raise ExtractionError("mock malformed extraction payload")
 
         normalized_notes = notes.strip()
+        if "needs-review" in normalized_notes.lower() or normalized_notes.startswith(
+            "transcript from stitched"
+        ):
+            return ExtractionResult(
+                transcript=normalized_notes,
+                line_items=[
+                    LineItemExtracted(
+                        description="Brown mulch",
+                        details="5 yards",
+                        price=120,
+                        flagged=True,
+                        flag_reason="Unit or price sounds inconsistent with the transcript",
+                    )
+                ],
+                total=120,
+                confidence_notes=[],
+            )
+
         return ExtractionResult(
             transcript=normalized_notes,
             line_items=[
-                LineItemDraft(
+                LineItemExtracted(
                     description="Brown mulch",
                     details="5 yards",
                     price=120,
@@ -205,6 +223,21 @@ async def test_convert_notes_returns_422_for_extraction_errors(client: AsyncClie
     assert response.json()["detail"].startswith("Extraction failed:")
 
 
+async def test_convert_notes_can_return_flagged_line_items(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/convert-notes",
+        json={"notes": "needs-review one board for 9000 dollars"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["line_items"][0]["flagged"] is True
+    assert payload["line_items"][0]["flag_reason"]
+
+
 async def test_capture_audio_single_clip_success(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -219,6 +252,21 @@ async def test_capture_audio_single_clip_success(client: AsyncClient) -> None:
     assert payload["transcript"] == "transcript from stitched-1"
     assert payload["line_items"]
     assert payload["confidence_notes"] == []
+
+
+async def test_capture_audio_can_return_flagged_line_items(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/capture-audio",
+        files=[("clips", ("clip-1.webm", b"clip-a", "audio/webm"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["line_items"][0]["flagged"] is True
+    assert payload["line_items"][0]["flag_reason"]
 
 
 async def test_capture_audio_multi_clip_success(client: AsyncClient) -> None:

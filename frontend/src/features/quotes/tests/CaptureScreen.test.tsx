@@ -54,7 +54,15 @@ const mockedQuoteService = vi.mocked(quoteService);
 
 const extractionFixture: ExtractionResult = {
   transcript: "5 yards brown mulch",
-  line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+  line_items: [
+    {
+      description: "Brown mulch",
+      details: "5 yards",
+      price: 120,
+      flagged: true,
+      flag_reason: "Unit phrasing may be ambiguous",
+    },
+  ],
   total: 120,
   confidence_notes: [],
 };
@@ -132,7 +140,15 @@ describe("CaptureScreen", () => {
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",
       transcript: "5 yards brown mulch",
-      lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      lineItems: [
+        {
+          description: "Brown mulch",
+          details: "5 yards",
+          price: 120,
+          flagged: true,
+          flagReason: "Unit phrasing may be ambiguous",
+        },
+      ],
       total: 120,
       confidenceNotes: [],
       notes: "",
@@ -176,7 +192,15 @@ describe("CaptureScreen", () => {
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",
       transcript: "5 yards brown mulch",
-      lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      lineItems: [
+        {
+          description: "Brown mulch",
+          details: "5 yards",
+          price: 120,
+          flagged: true,
+          flagReason: "Unit phrasing may be ambiguous",
+        },
+      ],
       total: 120,
       confidenceNotes: [],
       notes: "",

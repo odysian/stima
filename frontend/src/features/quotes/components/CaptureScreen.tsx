@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { QuoteSourceType } from "@/features/quotes/types/quote.types";
+import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 
 const VOICE_LOADING_STAGES = [
@@ -57,12 +57,7 @@ export function CaptureScreen(): React.ReactElement {
 
   function applyDraft(
     sourceType: QuoteSourceType,
-    extraction: {
-      transcript: string;
-      line_items: Array<{ description: string; details: string | null; price: number | null }>;
-      total: number | null;
-      confidence_notes: string[];
-    },
+    extraction: ExtractionResult,
   ): void {
     if (!customerId) {
       throw new Error("Missing customer context. Please select a customer again.");
@@ -71,7 +66,13 @@ export function CaptureScreen(): React.ReactElement {
     setDraft({
       customerId,
       transcript: extraction.transcript,
-      lineItems: extraction.line_items,
+      lineItems: extraction.line_items.map((lineItem) => ({
+        description: lineItem.description,
+        details: lineItem.details,
+        price: lineItem.price,
+        flagged: lineItem.flagged,
+        flagReason: lineItem.flag_reason,
+      })),
       total: extraction.total,
       confidenceNotes: extraction.confidence_notes,
       notes: "",

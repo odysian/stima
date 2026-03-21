@@ -4,9 +4,19 @@ export interface LineItemDraft {
   price: number | null;
 }
 
+export interface LineItemExtracted extends LineItemDraft {
+  flagged?: boolean;
+  flag_reason?: string | null;
+}
+
+export interface LineItemDraftWithFlags extends LineItemDraft {
+  flagged?: boolean;
+  flagReason?: string | null;
+}
+
 export interface ExtractionResult {
   transcript: string;
-  line_items: LineItemDraft[];
+  line_items: LineItemExtracted[];
   total: number | null;
   confidence_notes: string[];
 }

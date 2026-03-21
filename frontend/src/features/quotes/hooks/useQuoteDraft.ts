@@ -1,13 +1,13 @@
 import { useCallback, useState } from "react";
 
-import type { LineItemDraft, QuoteSourceType } from "@/features/quotes/types/quote.types";
+import type { LineItemDraftWithFlags, QuoteSourceType } from "@/features/quotes/types/quote.types";
 
 const DRAFT_STORAGE_KEY = "stima_quote_draft";
 
 export interface QuoteDraft {
   customerId: string;
   transcript: string;
-  lineItems: LineItemDraft[];
+  lineItems: LineItemDraftWithFlags[];
   total: number | null;
   confidenceNotes: string[];
   notes: string;
@@ -65,7 +65,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
     return {
       customerId,
       transcript,
-      lineItems: lineItems as LineItemDraft[],
+      lineItems: lineItems as LineItemDraftWithFlags[],
       total,
       confidenceNotes: confidenceNotes.filter(
         (entry): entry is string => typeof entry === "string",

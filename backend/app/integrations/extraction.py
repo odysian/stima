@@ -23,6 +23,8 @@ EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
                     "description": {"type": "string"},
                     "details": {"type": ["string", "null"]},
                     "price": {"type": ["number", "null"]},
+                    "flagged": {"type": "boolean"},
+                    "flag_reason": {"type": ["string", "null"]},
                 },
                 "required": ["description"],
                 "additionalProperties": False,
@@ -41,6 +43,9 @@ EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
 EXTRACTION_SYSTEM_PROMPT = (
     "Extract quote line items and totals from contractor notes. "
     "Do not invent pricing. Use null for missing prices and totals. "
+    "Set line-item flagged=true only for strong review signals: likely audio mishears, "
+    "clearly implausible single-item prices, or critically ambiguous quantity/unit phrasing. "
+    "When flagged=true, include a short flag_reason. Keep flagged false otherwise. "
     "Return only structured tool output."
 )
 

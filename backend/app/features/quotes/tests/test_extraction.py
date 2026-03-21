@@ -9,7 +9,11 @@ from typing import Any
 import pytest
 
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
-from app.integrations.extraction import ExtractionError, ExtractionIntegration
+from app.integrations.extraction import (
+    EXTRACTION_TOOL_SCHEMA,
+    ExtractionError,
+    ExtractionIntegration,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -160,6 +164,80 @@ async def test_extract_raises_typed_error_for_malformed_payload() -> None:
 
     with pytest.raises(ExtractionError, match="schema"):
         await integration.extract(transcript)
+
+
+async def test_extract_accepts_flagged_line_items_with_reason() -> None:
+    transcript = TRANSCRIPTS["partial_ambiguous"]
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Siding wash",
+                                "details": "1 side wall",
+                                "price": 9000,
+                                "flagged": True,
+                                "flag_reason": (
+                                    "Price seems implausibly high for a single side wall"
+                                ),
+                            }
+                        ],
+                        "total": 9000,
+                        "confidence_notes": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].flagged is True
+    assert result.line_items[0].flag_reason is not None
+
+
+async def test_extract_defaults_flag_fields_when_omitted() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Spread mulch",
+                                "details": "5 yards",
+                                "price": 350,
+                            }
+                        ],
+                        "total": 350,
+                        "confidence_notes": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].flagged is False
+    assert result.line_items[0].flag_reason is None
+
+
+async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
+    line_item_schema = EXTRACTION_TOOL_SCHEMA["properties"]["line_items"]["items"]
+    assert line_item_schema["properties"]["flagged"] == {"type": "boolean"}
+    assert line_item_schema["properties"]["flag_reason"] == {"type": ["string", "null"]}
+    assert "flagged" not in line_item_schema["required"]
+    assert "flag_reason" not in line_item_schema["required"]
 
 
 @pytest.mark.parametrize("fixture_name", sorted(TRANSCRIPTS))

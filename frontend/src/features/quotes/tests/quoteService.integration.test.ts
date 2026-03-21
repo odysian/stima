@@ -25,7 +25,15 @@ describe("quoteService integration (MSW)", () => {
 
         return HttpResponse.json({
           transcript: body.notes,
-          line_items: [{ description: "Mulch", details: "5 yards", price: 120 }],
+          line_items: [
+            {
+              description: "Mulch",
+              details: "5 yards",
+              price: 120,
+              flagged: true,
+              flag_reason: "Unit phrasing may be ambiguous",
+            },
+          ],
           total: 120,
           confidence_notes: [],
         });
@@ -37,7 +45,15 @@ describe("quoteService integration (MSW)", () => {
     expect(capturedCsrfHeader).toBe("integration-csrf-token");
     expect(result).toEqual({
       transcript: "Mulch and edging",
-      line_items: [{ description: "Mulch", details: "5 yards", price: 120 }],
+      line_items: [
+        {
+          description: "Mulch",
+          details: "5 yards",
+          price: 120,
+          flagged: true,
+          flag_reason: "Unit phrasing may be ambiguous",
+        },
+      ],
       total: 120,
       confidence_notes: [],
     });
@@ -125,7 +141,15 @@ describe("quoteService integration (MSW)", () => {
 
         return HttpResponse.json({
           transcript: "transcript from voice",
-          line_items: [{ description: "Mulch", details: "5 yards", price: 120 }],
+          line_items: [
+            {
+              description: "Mulch",
+              details: "5 yards",
+              price: 120,
+              flagged: true,
+              flag_reason: "Unit phrasing may be ambiguous",
+            },
+          ],
           total: 120,
           confidence_notes: [],
         });
@@ -139,7 +163,20 @@ describe("quoteService integration (MSW)", () => {
 
     expect(capturedCsrfHeader).toBe("integration-csrf-token");
     expect(capturedContentType).not.toContain("application/json");
-    expect(result.transcript).toBe("transcript from voice");
+    expect(result).toEqual({
+      transcript: "transcript from voice",
+      line_items: [
+        {
+          description: "Mulch",
+          details: "5 yards",
+          price: 120,
+          flagged: true,
+          flag_reason: "Unit phrasing may be ambiguous",
+        },
+      ],
+      total: 120,
+      confidence_notes: [],
+    });
   });
 
   it("generatePdf returns Blob and sends CSRF header", async () => {

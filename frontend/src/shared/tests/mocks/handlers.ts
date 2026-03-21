@@ -145,7 +145,15 @@ export const handlers = [
     return HttpResponse.json(
       {
         transcript: body.notes,
-        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        line_items: [
+          {
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            flagged: true,
+            flag_reason: "Unit phrasing may be ambiguous",
+          },
+        ],
         total: 120,
         confidence_notes: [],
       },
@@ -191,7 +199,15 @@ export const handlers = [
     return HttpResponse.json(
       {
         transcript: "Transcribed clip transcript",
-        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        line_items: [
+          {
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            flagged: true,
+            flag_reason: "Single-item price may need review",
+          },
+        ],
         total: 120,
         confidence_notes: [],
       },

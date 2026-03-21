@@ -213,6 +213,24 @@ describe("ReviewScreen", () => {
     expect(screen.getByText("Price for edging is uncertain")).toBeInTheDocument();
   });
 
+  it("renders inline warning for flagged line items", () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [
+          {
+            description: "Brown mulch",
+            details: "5 yards",
+            price: null,
+            flagged: true,
+            flagReason: "Unit phrasing may be ambiguous",
+          },
+        ],
+      }),
+    );
+
+    expect(screen.getByText("Unit phrasing may be ambiguous")).toBeInTheDocument();
+  });
+
   it("updates notes textarea", () => {
     renderScreen(makeDraft());
 
@@ -227,6 +245,44 @@ describe("ReviewScreen", () => {
       total: 120,
       confidenceNotes: [],
       notes: "Thanks for your business",
+      sourceType: "text",
+    });
+  });
+
+  it("preserves line-item flag metadata while editing", () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [
+          {
+            description: "Brown mulch",
+            details: "5 yards",
+            price: null,
+            flagged: true,
+            flagReason: "Unit phrasing may be ambiguous",
+          },
+        ],
+      }),
+    );
+
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "Premium mulch" },
+    });
+
+    expect(setDraftMock).toHaveBeenCalledWith({
+      customerId: "cust-1",
+      transcript: "5 yards brown mulch and edge front beds",
+      lineItems: [
+        {
+          description: "Premium mulch",
+          details: "5 yards",
+          price: null,
+          flagged: true,
+          flagReason: "Unit phrasing may be ambiguous",
+        },
+      ],
+      total: 120,
+      confidenceNotes: [],
+      notes: "",
       sourceType: "text",
     });
   });
@@ -269,6 +325,34 @@ describe("ReviewScreen", () => {
       lineItems: [
         { description: "Brown mulch", details: "5 yards", price: null },
         { description: "", details: null, price: null },
+      ],
+      notes: "See you next week",
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /generate quote pdf/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.createQuote).toHaveBeenCalledWith({
+        customer_id: "cust-1",
+        transcript: "5 yards brown mulch and edge front beds",
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
+        total_amount: 120,
+        notes: "See you next week",
+        source_type: "text",
+      });
+    });
+  });
+
+  it("strips flag metadata before createQuote submit", async () => {
+    renderScreen(makeDraft({
+      lineItems: [
+        {
+          description: "Brown mulch",
+          details: "5 yards",
+          price: null,
+          flagged: true,
+          flagReason: "Unit phrasing may be ambiguous",
+        },
       ],
       notes: "See you next week",
     }));
