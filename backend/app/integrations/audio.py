@@ -77,7 +77,7 @@ class AudioIntegration:
             if format_hint:
                 return audio_segment_cls.from_file(buffer, format=format_hint)
             return audio_segment_cls.from_file(buffer)
-        except Exception as exc:  # pragma: no cover - ffmpeg decode failures vary by runtime
+        except Exception as exc:
             raise AudioError("Audio clip format is not supported or file is corrupted") from exc
 
 
