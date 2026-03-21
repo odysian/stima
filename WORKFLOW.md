@@ -172,6 +172,9 @@ For small tasks with no contract/behavior change, decision brief is optional.
 
 Run the relevant checks before claiming completion.
 
+Agent execution note:
+- Do not run live/provider-backed verification targets from agent sessions (for example `make extraction-live`); ask the human operator to run them manually and share output.
+
 ### Makefile Verification Contract (Recommended)
 
 If the repo uses `make` for verification, standardize on these targets:
