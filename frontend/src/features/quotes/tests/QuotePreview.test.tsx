@@ -99,6 +99,16 @@ describe("QuotePreview", () => {
     expect(screen.getByText(/Status:/i)).toHaveTextContent("draft");
   });
 
+  it("shows an error when quote fetch fails", async () => {
+    mockedQuoteService.getQuote.mockRejectedValueOnce(new Error("Unable to load quote"));
+
+    renderScreen();
+
+    expect(await screen.findByText("Unable to load quote")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^share$/i })).toBeDisabled();
+  });
+
   it("generates PDF and renders iframe preview", async () => {
     renderScreen();
 
@@ -112,6 +122,23 @@ describe("QuotePreview", () => {
 
     const frame = screen.getByTitle("Quote PDF Preview") as HTMLIFrameElement;
     expect(frame.src).toContain("blob:quote-preview");
+  });
+
+  it("shows an error when PDF generation fails", async () => {
+    mockedQuoteService.generatePdf.mockRejectedValueOnce(
+      new Error("Unable to render quote PDF"),
+    );
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
+    });
+    expect(await screen.findByText("Unable to render quote PDF")).toBeInTheDocument();
+    expect(screen.queryByTitle("Quote PDF Preview")).not.toBeInTheDocument();
   });
 
   it("uses navigator.share when available", async () => {
@@ -186,5 +213,21 @@ describe("QuotePreview", () => {
     });
     expect(screen.queryByText("Share canceled")).not.toBeInTheDocument();
     expect(await screen.findByText(/share\/share-token-1/i)).toBeInTheDocument();
+  });
+
+  it("shows an error when share request fails", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ status: "ready" }));
+    mockedQuoteService.shareQuote.mockRejectedValueOnce(new Error("Unable to share quote"));
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
+    });
+    expect(await screen.findByText("Unable to share quote")).toBeInTheDocument();
+    expect(screen.queryByText(/Share URL:/i)).not.toBeInTheDocument();
   });
 });

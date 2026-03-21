@@ -211,6 +211,29 @@ async def test_public_share_endpoint_returns_404_for_unknown_token(client: Async
     assert response.json() == {"detail": "Not found"}
 
 
+async def test_public_share_endpoint_returns_422_when_render_fails(
+    client: AsyncClient,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    _override_quote_service_dependency.should_fail = True
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    client.cookies.clear()
+    response = await client.get(f"/share/{share_token}")
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Unable to render quote PDF"}
+
+
 async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) -> str:
     register_response = await client.post("/api/auth/register", json=credentials)
     assert register_response.status_code == 201
