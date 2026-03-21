@@ -5,8 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from io import BytesIO
-
-from pydub import AudioSegment  # type: ignore[import-untyped]
+from typing import Any
 
 MAX_AUDIO_DURATION_SECONDS = 600
 CLIP_GAP_MS = 300
@@ -33,14 +32,16 @@ class AudioIntegration:
         if not clips:
             raise AudioError("At least one audio clip is required")
 
-        stitched: AudioSegment | None = None
-        gap = AudioSegment.silent(duration=CLIP_GAP_MS)
-
         for clip in clips:
             if not clip.content:
                 raise AudioError("Audio clip is empty")
 
-            audio_segment = self._decode_clip(clip)
+        audio_segment_cls = _load_audio_segment_class()
+        stitched: Any | None = None
+        gap = audio_segment_cls.silent(duration=CLIP_GAP_MS)
+
+        for clip in clips:
+            audio_segment = self._decode_clip(clip, audio_segment_cls)
             if len(audio_segment) <= 0:
                 raise AudioError("Audio clip is empty")
 
@@ -68,16 +69,28 @@ class AudioIntegration:
 
         return wav_bytes
 
-    def _decode_clip(self, clip: AudioClip) -> AudioSegment:
+    def _decode_clip(self, clip: AudioClip, audio_segment_cls: Any) -> Any:
         format_hint = _infer_format(filename=clip.filename, content_type=clip.content_type)
         buffer = BytesIO(clip.content)
 
         try:
             if format_hint:
-                return AudioSegment.from_file(buffer, format=format_hint)
-            return AudioSegment.from_file(buffer)
+                return audio_segment_cls.from_file(buffer, format=format_hint)
+            return audio_segment_cls.from_file(buffer)
         except Exception as exc:  # pragma: no cover - ffmpeg decode failures vary by runtime
             raise AudioError("Audio clip format is not supported or file is corrupted") from exc
+
+
+def _load_audio_segment_class() -> Any:
+    """Load pydub lazily so app startup does not fail when audio deps are unavailable."""
+    try:
+        from pydub import AudioSegment  # type: ignore[import-untyped]
+    except ModuleNotFoundError as exc:
+        raise AudioError(
+            "Audio processing dependency is unavailable for this Python runtime"
+        ) from exc
+
+    return AudioSegment
 
 
 def _infer_format(*, filename: str | None, content_type: str | None) -> str | None:
