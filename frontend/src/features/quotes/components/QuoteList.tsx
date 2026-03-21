@@ -32,6 +32,7 @@ function formatCreatedDate(value: string): string {
   }
 
   return parsedDate.toLocaleDateString("en-US", {
+    timeZone: "UTC",
     year: "numeric",
     month: "short",
     day: "numeric",

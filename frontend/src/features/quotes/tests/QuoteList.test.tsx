@@ -155,6 +155,19 @@ describe("QuoteList", () => {
     });
   });
 
+  it("renders created_at using a timezone-stable calendar day", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([
+      makeQuoteListItem({
+        id: "quote-utc-midnight",
+        created_at: "2026-03-21T00:00:00.000Z",
+      }),
+    ]);
+
+    renderScreen();
+
+    expect(await screen.findByText("Mar 21, 2026")).toBeInTheDocument();
+  });
+
   it("shows error state when list request fails", async () => {
     mockedQuoteService.listQuotes.mockRejectedValueOnce(new Error("Unable to load quotes"));
 
