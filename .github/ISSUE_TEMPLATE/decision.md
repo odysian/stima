@@ -5,6 +5,8 @@ title: "Decision: "
 labels: ["type:decision"]
 ---
 
+> Add `1-3` `area:` labels from `ISSUES_WORKFLOW.md` before creating this issue.
+
 ## Decision to lock
 -
 

@@ -5,6 +5,8 @@ title: "Spec: "
 labels: ["type:spec"]
 ---
 
+> Add `1-3` `area:` labels from `ISSUES_WORKFLOW.md` before creating this issue.
+
 ## Summary
 What are we building and why?
 

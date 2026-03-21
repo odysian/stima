@@ -1,4 +1,4 @@
-# Task: PDF Share Hardening Test Coverage Follow-Ups (V0 Task 5)
+# Task: PDF Share Hardening Test Coverage Follow-Up (Post-Task 4)
 
 ## Goal
 
@@ -8,7 +8,13 @@ without changing API contracts.
 ## Parent Reference
 
 - Prior implementation: Task #21 / PR #22
-- Roadmap continuity: `docs/V0_ROADMAP.md` (post-Task 4 hardening follow-up)
+- Roadmap continuity: post-Task-4 hardening follow-up outside the numbered roadmap sequence
+
+## Positioning
+
+This is not the canonical roadmap `Task 5`. In `docs/V0_ROADMAP.md`, Task 5 remains
+Voice Capture. This issue is a focused hardening follow-up created after Task 4
+implementation surfaced additional testing value.
 
 ---
 

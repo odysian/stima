@@ -5,6 +5,8 @@ title: "Task: "
 labels: ["type:task"]
 ---
 
+> Add `1-3` `area:` labels from `ISSUES_WORKFLOW.md` before creating this issue.
+
 ## Goal
 What should exist when this is done?
 Default: this Task should represent the entire feature end-to-end unless split criteria apply.
