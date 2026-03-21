@@ -10,18 +10,25 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class LineItemDraft(BaseModel):
-    """Editable line item payload used during extraction and draft persistence."""
+    """Editable line item payload used for quote creation and updates."""
 
     description: str = Field(min_length=1)
     details: str | None = None
     price: float | None = None
 
 
+class LineItemExtracted(LineItemDraft):
+    """Extraction-only line item metadata used during review."""
+
+    flagged: bool = False
+    flag_reason: str | None = None
+
+
 class ExtractionResult(BaseModel):
     """Structured extraction output returned from convert-notes."""
 
     transcript: str = Field(min_length=1)
-    line_items: list[LineItemDraft] = Field(default_factory=list)
+    line_items: list[LineItemExtracted] = Field(default_factory=list)
     total: float | None = None
     confidence_notes: list[str] = Field(default_factory=list)
 

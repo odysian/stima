@@ -1,9 +1,9 @@
-import type { LineItemDraft } from "@/features/quotes/types/quote.types";
+import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 
 interface LineItemRowProps {
   rowId: string;
-  item: LineItemDraft;
-  onChange: (updated: LineItemDraft) => void;
+  item: LineItemDraftWithFlags;
+  onChange: (updated: LineItemDraftWithFlags) => void;
   onDelete: () => void;
   descriptionError?: string | null;
 }
@@ -21,6 +21,11 @@ export function LineItemRow({
 
   return (
     <div className="rounded-md border border-slate-200 p-4">
+      {item.flagged ? (
+        <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {item.flagReason ?? "This item may need review"}
+        </p>
+      ) : null}
       <div className="grid gap-3 md:grid-cols-[1.3fr_1.3fr_0.8fr_auto] md:items-end">
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-slate-700" htmlFor={descriptionInputId}>

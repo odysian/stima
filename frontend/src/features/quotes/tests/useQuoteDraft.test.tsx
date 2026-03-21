@@ -8,7 +8,15 @@ const DRAFT_STORAGE_KEY = "stima_quote_draft";
 const draftFixture: QuoteDraft = {
   customerId: "cust-1",
   transcript: "5 yards brown mulch",
-  lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+  lineItems: [
+    {
+      description: "Brown mulch",
+      details: "5 yards",
+      price: 120,
+      flagged: true,
+      flagReason: "Unit phrasing may be ambiguous",
+    },
+  ],
   total: 120,
   confidenceNotes: [],
   notes: "Thanks for your business",
@@ -70,5 +78,22 @@ describe("useQuoteDraft", () => {
 
     expect(screen.getByTestId("draft-state")).toHaveTextContent("null");
     expect(window.sessionStorage.getItem(DRAFT_STORAGE_KEY)).toBeNull();
+  });
+
+  it("rehydrates older drafts that do not include flag metadata", () => {
+    const legacyDraft = {
+      ...draftFixture,
+      lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+    };
+    window.sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(legacyDraft));
+
+    render(<HookHarness />);
+
+    expect(screen.getByTestId("draft-state")).toHaveTextContent(
+      JSON.stringify({
+        ...draftFixture,
+        lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      }),
+    );
   });
 });

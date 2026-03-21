@@ -52,4 +52,49 @@ describe("LineItemRow", () => {
 
     expect(screen.getByText("Description is required for this row.")).toBeInTheDocument();
   });
+
+  it("renders inline flag warning with reason when flagged", () => {
+    render(
+      <LineItemRow
+        rowId="line-item-10"
+        item={{
+          description: "Mulch",
+          details: "5 yards",
+          price: 120,
+          flagged: true,
+          flagReason: "Unit phrasing may be ambiguous",
+        }}
+        onChange={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Unit phrasing may be ambiguous")).toBeInTheDocument();
+  });
+
+  it("renders fallback inline warning when flagged without reason", () => {
+    render(
+      <LineItemRow
+        rowId="line-item-11"
+        item={{ description: "Mulch", details: "5 yards", price: 120, flagged: true, flagReason: null }}
+        onChange={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("This item may need review")).toBeInTheDocument();
+  });
+
+  it("does not render warning when item is not flagged", () => {
+    render(
+      <LineItemRow
+        rowId="line-item-12"
+        item={{ description: "Mulch", details: "5 yards", price: 120, flagged: false }}
+        onChange={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("This item may need review")).not.toBeInTheDocument();
+  });
 });

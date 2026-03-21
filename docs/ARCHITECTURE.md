@@ -147,7 +147,9 @@ Unique constraint: `(user_id, doc_sequence)`.
     {
       "description": "string",
       "details": "string | null",
-      "price": "number | null"
+      "price": "number | null",
+      "flagged": "boolean (optional, default false)",
+      "flag_reason": "string | null (optional, extraction-only)"
     }
   ],
   "total": "number | null",
@@ -159,6 +161,8 @@ Rules:
 - `line_items` is always an array (may be empty).
 - Missing prices remain `null` (never auto-filled to `0`).
 - `total` is nullable (`null` = not stated).
+- `flagged` and `flag_reason` are extraction-only review hints.
+- Extraction-only fields are stripped before `POST /quotes` and `PATCH /quotes/{id}` payloads.
 
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|

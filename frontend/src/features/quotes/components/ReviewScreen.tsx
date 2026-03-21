@@ -5,10 +5,10 @@ import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { LineItemRow } from "@/features/quotes/components/LineItemRow";
 import type { QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { LineItemDraft } from "@/features/quotes/types/quote.types";
+import type { LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 
-const EMPTY_LINE_ITEM: LineItemDraft = {
+const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   description: "",
   details: null,
   price: null,
@@ -23,20 +23,22 @@ function formatCurrency(value: number): string {
   });
 }
 
-function normalizeLineItem(item: LineItemDraft): LineItemDraft {
+function normalizeLineItem(item: LineItemDraftWithFlags): LineItemDraftWithFlags {
   const normalizedDetails = item.details?.trim() ?? "";
   return {
     description: item.description.trim(),
     details: normalizedDetails.length > 0 ? normalizedDetails : null,
     price: item.price,
+    flagged: item.flagged,
+    flagReason: item.flagReason,
   };
 }
 
-function isBlankLineItem(item: LineItemDraft): boolean {
+function isBlankLineItem(item: LineItemDraftWithFlags): boolean {
   return item.description.length === 0 && item.details === null && item.price === null;
 }
 
-function isInvalidLineItem(item: LineItemDraft): boolean {
+function isInvalidLineItem(item: LineItemDraftWithFlags): boolean {
   return item.description.length === 0 && !isBlankLineItem(item);
 }
 
@@ -80,7 +82,13 @@ export function ReviewScreen(): React.ReactElement | null {
 
   const currentDraft: QuoteDraft = draft;
   const normalizedLineItems = currentDraft.lineItems.map(normalizeLineItem);
-  const lineItemsForSubmit = normalizedLineItems.filter((lineItem) => lineItem.description.length > 0);
+  const lineItemsForSubmit: LineItemDraft[] = normalizedLineItems
+    .filter((lineItem) => lineItem.description.length > 0)
+    .map((lineItem) => ({
+      description: lineItem.description,
+      details: lineItem.details,
+      price: lineItem.price,
+    }));
   const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
   const canSubmit = lineItemsForSubmit.length > 0 && !hasInvalidLineItems;
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
@@ -94,7 +102,7 @@ export function ReviewScreen(): React.ReactElement | null {
     setDraft(updater(currentDraft));
   }
 
-  function onLineItemChange(index: number, updated: LineItemDraft): void {
+  function onLineItemChange(index: number, updated: LineItemDraftWithFlags): void {
     setSaveError(null);
     updateDraft((currentDraft) => ({
       ...currentDraft,
