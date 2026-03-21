@@ -11,7 +11,7 @@ vi.mock("@/shared/lib/http", () => ({
 const mockedRequest = vi.mocked(request);
 
 describe("quoteService.captureAudio", () => {
-  it("builds multipart form data with repeated clips fields", async () => {
+  it("builds multipart form data with repeated clips fields and mime-matched filenames", async () => {
     mockedRequest.mockResolvedValue({
       transcript: "voice transcript",
       line_items: [],
@@ -19,8 +19,8 @@ describe("quoteService.captureAudio", () => {
       confidence_notes: [],
     });
 
-    const clipA = new Blob(["clip-a"], { type: "audio/webm" });
-    const clipB = new Blob(["clip-b"], { type: "audio/webm" });
+    const clipA = new Blob(["clip-a"], { type: "audio/mp4" });
+    const clipB = new Blob(["clip-b"], { type: "audio/webm;codecs=opus" });
 
     await quoteService.captureAudio([clipA, clipB]);
 
@@ -35,5 +35,7 @@ describe("quoteService.captureAudio", () => {
 
     const clips = (formData as FormData).getAll("clips");
     expect(clips).toHaveLength(2);
+    expect((clips[0] as File).name).toBe("clip-1.mp4");
+    expect((clips[1] as File).name).toBe("clip-2.webm");
   });
 });

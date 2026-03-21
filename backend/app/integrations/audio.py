@@ -95,17 +95,17 @@ def _load_audio_segment_class() -> Any:
 
 def _infer_format(*, filename: str | None, content_type: str | None) -> str | None:
     """Infer best-effort format hint from multipart metadata when available."""
-    if filename and "." in filename:
-        extension = filename.rsplit(".", 1)[-1].lower()
-        if extension == "m4a":
-            return "mp4"
-        return extension
-
     if content_type and "/" in content_type:
         subtype = content_type.split("/", 1)[1].lower()
         if subtype in {"x-m4a", "m4a", "aac"}:
             return "mp4"
         if subtype in {"webm", "wav", "mpeg", "mp3", "mp4", "ogg"}:
             return subtype
+
+    if filename and "." in filename:
+        extension = filename.rsplit(".", 1)[-1].lower()
+        if extension == "m4a":
+            return "mp4"
+        return extension
 
     return None
