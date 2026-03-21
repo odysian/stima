@@ -7,6 +7,8 @@ Use these prompts to start an agent on already-scoped work with predictable outp
 ```text
 Run kickoff for existing Task #<task-id> mode=single.
 
+Reference <filename>
+
 Then execute the full Task flow end-to-end:
 1. Restate goal, non-goals, acceptance criteria, and exact verification commands from the issue.
 2. Create/switch to branch `task-<id>-<slug>`.
