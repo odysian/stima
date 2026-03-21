@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
@@ -18,9 +18,11 @@ from app.features.quotes.schemas import (
 )
 from app.features.quotes.service import CaptureAudioClip, QuoteService, QuoteServiceError
 from app.shared.dependencies import get_current_user, get_quote_service, require_csrf
+from app.shared.rate_limit import get_ip_key, limiter
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
+MAX_AUDIO_CLIP_BYTES = 10 * 1024 * 1024
 
 
 @router.post(
@@ -65,23 +67,35 @@ async def create_quote(
     response_model=ExtractionResult,
     dependencies=[Depends(require_csrf)],
 )
+@limiter.limit("10/minute", key_func=get_ip_key)
 async def capture_audio(
+    request: Request,
     clips: Annotated[list[UploadFile], File(...)],
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
 ) -> ExtractionResult:
     """Convert uploaded audio clips into structured quote extraction output."""
+    del request
     del user
     clip_inputs: list[CaptureAudioClip] = []
     for clip in clips:
-        clip_inputs.append(
-            CaptureAudioClip(
-                filename=clip.filename,
-                content_type=clip.content_type,
-                content=await clip.read(),
+        try:
+            if clip.size is not None and clip.size > MAX_AUDIO_CLIP_BYTES:
+                raise HTTPException(status_code=400, detail="Clip too large")
+
+            content = await clip.read()
+            if len(content) > MAX_AUDIO_CLIP_BYTES:
+                raise HTTPException(status_code=400, detail="Clip too large")
+
+            clip_inputs.append(
+                CaptureAudioClip(
+                    filename=clip.filename,
+                    content_type=clip.content_type,
+                    content=content,
+                )
             )
-        )
-        await clip.close()
+        finally:
+            await clip.close()
 
     try:
         return await quote_service.capture_audio(clip_inputs)

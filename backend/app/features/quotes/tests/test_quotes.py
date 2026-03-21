@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.features.auth.service import CSRF_COOKIE_NAME
+from app.features.quotes import api as quote_api
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult, LineItemDraft
 from app.features.quotes.service import QuoteService
@@ -271,6 +272,23 @@ async def test_capture_audio_rejects_unsupported_clip_with_400(client: AsyncClie
 
     assert response.status_code == 400
     assert response.json() == {"detail": "Audio clip format is not supported or file is corrupted"}
+
+
+async def test_capture_audio_rejects_oversized_clip_with_400(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(quote_api, "MAX_AUDIO_CLIP_BYTES", 4)
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/capture-audio",
+        files=[("clips", ("clip-1.webm", b"12345", "audio/webm"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Clip too large"}
 
 
 async def test_capture_audio_transcription_failure_returns_502(client: AsyncClient) -> None:
