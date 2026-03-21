@@ -179,6 +179,23 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert len(list_payload) == 2
     assert list_payload[0]["id"] == created_quote_2["id"]
     assert list_payload[1]["id"] == created_quote_1["id"]
+    assert list_payload[0]["customer_name"] == "Quote Test Customer"
+    assert list_payload[1]["customer_name"] == "Quote Test Customer"
+    assert set(list_payload[0].keys()) == {
+        "id",
+        "customer_id",
+        "customer_name",
+        "doc_number",
+        "status",
+        "total_amount",
+        "created_at",
+    }
+    # Regression guard: list endpoint remains lightweight and does not leak detail payloads.
+    assert "transcript" not in list_payload[0]
+    assert "notes" not in list_payload[0]
+    assert "line_items" not in list_payload[0]
+    assert "share_token" not in list_payload[0]
+    assert "updated_at" not in list_payload[0]
 
     detail_response = await client.get(f"/api/quotes/{created_quote_1['id']}")
     assert detail_response.status_code == 200

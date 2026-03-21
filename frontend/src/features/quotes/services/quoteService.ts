@@ -2,6 +2,7 @@ import type {
   ExtractionResult,
   Quote,
   QuoteCreateRequest,
+  QuoteListItem,
   QuoteUpdateRequest,
 } from "@/features/quotes/types/quote.types";
 import { request, requestBlob } from "@/shared/lib/http";
@@ -57,6 +58,10 @@ function createQuote(data: QuoteCreateRequest): Promise<Quote> {
   });
 }
 
+function listQuotes(): Promise<QuoteListItem[]> {
+  return request<QuoteListItem[]>("/api/quotes");
+}
+
 function getQuote(id: string): Promise<Quote> {
   return request<Quote>(`/api/quotes/${id}`);
 }
@@ -84,6 +89,7 @@ export const quoteService = {
   convertNotes,
   captureAudio,
   createQuote,
+  listQuotes,
   getQuote,
   updateQuote,
   generatePdf,

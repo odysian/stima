@@ -51,6 +51,19 @@ class QuoteRenderContext:
         return (self.updated_at - self.created_at).total_seconds() > 300
 
 
+@dataclass(slots=True)
+class QuoteListItemSummary:
+    """Summary row returned by the quote list query."""
+
+    id: UUID
+    customer_id: UUID
+    customer_name: str
+    doc_number: str
+    status: str
+    total_amount: Decimal | None
+    created_at: datetime
+
+
 class QuoteRepository:
     """Persist and query quote documents using SQLAlchemy async sessions."""
 
@@ -67,15 +80,36 @@ class QuoteRepository:
         )
         return customer is not None
 
-    async def list_by_user(self, user_id: UUID) -> list[Document]:
-        """Return all quotes for a user ordered newest-first."""
-        result = await self._session.scalars(
-            select(Document)
+    async def list_by_user(self, user_id: UUID) -> list[QuoteListItemSummary]:
+        """Return quote summaries for a user ordered newest-first."""
+        result = await self._session.execute(
+            select(
+                Document.id,
+                Document.customer_id,
+                Customer.name.label("customer_name"),
+                Document.doc_number,
+                Document.status,
+                Document.total_amount,
+                Document.created_at,
+            )
+            .join(Customer, Customer.id == Document.customer_id)
             .where(Document.user_id == user_id)
-            .options(selectinload(Document.line_items))
             .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
         )
-        return list(result)
+        return [
+            QuoteListItemSummary(
+                id=row.id,
+                customer_id=row.customer_id,
+                customer_name=row.customer_name,
+                doc_number=row.doc_number,
+                status=(
+                    row.status.value if isinstance(row.status, QuoteStatus) else str(row.status)
+                ),
+                total_amount=row.total_amount,
+                created_at=row.created_at,
+            )
+            for row in result
+        ]
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None:
         """Return one quote owned by a user, including line items."""

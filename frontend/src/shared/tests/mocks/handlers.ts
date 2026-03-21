@@ -211,6 +211,32 @@ export const handlers = [
     );
   }),
 
+  http.get("/api/quotes", () => {
+    return HttpResponse.json(
+      [
+        {
+          id: "quote-2",
+          customer_id: "cust-2",
+          customer_name: "Bob Brown",
+          doc_number: "Q-002",
+          status: "ready",
+          total_amount: null,
+          created_at: "2026-03-21T00:00:00.000Z",
+        },
+        {
+          id: "quote-1",
+          customer_id: "cust-1",
+          customer_name: "Alice Johnson",
+          doc_number: "Q-001",
+          status: "draft",
+          total_amount: 120,
+          created_at: "2026-03-20T00:00:00.000Z",
+        },
+      ],
+      { status: 200 },
+    );
+  }),
+
   http.get("/api/quotes/:id", ({ params }) => {
     const quoteId = String(params.id);
 

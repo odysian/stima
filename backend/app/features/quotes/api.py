@@ -13,6 +13,7 @@ from app.features.quotes.schemas import (
     ConvertNotesRequest,
     ExtractionResult,
     QuoteCreateRequest,
+    QuoteListItemResponse,
     QuoteResponse,
     QuoteUpdateRequest,
 )
@@ -103,14 +104,14 @@ async def capture_audio(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("", response_model=list[QuoteResponse])
+@router.get("", response_model=list[QuoteListItemResponse])
 async def list_quotes(
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
-) -> list[QuoteResponse]:
+) -> list[QuoteListItemResponse]:
     """List quotes for the authenticated user."""
     quotes = await quote_service.list_quotes(user)
-    return [QuoteResponse.model_validate(quote) for quote in quotes]
+    return [QuoteListItemResponse.model_validate(quote) for quote in quotes]
 
 
 @router.get("/{quote_id}", response_model=QuoteResponse)

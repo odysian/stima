@@ -48,6 +48,16 @@ export interface Quote {
   updated_at: string;
 }
 
+export interface QuoteListItem {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  doc_number: string;
+  status: QuoteStatus;
+  total_amount: number | null;
+  created_at: string;
+}
+
 export interface QuoteCreateRequest {
   customer_id: string;
   transcript: string;

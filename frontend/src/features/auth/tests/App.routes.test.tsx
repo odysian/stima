@@ -50,7 +50,7 @@ describe("App routes", () => {
 
     renderApp("/login");
 
-    expect(await screen.findByText("Authenticated App Shell")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /your quotes/i })).toBeInTheDocument();
   });
 
   it("redirects authenticated users who are not onboarded to onboarding", async () => {
@@ -76,7 +76,7 @@ describe("App routes", () => {
 
     renderApp("/onboarding");
 
-    expect(await screen.findByText("Authenticated App Shell")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /your quotes/i })).toBeInTheDocument();
   });
 
   it("redirects unauthenticated users from protected route to login", async () => {
