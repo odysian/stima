@@ -1,4 +1,4 @@
-.PHONY: help verify backend-verify frontend-verify db-verify template-verify
+.PHONY: help verify backend-verify frontend-verify db-verify template-verify extraction-live
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-20s %s\n", $$1, $$2}'
@@ -13,7 +13,7 @@ backend-verify: ## Run backend lint, type checks, security scan, and tests
 		.venv/bin/ruff format --check . && \
 		.venv/bin/mypy . --cache-dir .mypy_cache && \
 		.venv/bin/bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/profile/tests,app/features/quotes/tests,app/shared/tests && \
-		.venv/bin/pytest -v -o cache_dir=.pytest_cache
+		.venv/bin/pytest -v -m "not live" -o cache_dir=.pytest_cache
 
 frontend-verify: ## Run frontend type checks, lint, tests, and build
 	@test -x frontend/node_modules/.bin/tsc || (echo "Missing frontend dependencies. Run: cd frontend && npm install" && exit 1)
@@ -29,3 +29,7 @@ db-verify: ## Apply database migrations to head
 
 template-verify: ## Check template docs for unresolved placeholders
 	@./scripts/check-unresolved-template-tokens.sh
+
+extraction-live: ## Run live extraction tests against real Claude API (requires ANTHROPIC_API_KEY in .env)
+	@test -x backend/.venv/bin/pytest || (echo "Missing backend/.venv. Run: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" && exit 1)
+	@cd backend && .venv/bin/pytest -m live -s -v

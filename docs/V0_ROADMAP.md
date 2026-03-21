@@ -258,6 +258,34 @@ This is the end of Slice 0.
 
 ---
 
+### Task 4.5 — Extraction Live Validation
+**Mode:** `single` | **Slice:** 0.5
+
+**Why between Task 4 and Task 5:** Voice capture introduces transcription noise and
+format variance. Before adding that input layer, we validate the real extraction
+prompt against all transcript fixtures with the production integration path.
+
+**Backend scope:**
+- Add a dedicated live test module at
+  `backend/app/features/quotes/tests/test_extraction_live.py`
+- Use real `ExtractionIntegration` with settings-driven model/key
+  (`ANTHROPIC_API_KEY`, `EXTRACTION_MODEL`)
+- Add six fixture-specific assertions for null semantics and totals:
+  `clean_with_total`, `clean_no_prices`, `total_only`, `partial_ambiguous`,
+  `noisy_with_hesitation`, `no_pricing_at_all`
+- Print per-fixture report cards in test output for human review
+- Register pytest marker `live` in `backend/pytest.ini`
+
+**Tooling scope:**
+- `make backend-verify` excludes live tests via `pytest -m "not live"`
+- Add `make extraction-live` to run only live extraction tests with `-m live -s -v`
+- Keep live tests out of normal CI/verify runs
+
+**DoD gate for Task 5:** `make extraction-live` is available and validates all six
+fixtures against real Claude responses, while `make backend-verify` remains offline-safe.
+
+---
+
 ### Task 5 — Voice Capture
 **Mode:** `single` | **Slice:** 1
 
