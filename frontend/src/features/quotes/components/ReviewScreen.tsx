@@ -149,6 +149,7 @@ export function ReviewScreen(): React.ReactElement | null {
         line_items: lineItemsForSubmit,
         total_amount: currentDraft.total,
         notes: currentDraft.notes,
+        source_type: currentDraft.sourceType,
       });
       hasSubmittedRef.current = true;
       clearDraft();

@@ -25,8 +25,10 @@ from app.features.profile.repository import ProfileRepository
 from app.features.profile.service import ProfileService
 from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.service import QuoteService
+from app.integrations.audio import AudioIntegration
 from app.integrations.extraction import ExtractionIntegration
 from app.integrations.pdf import PdfIntegration
+from app.integrations.transcription import TranscriptionIntegration
 
 
 @lru_cache(maxsize=1)
@@ -66,6 +68,11 @@ def get_quote_service(
         extraction_integration=ExtractionIntegration(
             api_key=settings.anthropic_api_key,
             model=settings.extraction_model,
+        ),
+        audio_integration=AudioIntegration(),
+        transcription_integration=TranscriptionIntegration(
+            api_key=settings.openai_api_key,
+            model=settings.transcription_model,
         ),
         pdf_integration=get_pdf_integration(),
     )

@@ -164,7 +164,7 @@ export const handlers = [
         customer_id: body.customer_id,
         doc_number: "Q-001",
         status: "draft",
-        source_type: "text",
+        source_type: body.source_type,
         transcript: body.transcript,
         total_amount: body.total_amount,
         notes: body.notes,
@@ -181,6 +181,21 @@ export const handlers = [
         updated_at: "2026-03-20T00:00:00.000Z",
       },
       { status: 201 },
+    );
+  }),
+
+  http.post("/api/quotes/capture-audio", ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    return HttpResponse.json(
+      {
+        transcript: "Transcribed clip transcript",
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total: 120,
+        confidence_notes: [],
+      },
+      { status: 200 },
     );
   }),
 

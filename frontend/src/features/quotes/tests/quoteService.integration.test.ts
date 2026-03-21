@@ -65,7 +65,7 @@ describe("quoteService integration (MSW)", () => {
           customer_id: body.customer_id,
           doc_number: "Q-001",
           status: "draft",
-          source_type: "text",
+          source_type: body.source_type,
           transcript: body.transcript,
           total_amount: body.total_amount,
           notes: body.notes,
@@ -92,6 +92,7 @@ describe("quoteService integration (MSW)", () => {
       line_items: [{ description: "Mulch", details: "5 yards", price: 120 }],
       total_amount: 120,
       notes: "Thank you",
+      source_type: "text",
     });
 
     expect(capturedCsrfHeader).toBe("integration-csrf-token");
@@ -110,6 +111,35 @@ describe("quoteService integration (MSW)", () => {
       created_at: "2026-03-20T00:00:00.000Z",
       updated_at: "2026-03-20T00:00:00.000Z",
     });
+  });
+
+  it("captureAudio sends multipart clips and returns ExtractionResult", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+    let capturedContentType: string | null = null;
+
+    server.use(
+      http.post("/api/quotes/capture-audio", async ({ request }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        capturedContentType = request.headers.get("Content-Type");
+
+        return HttpResponse.json({
+          transcript: "transcript from voice",
+          line_items: [{ description: "Mulch", details: "5 yards", price: 120 }],
+          total: 120,
+          confidence_notes: [],
+        });
+      }),
+    );
+
+    const result = await quoteService.captureAudio([
+      new Blob(["clip-1"], { type: "audio/webm" }),
+      new Blob(["clip-2"], { type: "audio/webm" }),
+    ]);
+
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(capturedContentType).not.toContain("application/json");
+    expect(result.transcript).toBe("transcript from voice");
   });
 
   it("generatePdf returns Blob and sends CSRF header", async () => {

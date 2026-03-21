@@ -9,6 +9,7 @@ import type { Quote } from "@/features/quotes/types/quote.types";
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
     convertNotes: vi.fn(),
+    captureAudio: vi.fn(),
     createQuote: vi.fn(),
     getQuote: vi.fn(),
     updateQuote: vi.fn(),
