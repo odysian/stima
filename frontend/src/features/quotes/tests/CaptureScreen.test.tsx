@@ -141,6 +141,21 @@ describe("CaptureScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
   });
 
+  it("shows inline error when text mode submission fails and does not navigate", async () => {
+    mockedQuoteService.convertNotes.mockRejectedValueOnce(new Error("Text extraction failed"));
+
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: "Text" }));
+    fireEvent.change(screen.getByLabelText(/notes/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /generate draft/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Text extraction failed");
+    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
+  });
+
   it("keeps voice Generate Draft disabled until at least one clip exists", () => {
     mockVoiceCapture({ clips: [] });
 
@@ -168,6 +183,17 @@ describe("CaptureScreen", () => {
       sourceType: "voice",
     });
     expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
+  });
+
+  it("shows inline error when voice mode submission fails and does not navigate", async () => {
+    mockVoiceCapture({ clips: [clipFixture] });
+    mockedQuoteService.captureAudio.mockRejectedValueOnce(new Error("Voice capture failed"));
+
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: /generate draft/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Voice capture failed");
+    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
   });
 
   it("shows staged loading copy for voice submission while request is in flight", async () => {
