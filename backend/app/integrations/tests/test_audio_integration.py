@@ -6,7 +6,7 @@ import wave
 from io import BytesIO
 
 import pytest
-from app.integrations.audio import AudioClip, AudioError, AudioIntegration
+from app.integrations.audio import CLIP_GAP_MS, AudioClip, AudioError, AudioIntegration
 
 _DURATION_TOLERANCE_SECONDS = 0.03
 
@@ -97,7 +97,7 @@ def test_normalize_and_stitch_two_wav_clips_includes_gap_duration(wav_bytes: byt
 
     _assert_normalized_wav_contract(normalized)
     _, _, _, normalized_duration_seconds = _read_wav_details(normalized)
-    expected_seconds = (clip_duration_seconds * 2) + 0.3
+    expected_seconds = (clip_duration_seconds * 2) + (CLIP_GAP_MS / 1000)
     assert normalized_duration_seconds >= expected_seconds - _DURATION_TOLERANCE_SECONDS  # nosec B101
 
 

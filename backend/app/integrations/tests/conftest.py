@@ -15,7 +15,7 @@ _SAMPLE_RATE = 16_000
 _DURATION_SECONDS = 1.0
 _FREQUENCY_HZ = 440.0
 _AMPLITUDE = 0.4
-_GAP_RADIANS = 2 * math.pi
+_TWO_PI = 2 * math.pi
 
 
 def _build_wav_bytes() -> bytes:
@@ -24,7 +24,7 @@ def _build_wav_bytes() -> bytes:
 
     for index in range(frame_count):
         sample = int(
-            32767 * _AMPLITUDE * math.sin((_GAP_RADIANS * _FREQUENCY_HZ * index) / _SAMPLE_RATE)
+            32767 * _AMPLITUDE * math.sin((_TWO_PI * _FREQUENCY_HZ * index) / _SAMPLE_RATE)
         )
         pcm_frames.extend(struct.pack("<h", sample))
 
