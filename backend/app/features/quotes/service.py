@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.features.auth.models import User
 from app.features.quotes.models import Document, QuoteStatus
-from app.features.quotes.repository import QuoteRenderContext
+from app.features.quotes.repository import QuoteListItemSummary, QuoteRenderContext
 from app.features.quotes.schemas import (
     ExtractionResult,
     LineItemDraft,
@@ -41,7 +41,7 @@ class QuoteRepositoryProtocol(Protocol):
 
     async def customer_exists_for_user(self, *, user_id: UUID, customer_id: UUID) -> bool: ...
 
-    async def list_by_user(self, user_id: UUID) -> list[Document]: ...
+    async def list_by_user(self, user_id: UUID) -> list[QuoteListItemSummary]: ...
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
 
@@ -205,7 +205,7 @@ class QuoteService:
 
         raise QuoteServiceError(detail="Unable to create quote", status_code=409)
 
-    async def list_quotes(self, user: User) -> list[Document]:
+    async def list_quotes(self, user: User) -> list[QuoteListItemSummary]:
         """List quotes for the authenticated user."""
         return await self._repository.list_by_user(_resolve_user_id(user))
 

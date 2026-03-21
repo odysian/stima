@@ -169,13 +169,22 @@ Rules:
 | `/quotes/convert-notes` | POST | yes | cookie | `{ notes }` | `200 ExtractionResult` |
 | `/quotes/capture-audio` | POST | yes | cookie | multipart form-data `clips` files | `200 ExtractionResult` |
 | `/quotes` | POST | yes | cookie | `{ customer_id, transcript, line_items, total_amount, notes, source_type }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
-| `/quotes` | GET | no | cookie | — | `200 Quote[]` ordered `created_at DESC` (owned by current user) |
+| `/quotes` | GET | no | cookie | — | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 Quote` or `404 { detail: "Not found" }` |
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ line_items?, total_amount?, notes? }` | `200 Quote` or `404 { detail: "Not found" }` |
 
 `PATCH /quotes/{id}` behavior:
 - If `line_items` is present, existing rows are fully replaced.
 - If `line_items` is omitted, existing rows are preserved.
+
+`QuoteListItem` fields:
+- `id`
+- `customer_id`
+- `customer_name`
+- `doc_number`
+- `status`
+- `total_amount`
+- `created_at`
 
 ### Error format
 ```json

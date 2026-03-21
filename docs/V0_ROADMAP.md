@@ -331,8 +331,11 @@ a list to be proven — a user can navigate directly to a quote. The list is nee
 before pilot testing but not before the core loop is validated.
 
 **Backend scope:**
-- `GET /api/quotes` already wired in Task 3A. Ensure it returns pagination-friendly
-  data (ordered by `created_at DESC`; page/limit params optional for V0).
+- `GET /api/quotes` uses a dedicated list-summary contract for home screen rows
+  (`id`, `customer_id`, `customer_name`, `doc_number`, `status`, `total_amount`,
+  `created_at`), ordered by `created_at DESC, doc_sequence DESC`.
+- Keep list payload intentionally lightweight (no `transcript`, `notes`, `line_items`,
+  `share_token`, or `updated_at`) and reserve full detail shape for quote detail/create/update/share endpoints.
 - `GET /api/quotes/:id` detail endpoint also from Task 3A.
 
 **Frontend scope:**
@@ -343,8 +346,8 @@ before pilot testing but not before the core loop is validated.
 - Settings nav item (goes to `/settings`, which is a placeholder until Task 7)
 - Quote row tap → Quote Detail view (reuse QuotePreview or a lightweight detail screen)
 
-**Note:** `GET /api/quotes/:id` from Task 3A feeds the detail view. No new backend
-work expected.
+**Note:** `GET /api/quotes/:id` from Task 3A feeds the detail view. Task 6 refines
+the list endpoint contract only; detail/create/update/share contracts remain unchanged.
 
 ---
 

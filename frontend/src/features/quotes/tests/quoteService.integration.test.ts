@@ -5,6 +5,7 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type {
   Quote,
   QuoteCreateRequest,
+  QuoteListItem,
 } from "@/features/quotes/types/quote.types";
 import { clearCsrfToken, setCsrfToken } from "@/shared/lib/http";
 import { server } from "@/shared/tests/mocks/server";
@@ -127,6 +128,38 @@ describe("quoteService integration (MSW)", () => {
       created_at: "2026-03-20T00:00:00.000Z",
       updated_at: "2026-03-20T00:00:00.000Z",
     });
+  });
+
+  it("listQuotes returns quote summary contract including customer_name", async () => {
+    const response: QuoteListItem[] = [
+      {
+        id: "quote-2",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "Q-002",
+        status: "ready",
+        total_amount: null,
+        created_at: "2026-03-21T00:00:00.000Z",
+      },
+      {
+        id: "quote-1",
+        customer_id: "cust-1",
+        customer_name: "Alice Johnson",
+        doc_number: "Q-001",
+        status: "draft",
+        total_amount: 120,
+        created_at: "2026-03-20T00:00:00.000Z",
+      },
+    ];
+
+    server.use(
+      http.get("/api/quotes", () => HttpResponse.json(response, { status: 200 })),
+    );
+
+    const quotes = await quoteService.listQuotes();
+
+    expect(quotes).toEqual(response);
+    expect(quotes[0]).not.toHaveProperty("line_items");
   });
 
   it("captureAudio sends multipart clips and returns ExtractionResult", async () => {

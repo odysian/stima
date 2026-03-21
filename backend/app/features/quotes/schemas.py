@@ -77,6 +77,20 @@ class LineItemResponse(BaseModel):
     sort_order: int
 
 
+class QuoteListItemResponse(BaseModel):
+    """Serializable quote summary payload returned by the quote list endpoint."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    customer_id: UUID
+    customer_name: str
+    doc_number: str
+    status: str
+    total_amount: float | None
+    created_at: datetime
+
+
 class QuoteResponse(BaseModel):
     """Serializable quote payload returned by quote endpoints."""
 

@@ -4,7 +4,6 @@ import {
   Route,
   Routes,
   useLocation,
-  useNavigate,
 } from "react-router-dom";
 
 import { LoginForm } from "@/features/auth/components/LoginForm";
@@ -13,6 +12,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerSelectScreen } from "@/features/customers/components/CustomerSelectScreen";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
+import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { QuotePreview } from "@/features/quotes/components/QuotePreview";
 import { ReviewScreen } from "@/features/quotes/components/ReviewScreen";
 
@@ -53,25 +53,6 @@ function OnboardingRoute(): React.ReactElement {
   return <Outlet />;
 }
 
-function AppShell(): React.ReactElement {
-  const navigate = useNavigate();
-
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50">
-      <section className="flex flex-col items-center gap-4">
-        <h1 className="text-2xl font-semibold text-slate-900">Authenticated App Shell</h1>
-        <button
-          type="button"
-          onClick={() => navigate("/quotes/new")}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-        >
-          New Quote
-        </button>
-      </section>
-    </main>
-  );
-}
-
 export default function App(): React.ReactElement {
   return (
     <Routes>
@@ -95,7 +76,11 @@ export default function App(): React.ReactElement {
         <Route path="/onboarding" element={<OnboardingForm />} />
       </Route>
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<AppShell />} />
+        <Route path="/" element={<QuoteList />} />
+        <Route
+          path="/settings"
+          element={<div className="p-6 text-sm text-slate-700">Settings coming soon</div>}
+        />
         <Route path="/quotes/new" element={<CustomerSelectScreen />} />
         <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
         <Route path="/quotes/review" element={<ReviewScreen />} />
