@@ -80,6 +80,9 @@ describe("quoteService integration (MSW)", () => {
         const response: Quote = {
           id: "quote-1",
           customer_id: body.customer_id,
+          customer_name: "Test Customer",
+          customer_email: null,
+          customer_phone: null,
           doc_number: "Q-001",
           status: "draft",
           source_type: body.source_type,
@@ -116,6 +119,9 @@ describe("quoteService integration (MSW)", () => {
     expect(createdQuote).toEqual({
       id: "quote-1",
       customer_id: "cust-1",
+      customer_name: "Test Customer",
+      customer_email: null,
+      customer_phone: null,
       doc_number: "Q-001",
       status: "draft",
       source_type: "text",

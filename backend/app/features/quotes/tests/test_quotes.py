@@ -122,7 +122,13 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     client: AsyncClient,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
-    customer_id = await _create_customer(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        name="Quote Test Customer",
+        email="customer@example.com",
+        phone="+1-555-123-4567",
+    )
 
     initial_list = await client.get("/api/quotes")
     assert initial_list.status_code == 200
@@ -211,6 +217,9 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
     assert detail_payload["id"] == created_quote_1["id"]
+    assert detail_payload["customer_name"] == "Quote Test Customer"
+    assert detail_payload["customer_email"] == "customer@example.com"
+    assert detail_payload["customer_phone"] == "+1-555-123-4567"
     assert detail_payload["line_items"]
 
     patch_response = await client.patch(
@@ -248,6 +257,41 @@ async def test_convert_notes_returns_422_for_extraction_errors(client: AsyncClie
 
     assert response.status_code == 422
     assert response.json()["detail"].startswith("Extraction failed:")
+
+
+async def test_get_quote_detail_includes_nullable_customer_contact_fields(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        name="Nullable Contact Customer",
+        email=None,
+        phone=None,
+    )
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "Quote with nullable customer contact fields",
+            "line_items": [{"description": "Line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert detail_payload["customer_name"] == "Nullable Contact Customer"
+    assert detail_payload["customer_email"] is None
+    assert detail_payload["customer_phone"] is None
 
 
 async def test_convert_notes_can_return_flagged_line_items(client: AsyncClient) -> None:
@@ -749,10 +793,23 @@ async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) 
     return csrf_token
 
 
-async def _create_customer(client: AsyncClient, csrf_token: str) -> str:
+async def _create_customer(
+    client: AsyncClient,
+    csrf_token: str,
+    *,
+    name: str = "Quote Test Customer",
+    email: str | None = None,
+    phone: str | None = None,
+    address: str | None = None,
+) -> str:
     response = await client.post(
         "/api/customers",
-        json={"name": "Quote Test Customer"},
+        json={
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "address": address,
+        },
         headers={"X-CSRF-Token": csrf_token},
     )
     assert response.status_code == 201

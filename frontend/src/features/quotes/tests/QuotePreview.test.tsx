@@ -27,6 +27,9 @@ function makeQuote(overrides: Partial<Quote> = {}): Quote {
   return {
     id: "quote-1",
     customer_id: "cust-1",
+    customer_name: "Test Customer",
+    customer_email: null,
+    customer_phone: null,
     doc_number: "Q-001",
     status: "draft",
     source_type: "text",
@@ -134,7 +137,12 @@ describe("QuotePreview", () => {
   });
 
   it("renders amount and falls back to customer_id when customer details are unavailable", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ total_amount: 245.5 }));
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuote({
+        total_amount: 245.5,
+        customer_name: " ",
+      }),
+    );
 
     renderScreen();
 

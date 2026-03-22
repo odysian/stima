@@ -29,7 +29,7 @@ function readOptionalQuoteText(
     return null;
   }
 
-  const value = (quote as unknown as Record<string, unknown>)[key];
+  const value = quote[key];
   if (typeof value !== "string") {
     return null;
   }
@@ -100,8 +100,6 @@ export function QuotePreview(): React.ReactElement {
   const shareUrl = quote?.share_token
     ? `${window.location.origin}/share/${quote.share_token}`
     : null;
-  // Intentional fallback: current GET /quotes/{id} response does not include customer_* fields.
-  // Follow-up tracked in #51; until then render customer_id + contact placeholder.
   const clientName = readOptionalQuoteText(quote, "customer_name") || quote?.customer_id || "Unknown customer";
   const clientContact =
     [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]

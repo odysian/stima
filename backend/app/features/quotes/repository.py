@@ -65,6 +65,28 @@ class QuoteListItemSummary:
     created_at: datetime
 
 
+@dataclass(slots=True)
+class QuoteDetailRow:
+    """Detail row returned by the quote detail query."""
+
+    id: UUID
+    customer_id: UUID
+    customer_name: str
+    customer_email: str | None
+    customer_phone: str | None
+    doc_number: str
+    status: str
+    source_type: str
+    transcript: str
+    total_amount: Decimal | None
+    notes: str | None
+    shared_at: datetime | None
+    share_token: str | None
+    line_items: list[LineItem]
+    created_at: datetime
+    updated_at: datetime
+
+
 class QuoteRepository:
     """Persist and query quote documents using SQLAlchemy async sessions."""
 
@@ -131,6 +153,45 @@ class QuoteRepository:
             .options(selectinload(Document.line_items))
         )
         return result.scalar_one_or_none()
+
+    async def get_detail_by_id(self, quote_id: UUID, user_id: UUID) -> QuoteDetailRow | None:
+        """Return one quote detail row with customer contact fields."""
+        result = await self._session.execute(
+            select(Document, Customer)
+            .join(Customer, Customer.id == Document.customer_id)
+            .where(
+                Document.id == quote_id,
+                Document.user_id == user_id,
+            )
+            .options(selectinload(Document.line_items))
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+
+        document, customer = row
+        return QuoteDetailRow(
+            id=document.id,
+            customer_id=document.customer_id,
+            customer_name=customer.name,
+            customer_email=customer.email,
+            customer_phone=customer.phone,
+            doc_number=document.doc_number,
+            status=(
+                document.status.value
+                if isinstance(document.status, QuoteStatus)
+                else str(document.status)
+            ),
+            source_type=document.source_type,
+            transcript=document.transcript,
+            total_amount=document.total_amount,
+            notes=document.notes,
+            shared_at=document.shared_at,
+            share_token=document.share_token,
+            line_items=document.line_items,
+            created_at=document.created_at,
+            updated_at=document.updated_at,
+        )
 
     async def get_render_context(self, quote_id: UUID, user_id: UUID) -> QuoteRenderContext | None:
         """Return PDF render context for a user-owned quote."""
