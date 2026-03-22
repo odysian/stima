@@ -23,7 +23,7 @@ export function Input({
 }: InputProps): React.ReactElement {
   const inputClassName = [
     "w-full bg-surface-container-high rounded-lg px-4 py-3 font-body text-sm text-on-surface",
-    "placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white transition-all",
+    "placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-surface-container-lowest transition-all",
     className,
   ]
     .filter(Boolean)

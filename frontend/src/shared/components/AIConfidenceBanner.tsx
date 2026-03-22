@@ -6,7 +6,10 @@ export function AIConfidenceBanner({ message }: AIConfidenceBannerProps): React.
   return (
     <div className="bg-amber-500/10 border-l-4 border-amber-500 rounded-lg p-4 backdrop-blur-md shadow-[0_0_24px_rgba(0,0,0,0.04)]">
       <div className="flex gap-3">
-        <span className="material-symbols-outlined text-amber-600" style={{ fontVariationSettings: '"FILL" 1' }}>
+        <span
+          className="material-symbols-outlined text-amber-600"
+          style={{ fontVariationSettings: '"FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24' }}
+        >
           info
         </span>
         <div>
