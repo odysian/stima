@@ -136,8 +136,9 @@ export function ReviewScreen(): React.ReactElement | null {
         <div className="mx-auto flex w-full max-w-2xl items-center gap-4">
           <button
             type="button"
+            aria-label="Back to capture"
             className="rounded-full p-2 text-emerald-900 transition-colors hover:bg-slate-100 active:scale-95"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(`/quotes/capture/${currentDraft.customerId}`)}
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
