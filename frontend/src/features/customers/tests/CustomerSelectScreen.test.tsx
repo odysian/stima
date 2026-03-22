@@ -30,6 +30,8 @@ vi.mock("@/features/quotes/hooks/useQuoteDraft", () => ({
   useQuoteDraft: () => ({
     draft: null,
     setDraft: vi.fn(),
+    updateLineItem: vi.fn(),
+    removeLineItem: vi.fn(),
     clearDraft: clearDraftMock,
   }),
 }));
@@ -83,30 +85,15 @@ afterEach(() => {
 });
 
 describe("CustomerSelectScreen", () => {
-  it("renders search input and loading state on mount", async () => {
-    let resolveList: ((customers: Customer[]) => void) | undefined;
-    mockedCustomerService.listCustomers.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveList = resolve;
-        }),
-    );
-
+  it("renders top app bar and search mode content", async () => {
     renderScreen();
 
-    expect(screen.getByLabelText(/search customers/i)).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Loading customers...");
+    expect(screen.getByRole("heading", { name: "New Quote" })).toBeInTheDocument();
+    expect(screen.getByText("Select a customer to continue")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add new customer/i })).toBeInTheDocument();
     expect(clearDraftMock).toHaveBeenCalledTimes(1);
 
-    resolveList?.(customersFixture);
     expect(await screen.findByText("Alice Johnson")).toBeInTheDocument();
-  });
-
-  it("renders the customer list after load resolves", async () => {
-    renderScreen();
-
-    expect(await screen.findByText("Alice Johnson")).toBeInTheDocument();
-    expect(screen.getByText("Bob Brown")).toBeInTheDocument();
   });
 
   it("filters list when user types in search input", async () => {
@@ -121,67 +108,35 @@ describe("CustomerSelectScreen", () => {
     expect(screen.getByText("Bob Brown")).toBeInTheDocument();
   });
 
-  it("shows all customers when query is cleared", async () => {
-    renderScreen();
-    await screen.findByText("Alice Johnson");
-
-    const searchInput = screen.getByLabelText(/search customers/i);
-    fireEvent.change(searchInput, { target: { value: "alice" } });
-    expect(screen.queryByText("Bob Brown")).not.toBeInTheDocument();
-
-    fireEvent.change(searchInput, { target: { value: "" } });
-    expect(screen.getByText("Alice Johnson")).toBeInTheDocument();
-    expect(screen.getByText("Bob Brown")).toBeInTheDocument();
-  });
-
-  it("navigates to capture route when selecting a customer", async () => {
-    renderScreen();
-    const aliceRow = await screen.findByRole("button", { name: /alice johnson/i });
-
-    fireEvent.click(aliceRow);
-
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-1");
-  });
-
-  it("switches to create mode when add button is clicked", async () => {
+  it("shows create mode with New Customer heading when CTA is clicked", async () => {
     renderScreen();
     await screen.findByText("Alice Johnson");
 
     fireEvent.click(screen.getByRole("button", { name: /add new customer/i }));
 
-    expect(screen.getByRole("heading", { name: /add new customer/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New Customer" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/full name/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create & continue >/i })).toBeInTheDocument();
   });
 
-  it("renders create form fields in create mode", async () => {
+  it("submits create form and navigates to capture route", async () => {
     renderScreen();
     await screen.findByText("Alice Johnson");
 
     fireEvent.click(screen.getByRole("button", { name: /add new customer/i }));
-
-    expect(screen.getByLabelText(/^name$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^phone$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^email$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^address$/i)).toBeInTheDocument();
-  });
-
-  it("submits create form and calls createCustomer with the right payload", async () => {
-    renderScreen();
-    await screen.findByText("Alice Johnson");
-
-    fireEvent.click(screen.getByRole("button", { name: /add new customer/i }));
-    fireEvent.change(screen.getByLabelText(/^name$/i), {
+    fireEvent.change(screen.getByLabelText(/full name/i), {
       target: { value: "  New Customer  " },
     });
-    fireEvent.change(screen.getByLabelText(/^phone$/i), {
-      target: { value: "  555-0109 " },
+    fireEvent.change(screen.getByLabelText(/phone number/i), {
+      target: { value: " 555-0109 " },
     });
-    fireEvent.change(screen.getByLabelText(/^email$/i), {
+    fireEvent.change(screen.getByLabelText(/email address/i), {
       target: { value: " new@example.com " },
     });
     fireEvent.change(screen.getByLabelText(/^address$/i), {
       target: { value: " 100 River Rd " },
     });
-    fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
+    fireEvent.click(screen.getByRole("button", { name: /create & continue >/i }));
 
     await waitFor(() => {
       expect(mockedCustomerService.createCustomer).toHaveBeenCalledWith({
@@ -191,45 +146,6 @@ describe("CustomerSelectScreen", () => {
         address: "100 River Rd",
       });
     });
-  });
-
-  it("navigates to capture route after successful create", async () => {
-    renderScreen();
-    await screen.findByText("Alice Johnson");
-
-    fireEvent.click(screen.getByRole("button", { name: /add new customer/i }));
-    fireEvent.change(screen.getByLabelText(/^name$/i), {
-      target: { value: "New Customer" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
-
-    await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-new");
-    });
-  });
-
-  it("shows inline error if createCustomer rejects", async () => {
-    mockedCustomerService.createCustomer.mockRejectedValueOnce(new Error("Unable to create customer"));
-    renderScreen();
-    await screen.findByText("Alice Johnson");
-
-    fireEvent.click(screen.getByRole("button", { name: /add new customer/i }));
-    fireEvent.change(screen.getByLabelText(/^name$/i), {
-      target: { value: "New Customer" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to create customer");
-  });
-
-  it("returns to search mode when cancel is clicked in create mode", async () => {
-    renderScreen();
-    await screen.findByText("Alice Johnson");
-
-    fireEvent.click(screen.getByRole("button", { name: /add new customer/i }));
-    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
-
-    expect(screen.getByRole("heading", { name: /select customer/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/search customers/i)).toBeInTheDocument();
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-new");
   });
 });

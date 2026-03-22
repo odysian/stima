@@ -82,11 +82,6 @@ export function CustomerSelectScreen(): React.ReactElement {
     setMode("create");
   }
 
-  function onCancelCreate(): void {
-    setCreateError(null);
-    setMode("search");
-  }
-
   async function onCreateCustomer(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setCreateError(null);
@@ -120,115 +115,136 @@ export function CustomerSelectScreen(): React.ReactElement {
     }
   }
 
-  if (mode === "create") {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-        <section className="w-full max-w-xl rounded-xl bg-white p-6 shadow-sm">
-          <h1 className="mb-6 text-2xl font-semibold text-slate-900">Add new customer</h1>
-          {createError ? (
-            <p role="alert" className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
-              {createError}
-            </p>
-          ) : null}
-
-          <form className="flex flex-col gap-4" onSubmit={onCreateCustomer}>
-            <Input
-              id="customer-name"
-              label="Name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-            <Input
-              id="customer-phone"
-              label="Phone"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-            <Input
-              id="customer-email"
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="customer-address" className="text-sm font-medium text-slate-700">
-                Address
-              </label>
-              <textarea
-                id="customer-address"
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-                rows={3}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-              />
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button type="submit" isLoading={isCreating}>
-                Create customer
-              </Button>
-              <Button type="button" onClick={onCancelCreate}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </section>
-      </main>
-    );
-  }
-
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <section className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="mb-6 text-2xl font-semibold text-slate-900">Select customer</h1>
-
-        <Input
-          id="customer-search"
-          label="Search customers"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-
-        {loading ? <p role="status" className="mt-4 text-sm text-slate-600">Loading customers...</p> : null}
-        {loadError ? (
-          <p role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {loadError}
-          </p>
-        ) : null}
-
-        {!loading && !loadError ? (
-          <div className="mt-4 flex flex-col gap-2">
-            {filteredCustomers.length > 0 ? (
-              filteredCustomers.map((customer) => {
-                const subtitle = [customer.phone, customer.email].filter(Boolean).join(" · ");
-                return (
-                  <button
-                    key={customer.id}
-                    type="button"
-                    className="w-full rounded-md border border-slate-200 px-4 py-3 text-left transition hover:border-slate-400 hover:bg-slate-50"
-                    onClick={() => onSelectCustomer(customer.id)}
-                  >
-                    <p className="text-sm font-semibold text-slate-900">{customer.name}</p>
-                    {subtitle ? <p className="text-xs text-slate-600">{subtitle}</p> : null}
-                  </button>
-                );
-              })
-            ) : (
-              <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
-                No customers found. Create one to continue.
-              </p>
-            )}
-          </div>
-        ) : null}
-
-        <div className="mt-6">
-          <Button type="button" onClick={onSwitchToCreateMode}>
-            Add new customer
-          </Button>
+    <main className="min-h-screen bg-background">
+      <header className="fixed top-0 z-50 flex h-16 w-full items-center bg-white/80 px-4 shadow-[0_0_24px_rgba(13,28,46,0.04)] backdrop-blur-md">
+        <button
+          type="button"
+          className="mr-4 rounded-full p-2 text-emerald-900 transition-all hover:bg-slate-50 active:scale-95"
+          onClick={() => navigate(-1)}
+        >
+          <span className="material-symbols-outlined">arrow_back</span>
+        </button>
+        <div>
+          <h1 className="font-headline text-lg font-bold tracking-tight text-primary">
+            {mode === "search" ? "New Quote" : "New Customer"}
+          </h1>
+          {mode === "search" ? (
+            <p className="text-sm text-on-surface-variant">Select a customer to continue</p>
+          ) : null}
         </div>
+      </header>
+
+      <section className={`mx-auto w-full max-w-3xl px-4 pt-20 ${mode === "search" ? "pb-24" : "pb-8"}`}>
+        {mode === "search" ? (
+          <>
+            <Input
+              id="customer-search"
+              label="Search customers"
+              placeholder="Search customers..."
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+
+            {loading ? (
+              <p role="status" className="mt-4 text-sm text-on-surface-variant">
+                Loading customers...
+              </p>
+            ) : null}
+            {loadError ? (
+              <p role="alert" className="mt-4 rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
+                {loadError}
+              </p>
+            ) : null}
+
+            {!loading && !loadError ? (
+              <div className="mt-4">
+                {filteredCustomers.length > 0 ? (
+                  filteredCustomers.map((customer) => {
+                    const subtitle = [customer.phone, customer.email].filter(Boolean).join(" · ");
+                    return (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        className="mb-2 flex w-full items-center justify-between rounded-lg bg-surface-container-lowest p-4 text-left transition-all active:scale-[0.99]"
+                        onClick={() => onSelectCustomer(customer.id)}
+                      >
+                        <div>
+                          <p className="font-bold text-on-surface">{customer.name}</p>
+                          {subtitle ? (
+                            <p className="text-sm text-on-surface-variant">{subtitle}</p>
+                          ) : null}
+                        </div>
+                        <span className="material-symbols-outlined text-outline">chevron_right</span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p className="mt-6 text-center text-sm text-outline">No customers found.</p>
+                )}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
+            {createError ? (
+              <p role="alert" className="mb-4 rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
+                {createError}
+              </p>
+            ) : null}
+
+            <form className="flex flex-col gap-4" onSubmit={onCreateCustomer}>
+              <Input
+                id="customer-name"
+                label="Full Name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+              <Input
+                id="customer-phone"
+                label="Phone Number"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+              />
+              <Input
+                id="customer-email"
+                label="Email Address"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+
+              <div className="flex flex-col gap-1">
+                <label htmlFor="customer-address" className="text-sm font-medium text-on-surface-variant">
+                  Address
+                </label>
+                <textarea
+                  id="customer-address"
+                  rows={4}
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
+                />
+              </div>
+
+              <Button type="submit" variant="primary" className="mt-2 w-full" isLoading={isCreating}>
+                Create {"&"} Continue {">"}
+              </Button>
+            </form>
+          </section>
+        )}
       </section>
+
+      {mode === "search" ? (
+        <div className="fixed bottom-0 z-40 w-full bg-background/80 p-4 backdrop-blur-sm">
+          <div className="mx-auto w-full max-w-3xl">
+            <Button variant="primary" className="w-full" onClick={onSwitchToCreateMode}>
+              <span className="material-symbols-outlined mr-2 text-sm">person_add</span>
+              ADD NEW CUSTOMER
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

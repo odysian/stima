@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
-import { LineItemRow } from "@/features/quotes/components/LineItemRow";
-import type { QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import { LineItemCard } from "@/features/quotes/components/LineItemCard";
+import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
 import { Button } from "@/shared/components/Button";
 
 const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
@@ -47,9 +47,7 @@ export function ReviewScreen(): React.ReactElement | null {
   const { draft, setDraft, clearDraft } = useQuoteDraft();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const rowIdSequenceRef = useRef(0);
   const hasSubmittedRef = useRef(false);
-  const [lineItemRowIds, setLineItemRowIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!draft && !hasSubmittedRef.current) {
@@ -57,31 +55,13 @@ export function ReviewScreen(): React.ReactElement | null {
     }
   }, [draft, navigate]);
 
-  useEffect(() => {
-    if (!draft) {
-      return;
-    }
-
-    setLineItemRowIds((currentIds) => {
-      if (currentIds.length === draft.lineItems.length) {
-        return currentIds;
-      }
-
-      const nextIds = currentIds.slice(0, draft.lineItems.length);
-      while (nextIds.length < draft.lineItems.length) {
-        nextIds.push(`line-item-${rowIdSequenceRef.current}`);
-        rowIdSequenceRef.current += 1;
-      }
-      return nextIds;
-    });
-  }, [draft]);
-
   if (!draft) {
     return null;
   }
 
   const currentDraft: QuoteDraft = draft;
   const normalizedLineItems = currentDraft.lineItems.map(normalizeLineItem);
+  const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
   const lineItemsForSubmit: LineItemDraft[] = normalizedLineItems
     .filter((lineItem) => lineItem.description.length > 0)
     .map((lineItem) => ({
@@ -89,7 +69,6 @@ export function ReviewScreen(): React.ReactElement | null {
       details: lineItem.details,
       price: lineItem.price,
     }));
-  const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
   const canSubmit = lineItemsForSubmit.length > 0 && !hasInvalidLineItems;
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
@@ -97,40 +76,21 @@ export function ReviewScreen(): React.ReactElement | null {
     }
     return runningTotal + lineItem.price;
   }, 0);
+  const hasFlaggedItems = currentDraft.lineItems.some((lineItem) => lineItem.flagged);
+  const shouldRenderAiBanner = currentDraft.confidenceNotes.length > 0 || hasFlaggedItems;
+  const confidenceMessage = currentDraft.confidenceNotes.length > 0
+    ? currentDraft.confidenceNotes.join(" ")
+    : "One or more line items were flagged for review.";
 
   function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void {
     setDraft(updater(currentDraft));
   }
 
-  function onLineItemChange(index: number, updated: LineItemDraftWithFlags): void {
-    setSaveError(null);
-    updateDraft((currentDraft) => ({
-      ...currentDraft,
-      lineItems: currentDraft.lineItems.map((lineItem, currentIndex) =>
-        currentIndex === index ? updated : lineItem,
-      ),
-    }));
-  }
-
-  function onLineItemDelete(index: number): void {
-    setSaveError(null);
-    setLineItemRowIds((currentIds) => currentIds.filter((_, currentIndex) => currentIndex !== index));
-    updateDraft((currentDraft) => ({
-      ...currentDraft,
-      lineItems: currentDraft.lineItems.filter((_, currentIndex) => currentIndex !== index),
-    }));
-  }
-
   function onLineItemAdd(): void {
     setSaveError(null);
-    setLineItemRowIds((currentIds) => {
-      const nextIds = [...currentIds, `line-item-${rowIdSequenceRef.current}`];
-      rowIdSequenceRef.current += 1;
-      return nextIds;
-    });
-    updateDraft((currentDraft) => ({
-      ...currentDraft,
-      lineItems: [...currentDraft.lineItems, { ...EMPTY_LINE_ITEM }],
+    updateDraft((nextDraft) => ({
+      ...nextDraft,
+      lineItems: [...nextDraft.lineItems, { ...EMPTY_LINE_ITEM }],
     }));
   }
 
@@ -171,71 +131,84 @@ export function ReviewScreen(): React.ReactElement | null {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-8">
-      <section className="w-full max-w-5xl rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">Review extracted draft</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Edit line items, total, and notes before generating the quote.
-        </p>
+    <main className="min-h-screen bg-background pb-28">
+      <header className="fixed top-0 z-50 flex h-16 w-full items-center bg-white px-4 shadow-[0_0_24px_rgba(0,0,0,0.04)]">
+        <div className="mx-auto flex w-full max-w-2xl items-center gap-4">
+          <button
+            type="button"
+            className="rounded-full p-2 text-emerald-900 transition-colors hover:bg-slate-100 active:scale-95"
+            onClick={() => navigate(-1)}
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+          <h1 className="font-headline text-lg font-bold text-emerald-900">Review &amp; Edit</h1>
+        </div>
+      </header>
 
+      <form
+        id="quote-review-form"
+        className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-24 pt-20"
+        onSubmit={onSubmit}
+      >
         {saveError ? (
-          <p role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+          <p role="alert" className="rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
             {saveError}
           </p>
         ) : null}
 
-        <form className="mt-6 flex flex-col gap-6" onSubmit={onSubmit}>
-          <section className="rounded-md border border-slate-200 bg-slate-50 p-4">
-            <h2 className="text-sm font-semibold text-slate-800">Transcript</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{currentDraft.transcript}</p>
-          </section>
+        {shouldRenderAiBanner ? <AIConfidenceBanner message={confidenceMessage} /> : null}
 
-          {currentDraft.confidenceNotes.length > 0 ? (
-            <section className="rounded-md border border-amber-200 bg-amber-50 p-4">
-              <h2 className="text-sm font-semibold text-amber-900">Confidence notes</h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
-                {currentDraft.confidenceNotes.map((note, index) => (
-                  <li key={`${index}-${note}`}>{note}</li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+        <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
+          <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>
+          <span className="text-[0.6875rem] uppercase tracking-widest text-outline">
+            {currentDraft.lineItems.length} ITEMS EXTRACTED
+          </span>
+        </div>
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Line items</h2>
-              <Button type="button" onClick={onLineItemAdd}>
-                Add line item
-              </Button>
-            </div>
+        <div className="space-y-3">
+          {currentDraft.lineItems.length > 0 ? (
+            currentDraft.lineItems.map((lineItem, index) => (
+              <LineItemCard
+                key={`line-item-card-${index}-${lineItem.description}-${lineItem.details ?? ""}`}
+                description={lineItem.description || "Untitled line item"}
+                details={lineItem.details}
+                price={lineItem.price}
+                flagged={lineItem.flagged}
+                onClick={() => navigate(`/quotes/review/line-items/${index}/edit`)}
+              />
+            ))
+          ) : (
+            <p className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline">
+              No line items extracted yet.
+            </p>
+          )}
+        </div>
 
-            {currentDraft.lineItems.length > 0 ? (
-              currentDraft.lineItems.map((lineItem, index) => (
-                <LineItemRow
-                  key={lineItemRowIds[index] ?? `line-item-fallback-${index}`}
-                  rowId={lineItemRowIds[index] ?? `line-item-fallback-${index}`}
-                  item={lineItem}
-                  descriptionError={
-                    isInvalidLineItem(normalizedLineItems[index])
-                      ? "Description is required for this row."
-                      : null
-                  }
-                  onChange={(updatedItem) => onLineItemChange(index, updatedItem)}
-                  onDelete={() => onLineItemDelete(index)}
-                />
-              ))
-            ) : (
-              <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-                No line items yet. Add one to continue.
-              </p>
-            )}
-          </section>
+        <button
+          type="button"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low"
+          onClick={onLineItemAdd}
+        >
+          <span className="material-symbols-outlined text-base">add</span>
+          + Add Manual Line Item
+        </button>
 
-          <section className="grid gap-4 md:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="quote-total" className="text-sm font-medium text-slate-700">
-                Total amount
-              </label>
+        <section className="rounded-lg bg-surface-container-low p-4">
+          <div className="flex items-center justify-between text-sm text-outline">
+            <span>Line Item Sum</span>
+            <span>{formatCurrency(lineItemSum)}</span>
+          </div>
+          <div className="mt-4 border-t border-outline-variant/30 pt-4">
+            <label
+              htmlFor="quote-total"
+              className="block text-xs font-bold uppercase tracking-widest text-on-surface"
+            >
+              TOTAL AMOUNT
+            </label>
+            <div className="relative mt-2">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
+                $
+              </span>
               <input
                 id="quote-total"
                 type="number"
@@ -243,60 +216,60 @@ export function ReviewScreen(): React.ReactElement | null {
                 value={currentDraft.total ?? ""}
                 onChange={(event) => {
                   const rawValue = event.target.value.trim();
-                  if (rawValue === "") {
-                    updateDraft((currentDraft) => ({ ...currentDraft, total: null }));
+                  if (rawValue.length === 0) {
+                    updateDraft((nextDraft) => ({ ...nextDraft, total: null }));
                     return;
                   }
+
                   const parsedValue = Number(rawValue);
-                  updateDraft((currentDraft) => ({
-                    ...currentDraft,
+                  updateDraft((nextDraft) => ({
+                    ...nextDraft,
                     total: Number.isFinite(parsedValue) ? parsedValue : null,
                   }));
                 }}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-lg border-2 border-primary bg-white py-3 pl-10 pr-4 font-headline text-3xl font-bold tracking-tight text-primary outline-none transition-all focus:ring-2 focus:ring-primary/20"
               />
             </div>
-
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Line item sum
-              </p>
-              <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(lineItemSum)}</p>
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-1">
-            <label htmlFor="quote-notes" className="text-sm font-medium text-slate-700">
-              Notes
-            </label>
-            <textarea
-              id="quote-notes"
-              rows={4}
-              value={currentDraft.notes}
-              onChange={(event) =>
-                updateDraft((currentDraft) => ({
-                  ...currentDraft,
-                  notes: event.target.value,
-                }))
-              }
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-            />
-          </section>
-
-          <div className="flex items-center gap-3">
-            <Button
-              type="submit"
-              disabled={!canSubmit}
-              isLoading={isSaving}
-            >
-              Generate Quote PDF
-            </Button>
-            <Button type="button" onClick={() => navigate("/quotes/new")}>
-              Cancel
-            </Button>
           </div>
-        </form>
-      </section>
+        </section>
+
+        <section className="space-y-2">
+          <label
+            htmlFor="quote-notes"
+            className="text-xs font-bold uppercase tracking-wider text-outline-variant"
+          >
+            CUSTOMER NOTES
+          </label>
+          <textarea
+            id="quote-notes"
+            rows={3}
+            value={currentDraft.notes}
+            onChange={(event) =>
+              updateDraft((nextDraft) => ({
+                ...nextDraft,
+                notes: event.target.value,
+              }))
+            }
+            className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+            placeholder="Any notes to include for the customer."
+          />
+        </section>
+      </form>
+
+      <footer className="fixed bottom-0 z-40 w-full border-t border-slate-100 bg-white/80 p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] backdrop-blur-md">
+        <div className="mx-auto w-full max-w-2xl">
+          <Button
+            type="submit"
+            form="quote-review-form"
+            variant="primary"
+            className="w-full"
+            disabled={!canSubmit}
+            isLoading={isSaving}
+          >
+            Generate Quote {">"}
+          </Button>
+        </div>
+      </footer>
     </main>
   );
 }

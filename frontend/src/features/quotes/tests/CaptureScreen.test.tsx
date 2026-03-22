@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,13 +10,11 @@ import type { ExtractionResult } from "@/features/quotes/types/quote.types";
 
 const navigateMock = vi.fn();
 const setDraftMock = vi.fn();
-const clearDraftMock = vi.fn();
 const useParamsMock = vi.fn(() => ({ customerId: "cust-1" }));
 
 const startRecordingMock = vi.fn(async () => undefined);
 const stopRecordingMock = vi.fn();
 const removeClipMock = vi.fn();
-const clearClipsMock = vi.fn();
 const clearVoiceErrorMock = vi.fn();
 
 vi.mock("react-router-dom", async () => {
@@ -38,6 +36,7 @@ vi.mock("@/features/quotes/hooks/useVoiceCapture", () => ({
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
+    extract: vi.fn(),
     convertNotes: vi.fn(),
     captureAudio: vi.fn(),
     createQuote: vi.fn(),
@@ -85,7 +84,7 @@ function mockVoiceCapture(overrides: Partial<ReturnType<typeof useVoiceCapture>>
     startRecording: startRecordingMock,
     stopRecording: stopRecordingMock,
     removeClip: removeClipMock,
-    clearClips: clearClipsMock,
+    clearClips: vi.fn(),
     clearError: clearVoiceErrorMock,
     ...overrides,
   });
@@ -103,92 +102,74 @@ beforeEach(() => {
   mockedUseQuoteDraft.mockReturnValue({
     draft: null,
     setDraft: setDraftMock,
-    clearDraft: clearDraftMock,
+    updateLineItem: vi.fn(),
+    removeLineItem: vi.fn(),
+    clearDraft: vi.fn(),
   });
   mockVoiceCapture();
-  mockedQuoteService.convertNotes.mockResolvedValue(extractionFixture);
-  mockedQuoteService.captureAudio.mockResolvedValue(extractionFixture);
+  mockedQuoteService.extract.mockResolvedValue(extractionFixture);
   useParamsMock.mockReturnValue({ customerId: "cust-1" });
 });
 
 afterEach(() => {
-  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
 describe("CaptureScreen", () => {
-  it("defaults to voice mode with text mode available", () => {
+  it("renders both recorded clips and written description sections with no mode toggle", () => {
     renderScreen();
 
-    expect(screen.getByRole("button", { name: "Voice" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Text" })).toBeInTheDocument();
-    expect(screen.getByText("Recorder")).toBeInTheDocument();
-    expect(screen.queryByLabelText(/notes/i)).not.toBeInTheDocument();
+    expect(screen.getByText("RECORDED CLIPS")).toBeInTheDocument();
+    expect(screen.getByText("WRITTEN DESCRIPTION")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Voice" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Text" })).not.toBeInTheDocument();
   });
 
-  it("switches to text mode and submits typed notes", async () => {
+  it("keeps extract button disabled when there are no clips and notes are empty", () => {
     renderScreen();
 
-    fireEvent.click(screen.getByRole("button", { name: "Text" }));
-    fireEvent.change(screen.getByLabelText(/notes/i), {
+    expect(screen.getByRole("button", { name: /extract line items/i })).toBeDisabled();
+  });
+
+  it("enables extract button when notes are present", () => {
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
       target: { value: "Install sod in backyard" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /generate draft/i }));
 
-    await waitFor(() => {
-      expect(mockedQuoteService.convertNotes).toHaveBeenCalledWith("Install sod in backyard");
-    });
-    expect(setDraftMock).toHaveBeenCalledWith({
-      customerId: "cust-1",
-      transcript: "5 yards brown mulch",
-      lineItems: [
-        {
-          description: "Brown mulch",
-          details: "5 yards",
-          price: 120,
-          flagged: true,
-          flagReason: "Unit phrasing may be ambiguous",
-        },
-      ],
-      total: 120,
-      confidenceNotes: [],
-      notes: "",
-      sourceType: "text",
-    });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
+    expect(screen.getByRole("button", { name: /extract line items/i })).toBeEnabled();
   });
 
-  it("shows inline error when text mode submission fails and does not navigate", async () => {
-    mockedQuoteService.convertNotes.mockRejectedValueOnce(new Error("Text extraction failed"));
-
-    renderScreen();
-
-    fireEvent.click(screen.getByRole("button", { name: "Text" }));
-    fireEvent.change(screen.getByLabelText(/notes/i), {
-      target: { value: "Install sod in backyard" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /generate draft/i }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Text extraction failed");
-    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
-  });
-
-  it("keeps voice Generate Draft disabled until at least one clip exists", () => {
-    mockVoiceCapture({ clips: [] });
-
-    renderScreen();
-
-    expect(screen.getByRole("button", { name: /generate draft/i })).toBeDisabled();
-  });
-
-  it("submits voice clips, sets voice draft, and navigates to review", async () => {
+  it("enables extract button when at least one clip exists", () => {
     mockVoiceCapture({ clips: [clipFixture] });
-
     renderScreen();
-    fireEvent.click(screen.getByRole("button", { name: /generate draft/i }));
+
+    expect(screen.getByRole("button", { name: /extract line items/i })).toBeEnabled();
+  });
+
+  it("shows recording state with stop button and elapsed time", () => {
+    mockVoiceCapture({ isRecording: true, elapsedSeconds: 3 });
+    renderScreen();
+
+    expect(screen.getByText("Recording... 00:03")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+  });
+
+  it("submits combined extraction payload and writes voice draft when clips are present", async () => {
+    mockVoiceCapture({ clips: [clipFixture] });
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "  add travel surcharge  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     await waitFor(() => {
-      expect(mockedQuoteService.captureAudio).toHaveBeenCalledWith([clipFixture.blob]);
+      expect(mockedQuoteService.extract).toHaveBeenCalledWith({
+        clips: [clipFixture.blob],
+        notes: "  add travel surcharge  ",
+      });
     });
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",
@@ -210,43 +191,20 @@ describe("CaptureScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
   });
 
-  it("shows inline error when voice mode submission fails and does not navigate", async () => {
-    mockVoiceCapture({ clips: [clipFixture] });
-    mockedQuoteService.captureAudio.mockRejectedValueOnce(new Error("Voice capture failed"));
-
+  it("writes text sourceType when extracting with notes only", async () => {
     renderScreen();
-    fireEvent.click(screen.getByRole("button", { name: /generate draft/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Voice capture failed");
-    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
-  });
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
-  it("shows staged loading copy for voice submission while request is in flight", async () => {
-    vi.useFakeTimers();
-    let resolveExtraction: ((value: ExtractionResult) => void) | undefined;
-    mockVoiceCapture({ clips: [clipFixture] });
-    mockedQuoteService.captureAudio.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveExtraction = resolve;
+    await waitFor(() => {
+      expect(setDraftMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: "text",
         }),
-    );
-
-    renderScreen();
-    fireEvent.click(screen.getByRole("button", { name: /generate draft/i }));
-
-    expect(screen.getByRole("status")).toHaveTextContent("Uploading clips...");
-
-    await act(async () => {
-      vi.advanceTimersByTime(1300);
+      );
     });
-
-    expect(screen.getByRole("status")).toHaveTextContent("Transcribing audio...");
-
-    await act(async () => {
-      resolveExtraction?.(extractionFixture);
-    });
-
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
   });
 });

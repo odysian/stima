@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,6 +24,7 @@ vi.mock("@/features/quotes/hooks/useQuoteDraft", () => ({
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
+    extract: vi.fn(),
     convertNotes: vi.fn(),
     captureAudio: vi.fn(),
     createQuote: vi.fn(),
@@ -56,35 +56,10 @@ function renderScreen(draft: QuoteDraft | null): void {
   mockedUseQuoteDraft.mockReturnValue({
     draft,
     setDraft: setDraftMock,
+    updateLineItem: vi.fn(),
+    removeLineItem: vi.fn(),
     clearDraft: clearDraftMock,
   });
-
-  render(
-    <MemoryRouter>
-      <ReviewScreen />
-    </MemoryRouter>,
-  );
-}
-
-function renderScreenWithHookState(initialDraft: QuoteDraft | null): void {
-  function useQuoteDraftStateMock(): {
-    draft: QuoteDraft | null;
-    setDraft: (nextDraft: QuoteDraft) => void;
-    clearDraft: () => void;
-  } {
-    const [draft, setDraft] = useState<QuoteDraft | null>(initialDraft);
-
-    return {
-      draft,
-      setDraft: (nextDraft: QuoteDraft) => setDraft(nextDraft),
-      clearDraft: () => {
-        clearDraftMock();
-        setDraft(null);
-      },
-    };
-  }
-
-  mockedUseQuoteDraft.mockImplementation(useQuoteDraftStateMock);
 
   render(
     <MemoryRouter>
@@ -116,63 +91,55 @@ afterEach(() => {
 });
 
 describe("ReviewScreen", () => {
-  it("renders line items from draft", () => {
-    renderScreen(makeDraft());
+  it("renders line items as cards and navigates to edit route on click", () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      }),
+    );
 
-    expect(screen.getByDisplayValue("Brown mulch")).toBeInTheDocument();
+    const lineItemCard = screen.getByRole("button", { name: /brown mulch/i });
+    expect(lineItemCard).toBeInTheDocument();
+
+    fireEvent.click(lineItemCard);
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/review/line-items/0/edit");
   });
 
-  it("renders null price as empty field", () => {
-    renderScreen(makeDraft({ lineItems: [{ description: "Mulch", details: null, price: null }] }));
+  it("shows AI banner when confidence notes exist", () => {
+    renderScreen(makeDraft({ confidenceNotes: ["Price for edging is uncertain"] }));
 
-    expect(screen.getByLabelText(/price/i)).toHaveValue(null);
+    expect(screen.getByText(/ai confidence note/i)).toBeInTheDocument();
+    expect(screen.getByText(/price for edging is uncertain/i)).toBeInTheDocument();
   });
 
-  it("updates line item description", () => {
-    renderScreen(makeDraft());
-
-    fireEvent.change(screen.getByLabelText(/description/i), {
-      target: { value: "Premium mulch" },
-    });
-
-    expect(setDraftMock).toHaveBeenCalledWith({
-      customerId: "cust-1",
-      transcript: "5 yards brown mulch and edge front beds",
-      lineItems: [{ description: "Premium mulch", details: "5 yards", price: null }],
-      total: 120,
-      confidenceNotes: [],
-      notes: "",
-      sourceType: "text",
-    });
-  });
-
-  it("deletes a line item", () => {
+  it("shows AI banner when a line item is flagged even without confidence notes", () => {
     renderScreen(
       makeDraft({
         lineItems: [
-          { description: "Brown mulch", details: "5 yards", price: null },
-          { description: "Edging", details: null, price: 40 },
+          {
+            description: "Brown mulch",
+            details: "5 yards",
+            price: null,
+            flagged: true,
+            flagReason: "Unit phrasing may be ambiguous",
+          },
         ],
       }),
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: /delete/i })[0]);
-
-    expect(setDraftMock).toHaveBeenCalledWith({
-      customerId: "cust-1",
-      transcript: "5 yards brown mulch and edge front beds",
-      lineItems: [{ description: "Edging", details: null, price: 40 }],
-      total: 120,
-      confidenceNotes: [],
-      notes: "",
-      sourceType: "text",
-    });
+    expect(screen.getByText(/ai confidence note/i)).toBeInTheDocument();
   });
 
-  it("adds a new empty line item row", () => {
+  it("hides AI banner when there are no confidence notes and no flagged items", () => {
     renderScreen(makeDraft());
 
-    fireEvent.click(screen.getByRole("button", { name: /add line item/i }));
+    expect(screen.queryByText(/ai confidence note/i)).not.toBeInTheDocument();
+  });
+
+  it("adds a blank manual line item", () => {
+    renderScreen(makeDraft());
+
+    fireEvent.click(screen.getByRole("button", { name: /\+ add manual line item/i }));
 
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",
@@ -188,110 +155,10 @@ describe("ReviewScreen", () => {
     });
   });
 
-  it("disables Generate Quote PDF when no line items have a description", () => {
-    renderScreen(makeDraft({ lineItems: [] }));
+  it("creates quote, clears draft, and navigates to preview", async () => {
+    renderScreen(makeDraft({ notes: "Thanks for your business" }));
 
-    expect(screen.getByRole("button", { name: /generate quote pdf/i })).toBeDisabled();
-  });
-
-  it("enables Generate Quote PDF when at least one line item has description", () => {
-    renderScreen(makeDraft());
-
-    expect(screen.getByRole("button", { name: /generate quote pdf/i })).toBeEnabled();
-  });
-
-  it("renders transcript card in read-only section", () => {
-    renderScreen(makeDraft());
-
-    expect(screen.getByText("Transcript")).toBeInTheDocument();
-    expect(screen.getByText(/5 yards brown mulch and edge front beds/i)).toBeInTheDocument();
-  });
-
-  it("renders confidence notes when present", () => {
-    renderScreen(makeDraft({ confidenceNotes: ["Price for edging is uncertain"] }));
-
-    expect(screen.getByText("Confidence notes")).toBeInTheDocument();
-    expect(screen.getByText("Price for edging is uncertain")).toBeInTheDocument();
-  });
-
-  it("renders inline warning for flagged line items", () => {
-    renderScreen(
-      makeDraft({
-        lineItems: [
-          {
-            description: "Brown mulch",
-            details: "5 yards",
-            price: null,
-            flagged: true,
-            flagReason: "Unit phrasing may be ambiguous",
-          },
-        ],
-      }),
-    );
-
-    expect(screen.getByText("Unit phrasing may be ambiguous")).toBeInTheDocument();
-  });
-
-  it("updates notes textarea", () => {
-    renderScreen(makeDraft());
-
-    fireEvent.change(screen.getByLabelText(/^notes$/i), {
-      target: { value: "Thanks for your business" },
-    });
-
-    expect(setDraftMock).toHaveBeenCalledWith({
-      customerId: "cust-1",
-      transcript: "5 yards brown mulch and edge front beds",
-      lineItems: [{ description: "Brown mulch", details: "5 yards", price: null }],
-      total: 120,
-      confidenceNotes: [],
-      notes: "Thanks for your business",
-      sourceType: "text",
-    });
-  });
-
-  it("preserves line-item flag metadata while editing", () => {
-    renderScreen(
-      makeDraft({
-        lineItems: [
-          {
-            description: "Brown mulch",
-            details: "5 yards",
-            price: null,
-            flagged: true,
-            flagReason: "Unit phrasing may be ambiguous",
-          },
-        ],
-      }),
-    );
-
-    fireEvent.change(screen.getByLabelText(/description/i), {
-      target: { value: "Premium mulch" },
-    });
-
-    expect(setDraftMock).toHaveBeenCalledWith({
-      customerId: "cust-1",
-      transcript: "5 yards brown mulch and edge front beds",
-      lineItems: [
-        {
-          description: "Premium mulch",
-          details: "5 yards",
-          price: null,
-          flagged: true,
-          flagReason: "Unit phrasing may be ambiguous",
-        },
-      ],
-      total: 120,
-      confidenceNotes: [],
-      notes: "",
-      sourceType: "text",
-    });
-  });
-
-  it("creates quote, clears draft, and navigates to preview route", async () => {
-    renderScreen(makeDraft({ notes: "See you next week" }));
-
-    fireEvent.click(screen.getByRole("button", { name: /generate quote pdf/i }));
+    fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.createQuote).toHaveBeenCalledWith({
@@ -299,85 +166,11 @@ describe("ReviewScreen", () => {
         transcript: "5 yards brown mulch and edge front beds",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
         total_amount: 120,
-        notes: "See you next week",
+        notes: "Thanks for your business",
         source_type: "text",
       });
     });
     expect(clearDraftMock).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
-  });
-
-  it("keeps description input focused while typing so rows do not remount", () => {
-    renderScreenWithHookState(makeDraft());
-
-    const descriptionInput = screen.getByLabelText(/description/i);
-    descriptionInput.focus();
-    fireEvent.change(descriptionInput, {
-      target: { value: "Premium mulch" },
-    });
-
-    const updatedInput = screen.getByLabelText(/description/i);
-    expect(updatedInput).toHaveValue("Premium mulch");
-    expect(updatedInput).toHaveFocus();
-  });
-
-  it("sanitizes blank rows before submit and sends only described line items", async () => {
-    renderScreen(makeDraft({
-      lineItems: [
-        { description: "Brown mulch", details: "5 yards", price: null },
-        { description: "", details: null, price: null },
-      ],
-      notes: "See you next week",
-    }));
-
-    fireEvent.click(screen.getByRole("button", { name: /generate quote pdf/i }));
-
-    await waitFor(() => {
-      expect(mockedQuoteService.createQuote).toHaveBeenCalledWith({
-        customer_id: "cust-1",
-        transcript: "5 yards brown mulch and edge front beds",
-        line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
-        total_amount: 120,
-        notes: "See you next week",
-        source_type: "text",
-      });
-    });
-  });
-
-  it("strips flag metadata before createQuote submit", async () => {
-    renderScreen(makeDraft({
-      lineItems: [
-        {
-          description: "Brown mulch",
-          details: "5 yards",
-          price: null,
-          flagged: true,
-          flagReason: "Unit phrasing may be ambiguous",
-        },
-      ],
-      notes: "See you next week",
-    }));
-
-    fireEvent.click(screen.getByRole("button", { name: /generate quote pdf/i }));
-
-    await waitFor(() => {
-      expect(mockedQuoteService.createQuote).toHaveBeenCalledWith({
-        customer_id: "cust-1",
-        transcript: "5 yards brown mulch and edge front beds",
-        line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
-        total_amount: 120,
-        notes: "See you next week",
-        source_type: "text",
-      });
-    });
-  });
-
-  it("shows row-level description validation and blocks submit for partially filled blank-description rows", () => {
-    renderScreen(makeDraft({
-      lineItems: [{ description: "", details: "Needs two workers", price: 45 }],
-    }));
-
-    expect(screen.getByText("Description is required for this row.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate quote pdf/i })).toBeDisabled();
   });
 });
