@@ -60,6 +60,16 @@ function renderScreen(path = "/quotes/quote-1/preview"): void {
   );
 }
 
+async function generatePdfAndWaitForShareEnabled(): Promise<void> {
+  fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
+  await waitFor(() => {
+    expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
+  });
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: /^share$/i })).toBeEnabled();
+  });
+}
+
 beforeEach(() => {
   mockedQuoteService.getQuote.mockResolvedValue(makeQuote());
   mockedQuoteService.generatePdf.mockResolvedValue(
@@ -83,6 +93,16 @@ beforeEach(() => {
     writable: true,
     value: revokeObjectUrlMock,
   });
+  Object.defineProperty(navigator, "share", {
+    configurable: true,
+    writable: true,
+    value: undefined,
+  });
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    writable: true,
+    value: undefined,
+  });
 });
 
 afterEach(() => {
@@ -90,15 +110,18 @@ afterEach(() => {
 });
 
 describe("QuotePreview", () => {
-  it("fetches quote on mount and renders summary", async () => {
+  it("fetches quote on mount and renders the header, placeholder, and nav", async () => {
     renderScreen();
 
     await waitFor(() => {
       expect(mockedQuoteService.getQuote).toHaveBeenCalledWith("quote-1");
     });
 
-    expect(await screen.findByText(/Q-001/i)).toBeInTheDocument();
-    expect(screen.getByText(/Status:/i)).toHaveTextContent("draft");
+    expect(await screen.findByRole("heading", { name: "Q-001" })).toBeInTheDocument();
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+    expect(screen.getByText("Generate the PDF to preview it here.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^share$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
   });
 
   it("shows an error when quote fetch fails", async () => {
@@ -107,8 +130,17 @@ describe("QuotePreview", () => {
     renderScreen();
 
     expect(await screen.findByText("Unable to load quote")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /^share$/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
+  });
+
+  it("renders amount and falls back to customer_id when customer details are unavailable", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ total_amount: 245.5 }));
+
+    renderScreen();
+
+    expect(await screen.findByText("$245.50")).toBeInTheDocument();
+    expect(screen.getByText("cust-1")).toBeInTheDocument();
+    expect(screen.getByText("No contact details")).toBeInTheDocument();
   });
 
   it("generates PDF and renders iframe preview", async () => {
@@ -122,8 +154,9 @@ describe("QuotePreview", () => {
       expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
     });
 
-    const frame = screen.getByTitle("Quote PDF Preview") as HTMLIFrameElement;
+    const frame = screen.getByTitle("Quote PDF preview") as HTMLIFrameElement;
     expect(frame.src).toContain("blob:quote-preview");
+    expect(screen.getByRole("button", { name: /^share$/i })).toBeEnabled();
   });
 
   it("shows an error when PDF generation fails", async () => {
@@ -140,7 +173,7 @@ describe("QuotePreview", () => {
       expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
     });
     expect(await screen.findByText("Unable to render quote PDF")).toBeInTheDocument();
-    expect(screen.queryByTitle("Quote PDF Preview")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Quote PDF preview")).not.toBeInTheDocument();
   });
 
   it("uses navigator.share when available", async () => {
@@ -155,6 +188,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByText(/Q-001/i);
+    await generatePdfAndWaitForShareEnabled();
     fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
 
     await waitFor(() => {
@@ -183,6 +217,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByText(/Q-001/i);
+    await generatePdfAndWaitForShareEnabled();
     fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
 
     await waitFor(() => {
@@ -208,6 +243,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByText(/Q-001/i);
+    await generatePdfAndWaitForShareEnabled();
     fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
 
     await waitFor(() => {
@@ -217,6 +253,60 @@ describe("QuotePreview", () => {
     expect(await screen.findByText(/share\/share-token-1/i)).toBeInTheDocument();
   });
 
+  it("copies existing share URL from the client card row", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: { writeText: writeTextMock },
+    });
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuote({ share_token: "already-shared-token" }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /copy share link/i }));
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(
+        "http://localhost:3000/share/already-shared-token",
+      );
+    });
+    expect(await screen.findByText("Share link copied to clipboard.")).toBeInTheDocument();
+  });
+
+  it("shows manual-copy guidance when clipboard API is unavailable", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuote({ share_token: "already-shared-token" }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /copy share link/i }));
+
+    expect(await screen.findByText("Copy this share link manually.")).toBeInTheDocument();
+  });
+
+  it("shows an error when clipboard write fails from the share URL row", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error("Clipboard denied")),
+      },
+    });
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuote({ share_token: "already-shared-token" }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /copy share link/i }));
+
+    expect(await screen.findByText("Clipboard denied")).toBeInTheDocument();
+  });
+
   it("shows an error when share request fails", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ status: "ready" }));
     mockedQuoteService.shareQuote.mockRejectedValueOnce(new Error("Unable to share quote"));
@@ -224,12 +314,13 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByText(/Q-001/i);
+    await generatePdfAndWaitForShareEnabled();
     fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
     });
     expect(await screen.findByText("Unable to share quote")).toBeInTheDocument();
-    expect(screen.queryByText(/Share URL:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/share\/share-token-1/i)).not.toBeInTheDocument();
   });
 });
