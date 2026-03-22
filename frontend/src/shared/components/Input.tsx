@@ -6,6 +6,7 @@ interface InputProps {
   placeholder?: string;
   className?: string;
   type?: string;
+  required?: boolean;
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
   error?: string;
@@ -17,6 +18,7 @@ export function Input({
   placeholder,
   className,
   type = "text",
+  required = false,
   value,
   onChange,
   error,
@@ -41,6 +43,8 @@ export function Input({
         type={type}
         value={value}
         onChange={onChange}
+        required={required}
+        aria-required={required}
         placeholder={placeholder}
         className={inputClassName}
       />

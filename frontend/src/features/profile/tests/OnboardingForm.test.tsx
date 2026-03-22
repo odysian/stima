@@ -66,7 +66,7 @@ describe("OnboardingForm", () => {
   it("renders required onboarding fields with default trade type", () => {
     renderForm();
 
-    expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/business name/i)).toBeRequired();
     expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Plumber" })).toBeInTheDocument();

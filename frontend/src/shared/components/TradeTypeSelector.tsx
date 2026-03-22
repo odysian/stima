@@ -1,14 +1,17 @@
 interface TradeTypeSelectorProps {
+  options: readonly string[];
   value: string;
   onChange: (value: string) => void;
 }
 
-const TRADE_OPTIONS = ["Plumber", "Electrician", "Builder", "Painter", "Landscaper", "Other"] as const;
-
-export function TradeTypeSelector({ value, onChange }: TradeTypeSelectorProps): React.ReactElement {
+export function TradeTypeSelector({
+  options,
+  value,
+  onChange,
+}: TradeTypeSelectorProps): React.ReactElement {
   return (
     <div className="grid grid-cols-2 gap-2">
-      {TRADE_OPTIONS.map((option) => {
+      {options.map((option) => {
         const isSelected = option === value;
 
         return (

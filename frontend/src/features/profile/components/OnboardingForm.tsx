@@ -60,12 +60,13 @@ export function OnboardingForm(): React.ReactElement {
 
         <form className="flex flex-col gap-4" onSubmit={onSubmit}>
           <div className="flex flex-col gap-1">
-            <label htmlFor="business-name" className="flex items-center justify-between text-sm font-medium text-slate-700">
+            <label htmlFor="business-name" className="flex items-center justify-between text-sm font-medium text-on-surface-variant">
               <span>Business name</span>
               <span className="text-xs font-medium text-error">* required</span>
             </label>
             <Input
               id="business-name"
+              required
               value={businessName}
               onChange={(event) => setBusinessName(event.target.value)}
             />
@@ -87,8 +88,9 @@ export function OnboardingForm(): React.ReactElement {
           </div>
 
           <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 text-sm font-medium text-slate-700">Trade type</legend>
+            <legend className="mb-1 text-sm font-medium text-on-surface-variant">Trade type</legend>
             <TradeTypeSelector
+              options={TRADE_TYPES}
               value={tradeType}
               onChange={(value) => setTradeType(value as TradeType)}
             />
