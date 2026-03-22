@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -104,7 +104,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText("Alice Johnson");
 
-    fireEvent.change(screen.getByPlaceholderText("Search customer or quote ID..."), {
+    fireEvent.change(screen.getByLabelText("Search quotes"), {
       target: { value: "bob" },
     });
 
@@ -126,7 +126,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText("Alice Johnson");
 
-    fireEvent.change(screen.getByPlaceholderText("Search customer or quote ID..."), {
+    fireEvent.change(screen.getByLabelText("Search quotes"), {
       target: { value: "q-002" },
     });
 
@@ -140,7 +140,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText("Alice Johnson");
 
-    fireEvent.change(screen.getByPlaceholderText("Search customer or quote ID..."), {
+    fireEvent.change(screen.getByLabelText("Search quotes"), {
       target: { value: "does-not-exist" },
     });
 
@@ -154,6 +154,30 @@ describe("QuoteList", () => {
     fireEvent.click(await screen.findByRole("button", { name: /alice johnson/i }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
+  });
+
+  it("renders stats bar counts for active and pending quotes", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([
+      makeQuoteListItem({ status: "ready" }),
+      makeQuoteListItem({
+        id: "quote-2",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "Q-002",
+        status: "draft",
+      }),
+    ]);
+
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    const activeTile = screen.getByText("ACTIVE QUOTES").closest("div");
+    const pendingTile = screen.getByText("PENDING REVIEW").closest("div");
+
+    expect(activeTile).not.toBeNull();
+    expect(pendingTile).not.toBeNull();
+    expect(within(activeTile as HTMLDivElement).getByText("1")).toBeInTheDocument();
+    expect(within(pendingTile as HTMLDivElement).getByText("1")).toBeInTheDocument();
   });
 
   it("renders BottomNav with quotes tab active", async () => {

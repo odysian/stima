@@ -127,6 +127,8 @@ export function QuoteList(): React.ReactElement {
 
         <div className="mb-4 px-4">
           <Input
+            label="Search quotes"
+            id="quote-search"
             placeholder="Search customer or quote ID..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -167,31 +169,31 @@ export function QuoteList(): React.ReactElement {
               </p>
             </div>
             <ul className="px-4 pb-2">
-            {filteredQuotes.map((quote) => (
-              <li key={quote.id} className="mb-2">
-                <button
-                  type="button"
-                  onClick={() => navigate(`/quotes/${quote.id}/preview`)}
-                  className="w-full rounded-lg bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.99]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-headline font-bold text-on-surface">
-                        {quote.customer_name}
-                      </p>
-                      <p className="mt-1 text-sm text-on-surface-variant">
-                        {quote.doc_number} {" \u00b7 "} {formatCreatedDate(quote.created_at)}
-                      </p>
+              {filteredQuotes.map((quote) => (
+                <li key={quote.id} className="mb-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/quotes/${quote.id}/preview`)}
+                    className="w-full rounded-lg bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.99]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-headline font-bold text-on-surface">
+                          {quote.customer_name}
+                        </p>
+                        <p className="mt-1 text-sm text-on-surface-variant">
+                          {quote.doc_number} {" \u00b7 "} {formatCreatedDate(quote.created_at)}
+                        </p>
+                      </div>
+                      <StatusBadge variant={quote.status} />
                     </div>
-                    <StatusBadge variant={quote.status} />
-                  </div>
-                  <p className="mt-2 text-xs text-outline">{quote.item_count} items</p>
-                  <p className="mt-3 text-right font-bold text-on-surface">
-                    {formatTotalAmount(quote.total_amount)}
-                  </p>
-                </button>
-              </li>
-            ))}
+                    <p className="mt-2 text-xs text-outline">{quote.item_count} items</p>
+                    <p className="mt-3 text-right font-bold text-on-surface">
+                      {formatTotalAmount(quote.total_amount)}
+                    </p>
+                  </button>
+                </li>
+              ))}
             </ul>
           </>
         ) : null}
