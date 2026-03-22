@@ -172,7 +172,7 @@ Rules:
 | `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `200 ExtractionResult` |
 | `/quotes` | POST | yes | cookie | `{ customer_id, transcript, line_items, total_amount, notes, source_type }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
 | `/quotes` | GET | no | cookie | — | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user) |
-| `/quotes/{id}` | GET | no | cookie | — | `200 Quote` or `404 { detail: "Not found" }` |
+| `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`) or `404 { detail: "Not found" }` |
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ line_items?, total_amount?, notes? }` | `200 Quote` or `404 { detail: "Not found" }` |
 
 `PATCH /quotes/{id}` behavior:

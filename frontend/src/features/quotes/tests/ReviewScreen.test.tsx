@@ -72,9 +72,6 @@ beforeEach(() => {
   mockedQuoteService.createQuote.mockResolvedValue({
     id: "quote-1",
     customer_id: "cust-1",
-    customer_name: "Quote Test Customer",
-    customer_email: null,
-    customer_phone: null,
     doc_number: "Q-001",
     status: "draft",
     source_type: "text",

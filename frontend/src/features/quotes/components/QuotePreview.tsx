@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { Quote } from "@/features/quotes/types/quote.types";
+import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -22,7 +22,7 @@ function isShareAbortError(error: unknown): boolean {
 }
 
 function readOptionalQuoteText(
-  quote: Quote | null,
+  quote: QuoteDetail | null,
   key: "customer_name" | "customer_email" | "customer_phone",
 ): string | null {
   if (!quote) {
@@ -41,7 +41,7 @@ function readOptionalQuoteText(
 export function QuotePreview(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quote, setQuote] = useState<QuoteDetail | null>(null);
   const [isLoadingQuote, setIsLoadingQuote] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -151,7 +151,18 @@ export function QuotePreview(): React.ReactElement {
 
     try {
       const updatedQuote = await quoteService.shareQuote(id);
-      setQuote(updatedQuote);
+      setQuote((currentQuote) => {
+        if (!currentQuote) {
+          return currentQuote;
+        }
+        return {
+          ...currentQuote,
+          status: updatedQuote.status,
+          shared_at: updatedQuote.shared_at,
+          share_token: updatedQuote.share_token,
+          updated_at: updatedQuote.updated_at,
+        };
+      });
 
       if (!updatedQuote.share_token) {
         throw new Error("Share link unavailable");

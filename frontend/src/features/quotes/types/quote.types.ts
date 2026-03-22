@@ -35,9 +35,6 @@ export type QuoteSourceType = "text" | "voice";
 export interface Quote {
   id: string;
   customer_id: string;
-  customer_name: string;
-  customer_email: string | null;
-  customer_phone: string | null;
   doc_number: string;
   status: QuoteStatus;
   source_type: QuoteSourceType;
@@ -49,6 +46,12 @@ export interface Quote {
   line_items: LineItem[];
   created_at: string;
   updated_at: string;
+}
+
+export interface QuoteDetail extends Quote {
+  customer_name: string;
+  customer_email: string | null;
+  customer_phone: string | null;
 }
 
 export interface QuoteListItem {

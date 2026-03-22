@@ -267,6 +267,9 @@ export const handlers = [
       {
         id: quoteId,
         customer_id: "cust-1",
+        customer_name: "Alice Johnson",
+        customer_email: "alice@example.com",
+        customer_phone: "+1-555-0100",
         doc_number: "Q-001",
         status: "draft",
         source_type: "text",
