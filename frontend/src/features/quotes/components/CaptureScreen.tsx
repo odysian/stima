@@ -105,7 +105,7 @@ export function CaptureScreen(): React.ReactElement {
         ) : null}
 
         {!isSupported ? (
-          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="mb-4 rounded-lg border border-warning-accent/40 bg-warning-container p-3 text-sm text-warning">
             Voice capture is not supported in this browser. You can still type notes and extract line items.
           </p>
         ) : null}

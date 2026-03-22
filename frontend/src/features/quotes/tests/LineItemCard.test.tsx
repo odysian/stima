@@ -30,7 +30,7 @@ describe("LineItemCard", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /brown mulch/i })).toHaveClass("border-amber-500/20");
+    expect(screen.getByRole("button", { name: /brown mulch/i })).toHaveClass("border-warning-accent/20");
     expect(screen.getByText("REVIEW")).toBeInTheDocument();
   });
 

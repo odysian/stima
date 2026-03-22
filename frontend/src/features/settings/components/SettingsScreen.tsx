@@ -108,7 +108,7 @@ export function SettingsScreen(): React.ReactElement {
         {!isLoadingProfile && !loadError ? (
           <form className="space-y-4" onSubmit={onSubmit}>
             {saveSuccess ? (
-              <p role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">
+              <p role="status" className="rounded-md bg-success-container p-3 text-sm text-success">
                 {saveSuccess}
               </p>
             ) : null}
@@ -141,7 +141,7 @@ export function SettingsScreen(): React.ReactElement {
                   onChange={(event) => setLastName(event.target.value)}
                 />
                 <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-1 text-sm font-medium text-slate-700">Trade type</legend>
+                  <legend className="mb-1 text-sm font-medium text-on-surface">Trade type</legend>
                   <TradeTypeSelector
                     options={TRADE_TYPES}
                     value={tradeType}

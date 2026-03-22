@@ -3,9 +3,9 @@ interface StatusBadgeProps {
 }
 
 const styles = {
-  draft: "bg-slate-100 text-slate-600",
-  ready: "bg-emerald-100 text-emerald-800",
-  shared: "bg-sky-100 text-sky-800",
+  draft: "bg-neutral-container text-on-surface-variant",
+  ready: "bg-success-container text-success",
+  shared: "bg-info-container text-info",
 } as const;
 
 const labels = {

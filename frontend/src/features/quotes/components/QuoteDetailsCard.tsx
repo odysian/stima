@@ -22,7 +22,7 @@ export function QuoteDetailsCard({
         </p>
       </section>
 
-      <section className="ghost-shadow rounded-lg border-l-4 border-teal-500 bg-surface-container-lowest p-4">
+      <section className="ghost-shadow rounded-lg border-l-4 border-surface-tint bg-surface-container-lowest p-4">
         <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">CLIENT</h2>
         <p className="mt-2 font-bold text-on-surface">{clientName}</p>
         <p className="mt-1 text-sm text-on-surface-variant">{clientContact}</p>
