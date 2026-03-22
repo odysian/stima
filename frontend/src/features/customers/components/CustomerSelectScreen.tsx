@@ -82,6 +82,11 @@ export function CustomerSelectScreen(): React.ReactElement {
     setMode("create");
   }
 
+  function onBackToSearch(): void {
+    setCreateError(null);
+    setMode("search");
+  }
+
   async function onCreateCustomer(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setCreateError(null);
@@ -230,6 +235,13 @@ export function CustomerSelectScreen(): React.ReactElement {
               <Button type="submit" variant="primary" className="mt-2 w-full" isLoading={isCreating}>
                 Create {"&"} Continue {">"}
               </Button>
+              <button
+                type="button"
+                className="text-sm font-semibold text-on-surface-variant transition-colors hover:text-on-surface"
+                onClick={onBackToSearch}
+              >
+                Back to search
+              </button>
             </form>
           </section>
         )}

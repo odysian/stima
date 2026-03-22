@@ -99,6 +99,30 @@ describe("EditLineItemScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
   });
 
+  it("shows error and blocks save when description is empty", () => {
+    renderScreen(makeDraft());
+
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Description is required.");
+    expect(updateLineItemMock).not.toHaveBeenCalled();
+  });
+
+  it("shows error and blocks save when price is invalid", () => {
+    renderScreen(makeDraft());
+
+    fireEvent.change(screen.getByLabelText(/price/i), {
+      target: { value: "abc" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid number for price.");
+    expect(updateLineItemMock).not.toHaveBeenCalled();
+  });
+
   it("deletes item and navigates back to review", () => {
     renderScreen(makeDraft());
 

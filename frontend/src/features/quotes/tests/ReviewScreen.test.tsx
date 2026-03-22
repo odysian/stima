@@ -173,4 +173,74 @@ describe("ReviewScreen", () => {
     expect(clearDraftMock).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
   });
+
+  it("filters blank rows before submit and only sends described line items", async () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [
+          { description: "Brown mulch", details: "5 yards", price: null },
+          { description: "", details: null, price: null },
+        ],
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.createQuote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
+        }),
+      );
+    });
+  });
+
+  it("strips flagged metadata before submit payload", async () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [
+          {
+            description: "Brown mulch",
+            details: "5 yards",
+            price: null,
+            flagged: true,
+            flagReason: "Unit phrasing may be ambiguous",
+          },
+        ],
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.createQuote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
+        }),
+      );
+    });
+  });
+
+  it("blocks submit when a partially filled row has blank description", () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [{ description: "", details: "Needs two workers", price: 45 }],
+      }),
+    );
+
+    const submitButton = screen.getByRole("button", { name: /generate quote >/i });
+    expect(submitButton).toBeDisabled();
+    fireEvent.click(submitButton);
+    expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+  });
+
+  it("disables submit when no line items have a description", () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [{ description: "", details: null, price: null }],
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: /generate quote >/i })).toBeDisabled();
+  });
 });

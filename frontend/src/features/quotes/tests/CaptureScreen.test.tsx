@@ -207,4 +207,17 @@ describe("CaptureScreen", () => {
       );
     });
   });
+
+  it("shows inline error and does not navigate when extraction fails", async () => {
+    mockedQuoteService.extract.mockRejectedValueOnce(new Error("Extraction failed"));
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed");
+    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
+  });
 });

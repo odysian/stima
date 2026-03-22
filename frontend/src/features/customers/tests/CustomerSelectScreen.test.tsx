@@ -148,4 +148,29 @@ describe("CustomerSelectScreen", () => {
     });
     expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-new");
   });
+
+  it("shows inline error when create customer fails", async () => {
+    mockedCustomerService.createCustomer.mockRejectedValueOnce(new Error("Unable to create customer"));
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    fireEvent.click(screen.getByRole("button", { name: /add new customer/i }));
+    fireEvent.change(screen.getByLabelText(/full name/i), {
+      target: { value: "New Customer" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create & continue >/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to create customer");
+  });
+
+  it("returns to search mode from create mode using back to search action", async () => {
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    fireEvent.click(screen.getByRole("button", { name: /add new customer/i }));
+    fireEvent.click(screen.getByRole("button", { name: /back to search/i }));
+
+    expect(screen.getByRole("heading", { name: "New Quote" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/search customers/i)).toBeInTheDocument();
+  });
 });
