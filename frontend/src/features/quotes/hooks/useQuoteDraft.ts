@@ -17,6 +17,8 @@ export interface QuoteDraft {
 interface UseQuoteDraftResult {
   draft: QuoteDraft | null;
   setDraft: (nextDraft: QuoteDraft) => void;
+  updateLineItem: (index: number, item: LineItemDraftWithFlags) => void;
+  removeLineItem: (index: number) => void;
   clearDraft: () => void;
 }
 
@@ -115,9 +117,43 @@ export function useQuoteDraft(): UseQuoteDraftResult {
     setDraftState(null);
   }, []);
 
+  const updateLineItem = useCallback((index: number, item: LineItemDraftWithFlags) => {
+    setDraftState((currentDraft) => {
+      if (!currentDraft || index < 0 || index >= currentDraft.lineItems.length) {
+        return currentDraft;
+      }
+
+      const nextDraft: QuoteDraft = {
+        ...currentDraft,
+        lineItems: currentDraft.lineItems.map((existingItem, currentIndex) =>
+          currentIndex === index ? item : existingItem,
+        ),
+      };
+      persistDraftToStorage(nextDraft);
+      return nextDraft;
+    });
+  }, []);
+
+  const removeLineItem = useCallback((index: number) => {
+    setDraftState((currentDraft) => {
+      if (!currentDraft || index < 0 || index >= currentDraft.lineItems.length) {
+        return currentDraft;
+      }
+
+      const nextDraft: QuoteDraft = {
+        ...currentDraft,
+        lineItems: currentDraft.lineItems.filter((_, currentIndex) => currentIndex !== index),
+      };
+      persistDraftToStorage(nextDraft);
+      return nextDraft;
+    });
+  }, []);
+
   return {
     draft,
     setDraft,
+    updateLineItem,
+    removeLineItem,
     clearDraft,
   };
 }

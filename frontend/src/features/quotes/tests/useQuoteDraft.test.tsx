@@ -24,12 +24,27 @@ const draftFixture: QuoteDraft = {
 };
 
 function HookHarness(): React.ReactElement {
-  const { draft, setDraft, clearDraft } = useQuoteDraft();
+  const { draft, setDraft, updateLineItem, removeLineItem, clearDraft } = useQuoteDraft();
 
   return (
     <div>
       <button type="button" onClick={() => setDraft(draftFixture)}>
         Set Draft
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          updateLineItem(0, {
+            description: "Updated mulch",
+            details: "6 yards",
+            price: 150,
+          })
+        }
+      >
+        Update Line Item
+      </button>
+      <button type="button" onClick={() => removeLineItem(0)}>
+        Remove Line Item
       </button>
       <button type="button" onClick={clearDraft}>
         Clear Draft
@@ -95,5 +110,45 @@ describe("useQuoteDraft", () => {
         lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
       }),
     );
+  });
+
+  it("updates one line item and persists it to sessionStorage", () => {
+    render(<HookHarness />);
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Set Draft" }));
+      fireEvent.click(screen.getByRole("button", { name: "Update Line Item" }));
+    });
+
+    expect(screen.getByTestId("draft-state")).toHaveTextContent(
+      JSON.stringify({
+        ...draftFixture,
+        lineItems: [{ description: "Updated mulch", details: "6 yards", price: 150 }],
+      }),
+    );
+    expect(JSON.parse(window.sessionStorage.getItem(DRAFT_STORAGE_KEY) ?? "")).toEqual({
+      ...draftFixture,
+      lineItems: [{ description: "Updated mulch", details: "6 yards", price: 150 }],
+    });
+  });
+
+  it("removes one line item and persists it to sessionStorage", () => {
+    render(<HookHarness />);
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Set Draft" }));
+      fireEvent.click(screen.getByRole("button", { name: "Remove Line Item" }));
+    });
+
+    expect(screen.getByTestId("draft-state")).toHaveTextContent(
+      JSON.stringify({
+        ...draftFixture,
+        lineItems: [],
+      }),
+    );
+    expect(JSON.parse(window.sessionStorage.getItem(DRAFT_STORAGE_KEY) ?? "")).toEqual({
+      ...draftFixture,
+      lineItems: [],
+    });
   });
 });

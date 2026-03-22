@@ -5,6 +5,7 @@ interface ButtonProps {
   variant?: "primary" | "destructive" | "ghost";
   className?: string;
   type?: "button" | "submit";
+  form?: string;
   disabled?: boolean;
   isLoading?: boolean;
   onClick?: () => void;
@@ -21,6 +22,7 @@ export function Button({
   variant = "primary",
   className,
   type = "button",
+  form,
   disabled = false,
   isLoading = false,
   onClick,
@@ -36,6 +38,7 @@ export function Button({
   return (
     <button
       type={type}
+      form={form}
       onClick={onClick}
       disabled={disabled || isLoading}
       className={buttonClassName}
