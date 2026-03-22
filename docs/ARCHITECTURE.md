@@ -25,6 +25,7 @@ frontend/src/
   features/auth/    — auth types, services, hooks, components, tests
   features/customers/ — customer select/create screen + services/types/tests
   features/profile/ — onboarding form + profile service/types/tests
+  features/settings/ — settings screen for profile edits + sign out
   features/quotes/  — quote extraction + quote CRUD
 ```
 
