@@ -7,12 +7,6 @@ import { Button } from "@/shared/components/Button";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 
-type QuoteWithClientDetails = Quote & {
-  customer_name?: string | null;
-  customer_email?: string | null;
-  customer_phone?: string | null;
-};
-
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -25,6 +19,23 @@ function isShareAbortError(error: unknown): boolean {
     "name" in error &&
     (error as { name?: unknown }).name === "AbortError"
   );
+}
+
+function readOptionalQuoteText(
+  quote: Quote | null,
+  key: "customer_name" | "customer_email" | "customer_phone",
+): string | null {
+  if (!quote) {
+    return null;
+  }
+
+  const value = (quote as Record<string, unknown>)[key];
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+  return trimmedValue.length > 0 ? trimmedValue : null;
 }
 
 export function QuotePreview(): React.ReactElement {
@@ -86,13 +97,14 @@ export function QuotePreview(): React.ReactElement {
   }, [pdfUrl]);
 
   const canShare = quote !== null && pdfUrl !== null;
-  const quoteWithClientDetails = quote as QuoteWithClientDetails | null;
   const shareUrl = quote?.share_token
     ? `${window.location.origin}/share/${quote.share_token}`
     : null;
-  const clientName = quoteWithClientDetails?.customer_name?.trim() || quote?.customer_id || "Unknown customer";
+  // Intentional fallback: current GET /quotes/{id} response does not include customer_* fields.
+  // Follow-up tracked in #51; until then render customer_id + contact placeholder.
+  const clientName = readOptionalQuoteText(quote, "customer_name") || quote?.customer_id || "Unknown customer";
   const clientContact =
-    [quoteWithClientDetails?.customer_email, quoteWithClientDetails?.customer_phone]
+    [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]
       .map((value) => value?.trim())
       .filter((value): value is string => Boolean(value))
       .join(" \u00b7 ") || "No contact details";
