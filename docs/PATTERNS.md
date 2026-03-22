@@ -51,11 +51,44 @@ Record conventions that already exist in code.
 - Use MSW v2 API only (`http.*`, `HttpResponse.json()`). Do not use v1 patterns (`rest.*`, `ctx.json()`).
 - `onUnhandledRequest: 'error'` in test setup to catch unmocked network calls.
 
+## Shared Screen Primitives (Mandatory For New Screens)
+- `ScreenHeader` (`@/shared/components/ScreenHeader`):
+  - Use for top app bars with back navigation on screen-style views.
+  - Props: `title`, optional `subtitle`, `onBack`, optional `trailing`.
+  - Canonical shell styling: `fixed top-0 z-50 h-16 w-full bg-white/80 backdrop-blur-md shadow-[0_0_24px_rgba(13,28,46,0.04)]`.
+- `ScreenFooter` (`@/shared/components/ScreenFooter`):
+  - Use for sticky bottom action bars (primary submit/continue flows).
+  - Props: `children`.
+  - Canonical shell styling: `fixed bottom-0 z-40 w-full bg-white/80 backdrop-blur-md p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)]`.
+- `FeedbackMessage` (`@/shared/components/FeedbackMessage`):
+  - Use for inline error feedback instead of ad-hoc red utility classes.
+  - Current variant: `error` with tokenized style (`border-error bg-error-container text-error`).
+- `formatCurrency` / `formatDate` (`@/shared/lib/formatters`):
+  - Use for all money and calendar date display in UI.
+  - Do not duplicate local currency/date formatter helpers in screens/components.
+- New screen checklist:
+  - Use `ScreenHeader` for top-bar layout.
+  - Use `ScreenFooter` when actions are sticky to bottom.
+  - Use `FeedbackMessage` for inline errors.
+  - Import `formatCurrency` / `formatDate` instead of local formatters.
+
 ## File-Size Budgets
-- Frontend leaf components: target `<=250` LOC.
-- Frontend hooks/services: target `<=180` LOC.
-- Backend route/service/repository modules: target `<=220` LOC.
-- Split or create linked follow-up when modules exceed split thresholds.
+- Enforced by `scripts/check_file_sizes.sh` with scope-aware invocation:
+  - `make frontend-verify` runs `--scope frontend`
+  - `make backend-verify` runs `--scope backend`
+  - `make verify` runs `--scope all` once, then executes backend/frontend verification without duplicate size checks
+- Frontend component files:
+  - Warn (non-blocking): `>250` LOC
+  - Fail (blocking): `>450` LOC
+- Frontend hook/service files:
+  - Warn (non-blocking): `>180` LOC
+  - Fail (blocking): `>300` LOC
+- Backend route/service/repository files:
+  - Warn only (non-blocking): `>220` LOC
+  - No hard-fail LOC threshold for backend by default.
+- Backend warning evaluation rule:
+  - A LOC warning is a review flag, not an automatic split mandate.
+  - Split only when the two candidate halves have different collaborators/dependencies or different reasons to change.
 
 ## Verification Reference
 Canonical targets:

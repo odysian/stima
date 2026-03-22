@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer } from "@/features/customers/types/customer.types";
 import { BottomNav } from "@/shared/components/BottomNav";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 
 function contactLine(customer: Customer): string {
@@ -85,9 +86,9 @@ export function CustomerListScreen(): React.ReactElement {
         ) : null}
 
         {loadError ? (
-          <p role="alert" className="mx-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            {loadError}
-          </p>
+          <div className="mx-4">
+            <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
+          </div>
         ) : null}
 
         {!isLoading && !loadError && filteredCustomers.length > 0 ? (

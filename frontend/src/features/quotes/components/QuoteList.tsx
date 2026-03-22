@@ -4,35 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-
-function formatTotalAmount(totalAmount: number | null): string {
-  if (totalAmount === null) {
-    return "\u2014";
-  }
-
-  return totalAmount.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatCreatedDate(value: string): string {
-  const parsedDate = new Date(value);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return "Unknown date";
-  }
-
-  return parsedDate.toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 export function QuoteList(): React.ReactElement {
   const navigate = useNavigate();
@@ -142,9 +117,9 @@ export function QuoteList(): React.ReactElement {
         ) : null}
 
         {loadError ? (
-          <p role="alert" className="mx-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            {loadError}
-          </p>
+          <div className="mx-4">
+            <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
+          </div>
         ) : null}
 
         {!isLoading && !loadError && filteredQuotes.length === 0 ? (
@@ -182,14 +157,14 @@ export function QuoteList(): React.ReactElement {
                           {quote.customer_name}
                         </p>
                         <p className="mt-1 text-sm text-on-surface-variant">
-                          {quote.doc_number} {" \u00b7 "} {formatCreatedDate(quote.created_at)}
+                          {quote.doc_number} {" \u00b7 "} {formatDate(quote.created_at)}
                         </p>
                       </div>
                       <StatusBadge variant={quote.status} />
                     </div>
                     <p className="mt-2 text-xs text-outline">{quote.item_count} items</p>
                     <p className="mt-3 text-right font-bold text-on-surface">
-                      {formatTotalAmount(quote.total_amount)}
+                      {formatCurrency(quote.total_amount)}
                     </p>
                   </button>
                 </li>

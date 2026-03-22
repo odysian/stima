@@ -3,10 +3,14 @@
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-20s %s\n", $$1, $$2}'
 
-verify: backend-verify frontend-verify ## Run all backend and frontend verification checks
+verify: ## Run all backend and frontend verification checks
+	@bash scripts/check_file_sizes.sh --scope all
+	@$(MAKE) backend-verify SKIP_FILE_SIZE_CHECK=1
+	@$(MAKE) frontend-verify SKIP_FILE_SIZE_CHECK=1
 
 backend-verify: ## Run backend lint, type checks, security scan, and tests
 	@bash scripts/check_backend_boundaries.sh
+	@if [ "$(SKIP_FILE_SIZE_CHECK)" != "1" ]; then bash scripts/check_file_sizes.sh --scope backend; fi
 	@test -x backend/.venv/bin/ruff || (echo "Missing backend/.venv. Run: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" && exit 1)
 	@cd backend && \
 		.venv/bin/ruff check . --cache-dir .ruff_cache && \
@@ -16,6 +20,7 @@ backend-verify: ## Run backend lint, type checks, security scan, and tests
 		.venv/bin/pytest -v -m "not live" -o cache_dir=.pytest_cache
 
 frontend-verify: ## Run frontend type checks, lint, tests, and build
+	@if [ "$(SKIP_FILE_SIZE_CHECK)" != "1" ]; then bash scripts/check_file_sizes.sh --scope frontend; fi
 	@test -x frontend/node_modules/.bin/tsc || (echo "Missing frontend dependencies. Run: cd frontend && npm install" && exit 1)
 	@cd frontend && \
 		./node_modules/.bin/tsc --noEmit && \

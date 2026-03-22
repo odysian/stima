@@ -8,7 +8,9 @@ import type {
   CustomerCreateRequest,
 } from "@/features/customers/types/customer.types";
 import { Button } from "@/shared/components/Button";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
 type ScreenMode = "search" | "create";
 
@@ -122,24 +124,12 @@ export function CustomerSelectScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background">
-      <header className="fixed top-0 z-50 flex h-16 w-full items-center bg-white/80 px-4 shadow-[0_0_24px_rgba(13,28,46,0.04)] backdrop-blur-md">
-        <button
-          type="button"
-          aria-label="Go back"
-          className="mr-4 rounded-full p-2 text-emerald-900 transition-all hover:bg-slate-50 active:scale-95"
-          onClick={() => navigate(-1)}
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
-        <div>
-          <h1 className="font-headline text-lg font-bold tracking-tight text-primary">
-            {mode === "search" ? "New Quote" : "New Customer"}
-          </h1>
-          {mode === "search" ? (
-            <p className="text-sm text-on-surface-variant">Select a customer to continue</p>
-          ) : null}
-        </div>
-      </header>
+      <ScreenHeader
+        title={mode === "search" ? "New Quote" : "New Customer"}
+        subtitle={mode === "search" ? "Select a customer to continue" : undefined}
+        backLabel="Go back"
+        onBack={() => navigate(-1)}
+      />
 
       <section className={`mx-auto w-full max-w-3xl px-4 pt-20 ${mode === "search" ? "pb-24" : "pb-8"}`}>
         {mode === "search" ? (
@@ -158,9 +148,9 @@ export function CustomerSelectScreen(): React.ReactElement {
               </p>
             ) : null}
             {loadError ? (
-              <p role="alert" className="mt-4 rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
-                {loadError}
-              </p>
+              <div className="mt-4">
+                <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
+              </div>
             ) : null}
 
             {!loading && !loadError ? (
@@ -194,9 +184,9 @@ export function CustomerSelectScreen(): React.ReactElement {
         ) : (
           <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
             {createError ? (
-              <p role="alert" className="mb-4 rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
-                {createError}
-              </p>
+              <div className="mb-4">
+                <FeedbackMessage variant="error">{createError}</FeedbackMessage>
+              </div>
             ) : null}
 
             <form className="flex flex-col gap-4" onSubmit={onCreateCustomer}>
