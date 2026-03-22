@@ -15,19 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
-from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteService
 from app.integrations.pdf import PdfRenderError
 from app.main import app
 from app.shared.dependencies import get_quote_service
 
 pytestmark = pytest.mark.asyncio
-
-
-class _NoopExtractionIntegration:
-    async def extract(self, notes: str) -> ExtractionResult:
-        del notes
-        raise AssertionError("Extraction is not expected in PDF/share endpoint tests")
 
 
 class _ConfigurablePdfIntegration:
@@ -40,18 +33,6 @@ class _ConfigurablePdfIntegration:
         return f"PDF for {context.doc_number}".encode()
 
 
-class _NoopAudioIntegration:
-    def normalize_and_stitch(self, clips: object) -> bytes:
-        del clips
-        raise AssertionError("Audio normalization is not expected in PDF/share endpoint tests")
-
-
-class _NoopTranscriptionIntegration:
-    async def transcribe(self, audio_wav: bytes) -> str:
-        del audio_wav
-        raise AssertionError("Transcription is not expected in PDF/share endpoint tests")
-
-
 @pytest.fixture(autouse=True)
 def _override_quote_service_dependency() -> Iterator[_ConfigurablePdfIntegration]:
     pdf_integration = _ConfigurablePdfIntegration()
@@ -61,9 +42,6 @@ def _override_quote_service_dependency() -> Iterator[_ConfigurablePdfIntegration
     ) -> QuoteService:
         return QuoteService(
             repository=QuoteRepository(db),
-            extraction_integration=_NoopExtractionIntegration(),
-            audio_integration=_NoopAudioIntegration(),
-            transcription_integration=_NoopTranscriptionIntegration(),
             pdf_integration=pdf_integration,
         )
 

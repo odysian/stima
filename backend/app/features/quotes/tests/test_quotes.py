@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes import api as quote_api
+from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
 from app.features.quotes.service import QuoteService
@@ -21,7 +22,7 @@ from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
 from app.main import app
-from app.shared.dependencies import get_quote_service
+from app.shared.dependencies import get_extraction_service, get_quote_service
 
 pytestmark = pytest.mark.asyncio
 
@@ -100,15 +101,26 @@ def _override_quote_service_dependency() -> Iterator[None]:
     ) -> QuoteService:
         return QuoteService(
             repository=QuoteRepository(db),
-            extraction_integration=_MockExtractionIntegration(),
-            audio_integration=_MockAudioIntegration(),
-            transcription_integration=_MockTranscriptionIntegration(),
             pdf_integration=_MockPdfIntegration(),
         )
 
     app.dependency_overrides[get_quote_service] = _override_get_quote_service
     yield
     app.dependency_overrides.pop(get_quote_service, None)
+
+
+@pytest.fixture(autouse=True)
+def _override_extraction_service_dependency() -> Iterator[None]:
+    async def _override_get_extraction_service() -> ExtractionService:
+        return ExtractionService(
+            extraction_integration=_MockExtractionIntegration(),
+            audio_integration=_MockAudioIntegration(),
+            transcription_integration=_MockTranscriptionIntegration(),
+        )
+
+    app.dependency_overrides[get_extraction_service] = _override_get_extraction_service
+    yield
+    app.dependency_overrides.pop(get_extraction_service, None)
 
 
 @pytest.fixture(autouse=True)

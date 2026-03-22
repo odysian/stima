@@ -23,6 +23,7 @@ from app.features.customers.repository import CustomerRepository
 from app.features.customers.service import CustomerService
 from app.features.profile.repository import ProfileRepository
 from app.features.profile.service import ProfileService
+from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.service import QuoteService
 from app.integrations.audio import AudioIntegration
@@ -61,10 +62,17 @@ def get_customer_service(
 def get_quote_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> QuoteService:
-    """Build a request-scoped quote service wired to DB and extraction integration."""
-    settings = get_settings()
+    """Build a request-scoped quote service wired to DB and PDF integration."""
     return QuoteService(
         repository=QuoteRepository(db),
+        pdf_integration=get_pdf_integration(),
+    )
+
+
+def get_extraction_service() -> ExtractionService:
+    """Build a request-scoped extraction service wired to external integrations."""
+    settings = get_settings()
+    return ExtractionService(
         extraction_integration=ExtractionIntegration(
             api_key=settings.anthropic_api_key,
             model=settings.extraction_model,
@@ -74,7 +82,6 @@ def get_quote_service(
             api_key=settings.openai_api_key,
             model=settings.transcription_model,
         ),
-        pdf_integration=get_pdf_integration(),
     )
 
 
