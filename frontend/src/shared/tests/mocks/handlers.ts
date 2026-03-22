@@ -215,22 +215,9 @@ export const handlers = [
     const csrfError = requireCsrf(request);
     if (csrfError) return csrfError;
 
-    let notes = "";
-    let hasClips = false;
-    try {
-      const formData = await request.formData();
-      notes = String(formData.get("notes") ?? "").trim();
-      hasClips = formData.getAll("clips").length > 0;
-    } catch {
-      const rawBody = await request.text();
-      notes = rawBody.includes('name="notes"') ? "typed note" : "";
-      hasClips = rawBody.includes('name="clips"; filename=');
-    }
-    const transcript = notes || (hasClips ? "Transcribed clip transcript" : "");
-
     return HttpResponse.json(
       {
-        transcript,
+        transcript: "Transcribed clip transcript",
         line_items: [
           {
             description: "Brown mulch",

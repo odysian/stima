@@ -411,6 +411,19 @@ async def test_extract_combined_clips_only_success(client: AsyncClient) -> None:
     assert payload["line_items"][0]["flag_reason"]
 
 
+async def test_extract_combined_rejects_empty_clip_with_400(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("clips", ("clip-1.webm", b"", "audio/webm"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Audio clip is empty"}
+
+
 async def test_extract_combined_clips_and_notes_success(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
