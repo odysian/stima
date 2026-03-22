@@ -5,7 +5,17 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
@@ -146,9 +156,10 @@ async def extract_combined(
 async def list_quotes(
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    customer_id: Annotated[UUID | None, Query()] = None,
 ) -> list[QuoteListItemResponse]:
     """List quotes for the authenticated user."""
-    quotes = await quote_service.list_quotes(user)
+    quotes = await quote_service.list_quotes(user, customer_id=customer_id)
     return [QuoteListItemResponse.model_validate(quote) for quote in quotes]
 
 

@@ -77,8 +77,9 @@ function createQuote(data: QuoteCreateRequest): Promise<Quote> {
   });
 }
 
-function listQuotes(): Promise<QuoteListItem[]> {
-  return request<QuoteListItem[]>("/api/quotes");
+function listQuotes(params?: { customer_id?: string }): Promise<QuoteListItem[]> {
+  const query = params?.customer_id ? `?customer_id=${params.customer_id}` : "";
+  return request<QuoteListItem[]>(`/api/quotes${query}`);
 }
 
 function getQuote(id: string): Promise<QuoteDetail> {
