@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
+import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
+import { ShareLinkRow } from "@/features/quotes/components/ShareLinkRow";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
-import { Button } from "@/shared/components/Button";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-import { formatCurrency } from "@/shared/lib/formatters";
 
 function isShareAbortError(error: unknown): boolean {
   return (
@@ -23,15 +24,8 @@ function readOptionalQuoteText(
   quote: QuoteDetail | null,
   key: "customer_name" | "customer_email" | "customer_phone",
 ): string | null {
-  if (!quote) {
-    return null;
-  }
-
-  const value = quote[key];
-  if (typeof value !== "string") {
-    return null;
-  }
-
+  const value = quote?.[key];
+  if (typeof value !== "string") return null;
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : null;
 }
@@ -56,7 +50,6 @@ export function QuotePreview(): React.ReactElement {
       return;
     }
     const quoteId = id;
-
     let isActive = true;
 
     async function fetchQuote(): Promise<void> {
@@ -64,41 +57,24 @@ export function QuotePreview(): React.ReactElement {
       setLoadError(null);
       try {
         const fetchedQuote = await quoteService.getQuote(quoteId);
-        if (isActive) {
-          setQuote(fetchedQuote);
-        }
+        if (isActive) setQuote(fetchedQuote);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load quote";
-        if (isActive) {
-          setLoadError(message);
-        }
+        if (isActive) setLoadError(message);
       } finally {
-        if (isActive) {
-          setIsLoadingQuote(false);
-        }
+        if (isActive) setIsLoadingQuote(false);
       }
     }
 
     void fetchQuote();
-
-    return () => {
-      isActive = false;
-    };
+    return () => { isActive = false; };
   }, [id]);
 
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [pdfUrl]);
+  useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
 
-  const canShare = quote !== null && pdfUrl !== null;
-  const shareUrl = quote?.share_token
-    ? `${window.location.origin}/share/${quote.share_token}`
-    : null;
-  const clientName = readOptionalQuoteText(quote, "customer_name") || quote?.customer_id || "Unknown customer";
+  const canShare = !!quote && !!pdfUrl;
+  const shareUrl = quote?.share_token ? `${window.location.origin}/share/${quote.share_token}` : null;
+  const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact =
     [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]
       .map((value) => value?.trim())
@@ -117,17 +93,12 @@ export function QuotePreview(): React.ReactElement {
     try {
       const blob = await quoteService.generatePdf(id);
       const nextPdfUrl = URL.createObjectURL(blob);
-
       setPdfUrl((currentPdfUrl) => {
-        if (currentPdfUrl) {
-          URL.revokeObjectURL(currentPdfUrl);
-        }
+        if (currentPdfUrl) URL.revokeObjectURL(currentPdfUrl);
         return nextPdfUrl;
       });
       setQuote((currentQuote) => {
-        if (!currentQuote || currentQuote.status === "shared") {
-          return currentQuote;
-        }
+        if (!currentQuote || currentQuote.status === "shared") return currentQuote;
         return { ...currentQuote, status: "ready" };
       });
     } catch (error) {
@@ -142,7 +113,6 @@ export function QuotePreview(): React.ReactElement {
     if (!id || !quote) {
       return;
     }
-
     setShareError(null);
     setShareMessage(null);
     setIsSharing(true);
@@ -150,9 +120,7 @@ export function QuotePreview(): React.ReactElement {
     try {
       const updatedQuote = await quoteService.shareQuote(id);
       setQuote((currentQuote) => {
-        if (!currentQuote) {
-          return currentQuote;
-        }
+        if (!currentQuote) return currentQuote;
         return {
           ...currentQuote,
           status: updatedQuote.status,
@@ -165,12 +133,8 @@ export function QuotePreview(): React.ReactElement {
       if (!updatedQuote.share_token) {
         throw new Error("Share link unavailable");
       }
-
       const nextSharedUrl = `${window.location.origin}/share/${updatedQuote.share_token}`;
-
-      const maybeNavigator = navigator as Navigator & {
-        share?: (data: ShareData) => Promise<void>;
-      };
+      const maybeNavigator = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
 
       if (typeof maybeNavigator.share === "function") {
         await maybeNavigator.share({
@@ -180,18 +144,14 @@ export function QuotePreview(): React.ReactElement {
         setShareMessage("Quote link shared.");
         return;
       }
-
       if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
         await navigator.clipboard.writeText(nextSharedUrl);
         setShareMessage("Share link copied to clipboard.");
         return;
       }
-
       setShareMessage("Share this link with your customer.");
     } catch (error) {
-      if (isShareAbortError(error)) {
-        return;
-      }
+      if (isShareAbortError(error)) return;
       const message = error instanceof Error ? error.message : "Unable to share quote";
       setShareError(message);
     } finally {
@@ -203,10 +163,8 @@ export function QuotePreview(): React.ReactElement {
     if (!shareUrl) {
       return;
     }
-
     setShareError(null);
     setShareMessage(null);
-
     if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
       setShareMessage("Copy this share link manually.");
       return;
@@ -230,11 +188,7 @@ export function QuotePreview(): React.ReactElement {
       />
 
       <section className="mx-auto w-full max-w-6xl">
-        {isLoadingQuote ? (
-          <p role="status" className="mt-4 px-4 text-sm text-on-surface-variant">
-            Loading quote...
-          </p>
-        ) : null}
+        {isLoadingQuote ? <p role="status" className="mt-4 px-4 text-sm text-on-surface-variant">Loading quote...</p> : null}
 
         {loadError ? (
           <div className="mx-4 mt-4">
@@ -244,7 +198,10 @@ export function QuotePreview(): React.ReactElement {
 
         {!isLoadingQuote && !loadError ? (
           <>
-            <div className="mx-4 mt-4 overflow-hidden rounded-xl bg-surface-container-low" style={{ height: "55vh" }}>
+            <div
+              className="mx-4 mt-4 overflow-hidden rounded-xl bg-surface-container-low"
+              style={{ height: "55vh" }}
+            >
               {pdfUrl ? (
                 <iframe src={pdfUrl} className="h-full w-full border-0" title="Quote PDF preview" />
               ) : (
@@ -255,87 +212,20 @@ export function QuotePreview(): React.ReactElement {
               )}
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 px-4">
-              <Button
-                type="button"
-                className="w-full"
-                onClick={() => {
-                  void onGeneratePdf();
-                }}
-                isLoading={isGeneratingPdf}
-                disabled={isLoadingQuote || !!loadError}
-              >
-                Generate PDF
-              </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  void onShare();
-                }}
-                className="w-full rounded-lg border border-primary py-4 font-semibold text-primary transition-all disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]"
-                disabled={!canShare || isLoadingQuote || !!loadError || isSharing}
-              >
-                {isSharing ? "Sharing..." : "Share"}
-              </button>
-            </div>
+            <QuotePreviewActions
+              onGeneratePdf={onGeneratePdf}
+              onShare={onShare}
+              isGeneratingPdf={isGeneratingPdf}
+              isSharing={isSharing}
+              canShare={canShare}
+              disabled={isLoadingQuote || !!loadError}
+              pdfError={pdfError}
+              shareError={shareError}
+              shareMessage={shareMessage}
+            />
 
-            {shareUrl ? (
-              <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-surface-container-low p-3">
-                <span className="flex-1 truncate text-sm text-on-surface-variant">{shareUrl}</span>
-                <button
-                  type="button"
-                  className="rounded-lg p-2 transition-all hover:bg-surface-container active:scale-95"
-                  onClick={() => {
-                    void copyToClipboard();
-                  }}
-                  aria-label="Copy share link"
-                >
-                  <span className="material-symbols-outlined text-primary">content_copy</span>
-                </button>
-              </div>
-            ) : null}
-
-            {isGeneratingPdf ? (
-              <p role="status" className="mx-4 mt-3 text-sm text-on-surface-variant">
-                Generating PDF...
-              </p>
-            ) : null}
-
-            {pdfError ? (
-              <div className="mx-4 mt-3">
-                <FeedbackMessage variant="error">{pdfError}</FeedbackMessage>
-              </div>
-            ) : null}
-
-            {shareError ? (
-              <div className="mx-4 mt-3">
-                <FeedbackMessage variant="error">{shareError}</FeedbackMessage>
-              </div>
-            ) : null}
-
-            {shareMessage ? (
-              <p className="mx-4 mt-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{shareMessage}</p>
-            ) : null}
-
-            {quote ? (
-              <div className="mt-4 flex flex-col gap-3 px-4 pb-6">
-                <section className="ghost-shadow rounded-lg border-l-4 border-primary bg-surface-container-lowest p-4">
-                  <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                    TOTAL AMOUNT
-                  </h2>
-                  <p className="mt-2 font-headline text-2xl font-bold text-primary">
-                    {formatCurrency(quote.total_amount)}
-                  </p>
-                </section>
-
-                <section className="ghost-shadow rounded-lg border-l-4 border-teal-500 bg-surface-container-lowest p-4">
-                  {/* Using border-teal-500 to match Stitch's client accent; it's visually aligned with the surface-tint token. */}
-                  <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">CLIENT</h2>
-                  <p className="mt-2 font-bold text-on-surface">{clientName}</p>
-                  <p className="mt-1 text-sm text-on-surface-variant">{clientContact}</p>
-                </section>
-              </div>
-            ) : null}
+            {shareUrl ? <ShareLinkRow shareUrl={shareUrl} onCopy={copyToClipboard} /> : null}
+            {quote ? <QuoteDetailsCard totalAmount={quote.total_amount} clientName={clientName} clientContact={clientContact} /> : null}
           </>
         ) : null}
       </section>

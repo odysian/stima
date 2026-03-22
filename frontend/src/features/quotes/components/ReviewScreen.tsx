@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
+import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
@@ -10,7 +11,6 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { formatCurrency } from "@/shared/lib/formatters";
 
 const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   description: "",
@@ -179,45 +179,13 @@ export function ReviewScreen(): React.ReactElement | null {
           + Add Manual Line Item
         </button>
 
-        <section className="rounded-lg bg-surface-container-low p-4">
-          <div className="flex items-center justify-between text-sm text-outline">
-            <span>Line Item Sum</span>
-            <span>{formatCurrency(lineItemSum)}</span>
-          </div>
-          <div className="mt-4 border-t border-outline-variant/30 pt-4">
-            <label
-              htmlFor="quote-total"
-              className="block text-xs font-bold uppercase tracking-widest text-on-surface"
-            >
-              TOTAL AMOUNT
-            </label>
-            <div className="relative mt-2">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
-                $
-              </span>
-              <input
-                id="quote-total"
-                type="number"
-                step="0.01"
-                value={currentDraft.total ?? ""}
-                onChange={(event) => {
-                  const rawValue = event.target.value.trim();
-                  if (rawValue.length === 0) {
-                    updateDraft((nextDraft) => ({ ...nextDraft, total: null }));
-                    return;
-                  }
-
-                  const parsedValue = Number(rawValue);
-                  updateDraft((nextDraft) => ({
-                    ...nextDraft,
-                    total: Number.isFinite(parsedValue) ? parsedValue : null,
-                  }));
-                }}
-                className="w-full rounded-lg border-2 border-primary bg-white py-3 pl-10 pr-4 font-headline text-3xl font-bold tracking-tight text-primary outline-none transition-all focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-          </div>
-        </section>
+        <TotalAmountSection
+          lineItemSum={lineItemSum}
+          total={currentDraft.total}
+          onTotalChange={(total) => {
+            updateDraft((nextDraft) => ({ ...nextDraft, total }));
+          }}
+        />
 
         <section className="space-y-2">
           <label
