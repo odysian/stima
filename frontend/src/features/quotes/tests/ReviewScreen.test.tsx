@@ -144,6 +144,29 @@ describe("ReviewScreen", () => {
     expect(screen.queryByText(/ai confidence note/i)).not.toBeInTheDocument();
   });
 
+  it("shows a null-price warning when any submitted line item has no price", () => {
+    renderScreen(makeDraft());
+
+    expect(screen.getByText(/some line items have no price/i)).toBeInTheDocument();
+  });
+
+  it("hides the null-price warning when all submitted line items have prices", () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      }),
+    );
+
+    expect(screen.queryByText(/some line items have no price/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps quote generation enabled when the null-price warning is shown", () => {
+    renderScreen(makeDraft());
+
+    expect(screen.getByText(/some line items have no price/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate quote >/i })).toBeEnabled();
+  });
+
   it("adds a blank manual line item", () => {
     renderScreen(makeDraft());
 

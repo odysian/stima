@@ -64,6 +64,7 @@ export function ReviewScreen(): React.ReactElement | null {
       details: lineItem.details,
       price: lineItem.price,
     }));
+  const hasNullPrices = lineItemsForSubmit.some((lineItem) => lineItem.price === null);
   const canSubmit = lineItemsForSubmit.length > 0 && !hasInvalidLineItems;
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
@@ -212,6 +213,11 @@ export function ReviewScreen(): React.ReactElement | null {
 
       <ScreenFooter>
         <div className="mx-auto w-full max-w-2xl">
+          {hasNullPrices ? (
+            <p className="mb-2 rounded-lg bg-warning-container px-3 py-2 text-center text-xs text-warning">
+              Some line items have no price — the quote will show "TBD" for those items.
+            </p>
+          ) : null}
           <Button
             type="submit"
             form="quote-review-form"
