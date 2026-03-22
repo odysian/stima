@@ -71,7 +71,11 @@ export function SettingsScreen(): React.ReactElement {
         last_name: lastName,
         trade_type: tradeType,
       });
-      await refreshUser();
+      try {
+        await refreshUser();
+      } catch {
+        // Ignore refresh failures because profile save already succeeded.
+      }
       setSaveSuccess("Saved");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save settings";

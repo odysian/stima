@@ -162,6 +162,38 @@ describe("SettingsScreen", () => {
     expect(await screen.findByText("Saved")).toBeInTheDocument();
   });
 
+  it("keeps save success when refreshUser fails after successful profile update", async () => {
+    const refreshUser = vi.fn(async () => {
+      throw new Error("Unable to refresh user");
+    });
+    mockedUseAuth.mockReturnValue({
+      user: {
+        id: "user-1",
+        email: "test@example.com",
+        is_active: true,
+        is_onboarded: true,
+      },
+      isLoading: false,
+      isOnboarded: true,
+      refreshUser,
+      login: vi.fn(async () => undefined),
+      register: vi.fn(async () => undefined),
+      logout: vi.fn(async () => undefined),
+    });
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+    mockedProfileService.updateProfile.mockResolvedValueOnce(makeProfileResponse());
+
+    renderScreen();
+
+    await screen.findByLabelText(/business name/i);
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(mockedProfileService.updateProfile).toHaveBeenCalledTimes(1));
+    expect(refreshUser).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(screen.queryByText("Unable to save settings")).not.toBeInTheDocument();
+  });
+
   it("shows inline save error when profile update fails", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
     mockedProfileService.updateProfile.mockRejectedValueOnce(new Error("Unable to save settings"));
