@@ -15,6 +15,7 @@ import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { QuotePreview } from "@/features/quotes/components/QuotePreview";
 import { ReviewScreen } from "@/features/quotes/components/ReviewScreen";
+import { SettingsScreen } from "@/features/settings/components/SettingsScreen";
 
 function ProtectedRoute(): React.ReactElement {
   const { user, isOnboarded } = useAuth();
@@ -77,10 +78,7 @@ export default function App(): React.ReactElement {
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<QuoteList />} />
-        <Route
-          path="/settings"
-          element={<div className="p-6 text-sm text-slate-700">Settings coming soon</div>}
-        />
+        <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/quotes/new" element={<CustomerSelectScreen />} />
         <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
         <Route path="/quotes/review" element={<ReviewScreen />} />

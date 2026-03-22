@@ -79,6 +79,20 @@ describe("App routes", () => {
     expect(await screen.findByRole("heading", { name: /your quotes/i })).toBeInTheDocument();
   });
 
+  it("renders settings screen for onboarded users at /settings", async () => {
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-6",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: true,
+    });
+
+    renderApp("/settings");
+
+    expect(await screen.findByRole("heading", { name: /settings/i })).toBeInTheDocument();
+    expect(screen.queryByText(/settings coming soon/i)).not.toBeInTheDocument();
+  });
+
   it("redirects unauthenticated users from protected route to login", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
 
