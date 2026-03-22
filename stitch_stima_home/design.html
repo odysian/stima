@@ -1,0 +1,3526 @@
+<!-- Quote Preview - Refined -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              secondary: "#904a45",
+              "primary-container": "#065f46",
+              "on-tertiary-fixed": "#2c1600",
+              "surface-container-low": "#eff4ff",
+              "inverse-primary": "#8bd6b6",
+              "surface-tint": "#1b6b51",
+              "inverse-on-surface": "#eaf1ff",
+              "surface-container-lowest": "#ffffff",
+              "on-primary-container": "#8bd6b7",
+              "surface-container-high": "#dce9ff",
+              "on-primary-fixed-variant": "#00513b",
+              "on-primary-fixed": "#002116",
+              "on-surface": "#0d1c2e",
+              "surface-dim": "#ccdbf3",
+              "secondary-fixed": "#ffdad6",
+              "on-tertiary": "#ffffff",
+              "on-background": "#0d1c2e",
+              "on-tertiary-container": "#ffba73",
+              "surface-container-highest": "#d5e3fc",
+              "on-surface-variant": "#3f4944",
+              "on-tertiary-fixed-variant": "#693c00",
+              "on-secondary-fixed": "#3b0908",
+              "outline-variant": "#bec9c2",
+              tertiary: "#5b3300",
+              primary: "#004532",
+              error: "#ba1a1a",
+              "on-primary": "#ffffff",
+              "on-secondary": "#ffffff",
+              "primary-fixed-dim": "#8bd6b6",
+              "surface-variant": "#d5e3fc",
+              "on-secondary-fixed-variant": "#73332f",
+              "on-error-container": "#93000a",
+              "surface-bright": "#f8f9ff",
+              surface: "#f8f9ff",
+              "secondary-fixed-dim": "#ffb3ac",
+              "on-error": "#ffffff",
+              "secondary-container": "#fda49c",
+              "surface-container": "#e6eeff",
+              background: "#f8f9ff",
+              "on-secondary-container": "#783733",
+              "inverse-surface": "#233144",
+              "tertiary-fixed-dim": "#ffb870",
+              "tertiary-fixed": "#ffdcbe",
+              "primary-fixed": "#a6f2d1",
+              "tertiary-container": "#7b4700",
+              outline: "#6f7973",
+              "error-container": "#ffdad6",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      .blueprint-pattern {
+        background-image: radial-gradient(#bec9c2 0.5px, transparent 0.5px);
+        background-size: 20px 20px;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-surface font-body text-on-surface selection:bg-primary-fixed selection:text-primary"
+  >
+    <!-- Top Navigation Bar -->
+    <header
+      class="bg-white sticky top-0 z-50 shadow-[0_0_24px_rgba(0,0,0,0.04)] border-none"
+    >
+      <div
+        class="flex justify-between items-center w-full px-6 h-20 max-w-screen-xl mx-auto"
+      >
+        <div class="flex items-center gap-4">
+          <button
+            class="material-symbols-outlined text-on-surface active:scale-[0.97] transition-all duration-200 hover:bg-surface-container-low p-2 rounded-full"
+          >
+            arrow_back
+          </button>
+          <div class="flex items-center gap-3">
+            <h1
+              class="font-headline font-bold text-2xl tracking-[-0.02em] text-emerald-900"
+            >
+              Q-004
+            </h1>
+            <span
+              class="bg-emerald-100 text-primary-container text-[0.6875rem] font-bold px-2.5 py-1 rounded-sm uppercase tracking-wider"
+              >Ready</span
+            >
+          </div>
+        </div>
+        <div class="w-10"></div>
+      </div>
+    </header>
+    <main class="max-w-screen-xl mx-auto px-6 py-8 flex flex-col gap-9">
+      <!-- Action Section -->
+      <section class="flex flex-col md:flex-row gap-4">
+        <button
+          class="flex-1 bg-gradient-to-r from-primary to-primary-container text-on-primary font-body font-semibold py-4 px-6 rounded-lg shadow-[0_0_24px_rgba(6,95,70,0.1)] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+        >
+          <span class="material-symbols-outlined text-xl">picture_as_pdf</span>
+          Generate PDF
+        </button>
+        <button
+          class="flex-1 border border-outline-variant bg-white text-on-surface-variant font-body font-semibold py-4 px-6 rounded-lg hover:bg-surface-container-low active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+        >
+          <span class="material-symbols-outlined text-xl">share</span>
+          Share
+        </button>
+      </section>
+      <!-- Preview Canvas -->
+      <section
+        class="relative w-full h-[486px] bg-surface-container-low rounded-xl overflow-hidden shadow-inner group"
+      >
+        <!-- Blueprint texture overlay -->
+        <div
+          class="absolute inset-0 blueprint-pattern opacity-30 pointer-events-none"
+        ></div>
+        <div
+          class="absolute inset-0 flex flex-col items-center justify-center text-center p-8"
+        >
+          <div
+            class="bg-white/80 backdrop-blur-md p-12 rounded-xl border border-white/50 shadow-[0_0_40px_rgba(0,0,0,0.02)] max-w-md"
+          >
+            <span
+              class="material-symbols-outlined text-6xl text-outline mb-4 block"
+              style="font-variation-settings: &quot;wght&quot; 200"
+              >draft</span
+            >
+            <p
+              class="text-on-surface-variant leading-relaxed font-body text-sm"
+            >
+              Generate the PDF to preview it here.
+            </p>
+          </div>
+        </div>
+        <!-- Decorative Mockup Element (Glassmorphism layer) -->
+        <div
+          class="absolute -bottom-10 left-1/2 -translate-x-1/2 w-[85%] h-64 bg-white/40 backdrop-blur-sm rounded-t-2xl border-t border-x border-white/60 shadow-2xl flex flex-col p-8 opacity-40"
+        >
+          <div class="w-1/3 h-4 bg-slate-300/30 rounded mb-4"></div>
+          <div class="w-2/3 h-3 bg-slate-300/30 rounded mb-2"></div>
+          <div class="w-1/2 h-3 bg-slate-300/30 rounded"></div>
+        </div>
+      </section>
+      <!-- Metadata Section (Bento style) -->
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <div
+          class="bg-white p-6 rounded-lg border-l-4 border-primary shadow-sm"
+        >
+          <span class="text-xs font-bold text-outline uppercase block mb-2"
+            >Total Amount</span
+          >
+          <span class="font-headline font-bold text-2xl text-on-surface"
+            >$12,450.00</span
+          >
+        </div>
+        <div
+          class="bg-white p-6 rounded-lg border-l-4 border-emerald-200 shadow-sm"
+        >
+          <span class="text-xs font-bold text-outline uppercase block mb-2"
+            >Client</span
+          >
+          <span class="font-headline font-bold text-2xl text-on-surface"
+            >Modernist Dev.</span
+          >
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
+
+<!-- Edit Line Item - Flagged -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Edit Line Item - Stima</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#ccdbf3",
+              surface: "#f8f9ff",
+              "on-secondary-container": "#783733",
+              "surface-container-high": "#dce9ff",
+              "surface-bright": "#f8f9ff",
+              "on-error-container": "#93000a",
+              secondary: "#904a45",
+              "inverse-primary": "#8bd6b6",
+              "error-container": "#ffdad6",
+              "surface-tint": "#1b6b51",
+              "surface-container-highest": "#d5e3fc",
+              "on-surface-variant": "#3f4944",
+              "on-secondary": "#ffffff",
+              "surface-variant": "#d5e3fc",
+              error: "#ba1a1a",
+              "surface-container": "#e6eeff",
+              tertiary: "#5b3300",
+              "surface-container-lowest": "#ffffff",
+              "primary-fixed": "#a6f2d1",
+              "primary-fixed-dim": "#8bd6b6",
+              "secondary-fixed-dim": "#ffb3ac",
+              "secondary-fixed": "#ffdad6",
+              "tertiary-container": "#7b4700",
+              "on-primary-fixed": "#002116",
+              "on-background": "#0d1c2e",
+              "on-tertiary-fixed": "#2c1600",
+              "tertiary-fixed": "#ffdcbe",
+              "on-tertiary-fixed-variant": "#693c00",
+              "on-tertiary-container": "#ffba73",
+              "on-primary-container": "#8bd6b7",
+              "inverse-surface": "#233144",
+              "inverse-on-surface": "#eaf1ff",
+              "tertiary-fixed-dim": "#ffb870",
+              "on-tertiary": "#ffffff",
+              "on-error": "#ffffff",
+              "surface-container-low": "#eff4ff",
+              primary: "#004532",
+              outline: "#6f7973",
+              "on-primary-fixed-variant": "#00513b",
+              "on-secondary-fixed-variant": "#73332f",
+              background: "#f8f9ff",
+              "primary-container": "#065f46",
+              "on-surface": "#0d1c2e",
+              "outline-variant": "#bec9c2",
+              "secondary-container": "#fda49c",
+              "on-secondary-fixed": "#3b0908",
+              "on-primary": "#ffffff",
+              warning: "#F59E3B",
+              destructive: "#823F3A",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.25rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+        vertical-align: middle;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .font-headline {
+        font-family: "Space Grotesk", sans-serif;
+      }
+      .glass-nav {
+        backdrop-filter: blur(12px);
+      }
+      .ghost-shadow {
+        shadow: 0 0 24px 0 rgba(13, 28, 46, 0.04);
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-surface-container-low min-h-screen text-on-surface">
+    <!-- TopAppBar -->
+    <header
+      class="fixed top-0 w-full z-50 flex items-center justify-between px-4 h-16 bg-white dark:bg-slate-950"
+    >
+      <div class="flex items-center gap-3">
+        <button
+          class="text-emerald-900 dark:text-emerald-500 active:scale-95 transition-transform duration-150 p-2 rounded-full hover:bg-slate-50"
+        >
+          <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+        <div class="flex flex-col">
+          <span
+            class="text-[10px] uppercase tracking-widest text-slate-500 font-bold"
+            >Review &amp; Edit</span
+          >
+          <h1
+            class="font-['Space_Grotesk'] font-bold tracking-tight text-emerald-900 dark:text-emerald-500 text-lg leading-tight"
+          >
+            Edit Line Item
+          </h1>
+        </div>
+      </div>
+    </header>
+    <main class="pt-20 pb-32 px-4 max-w-2xl mx-auto">
+      <!-- AI Confidence Note Banner -->
+      <div
+        class="mb-8 flex items-start gap-3 p-4 bg-warning/10 border-l-4 border-warning rounded-r-lg shadow-[0_4px_24px_rgba(245,158,59,0.08)] backdrop-blur-sm"
+      >
+        <span
+          class="material-symbols-outlined text-warning"
+          style="font-variation-settings: &quot;FILL&quot; 1"
+          >error</span
+        >
+        <div>
+          <p
+            class="font-headline text-[11px] font-bold tracking-widest text-warning uppercase mb-0.5"
+          >
+            AI CONFIDENCE NOTE
+          </p>
+          <p class="text-sm font-medium text-on-surface">
+            Price could not be confirmed from your notes.
+          </p>
+        </div>
+      </div>
+      <!-- Form Card -->
+      <div
+        class="bg-surface-container-lowest rounded-xl p-6 shadow-[0_0_24px_rgba(13,28,46,0.04)]"
+      >
+        <form class="space-y-8">
+          <!-- Description Field -->
+          <div class="group">
+            <label
+              class="block font-headline text-sm font-bold tracking-tight text-on-surface-variant mb-2"
+              >Description <span class="text-destructive">*</span></label
+            >
+            <input
+              class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary text-on-surface px-4 py-3 transition-all duration-200"
+              required=""
+              type="text"
+              value="Custom Hardwood Decking Installation"
+            />
+          </div>
+          <!-- Details Field -->
+          <div class="group">
+            <label
+              class="block font-headline text-sm font-bold tracking-tight text-on-surface-variant mb-2"
+              >Details</label
+            >
+            <textarea
+              class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary text-on-surface px-4 py-3 transition-all duration-200 resize-none"
+              placeholder="Additional details or specifications..."
+              rows="3"
+            >
+Ipe wood boards, stainless steel fasteners, joist tape applied to entire frame. 350 sq ft total coverage.</textarea
+            >
+          </div>
+          <!-- Price Field -->
+          <div class="group">
+            <label
+              class="block font-headline text-sm font-bold tracking-tight text-on-surface-variant mb-2"
+              >Price</label
+            >
+            <div class="relative">
+              <span
+                class="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant font-medium"
+                >$</span
+              >
+              <input
+                class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary text-on-surface pl-8 pr-4 py-3 transition-all duration-200"
+                placeholder="0.00"
+                step="0.01"
+                type="number"
+              />
+            </div>
+          </div>
+        </form>
+      </div>
+      <!-- Asymmetric Decorative Element -->
+      <div class="mt-8 flex justify-end">
+        <div class="h-1 w-24 bg-surface-container-highest rounded-full"></div>
+      </div>
+    </main>
+    <!-- Bottom Actions Container -->
+    <div
+      class="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-xl z-50 px-6 pb-8 pt-4 flex flex-col gap-3 shadow-[0_-4px_24px_rgba(0,0,0,0.04)]"
+    >
+      <!-- Save Changes Button -->
+      <button
+        class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-headline font-bold py-4 rounded shadow-lg active:scale-95 transition-all duration-200 uppercase tracking-widest text-sm"
+      >
+        Save Changes
+      </button>
+      <!-- Delete Line Item Button -->
+      <button
+        class="w-full border-2 border-destructive/20 text-destructive font-headline font-bold py-4 rounded hover:bg-destructive/5 active:scale-95 transition-all duration-200 uppercase tracking-widest text-sm"
+      >
+        Delete Line Item
+      </button>
+    </div>
+    <!-- Background Blueprint Pattern (Abstract Aesthetic) -->
+    <div
+      class="fixed inset-0 -z-10 opacity-[0.03] pointer-events-none"
+      data-alt="Abstract subtle green grid pattern representing architectural blueprint lines"
+      style="
+        background-image: radial-gradient(#065f46 0.5px, transparent 0.5px);
+        background-size: 24px 24px;
+      "
+    ></div>
+  </body>
+</html>
+
+<!-- Edit Line Item - Clean -->
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Edit Line Item - Stima</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#ccdbf3",
+              surface: "#f8f9ff",
+              "on-secondary-container": "#783733",
+              "surface-container-high": "#dce9ff",
+              "surface-bright": "#f8f9ff",
+              "on-error-container": "#93000a",
+              secondary: "#904a45",
+              "inverse-primary": "#8bd6b6",
+              "error-container": "#ffdad6",
+              "surface-tint": "#1b6b51",
+              "surface-container-highest": "#d5e3fc",
+              "on-surface-variant": "#3f4944",
+              "on-secondary": "#ffffff",
+              "surface-variant": "#d5e3fc",
+              error: "#ba1a1a",
+              "surface-container": "#e6eeff",
+              tertiary: "#5b3300",
+              "surface-container-lowest": "#ffffff",
+              "primary-fixed": "#a6f2d1",
+              "primary-fixed-dim": "#8bd6b6",
+              "secondary-fixed-dim": "#ffb3ac",
+              "secondary-fixed": "#ffdad6",
+              "tertiary-container": "#7b4700",
+              "on-primary-fixed": "#002116",
+              "on-background": "#0d1c2e",
+              "on-tertiary-fixed": "#2c1600",
+              "tertiary-fixed": "#ffdcbe",
+              "on-tertiary-fixed-variant": "#693c00",
+              "on-tertiary-container": "#ffba73",
+              "on-primary-container": "#8bd6b7",
+              "inverse-surface": "#233144",
+              "inverse-on-surface": "#eaf1ff",
+              "tertiary-fixed-dim": "#ffb870",
+              "on-tertiary": "#ffffff",
+              "on-error": "#ffffff",
+              "surface-container-low": "#eff4ff",
+              primary: "#004532",
+              outline: "#6f7973",
+              "on-primary-fixed-variant": "#00513b",
+              "on-secondary-fixed-variant": "#73332f",
+              background: "#f8f9ff",
+              "primary-container": "#065f46",
+              "on-surface": "#0d1c2e",
+              "outline-variant": "#bec9c2",
+              "secondary-container": "#fda49c",
+              "on-secondary-fixed": "#3b0908",
+              "on-primary": "#ffffff",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f8f9ff;
+      }
+      .architectural-shadow {
+        box-shadow: 0 4px 24px rgba(13, 28, 46, 0.04);
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-surface-container-low text-on-surface min-h-screen flex flex-col"
+  >
+    <!-- TopAppBar -->
+    <header
+      class="fixed top-0 w-full z-50 flex items-center justify-between px-4 h-16 bg-white dark:bg-slate-950"
+    >
+      <div class="flex items-center gap-3">
+        <button
+          class="flex items-center justify-center w-10 h-10 rounded-full active:scale-95 transition-transform duration-150 hover:bg-slate-50 dark:hover:bg-slate-800"
+        >
+          <span
+            class="material-symbols-outlined text-emerald-900 dark:text-emerald-500"
+            >arrow_back</span
+          >
+        </button>
+        <div class="flex flex-col">
+          <span
+            class="text-[10px] uppercase tracking-widest text-slate-500 font-bold font-label"
+            >Review &amp; Edit</span
+          >
+          <h1
+            class="text-emerald-900 dark:text-emerald-500 font-['Space_Grotesk'] font-bold tracking-tight text-lg"
+          >
+            Edit Line Item
+          </h1>
+        </div>
+      </div>
+    </header>
+    <!-- Main Content -->
+    <main class="flex-1 mt-16 px-4 py-8 max-w-2xl mx-auto w-full">
+      <!-- Blueprint Style Header Info (Visual anchor, non-editable here) -->
+      <!-- Form Container -->
+      <div
+        class="bg-surface-container-lowest architectural-shadow rounded-lg p-6 space-y-8"
+      >
+        <!-- Description Field -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-end">
+            <label
+              class="font-headline font-bold text-sm tracking-tight text-on-surface"
+              for="description"
+              >Description</label
+            >
+            <span
+              class="font-label text-[10px] text-primary-container font-bold uppercase tracking-tighter"
+              >Required</span
+            >
+          </div>
+          <input
+            class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface font-body text-sm py-3 px-4 transition-all"
+            id="description"
+            name="description"
+            placeholder="Enter line item title..."
+            type="text"
+            value="Premium Quartz Countertop Installation"
+          />
+        </div>
+        <!-- Details Field -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-end">
+            <label
+              class="font-headline font-bold text-sm tracking-tight text-on-surface"
+              for="details"
+              >Details</label
+            >
+            <span
+              class="font-label text-[10px] text-outline font-medium uppercase tracking-tighter"
+              >Optional</span
+            >
+          </div>
+          <textarea
+            class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface font-body text-sm py-3 px-4 transition-all resize-none"
+            id="details"
+            name="details"
+            placeholder="Additional details or specifications..."
+            rows="3"
+          >
+Grade A Calacatta Nuvo Quartz, 3cm thickness with mitered edges. Includes sink cutout and backsplash matching.</textarea
+          >
+        </div>
+        <!-- Price Field -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-end">
+            <label
+              class="font-headline font-bold text-sm tracking-tight text-on-surface"
+              for="price"
+              >Price</label
+            >
+            <span
+              class="font-label text-[10px] text-outline font-medium uppercase tracking-tighter"
+              >Optional</span
+            >
+          </div>
+          <div class="relative group">
+            <span
+              class="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant font-bold text-sm"
+              >$</span
+            >
+            <input
+              class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface font-body text-sm py-3 pl-8 pr-4 transition-all"
+              id="price"
+              name="price"
+              placeholder="0.00"
+              step="0.01"
+              type="number"
+            />
+          </div>
+        </div>
+      </div>
+      <!-- Meta Info / System Logs (Editorial Touch) -->
+    </main>
+    <!-- Bottom Actions -->
+    <footer class="p-6 space-y-3 max-w-2xl mx-auto w-full mb-20 md:mb-8">
+      <button
+        class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold tracking-tight rounded-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-container/20"
+      >
+        <span
+          class="material-symbols-outlined"
+          style="font-variation-settings: &quot;FILL&quot; 1"
+          >save</span
+        >
+        Save Changes
+      </button>
+      <button
+        class="w-full h-14 border-2 border-on-secondary-container text-on-secondary-container font-headline font-bold tracking-tight rounded-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-secondary-container/10"
+      >
+        <span class="material-symbols-outlined">delete_forever</span>
+        Delete Line Item
+      </button>
+    </footer>
+    <!-- BottomNavBar -->
+  </body>
+</html>
+
+<!-- Design System -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Review &amp; Edit - Stima</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed": "#002116",
+              "primary-container": "#065f46",
+              "on-secondary-fixed": "#3b0908",
+              "outline-variant": "#bec9c2",
+              "surface-variant": "#d5e3fc",
+              "on-primary": "#ffffff",
+              "surface-dim": "#ccdbf3",
+              "surface-bright": "#f8f9ff",
+              "inverse-primary": "#8bd6b6",
+              "tertiary-container": "#7b4700",
+              "on-error": "#ffffff",
+              "secondary-fixed-dim": "#ffb3ac",
+              "tertiary-fixed-dim": "#ffb870",
+              "surface-container": "#e6eeff",
+              "secondary-container": "#fda49c",
+              "tertiary-fixed": "#ffdcbe",
+              "primary-fixed": "#a6f2d1",
+              "on-surface-variant": "#3f4944",
+              "inverse-surface": "#233144",
+              surface: "#f8f9ff",
+              "secondary-fixed": "#ffdad6",
+              "on-tertiary": "#ffffff",
+              "surface-container-highest": "#d5e3fc",
+              secondary: "#904a45",
+              primary: "#004532",
+              "on-error-container": "#93000a",
+              "on-surface": "#0d1c2e",
+              "on-secondary-container": "#783733",
+              tertiary: "#5b3300",
+              "inverse-on-surface": "#eaf1ff",
+              error: "#ba1a1a",
+              "surface-container-lowest": "#ffffff",
+              "primary-fixed-dim": "#8bd6b6",
+              "on-tertiary-fixed": "#2c1600",
+              "on-primary-container": "#8bd6b7",
+              "surface-container-high": "#dce9ff",
+              "surface-tint": "#1b6b51",
+              outline: "#6f7973",
+              "on-primary-fixed-variant": "#00513b",
+              "surface-container-low": "#eff4ff",
+              "on-background": "#0d1c2e",
+              "on-tertiary-container": "#ffba73",
+              "on-secondary-fixed-variant": "#73332f",
+              "on-secondary": "#ffffff",
+              background: "#f8f9ff",
+              "on-tertiary-fixed-variant": "#693c00",
+              "error-container": "#ffdad6",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: "Space Grotesk", sans-serif;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-surface text-on-surface min-h-screen pb-32">
+    <!-- TopAppBar -->
+    <header
+      class="fixed top-0 w-full z-50 bg-white dark:bg-slate-900 shadow-[0_0_24px_rgba(0,0,0,0.04)] flex items-center justify-between px-4 h-16 w-full"
+    >
+      <div class="flex items-center gap-4">
+        <button
+          class="flex items-center justify-center p-2 text-emerald-900 dark:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95 duration-200"
+        >
+          <span class="material-symbols-outlined" data-icon="arrow_back"
+            >arrow_back</span
+          >
+        </button>
+        <h1
+          class="text-emerald-900 dark:text-emerald-400 font-['Space_Grotesk'] font-bold tracking-tight text-lg"
+        >
+          Review &amp; Edit
+        </h1>
+      </div>
+    </header>
+    <main class="pt-20 px-4 space-y-6 max-w-[390px] mx-auto">
+      <!-- AI Confidence Banner -->
+      <div
+        class="relative overflow-hidden bg-amber-500/10 border-l-4 border-amber-500 rounded-lg p-4 backdrop-blur-md shadow-[0_0_24px_rgba(0,0,0,0.04)]"
+      >
+        <div class="flex gap-3">
+          <span
+            class="material-symbols-outlined text-amber-600"
+            data-icon="info"
+            style="font-variation-settings: &quot;FILL&quot; 1"
+            >info</span
+          >
+          <div class="space-y-1">
+            <p
+              class="text-[0.6875rem] font-bold text-amber-800 uppercase tracking-wider font-label"
+            >
+              AI Confidence Note
+            </p>
+            <p class="text-sm font-medium text-amber-900 leading-snug">
+              3 line items flagged for your review. Please confirm quantities
+              and pricing.
+            </p>
+          </div>
+        </div>
+      </div>
+      <!-- Section Header -->
+      <div
+        class="flex items-end justify-between border-b border-outline-variant/20 pb-2"
+      >
+        <h2
+          class="text-1.5rem font-bold tracking-tighter text-primary font-headline"
+        >
+          Line Items
+        </h2>
+        <span
+          class="text-[0.6875rem] font-medium text-outline uppercase tracking-[0.1em]"
+          >3 Items Extracted</span
+        >
+      </div>
+      <!-- Line Items List (Bento-ish Grid layout) -->
+      <div class="space-y-3">
+        <!-- Item 1 -->
+        <button
+          class="w-full text-left group bg-surface-container-lowest rounded-lg p-4 flex items-center justify-between shadow-[0_0_24px_rgba(0,0,0,0.04)] hover:bg-surface-container-low transition-colors active:scale-[0.98] duration-200 border border-amber-500/20"
+        >
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <h3
+                class="font-bold text-on-surface text-lg tracking-tight font-headline"
+              >
+                15m Copper Pipe - 15mm
+              </h3>
+              <span
+                class="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase"
+                >Review</span
+              >
+            </div>
+            <div
+              class="flex items-center gap-3 text-sm text-on-surface-variant font-medium"
+            >
+              <span class="flex items-center gap-1"> 15m</span>
+              <span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+              <span class="text-primary font-bold">$225.00</span>
+            </div>
+          </div>
+          <span
+            class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+            data-icon="chevron_right"
+            >chevron_right</span
+          >
+        </button>
+        <!-- Item 2 -->
+        <button
+          class="w-full text-left group bg-surface-container-lowest rounded-lg p-4 flex items-center justify-between shadow-[0_0_24px_rgba(0,0,0,0.04)] hover:bg-surface-container-low transition-colors active:scale-[0.98] duration-200 border border-amber-500/20"
+        >
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <h3
+                class="font-bold text-on-surface text-lg tracking-tight font-headline"
+              >
+                Labor - Plumb New Bath
+              </h3>
+              <span
+                class="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase"
+                >Review</span
+              >
+            </div>
+            <div
+              class="flex items-center gap-3 text-sm text-on-surface-variant font-medium"
+            >
+              <span class="flex items-center gap-1"> 1 Unit</span>
+              <span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+              <span class="text-primary font-bold">$450.00</span>
+            </div>
+          </div>
+          <span
+            class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+            data-icon="chevron_right"
+            >chevron_right</span
+          >
+        </button>
+        <!-- Item 3 -->
+        <button
+          class="w-full text-left group bg-surface-container-lowest rounded-lg p-4 flex items-center justify-between shadow-[0_0_24px_rgba(0,0,0,0.04)] hover:bg-surface-container-low transition-colors active:scale-[0.98] duration-200 border border-amber-500/20"
+        >
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <h3
+                class="font-bold text-on-surface text-lg tracking-tight font-headline"
+              >
+                Chrome Mixer Tap
+              </h3>
+              <span
+                class="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase"
+                >Review</span
+              >
+            </div>
+            <div
+              class="flex items-center gap-3 text-sm text-on-surface-variant font-medium"
+            >
+              <span class="flex items-center gap-1"> 1 Unit</span>
+              <span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+              <span class="text-primary font-bold">$180.00</span>
+            </div>
+          </div>
+          <span
+            class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+            data-icon="chevron_right"
+            >chevron_right</span
+          >
+        </button>
+      </div>
+      <!-- Totals Summary -->
+      <div class="bg-surface-container-low rounded-lg p-6 space-y-4">
+        <div class="space-y-3">
+          <div
+            class="flex justify-between items-center text-sm font-medium text-outline"
+          >
+            <span>Line Item Sum</span>
+            <span>$855.00</span>
+          </div>
+          <div class="pt-4 border-t border-outline-variant/30 space-y-2">
+            <label
+              class="block font-bold text-on-surface uppercase tracking-wider text-xs font-label"
+              for="total-override"
+              >Total Amount</label
+            >
+            <div class="relative">
+              <span
+                class="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary"
+                >$</span
+              >
+              <input
+                class="w-full bg-white border-2 border-primary rounded-lg py-4 pl-10 pr-4 text-3xl font-bold text-primary font-headline tracking-tighter focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                id="total-override"
+                type="text"
+                value="940.50"
+              />
+            </div>
+            <p class="text-[10px] text-outline-variant">
+              Tap to override calculated total
+            </p>
+          </div>
+        </div>
+      </div>
+      <!-- Add Item Ghost Button -->
+      <button
+        class="w-full py-4 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-outline font-bold hover:bg-surface-container transition-colors"
+      >
+        <span class="material-symbols-outlined" data-icon="add">add</span>
+        <span>Add Manual Line Item</span>
+      </button>
+      <div class="space-y-2 mb-8">
+        <label
+          class="block text-xs font-bold text-outline-variant uppercase tracking-wider font-label"
+          for="customer-notes"
+        >
+          Customer Notes
+        </label>
+        <textarea
+          class="w-full bg-white border border-outline-variant/30 rounded-lg p-4 text-sm text-on-surface-variant placeholder:text-outline-variant/60 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+          id="customer-notes"
+          placeholder="Any notes to include on the quote for the customer."
+          rows="3"
+        ></textarea>
+      </div>
+    </main>
+    <!-- Fixed Bottom Action Bar -->
+    <div
+      class="fixed bottom-0 left-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 space-y-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] z-40 border-t border-slate-100 dark:border-slate-800"
+    >
+      <button
+        class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold text-lg shadow-lg active:scale-[0.97] transition-transform flex items-center justify-center gap-2"
+      >
+        <span>Generate Quote</span>
+        <span class="material-symbols-outlined" data-icon="send">send</span>
+      </button>
+    </div>
+    <!-- BottomNavBar (Hidden for transactional screen as per instruction) -->
+    <!-- Suppression logic applied: This is a focused 'Review & Edit' task -->
+  </body>
+</html>
+
+<!-- Review & Edit Quote - Final -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed": "#ffdcbe",
+              primary: "#004532",
+              "on-secondary-fixed-variant": "#73332f",
+              "secondary-fixed-dim": "#ffb3ac",
+              "secondary-fixed": "#ffdad6",
+              "surface-container-lowest": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              background: "#f8f9ff",
+              "primary-container": "#065f46",
+              "on-secondary": "#ffffff",
+              "on-background": "#0d1c2e",
+              outline: "#6f7973",
+              "on-primary-fixed": "#002116",
+              "on-primary-container": "#8bd6b7",
+              "surface-dim": "#ccdbf3",
+              secondary: "#904a45",
+              "primary-fixed": "#a6f2d1",
+              "on-surface": "#0d1c2e",
+              "surface-container-low": "#eff4ff",
+              "surface-bright": "#f8f9ff",
+              "primary-fixed-dim": "#8bd6b6",
+              "surface-variant": "#d5e3fc",
+              "on-primary": "#ffffff",
+              "on-secondary-container": "#783733",
+              "inverse-surface": "#233144",
+              "secondary-container": "#fda49c",
+              "on-tertiary": "#ffffff",
+              "on-secondary-fixed": "#3b0908",
+              "surface-tint": "#1b6b51",
+              "outline-variant": "#bec9c2",
+              "on-tertiary-fixed-variant": "#693c00",
+              "on-primary-fixed-variant": "#00513b",
+              "surface-container-highest": "#d5e3fc",
+              "error-container": "#ffdad6",
+              "tertiary-fixed-dim": "#ffb870",
+              "surface-container-high": "#dce9ff",
+              "surface-container": "#e6eeff",
+              error: "#ba1a1a",
+              "on-error": "#ffffff",
+              "on-tertiary-fixed": "#2c1600",
+              "on-error-container": "#93000a",
+              "tertiary-container": "#7b4700",
+              "on-surface-variant": "#3f4944",
+              surface: "#f8f9ff",
+              "inverse-primary": "#8bd6b6",
+              tertiary: "#5b3300",
+              "on-tertiary-container": "#ffba73",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      .waveform-bar {
+        width: 4px;
+        background-color: #065f46;
+        border-radius: 2px;
+        transition: height 0.2s ease;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-surface font-body text-on-surface">
+    <!-- Top Navigation Bar -->
+    <header
+      class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-[0_0_24px_rgba(13,28,46,0.04)]"
+    >
+      <div class="flex items-center px-4 h-16 w-full">
+        <button class="mr-4 text-emerald-900 active:scale-95 duration-200">
+          <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+        <div class="flex flex-col">
+          <h1
+            class="font-['Space_Grotesk'] font-bold tracking-tight text-emerald-900 text-lg leading-tight"
+          >
+            Capture Job Notes
+          </h1>
+          <p class="text-on-surface-variant text-xs font-medium">
+            Recording your site visit details...
+          </p>
+        </div>
+      </div>
+    </header>
+    <!-- Main Content Area -->
+    <main class="pt-16 pb-64 px-4 min-h-screen overflow-y-auto">
+      <!-- Waveform Visualization -->
+      <section
+        class="mt-8 mb-10 bg-surface-container-low h-48 flex items-center justify-center gap-1.5 px-6 rounded-lg overflow-hidden relative"
+      >
+        <div class="waveform-bar h-12"></div>
+        <div class="waveform-bar h-24"></div>
+        <div class="waveform-bar h-16"></div>
+        <div class="waveform-bar h-32"></div>
+        <div class="waveform-bar h-20"></div>
+        <div class="waveform-bar h-28"></div>
+        <div class="waveform-bar h-40"></div>
+        <div class="waveform-bar h-24"></div>
+        <div class="waveform-bar h-12"></div>
+        <div class="waveform-bar h-32"></div>
+        <div class="waveform-bar h-16"></div>
+        <div class="waveform-bar h-24"></div>
+        <div class="waveform-bar h-36"></div>
+        <div class="waveform-bar h-12"></div>
+        <div class="waveform-bar h-20"></div>
+        <div class="waveform-bar h-28"></div>
+        <div class="waveform-bar h-16"></div>
+        <div class="waveform-bar h-24"></div>
+        <div class="waveform-bar h-12"></div>
+      </section>
+      <!-- Recorded Clips Section -->
+      <section class="mb-8">
+        <h2
+          class="font-headline text-lg font-bold text-on-surface mb-4 tracking-tight"
+        >
+          Recorded Clips
+        </h2>
+        <div
+          class="bg-surface-container-lowest border border-outline-variant/15 p-4 rounded-lg flex items-center justify-between shadow-[0_0_24px_rgba(13,28,46,0.04)]"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 bg-primary-container/10 flex items-center justify-center rounded"
+            >
+              <span
+                class="material-symbols-outlined text-primary-container"
+                style="font-variation-settings: &quot;FILL&quot; 1"
+                >play_arrow</span
+              >
+            </div>
+            <div>
+              <p class="font-headline font-bold text-on-surface leading-none">
+                Clip 1
+              </p>
+              <p class="text-on-surface-variant text-xs mt-1">0:23</p>
+            </div>
+          </div>
+          <button
+            class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors rounded"
+          >
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+      </section>
+      <!-- Written Description -->
+      <section>
+        <label
+          class="block font-headline text-lg font-bold text-on-surface mb-4 tracking-tight"
+          for="transcription"
+          >Written Description</label
+        >
+        <div class="relative group">
+          <textarea
+            class="w-full bg-surface-container-high border-none rounded-lg p-4 text-on-surface font-body text-sm focus:ring-2 focus:ring-primary transition-all placeholder:text-on-surface-variant/50"
+            id="transcription"
+            placeholder="Recording transcribed in real-time..."
+            rows="6"
+          ></textarea>
+          <div
+            class="absolute bottom-3 right-3 flex items-center gap-1.5 px-2 py-1 bg-amber-100 rounded border border-amber-200/50"
+          >
+            <span
+              class="material-symbols-outlined text-amber-600 text-[14px]"
+              style="font-variation-settings: &quot;FILL&quot; 1"
+              >bolt</span
+            >
+            <span
+              class="text-[10px] font-bold text-amber-700 font-label uppercase tracking-widest"
+              >AI Assisted</span
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+    <!-- Fixed Footer -->
+    <footer
+      class="fixed bottom-0 w-full bg-surface/80 backdrop-blur-xl z-50 p-6 flex flex-col items-center border-t border-outline-variant/10"
+    >
+      <!-- Recording Timer State -->
+      <div class="flex items-center gap-2 mb-6">
+        <span class="relative flex h-2 w-2">
+          <span
+            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"
+          ></span>
+          <span
+            class="relative inline-flex rounded-full h-2 w-2 bg-error"
+          ></span>
+        </span>
+        <span class="text-error font-headline font-bold text-sm tracking-wide"
+          >Recording... 0:23</span
+        >
+      </div>
+      <!-- Stop Button -->
+      <div class="flex flex-col items-center gap-2 mb-8">
+        <button
+          class="group relative flex items-center justify-center w-20 h-20 rounded-full bg-error-container text-error active:scale-90 transition-transform shadow-lg"
+        >
+          <div
+            class="absolute inset-0 rounded-full border-4 border-error/20 animate-[ping_2s_infinite]"
+          ></div>
+          <div class="bg-error w-8 h-8 rounded-sm"></div>
+        </button>
+        <span
+          class="font-headline font-bold text-error text-[10px] tracking-[0.2em] uppercase"
+          >STOP</span
+        >
+      </div>
+      <!-- Action Button -->
+      <button
+        class="w-full h-14 bg-primary/40 text-on-primary font-headline font-bold tracking-tight rounded-lg cursor-not-allowed flex items-center justify-center gap-2"
+        disabled=""
+      >
+        <span class="material-symbols-outlined text-[20px]">magic_button</span>
+        Extract Line Items
+      </button>
+    </footer>
+  </body>
+</html>
+
+<!-- Capture Notes - Active Recording (v2) -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed": "#ffdcbe",
+              primary: "#004532",
+              "on-secondary-fixed-variant": "#73332f",
+              "secondary-fixed-dim": "#ffb3ac",
+              "secondary-fixed": "#ffdad6",
+              "surface-container-lowest": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              background: "#f8f9ff",
+              "primary-container": "#065f46",
+              "on-secondary": "#ffffff",
+              "on-background": "#0d1c2e",
+              outline: "#6f7973",
+              "on-primary-fixed": "#002116",
+              "on-primary-container": "#8bd6b7",
+              "surface-dim": "#ccdbf3",
+              secondary: "#904a45",
+              "primary-fixed": "#a6f2d1",
+              "on-surface": "#0d1c2e",
+              "surface-container-low": "#eff4ff",
+              "surface-bright": "#f8f9ff",
+              "primary-fixed-dim": "#8bd6b6",
+              "surface-variant": "#d5e3fc",
+              "on-primary": "#ffffff",
+              "on-secondary-container": "#783733",
+              "inverse-surface": "#233144",
+              "secondary-container": "#fda49c",
+              "on-tertiary": "#ffffff",
+              "on-secondary-fixed": "#3b0908",
+              "surface-tint": "#1b6b51",
+              "outline-variant": "#bec9c2",
+              "on-tertiary-fixed-variant": "#693c00",
+              "on-primary-fixed-variant": "#00513b",
+              "surface-container-highest": "#d5e3fc",
+              "error-container": "#ffdad6",
+              "tertiary-fixed-dim": "#ffb870",
+              "surface-container-high": "#dce9ff",
+              "surface-container": "#e6eeff",
+              error: "#ba1a1a",
+              "on-error": "#ffffff",
+              "on-tertiary-fixed": "#2c1600",
+              "on-error-container": "#93000a",
+              "tertiary-container": "#7b4700",
+              "on-surface-variant": "#3f4944",
+              surface: "#f8f9ff",
+              "inverse-primary": "#8bd6b6",
+              tertiary: "#5b3300",
+              "on-tertiary-container": "#ffba73",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      .ghost-shadow {
+        box-shadow: 0 0 24px rgba(13, 28, 46, 0.04);
+      }
+      .forest-gradient {
+        background: linear-gradient(135deg, #004532 0%, #065f46 100%);
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-background text-on-surface font-body min-h-screen flex flex-col"
+  >
+    <!-- TopAppBar from JSON Authority -->
+    <header
+      class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-[0_0_24px_rgba(13,28,46,0.04)]"
+    >
+      <div class="flex items-center px-4 h-16 w-full">
+        <button
+          class="mr-4 text-emerald-900 active:scale-95 duration-200 transition-colors hover:bg-slate-50 p-2 rounded-full"
+        >
+          <span class="material-symbols-outlined" data-icon="arrow_back"
+            >arrow_back</span
+          >
+        </button>
+        <div class="flex flex-col">
+          <h1
+            class="font-headline font-bold tracking-tight text-emerald-900 text-lg leading-tight"
+          >
+            Capture Job Notes
+          </h1>
+          <p class="font-label text-xs text-slate-500 font-medium">
+            Record your site visit details or type them manually.
+          </p>
+        </div>
+      </div>
+    </header>
+    <!-- Main Content (Scrollable) -->
+    <main
+      class="flex-1 mt-16 mb-64 px-4 pt-6 max-w-2xl mx-auto w-full overflow-y-auto"
+    >
+      <!-- Recorded Clips Section -->
+      <section class="mb-8">
+        <div class="flex items-center justify-between mb-3 px-1">
+          <h2
+            class="font-headline text-on-surface font-semibold text-sm tracking-wide uppercase"
+          >
+            Recorded Clips
+          </h2>
+          <span
+            class="text-[10px] font-bold text-slate-400 font-label bg-slate-100 px-2 py-0.5 rounded-sm"
+            >0 CLIPS</span
+          >
+        </div>
+        <!-- Empty State Card -->
+        <div
+          class="bg-surface-container-lowest border-2 border-dashed border-outline-variant/30 rounded-lg p-10 flex flex-col items-center justify-center text-center ghost-shadow"
+        >
+          <div class="bg-surface-container-low p-4 rounded-full mb-4">
+            <span
+              class="material-symbols-outlined text-outline-variant text-3xl"
+              data-icon="mic_off"
+              >mic_off</span
+            >
+          </div>
+          <p class="font-label text-sm text-on-surface-variant font-medium">
+            No clips recorded yet
+          </p>
+          <p class="font-label text-xs text-slate-400 mt-1 max-w-[180px]">
+            Your voice memos will appear here for transcription.
+          </p>
+        </div>
+      </section>
+      <!-- Written Description Section -->
+      <section class="mb-8">
+        <div class="flex items-center mb-3 px-1">
+          <label
+            class="font-headline text-on-surface font-semibold text-sm tracking-wide uppercase"
+            for="manual-notes"
+            >Written Description</label
+          >
+        </div>
+        <div
+          class="relative bg-surface-container-lowest rounded-lg ghost-shadow overflow-hidden group focus-within:ring-2 focus-within:ring-primary/20 transition-all"
+        >
+          <textarea
+            class="w-full min-h-[280px] p-5 bg-transparent border-0 focus:ring-0 text-on-surface placeholder:text-slate-300 font-body text-sm leading-relaxed resize-none"
+            id="manual-notes"
+            placeholder="Add manual notes or edit transcribed text here..."
+          ></textarea>
+          <!-- Stylized Corner Accent (Architectural Detail) -->
+          <div
+            class="absolute top-0 right-0 w-8 h-8 pointer-events-none overflow-hidden"
+          >
+            <div
+              class="absolute top-0 right-0 w-12 h-1 bg-surface-container-high rotate-45 translate-x-4 -translate-y-2"
+            ></div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <!-- Footer Action Bar (Fixed) -->
+    <footer
+      class="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl px-6 pt-8 pb-10 flex flex-col items-center shadow-[0_-10px_30px_rgba(0,0,0,0.03)] border-t border-slate-100"
+    >
+      <!-- Tap to Start Microphone Interaction -->
+      <div class="flex flex-col items-center mb-8">
+        <span
+          class="font-headline text-[10px] font-bold tracking-[0.2em] text-primary mb-4 opacity-80"
+          >TAP TO START</span
+        >
+        <button
+          class="w-20 h-20 rounded-full forest-gradient flex items-center justify-center text-white shadow-xl shadow-primary/20 active:scale-90 transition-all hover:brightness-110 group"
+        >
+          <div
+            class="w-full h-full rounded-full flex items-center justify-center relative"
+          >
+            <!-- Subtle pulsing ring effect -->
+            <div
+              class="absolute inset-0 rounded-full border border-white/20 scale-110 group-hover:scale-125 transition-transform duration-500"
+            ></div>
+            <span
+              class="material-symbols-outlined text-4xl leading-none"
+              data-icon="mic"
+              style="font-variation-settings: &quot;FILL&quot; 1"
+              >mic</span
+            >
+          </div>
+        </button>
+      </div>
+      <!-- Secondary Global Action -->
+      <div class="w-full max-w-md">
+        <button
+          class="w-full py-4 forest-gradient text-white font-headline font-bold text-sm tracking-tight rounded flex items-center justify-center gap-3 shadow-lg shadow-primary/10 active:scale-[0.98] transition-all hover:shadow-xl hover:shadow-primary/15"
+        >
+          <span
+            class="material-symbols-outlined text-xl"
+            data-icon="magic_button"
+            >magic_button</span
+          >
+          Extract Line Items
+        </button>
+      </div>
+      <!-- Safe Area Spacer for modern mobile devices -->
+      <div class="h-2"></div>
+    </footer>
+    <!-- No BottomNavBar as per "Remove the bottom navigation bar" instruction -->
+  </body>
+</html>
+
+<!-- Capture Notes - Idle State (v2) -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      name="viewport"
+    />
+    <title>New Customer | Stima</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=Inter:wght@300..700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface-variant": "#3f4944",
+              surface: "#f8f9ff",
+              "on-tertiary-container": "#ffba73",
+              "on-background": "#0d1c2e",
+              "on-error": "#ffffff",
+              "on-secondary-fixed-variant": "#73332f",
+              "surface-container-high": "#dce9ff",
+              "surface-bright": "#f8f9ff",
+              primary: "#004532",
+              "on-primary-fixed-variant": "#00513b",
+              error: "#ba1a1a",
+              "on-secondary-container": "#783733",
+              "on-primary-container": "#8bd6b7",
+              "on-primary": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              "tertiary-fixed": "#ffdcbe",
+              "surface-container-low": "#eff4ff",
+              "on-error-container": "#93000a",
+              "surface-container-highest": "#d5e3fc",
+              "on-secondary": "#ffffff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#bec9c2",
+              "on-primary-fixed": "#002116",
+              tertiary: "#5b3300",
+              secondary: "#904a45",
+              "surface-container": "#e6eeff",
+              background: "#f8f9ff",
+              "tertiary-fixed-dim": "#ffb870",
+              outline: "#6f7973",
+              "on-secondary-fixed": "#3b0908",
+              "tertiary-container": "#7b4700",
+              "on-tertiary": "#ffffff",
+              "secondary-fixed": "#ffdad6",
+              "inverse-surface": "#233144",
+              "on-tertiary-fixed": "#2c1600",
+              "surface-tint": "#1b6b51",
+              "primary-fixed-dim": "#8bd6b6",
+              "primary-container": "#065f46",
+              "inverse-primary": "#8bd6b6",
+              "surface-dim": "#ccdbf3",
+              "secondary-container": "#fda49c",
+              "on-tertiary-fixed-variant": "#693c00",
+              "surface-variant": "#d5e3fc",
+              "secondary-fixed-dim": "#ffb3ac",
+              "primary-fixed": "#a6f2d1",
+              "surface-container-lowest": "#ffffff",
+              "on-surface": "#0d1c2e",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+        vertical-align: middle;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .font-headline {
+        font-family: "Space Grotesk", sans-serif;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-surface text-on-surface min-h-screen flex flex-col">
+    <!-- TopAppBar -->
+    <header
+      class="bg-white dark:bg-slate-900 shadow-[0_24px_24px_0_rgba(13,28,46,0.04)] sticky top-0 z-40 w-full"
+    >
+      <div class="flex items-center justify-between px-6 h-16 w-full">
+        <div class="flex items-center gap-4">
+          <button
+            class="text-emerald-900 dark:text-emerald-500 active:scale-95 duration-200 transition-colors p-2 -ml-2 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <span class="material-symbols-outlined" data-icon="arrow_back"
+              >arrow_back</span
+            >
+          </button>
+          <h1
+            class="text-emerald-900 dark:text-emerald-500 font-['Space_Grotesk'] font-bold tracking-tight text-xl"
+          >
+            New Customer
+          </h1>
+        </div>
+        <div class="w-10"></div>
+        <!-- Spacer for balance -->
+      </div>
+      <div class="bg-slate-100 dark:bg-slate-800 h-[1px] w-full"></div>
+    </header>
+    <!-- Main Content Canvas -->
+    <main
+      class="flex-1 overflow-y-auto px-6 pt-8 pb-32 max-w-2xl mx-auto w-full"
+    >
+      <!-- Section Header mimicking architectural drafting style -->
+      <form class="space-y-6">
+        <!-- Name Field (Required) -->
+        <div class="space-y-2">
+          <label
+            class="block font-headline text-sm font-semibold tracking-tight text-on-surface-variant"
+            for="customer-name"
+          >
+            FULL NAME <span class="text-error">*</span>
+          </label>
+          <div class="relative group">
+            <input
+              class="w-full h-14 px-4 bg-surface-container-low border-none rounded focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline-variant transition-all text-lg"
+              id="customer-name"
+              name="name"
+              placeholder="e.g. Jonathan Arris"
+              required=""
+              type="text"
+            />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Phone Field -->
+          <div class="space-y-2">
+            <label
+              class="block font-headline text-sm font-semibold tracking-tight text-on-surface-variant"
+              for="customer-phone"
+            >
+              PHONE NUMBER
+            </label>
+            <div class="relative">
+              <input
+                class="w-full h-14 px-4 bg-surface-container-low border-none rounded focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline-variant transition-all text-lg"
+                id="customer-phone"
+                name="phone"
+                placeholder="+1 (555) 000-0000"
+                type="tel"
+              />
+            </div>
+          </div>
+          <!-- Email Field -->
+          <div class="space-y-2">
+            <label
+              class="block font-headline text-sm font-semibold tracking-tight text-on-surface-variant"
+              for="customer-email"
+            >
+              EMAIL ADDRESS
+            </label>
+            <div class="relative">
+              <input
+                class="w-full h-14 px-4 bg-surface-container-low border-none rounded focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline-variant transition-all text-lg"
+                id="customer-email"
+                name="email"
+                placeholder="j.arris@example.com"
+                type="email"
+              />
+            </div>
+          </div>
+        </div>
+        <!-- Address Field (Multi-line) -->
+        <div class="space-y-2">
+          <label
+            class="block font-headline text-sm font-semibold tracking-tight text-on-surface-variant"
+            for="customer-address"
+            >ADDRESS</label
+          >
+          <div class="relative">
+            <textarea
+              class="w-full p-4 bg-surface-container-low border-none rounded focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline-variant transition-all text-lg resize-none"
+              id="customer-address"
+              name="address"
+              placeholder="Street, Suite/Apt, City, Zip Code"
+              rows="4"
+            ></textarea>
+          </div>
+        </div>
+        <!-- Contextual Note / AI confidence banner placeholder -->
+      </form>
+    </main>
+    <!-- Fixed Bottom Action Bar -->
+    <div
+      class="fixed bottom-0 left-0 w-full p-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-50 shadow-[0_-4px_24px_0_rgba(13,28,46,0.04)]"
+    >
+      <div class="max-w-2xl mx-auto">
+        <button
+          class="w-full h-16 bg-gradient-to-r from-[#004532] to-[#065f46] text-white font-headline font-bold text-lg rounded shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+        >
+          Create &amp; Continue
+          <span class="material-symbols-outlined" data-icon="chevron_right"
+            >chevron_right</span
+          >
+        </button>
+        <!-- Safe Area Spacer for iOS -->
+        <div class="h-safe"></div>
+      </div>
+    </div>
+    <!-- Hidden Navigation logic for non-top-level destination -->
+    <!-- (Suppressed per "The Destination Rule" - this is a transactional creation screen) -->
+  </body>
+</html>
+
+<!-- New Customer - Create -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>New Quote - Select Customer</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;700;800;900&amp;display=swap"
+      rel="stylesheet"
+    />
+    <!-- Material Symbols -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-tint": "#1b6b51",
+              "secondary-fixed-dim": "#ffb3ac",
+              "inverse-primary": "#8bd6b6",
+              outline: "#6f7973",
+              primary: "#004532",
+              secondary: "#904a45",
+              "outline-variant": "#bec9c2",
+              "on-secondary-fixed-variant": "#73332f",
+              "inverse-on-surface": "#eaf1ff",
+              "surface-bright": "#f8f9ff",
+              "on-tertiary-fixed": "#2c1600",
+              "secondary-fixed": "#ffdad6",
+              "on-primary-fixed-variant": "#00513b",
+              "on-surface": "#0d1c2e",
+              "on-surface-variant": "#3f4944",
+              "surface-dim": "#ccdbf3",
+              "primary-fixed-dim": "#8bd6b6",
+              "on-secondary": "#ffffff",
+              "surface-variant": "#d5e3fc",
+              "surface-container-lowest": "#ffffff",
+              "primary-fixed": "#a6f2d1",
+              "tertiary-fixed": "#ffdcbe",
+              "on-secondary-fixed": "#3b0908",
+              "primary-container": "#065f46",
+              "surface-container-highest": "#d5e3fc",
+              "tertiary-fixed-dim": "#ffb870",
+              "surface-container": "#e6eeff",
+              "on-secondary-container": "#783733",
+              surface: "#f8f9ff",
+              "on-tertiary-container": "#ffba73",
+              "surface-container-low": "#eff4ff",
+              "on-error": "#ffffff",
+              "inverse-surface": "#233144",
+              "on-primary": "#ffffff",
+              "error-container": "#ffdad6",
+              "on-error-container": "#93000a",
+              "surface-container-high": "#dce9ff",
+              "on-primary-container": "#8bd6b7",
+              "on-background": "#0d1c2e",
+              error: "#ba1a1a",
+              "on-tertiary": "#ffffff",
+              "on-tertiary-fixed-variant": "#693c00",
+              "on-primary-fixed": "#002116",
+              "tertiary-container": "#7b4700",
+              "secondary-container": "#fda49c",
+              background: "#f8f9ff",
+              tertiary: "#5b3300",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #bec9c2;
+        border-radius: 10px;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-background font-body text-on-surface min-h-screen flex flex-col max-w-[390px] mx-auto overflow-hidden"
+  >
+    <!-- TopAppBar -->
+    <header class="bg-white dark:bg-slate-900 sticky top-0 z-50">
+      <div class="flex items-center w-full px-6 py-4 max-w-none">
+        <button
+          class="mr-4 text-emerald-900 dark:text-emerald-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors active:scale-95 duration-150 rounded-full p-1"
+        >
+          <span class="material-symbols-outlined block" data-icon="arrow_back"
+            >arrow_back</span
+          >
+        </button>
+        <h1
+          class="font-['Space_Grotesk'] font-bold tracking-tight text-2xl text-emerald-900 dark:text-emerald-50"
+        >
+          New Quote
+        </h1>
+      </div>
+      <!-- Separation Logic -->
+      <div class="bg-slate-100 dark:bg-slate-800 h-[1px] w-full"></div>
+    </header>
+    <main class="flex-1 overflow-y-auto custom-scrollbar">
+      <!-- Subtitle & Search Section -->
+      <section class="px-6 py-6 bg-surface">
+        <p class="font-body text-on-surface-variant text-sm mb-6">
+          Select a customer to continue
+        </p>
+        <div class="relative group">
+          <span
+            class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline"
+            data-icon="search"
+            >search</span
+          >
+          <input
+            class="w-full pl-12 pr-4 py-4 bg-surface-container-high border-none rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all font-body text-on-surface placeholder:text-outline"
+            placeholder="Search customers..."
+            type="text"
+          />
+        </div>
+      </section>
+      <!-- Customer List Section -->
+      <section class="px-6 pb-32">
+        <div class="space-y-1">
+          <!-- Customer Item -->
+          <button
+            class="w-full flex items-center justify-between py-5 text-left border-b border-outline-variant/20 hover:bg-surface-container-low transition-colors group"
+          >
+            <div>
+              <h3
+                class="font-headline font-bold text-lg text-on-surface tracking-tight"
+              >
+                Acme Property Management
+              </h3>
+              <p class="font-body text-sm text-on-surface-variant">
+                0412 345 678
+              </p>
+            </div>
+            <span
+              class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+              data-icon="chevron_right"
+              >chevron_right</span
+            >
+          </button>
+          <!-- Customer Item -->
+          <button
+            class="w-full flex items-center justify-between py-5 text-left border-b border-outline-variant/20 hover:bg-surface-container-low transition-colors group"
+          >
+            <div>
+              <h3
+                class="font-headline font-bold text-lg text-on-surface tracking-tight"
+              >
+                John Smith
+              </h3>
+              <p class="font-body text-sm text-on-surface-variant">
+                john.smith@email.com
+              </p>
+            </div>
+            <span
+              class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+              data-icon="chevron_right"
+              >chevron_right</span
+            >
+          </button>
+          <!-- Customer Item -->
+          <button
+            class="w-full flex items-center justify-between py-5 text-left border-b border-outline-variant/20 hover:bg-surface-container-low transition-colors group"
+          >
+            <div>
+              <h3
+                class="font-headline font-bold text-lg text-on-surface tracking-tight"
+              >
+                Westside Development
+              </h3>
+              <p class="font-body text-sm text-on-surface-variant">
+                billing@westside.co
+              </p>
+            </div>
+            <span
+              class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+              data-icon="chevron_right"
+              >chevron_right</span
+            >
+          </button>
+          <!-- Customer Item -->
+          <button
+            class="w-full flex items-center justify-between py-5 text-left border-b border-outline-variant/20 hover:bg-surface-container-low transition-colors group"
+          >
+            <div>
+              <h3
+                class="font-headline font-bold text-lg text-on-surface tracking-tight"
+              >
+                Sarah Jenkins
+              </h3>
+              <p class="font-body text-sm text-on-surface-variant">
+                0499 888 777
+              </p>
+            </div>
+            <span
+              class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+              data-icon="chevron_right"
+              >chevron_right</span
+            >
+          </button>
+          <!-- Customer Item -->
+          <button
+            class="w-full flex items-center justify-between py-5 text-left border-b border-outline-variant/20 hover:bg-surface-container-low transition-colors group"
+          >
+            <div>
+              <h3
+                class="font-headline font-bold text-lg text-on-surface tracking-tight"
+              >
+                Blue Chip Logistics
+              </h3>
+              <p class="font-body text-sm text-on-surface-variant">
+                admin@bluechiplog.com
+              </p>
+            </div>
+            <span
+              class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+              data-icon="chevron_right"
+              >chevron_right</span
+            >
+          </button>
+          <!-- Customer Item -->
+          <button
+            class="w-full flex items-center justify-between py-5 text-left border-b border-outline-variant/20 hover:bg-surface-container-low transition-colors group"
+          >
+            <div>
+              <h3
+                class="font-headline font-bold text-lg text-on-surface tracking-tight"
+              >
+                David Miller
+              </h3>
+              <p class="font-body text-sm text-on-surface-variant">
+                0422 111 222
+              </p>
+            </div>
+            <span
+              class="material-symbols-outlined text-outline group-hover:text-primary transition-colors"
+              data-icon="chevron_right"
+              >chevron_right</span
+            >
+          </button>
+        </div>
+        <!-- Empty State Helper (Hidden by default, used for reference) -->
+        <div
+          class="hidden flex-col items-center justify-center py-12 text-center"
+        >
+          <span
+            class="material-symbols-outlined text-outline-variant text-5xl mb-4"
+            data-icon="person_search"
+            >person_search</span
+          >
+          <p class="font-body text-on-surface-variant text-sm">
+            No customers match your search
+          </p>
+        </div>
+      </section>
+    </main>
+    <!-- BottomNavBar (The Shell) -->
+    <nav
+      class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-[0_-4px_24px_rgba(0,0,0,0.04)] border-t border-slate-100 dark:border-slate-800"
+    >
+      <!-- Active Nav Item (Add New Customer) -->
+      <button
+        class="flex flex-col items-center justify-center bg-emerald-900 dark:bg-emerald-500 text-white dark:text-slate-950 rounded-sm px-6 py-2 flex-1 mx-2 active:translate-y-0.5 transition-transform hover:text-emerald-700 dark:hover:text-emerald-300"
+      >
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm" data-icon="person_add"
+            >person_add</span
+          >
+          <span
+            class="font-['Inter'] text-[11px] font-semibold uppercase tracking-wider"
+            >Add New Customer</span
+          >
+        </div>
+      </button>
+      <!-- Inactive Nav Item (Back) -->
+    </nav>
+    <!-- Ghost Spacer for Bottom Nav -->
+    <div class="h-24 shrink-0"></div>
+  </body>
+</html>
+
+<!-- Customer Select - Search -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Stima Quotes - Dashboard</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <!-- Icons -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              error: "#ba1a1a",
+              "on-secondary-fixed-variant": "#73332f",
+              "surface-bright": "#f8f9ff",
+              "secondary-fixed": "#ffdad6",
+              "primary-fixed": "#a6f2d1",
+              "surface-variant": "#d5e3fc",
+              "inverse-primary": "#8bd6b6",
+              "primary-container": "#065f46",
+              "surface-container-low": "#eff4ff",
+              "on-surface-variant": "#3f4944",
+              "on-tertiary-container": "#ffba73",
+              "on-tertiary-fixed-variant": "#693c00",
+              "surface-dim": "#ccdbf3",
+              "on-secondary-container": "#783733",
+              "surface-tint": "#1b6b51",
+              "on-primary-fixed-variant": "#00513b",
+              "tertiary-fixed": "#ffdcbe",
+              background: "#f8f9ff",
+              primary: "#004532",
+              "on-tertiary-fixed": "#2c1600",
+              "surface-container": "#e6eeff",
+              outline: "#6f7973",
+              "on-secondary-fixed": "#3b0908",
+              "on-error-container": "#93000a",
+              "on-background": "#0d1c2e",
+              "outline-variant": "#bec9c2",
+              "on-secondary": "#ffffff",
+              "on-primary": "#ffffff",
+              secondary: "#904a45",
+              "on-tertiary": "#ffffff",
+              "inverse-surface": "#233144",
+              "on-primary-container": "#8bd6b6",
+              "surface-container-highest": "#d5e3fc",
+              surface: "#f8f9ff",
+              tertiary: "#5b3300",
+              "surface-container-high": "#dce9ff",
+              "primary-fixed-dim": "#8bd6b6",
+              "tertiary-container": "#7b4700",
+              "on-error": "#ffffff",
+              "secondary-container": "#fda49c",
+              "inverse-on-surface": "#eaf1ff",
+              "on-primary-fixed": "#002116",
+              "error-container": "#ffdad6",
+              "tertiary-fixed-dim": "#ffb870",
+              "secondary-fixed-dim": "#ffb3ac",
+              "surface-container-lowest": "#ffffff",
+              "on-surface": "#0d1c2e",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-surface font-body text-on-surface antialiased">
+    <!-- TopAppBar -->
+    <header
+      class="bg-white dark:bg-slate-950 docked full-width top-0 sticky z-40 transition-all"
+    >
+      <div class="flex justify-between items-center w-full px-6 py-4">
+        <div class="flex items-center gap-4">
+          <h1
+            class="text-xl font-bold text-emerald-900 dark:text-emerald-50 tracking-tighter font-['Space_Grotesk']"
+          >
+            Stima Quotes
+          </h1>
+        </div>
+      </div>
+      <div class="bg-slate-100 dark:bg-slate-900 h-px"></div>
+    </header>
+    <main class="max-w-4xl mx-auto px-6 pb-32 pt-6">
+      <!-- Summary Bento Grid -->
+      <section class="grid grid-cols-2 gap-4 mb-10">
+        <div
+          class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_4px_24px_rgba(0,0,0,0.02)] border-l-4 border-primary"
+        >
+          <p
+            class="text-[0.6875rem] font-bold uppercase tracking-widest text-outline mb-1 font-label"
+          >
+            Active Quotes
+          </p>
+          <p
+            class="text-3xl font-headline font-bold text-on-surface tracking-tight"
+          >
+            12
+          </p>
+        </div>
+        <div
+          class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_4px_24px_rgba(0,0,0,0.02)] border-l-4 border-amber-500"
+        >
+          <p
+            class="text-[0.6875rem] font-bold uppercase tracking-widest text-outline mb-1 font-label"
+          >
+            Ready to Send
+          </p>
+          <p
+            class="text-3xl font-headline font-bold text-on-surface tracking-tight"
+          >
+            04
+          </p>
+        </div>
+      </section>
+      <!-- Search & Filter Area -->
+      <section class="mb-10">
+        <div class="relative group">
+          <div
+            class="absolute inset-y-0 left-4 flex items-center pointer-events-none"
+          >
+            <span class="material-symbols-outlined text-outline">search</span>
+          </div>
+          <input
+            class="w-full bg-surface-container-high py-4 pl-12 pr-4 rounded text-sm focus:ring-2 focus:ring-primary-container focus:border-transparent border-none transition-all placeholder:text-outline/60"
+            placeholder="Search customer or quote ID..."
+            type="text"
+          />
+        </div>
+      </section>
+      <!-- Quotes List Header -->
+      <div class="flex justify-between items-end mb-6">
+        <h2
+          class="text-1.5rem font-headline font-bold text-on-surface leading-none"
+        >
+          Past Quotes
+        </h2>
+        <p class="text-[0.6875rem] text-outline font-medium">
+          Sorted by: Most Recent
+        </p>
+      </div>
+      <!-- Scrollable List of Past Quotes -->
+      <div class="space-y-4">
+        <!-- Quote Card: Ready State -->
+        <div
+          class="bg-surface-container-lowest p-5 rounded hover:bg-surface-container transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.02)] cursor-pointer group"
+        >
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <h3
+                class="text-1.125rem font-bold text-on-surface font-body mb-0.5 group-hover:text-primary transition-colors"
+              >
+                Harrison &amp; Sons Ltd
+              </h3>
+              <p class="text-[0.6875rem] font-medium text-outline">
+                #2024-089 • Oct 12, 2023
+              </p>
+            </div>
+            <span
+              class="bg-emerald-50 text-emerald-800 text-[0.6875rem] font-bold px-2 py-1 rounded uppercase tracking-wider"
+              >Ready</span
+            >
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex -space-x-2">
+              <span class="text-[0.6875rem] text-outline">4 items</span>
+            </div>
+            <p
+              class="text-1.5rem font-headline font-bold tracking-tight text-on-surface"
+            >
+              $2,450.00
+            </p>
+          </div>
+        </div>
+        <!-- Quote Card: Draft State -->
+        <div
+          class="bg-surface-container-lowest p-5 rounded hover:bg-surface-container transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.02)] cursor-pointer group"
+        >
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <h3
+                class="text-1.125rem font-bold text-on-surface font-body mb-0.5 group-hover:text-primary transition-colors"
+              >
+                Elena Rodriguez
+              </h3>
+              <p class="text-[0.6875rem] font-medium text-outline">
+                #2024-088 • Oct 10, 2023
+              </p>
+            </div>
+            <span
+              class="bg-slate-100 text-slate-600 text-[0.6875rem] font-bold px-2 py-1 rounded uppercase tracking-wider"
+              >Draft</span
+            >
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex -space-x-2">
+              <span class="text-[0.6875rem] text-outline">2 items</span>
+            </div>
+            <p
+              class="text-1.5rem font-headline font-bold tracking-tight text-on-surface"
+            >
+              $890.00
+            </p>
+          </div>
+        </div>
+        <!-- Quote Card: Shared State -->
+        <div
+          class="bg-surface-container-lowest p-5 rounded hover:bg-surface-container transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.02)] cursor-pointer group"
+        >
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <h3
+                class="text-1.125rem font-bold text-on-surface font-body mb-0.5 group-hover:text-primary transition-colors"
+              >
+                Oakwood Community Hub
+              </h3>
+              <p class="text-[0.6875rem] font-medium text-outline">
+                #2024-087 • Oct 08, 2023
+              </p>
+            </div>
+            <span
+              class="bg-sky-50 text-sky-700 text-[0.6875rem] font-bold px-2 py-1 rounded uppercase tracking-wider bg-sky-100 text-sky-800"
+              >Shared</span
+            >
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex -space-x-2">
+              <span class="text-[0.6875rem] text-outline">12 items</span>
+            </div>
+            <p
+              class="text-1.5rem font-headline font-bold tracking-tight text-on-surface"
+            >
+              $12,750.00
+            </p>
+          </div>
+        </div>
+        <!-- Quote Card: Ready State -->
+        <div
+          class="bg-surface-container-lowest p-5 rounded hover:bg-surface-container transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.02)] cursor-pointer group"
+        >
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <h3
+                class="text-1.125rem font-bold text-on-surface font-body mb-0.5 group-hover:text-primary transition-colors"
+              >
+                Sarah Jenkins
+              </h3>
+              <p class="text-[0.6875rem] font-medium text-outline">
+                #2024-086 • Oct 05, 2023
+              </p>
+            </div>
+            <span
+              class="bg-emerald-50 text-emerald-800 text-[0.6875rem] font-bold px-2 py-1 rounded uppercase tracking-wider"
+              >Ready</span
+            >
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex -space-x-2">
+              <span class="text-[0.6875rem] text-outline">1 item</span>
+            </div>
+            <p
+              class="text-1.5rem font-headline font-bold tracking-tight text-on-surface"
+            >
+              $420.00
+            </p>
+          </div>
+        </div>
+        <!-- Empty State / Load More simulation -->
+        <div class="pt-8 flex flex-col items-center opacity-40">
+          <div class="h-px w-12 bg-outline mb-4"></div>
+          <p
+            class="text-[0.6875rem] font-bold uppercase tracking-widest font-label"
+          >
+            End of List
+          </p>
+        </div>
+      </div>
+    </main>
+    <!-- Floating Action Button -->
+    <button
+      class="fixed bottom-24 right-6 h-14 w-14 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded shadow-xl flex items-center justify-center z-50 Active: scale-95 transition-transform duration-200"
+      title="New Quote"
+    >
+      <span
+        class="material-symbols-outlined"
+        style="font-variation-settings: &quot;FILL&quot; 1"
+        >add</span
+      >
+    </button>
+    <!-- BottomNavBar -->
+    <nav
+      class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-50 border-t border-slate-100 dark:border-slate-800 shadow-[0_-4px_24px_rgba(0,0,0,0.04)]"
+    >
+      <!-- Home (Active) -->
+      <a
+        class="flex flex-col items-center justify-center text-emerald-900 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 rounded-lg px-4 py-1 Active: scale-95 transition-transform duration-200"
+        href="#"
+      >
+        <span
+          class="material-symbols-outlined"
+          style="font-variation-settings: &quot;FILL&quot; 1"
+          >home</span
+        >
+        <span
+          class="text-[10px] font-medium font-['Inter'] uppercase tracking-wider mt-1"
+          >Home</span
+        >
+      </a>
+      <!-- Quotes -->
+      <a
+        class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-4 py-1 hover:text-emerald-700 dark:hover:text-emerald-300"
+        href="#"
+      >
+        <span class="material-symbols-outlined">request_quote</span>
+        <span
+          class="text-[10px] font-medium font-['Inter'] uppercase tracking-wider mt-1"
+          >Quotes</span
+        >
+      </a>
+      <!-- Settings -->
+      <a
+        class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-4 py-1 hover:text-emerald-700 dark:hover:text-emerald-300"
+        href="#"
+      >
+        <span class="material-symbols-outlined">settings</span>
+        <span
+          class="text-[10px] font-medium font-['Inter'] uppercase tracking-wider mt-1"
+          >Settings</span
+        >
+      </a>
+    </nav>
+  </body>
+</html>
+
+<!-- Stima Home - Refined -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;family=Space+Grotesk:wght@500;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed": "#002116",
+              "on-error-container": "#93000a",
+              "on-primary": "#ffffff",
+              "tertiary-fixed-dim": "#ffb870",
+              "on-secondary-container": "#783733",
+              "secondary-fixed-dim": "#ffb3ac",
+              "surface-tint": "#1b6b51",
+              primary: "#004532",
+              "on-primary-container": "#8bd6b7",
+              secondary: "#904a45",
+              "error-container": "#ffdad6",
+              "inverse-surface": "#233144",
+              tertiary: "#5b3300",
+              background: "#f8f9ff",
+              "on-surface-variant": "#3f4944",
+              "tertiary-container": "#7b4700",
+              "surface-container": "#e6eeff",
+              "on-secondary-fixed": "#3b0908",
+              "on-tertiary": "#ffffff",
+              "on-surface": "#0d1c2e",
+              "surface-variant": "#d5e3fc",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-fixed": "#2c1600",
+              "primary-container": "#065f46",
+              "inverse-primary": "#8bd6b6",
+              "surface-container-highest": "#d5e3fc",
+              "inverse-on-surface": "#eaf1ff",
+              "on-background": "#0d1c2e",
+              "secondary-container": "#fda49c",
+              "primary-fixed-dim": "#8bd6b6",
+              "on-tertiary-fixed-variant": "#693c00",
+              "on-secondary-fixed-variant": "#73332f",
+              "surface-container-low": "#eff4ff",
+              "secondary-fixed": "#ffdad6",
+              "outline-variant": "#bec9c2",
+              outline: "#6f7973",
+              "tertiary-fixed": "#ffdcbe",
+              surface: "#f8f9ff",
+              "primary-fixed": "#a6f2d1",
+              "surface-bright": "#f8f9ff",
+              "on-error": "#ffffff",
+              "surface-dim": "#ccdbf3",
+              "surface-container-high": "#dce9ff",
+              "on-primary-fixed-variant": "#00513b",
+              "on-secondary": "#ffffff",
+              "on-tertiary-container": "#ffba73",
+              error: "#ba1a1a",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 300,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f8f9ff;
+      }
+      .headline-text {
+        font-family: "Space Grotesk", sans-serif;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-surface text-on-surface min-h-screen">
+    <!-- TopAppBar -->
+    <header
+      class="flex items-center w-full px-4 h-16 sticky top-0 z-50 bg-white dark:bg-slate-900"
+    >
+      <div class="flex items-center gap-4 w-full max-w-2xl mx-auto">
+        <button
+          class="flex items-center justify-center w-10 h-10 rounded-full text-emerald-900 dark:text-emerald-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors active:scale-95 transition-transform"
+        >
+          <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+        <h1
+          class="font-['Space_Grotesk'] font-bold tracking-tight text-xl text-emerald-900 dark:text-emerald-500"
+        >
+          Settings
+        </h1>
+      </div>
+    </header>
+    <main class="max-w-2xl mx-auto px-4 pt-6 pb-32">
+      <div class="space-y-6">
+        <!-- Business Profile Card -->
+        <section
+          class="bg-surface-container-lowest rounded-lg p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)]"
+        >
+          <h2
+            class="font-headline font-bold text-lg mb-6 tracking-tight text-on-surface"
+          >
+            Business Profile
+          </h2>
+          <div class="space-y-5">
+            <div class="space-y-1.5">
+              <label
+                class="block text-xs font-bold text-outline uppercase tracking-wider font-label"
+                >Business Name</label
+              >
+              <input
+                class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface px-4 py-3 font-body"
+                type="text"
+                value="Stima Architecture &amp; Build"
+              />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-1.5">
+                <label
+                  class="block text-xs font-bold text-outline uppercase tracking-wider font-label"
+                  >First Name</label
+                >
+                <input
+                  class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface px-4 py-3 font-body"
+                  type="text"
+                  value="Julian"
+                />
+              </div>
+              <div class="space-y-1.5">
+                <label
+                  class="block text-xs font-bold text-outline uppercase tracking-wider font-label"
+                  >Last Name</label
+                >
+                <input
+                  class="w-full bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface px-4 py-3 font-body"
+                  type="text"
+                  value="Ames"
+                />
+              </div>
+            </div>
+            <div class="space-y-3">
+              <label
+                class="block text-xs font-bold text-outline uppercase tracking-wider font-label"
+                >Trade Type</label
+              >
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <button
+                  class="py-3 px-4 rounded border-2 border-primary-container bg-primary-container/5 text-primary-container font-bold text-sm text-center transition-all hover:bg-primary-container/10"
+                >
+                  Plumber
+                </button>
+                <button
+                  class="py-3 px-4 rounded border-2 border-transparent bg-surface-container-high text-on-surface-variant font-bold text-sm text-center transition-all hover:bg-surface-container-highest"
+                >
+                  Electrician
+                </button>
+                <button
+                  class="py-3 px-4 rounded border-2 border-transparent bg-surface-container-high text-on-surface-variant font-bold text-sm text-center transition-all hover:bg-surface-container-highest"
+                >
+                  Builder
+                </button>
+                <button
+                  class="py-3 px-4 rounded border-2 border-transparent bg-surface-container-high text-on-surface-variant font-bold text-sm text-center transition-all hover:bg-surface-container-highest"
+                >
+                  Painter
+                </button>
+                <button
+                  class="py-3 px-4 rounded border-2 border-transparent bg-surface-container-high text-on-surface-variant font-bold text-sm text-center transition-all hover:bg-surface-container-highest"
+                >
+                  Landscaper
+                </button>
+                <button
+                  class="py-3 px-4 rounded border-2 border-transparent bg-surface-container-high text-on-surface-variant font-bold text-sm text-center transition-all hover:bg-surface-container-highest"
+                >
+                  Other
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <!-- Account Card -->
+        <section
+          class="bg-surface-container-lowest rounded-lg p-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)]"
+        >
+          <h2
+            class="font-headline font-bold text-lg mb-6 tracking-tight text-on-surface"
+          >
+            Account
+          </h2>
+          <div class="flex items-center justify-between gap-4">
+            <div class="space-y-1">
+              <label
+                class="block text-xs font-bold text-outline uppercase tracking-wider font-label"
+                >Email</label
+              >
+              <p class="font-body font-medium text-on-surface">
+                architect@stima.com
+              </p>
+            </div>
+            <button
+              class="px-5 py-2.5 rounded bg-secondary text-white font-bold text-sm tracking-wide uppercase hover:brightness-110 active:scale-[0.98] transition-all duration-200"
+            >
+              Sign Out
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
+    <!-- Footer Action -->
+    <footer
+      class="fixed bottom-0 left-0 w-full z-50 flex flex-col items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] border-t border-slate-100 dark:border-slate-800"
+    >
+      <div class="w-full max-w-2xl">
+        <button
+          class="w-full bg-primary-container text-on-primary py-4 rounded font-['Inter'] font-bold text-sm uppercase tracking-wider hover:brightness-110 active:scale-[0.98] transition-all duration-200"
+        >
+          Save Changes
+        </button>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<!-- Settings Screen -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container": "#e6eeff",
+              outline: "#6f7973",
+              "tertiary-container": "#7b4700",
+              tertiary: "#5b3300",
+              "surface-container-high": "#dce9ff",
+              "tertiary-fixed-dim": "#ffb870",
+              "inverse-on-surface": "#eaf1ff",
+              primary: "#004532",
+              "surface-tint": "#1b6b51",
+              "on-background": "#0d1c2e",
+              "inverse-primary": "#8bd6b6",
+              "surface-dim": "#ccdbf3",
+              "primary-fixed-dim": "#8bd6b6",
+              "primary-container": "#065f46",
+              "on-tertiary-fixed-variant": "#693c00",
+              "surface-container-low": "#eff4ff",
+              "on-secondary-fixed": "#3b0908",
+              "primary-fixed": "#a6f2d1",
+              "error-container": "#ffdad6",
+              "surface-bright": "#f8f9ff",
+              "on-tertiary-container": "#ffba73",
+              "on-surface": "#0d1c2e",
+              "secondary-fixed-dim": "#ffb3ac",
+              "on-surface-variant": "#3f4944",
+              "on-error-container": "#93000a",
+              background: "#f8f9ff",
+              "on-secondary": "#ffffff",
+              secondary: "#904a45",
+              "surface-variant": "#d5e3fc",
+              "outline-variant": "#bec9c2",
+              "on-error": "#ffffff",
+              "on-primary-container": "#8bd6b7",
+              "surface-container-highest": "#d5e3fc",
+              "secondary-container": "#fda49c",
+              "on-secondary-container": "#783733",
+              "on-tertiary": "#ffffff",
+              "on-primary-fixed": "#002116",
+              error: "#ba1a1a",
+              "tertiary-fixed": "#ffdcbe",
+              "secondary-fixed": "#ffdad6",
+              "inverse-surface": "#233144",
+              "on-tertiary-fixed": "#2c1600",
+              "on-primary": "#ffffff",
+              "on-primary-fixed-variant": "#00513b",
+              surface: "#f8f9ff",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-fixed-variant": "#73332f",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .headline-font {
+        font-family: "Space Grotesk", sans-serif;
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-surface-container-low min-h-screen flex flex-col items-center"
+  >
+    <!-- Top Branding Anchor -->
+    <header class="w-full pt-12 pb-8 flex justify-center">
+      <h1
+        class="headline-font text-primary-container text-4xl font-bold tracking-tight"
+      >
+        Stima
+      </h1>
+    </header>
+    <!-- Onboarding Card Container -->
+    <main class="w-full max-w-md px-6 pb-20">
+      <div class="bg-surface-container-lowest rounded-lg p-8 shadow-sm">
+        <!-- Header Section -->
+        <div class="mb-10 text-left">
+          <h2
+            class="headline-font text-on-surface text-2xl font-bold tracking-tight mb-2"
+          >
+            Set up your business
+          </h2>
+          <p class="text-on-surface-variant text-sm leading-relaxed">
+            Tell us a bit about your work so we can tailor your quotes.
+          </p>
+        </div>
+        <!-- Form Section -->
+        <form class="space-y-6">
+          <!-- Business Name -->
+          <div class="flex flex-col gap-1.5">
+            <label
+              class="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex justify-between"
+              for="business-name"
+            >
+              <span>Business Name</span>
+              <span
+                class="text-primary text-[10px] font-normal lowercase tracking-normal italic"
+                >* Required</span
+              >
+            </label>
+            <input
+              class="w-full px-4 py-3 bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-outline-variant transition-all duration-200"
+              id="business-name"
+              placeholder="e.g. Apex Electrical Solutions"
+              required=""
+              type="text"
+            />
+          </div>
+          <!-- Personal Name Row -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label
+                class="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+                for="first-name"
+                >First Name</label
+              >
+              <input
+                class="w-full px-4 py-3 bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-outline-variant transition-all duration-200"
+                id="first-name"
+                placeholder="John"
+                type="text"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label
+                class="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+                for="last-name"
+                >Last Name</label
+              >
+              <input
+                class="w-full px-4 py-3 bg-surface-container-high border-none rounded focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-outline-variant transition-all duration-200"
+                id="last-name"
+                placeholder="Doe"
+                type="text"
+              />
+            </div>
+          </div>
+          <!-- Trade Type Selection -->
+          <div class="flex flex-col gap-1.5">
+            <label
+              class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1"
+              >Trade Type</label
+            >
+            <div class="grid grid-cols-2 gap-2">
+              <!-- Plumber -->
+              <label class="cursor-pointer group">
+                <input
+                  class="peer hidden"
+                  name="trade"
+                  type="radio"
+                  value="plumber"
+                />
+                <div
+                  class="px-4 py-3 border-none bg-surface-container-high rounded text-center text-sm font-medium text-on-surface-variant peer-checked:bg-primary-container peer-checked:text-white group-hover:bg-surface-variant transition-all duration-200"
+                >
+                  Plumber
+                </div>
+              </label>
+              <!-- Electrician -->
+              <label class="cursor-pointer group">
+                <input
+                  class="peer hidden"
+                  name="trade"
+                  type="radio"
+                  value="electrician"
+                />
+                <div
+                  class="px-4 py-3 border-none bg-surface-container-high rounded text-center text-sm font-medium text-on-surface-variant peer-checked:bg-primary-container peer-checked:text-white group-hover:bg-surface-variant transition-all duration-200"
+                >
+                  Electrician
+                </div>
+              </label>
+              <!-- Builder -->
+              <label class="cursor-pointer group">
+                <input
+                  class="peer hidden"
+                  name="trade"
+                  type="radio"
+                  value="builder"
+                />
+                <div
+                  class="px-4 py-3 border-none bg-surface-container-high rounded text-center text-sm font-medium text-on-surface-variant peer-checked:bg-primary-container peer-checked:text-white group-hover:bg-surface-variant transition-all duration-200"
+                >
+                  Builder
+                </div>
+              </label>
+              <!-- Painter -->
+              <label class="cursor-pointer group">
+                <input
+                  class="peer hidden"
+                  name="trade"
+                  type="radio"
+                  value="painter"
+                />
+                <div
+                  class="px-4 py-3 border-none bg-surface-container-high rounded text-center text-sm font-medium text-on-surface-variant peer-checked:bg-primary-container peer-checked:text-white group-hover:bg-surface-variant transition-all duration-200"
+                >
+                  Painter
+                </div>
+              </label>
+              <!-- Landscaper -->
+              <label class="cursor-pointer group">
+                <input
+                  class="peer hidden"
+                  name="trade"
+                  type="radio"
+                  value="landscaper"
+                />
+                <div
+                  class="px-4 py-3 border-none bg-surface-container-high rounded text-center text-sm font-medium text-on-surface-variant peer-checked:bg-primary-container peer-checked:text-white group-hover:bg-surface-variant transition-all duration-200"
+                >
+                  Landscaper
+                </div>
+              </label>
+              <!-- Other -->
+              <label class="cursor-pointer group">
+                <input
+                  class="peer hidden"
+                  name="trade"
+                  type="radio"
+                  value="other"
+                />
+                <div
+                  class="px-4 py-3 border-none bg-surface-container-high rounded text-center text-sm font-medium text-on-surface-variant peer-checked:bg-primary-container peer-checked:text-white group-hover:bg-surface-variant transition-all duration-200"
+                >
+                  Other
+                </div>
+              </label>
+            </div>
+          </div>
+          <!-- Submit Button -->
+          <button
+            class="w-full mt-4 flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-primary-container text-white py-4 rounded font-bold headline-font tracking-wide hover:opacity-90 active:scale-[0.98] transition-all duration-200 shadow-sm"
+            type="submit"
+          >
+            Continue
+            <span
+              class="material-symbols-outlined text-sm leading-none"
+              data-icon="arrow_forward"
+              >arrow_forward</span
+            >
+          </button>
+        </form>
+      </div>
+      <!-- Footer Help -->
+      <p class="mt-8 text-center text-xs text-on-surface-variant">
+        Need help? Contact
+        <a class="text-primary-container underline underline-offset-2" href="#"
+          >support@stima.com</a
+        >
+      </p>
+    </main>
+  </body>
+</html>
+
+<!-- Onboarding Screen -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Stima - Register</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <!-- Icons -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#ffb870",
+              "surface-dim": "#ccdbf3",
+              "surface-bright": "#f8f9ff",
+              "surface-container-high": "#dce9ff",
+              "on-primary-fixed": "#002116",
+              "on-primary-fixed-variant": "#00513b",
+              "on-primary": "#ffffff",
+              "on-primary-container": "#8bd6b7",
+              "inverse-on-surface": "#eaf1ff",
+              tertiary: "#5b3300",
+              "secondary-fixed-dim": "#ffb3ac",
+              "surface-container": "#e6eeff",
+              "secondary-fixed": "#ffdad6",
+              primary: "#004532",
+              "on-secondary-container": "#783733",
+              "tertiary-fixed": "#ffdcbe",
+              "surface-container-lowest": "#ffffff",
+              "on-background": "#0d1c2e",
+              "surface-variant": "#d5e3fc",
+              "on-secondary-fixed": "#3b0908",
+              error: "#ba1a1a",
+              "on-error": "#ffffff",
+              "on-surface-variant": "#3f4944",
+              "outline-variant": "#bec9c2",
+              "on-surface": "#0d1c2e",
+              "primary-fixed": "#a6f2d1",
+              "on-secondary-fixed-variant": "#73332f",
+              "on-error-container": "#93000a",
+              "primary-fixed-dim": "#8bd6b6",
+              "surface-container-low": "#eff4ff",
+              surface: "#f8f9ff",
+              background: "#f8f9ff",
+              "surface-tint": "#1b6b51",
+              "on-tertiary-fixed": "#2c1600",
+              "on-tertiary-fixed-variant": "#693c00",
+              "primary-container": "#065f46",
+              "surface-container-highest": "#d5e3fc",
+              secondary: "#904a45",
+              outline: "#6f7973",
+              "on-tertiary-container": "#ffba73",
+              "on-tertiary": "#ffffff",
+              "error-container": "#ffdad6",
+              "inverse-primary": "#8bd6b6",
+              "tertiary-container": "#7b4700",
+              "secondary-container": "#fda49c",
+              "on-secondary": "#ffffff",
+              "inverse-surface": "#233144",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .font-headline {
+        font-family: "Space Grotesk", sans-serif;
+      }
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body class="bg-surface-container-low min-h-screen flex flex-col">
+    <!-- TopAppBar Replacement -->
+    <header class="flex items-center justify-center w-full h-24 px-6">
+      <div
+        class="text-4xl font-headline font-bold text-primary tracking-tighter"
+      >
+        Stima
+      </div>
+    </header>
+    <!-- Main Content Canvas -->
+    <main class="flex-grow flex items-center justify-center px-4 pb-12">
+      <div class="w-full max-w-md">
+        <!-- Registration Card -->
+        <div
+          class="bg-surface-container-lowest rounded-lg shadow-[0_4px_24px_rgba(0,0,0,0.04)] p-8 md:p-10"
+        >
+          <div class="mb-8">
+            <h1
+              class="font-headline text-2xl font-bold text-on-surface tracking-tight"
+            >
+              Create your account
+            </h1>
+          </div>
+          <form action="#" class="space-y-6" method="POST">
+            <!-- Email Input Group -->
+            <div class="space-y-1.5">
+              <label
+                class="block text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label"
+                for="email"
+              >
+                Email
+              </label>
+              <div class="relative">
+                <input
+                  class="w-full h-12 px-4 bg-surface-container-high border-none rounded-lg focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline transition-all duration-200"
+                  id="email"
+                  name="email"
+                  placeholder="name@company.com"
+                  required=""
+                  type="email"
+                />
+              </div>
+            </div>
+            <!-- Password Input Group -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-center">
+                <label
+                  class="block text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label"
+                  for="password"
+                >
+                  Password
+                </label>
+              </div>
+              <div class="relative">
+                <input
+                  class="w-full h-12 px-4 bg-surface-container-high border-none rounded-lg focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline transition-all duration-200"
+                  id="password"
+                  name="password"
+                  placeholder="••••••••"
+                  required=""
+                  type="password"
+                />
+              </div>
+            </div>
+            <!-- Primary CTA -->
+            <button
+              class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-on-primary font-headline font-bold text-lg rounded-lg shadow-sm hover:opacity-90 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group"
+              type="submit"
+            >
+              Create Account
+              <span
+                class="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform"
+                >arrow_forward</span
+              >
+            </button>
+          </form>
+          <!-- Secondary Action -->
+          <div class="mt-8 pt-6 border-t border-outline-variant/20 text-center">
+            <p class="text-on-surface-variant text-sm font-body">
+              Already have an account?
+              <a
+                class="text-primary font-bold hover:underline underline-offset-4 decoration-2 transition-all"
+                href="#"
+                >Sign In</a
+              >
+            </p>
+          </div>
+        </div>
+        <!-- Trust Footer suppressed (badges removed as requested) -->
+      </div>
+    </main>
+  </body>
+</html>
+
+<!-- Register Screen - Final (Clean) -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Stima - Login</title>
+    <!-- Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=Inter:wght@300..700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <!-- Material Symbols -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#ffb870",
+              "surface-dim": "#ccdbf3",
+              "surface-bright": "#f8f9ff",
+              "surface-container-high": "#dce9ff",
+              "on-primary-fixed": "#002116",
+              "on-primary-fixed-variant": "#00513b",
+              "on-primary": "#ffffff",
+              "on-primary-container": "#8bd6b7",
+              "inverse-on-surface": "#eaf1ff",
+              tertiary: "#5b3300",
+              "secondary-fixed-dim": "#ffb3ac",
+              "surface-container": "#e6eeff",
+              "secondary-fixed": "#ffdad6",
+              primary: "#004532",
+              "on-secondary-container": "#783733",
+              "tertiary-fixed": "#ffdcbe",
+              "surface-container-lowest": "#ffffff",
+              "on-background": "#0d1c2e",
+              "surface-variant": "#d5e3fc",
+              "on-secondary-fixed": "#3b0908",
+              error: "#ba1a1a",
+              "on-error": "#ffffff",
+              "on-surface-variant": "#3f4944",
+              "outline-variant": "#bec9c2",
+              "on-surface": "#0d1c2e",
+              "primary-fixed": "#a6f2d1",
+              "on-secondary-fixed-variant": "#73332f",
+              "on-error-container": "#93000a",
+              "primary-fixed-dim": "#8bd6b6",
+              "surface-container-low": "#eff4ff",
+              surface: "#f8f9ff",
+              "surface-tint": "#1b6b51",
+              "on-tertiary-fixed": "#2c1600",
+              "on-tertiary-fixed-variant": "#693c00",
+              "primary-container": "#065f46",
+              background: "#f8f9ff",
+              "surface-container-highest": "#d5e3fc",
+              secondary: "#904a45",
+              outline: "#6f7973",
+              "on-tertiary-container": "#ffba73",
+              "on-tertiary": "#ffffff",
+              "error-container": "#ffdad6",
+              "inverse-primary": "#8bd6b6",
+              "tertiary-container": "#7b4700",
+              "secondary-container": "#fda49c",
+              "on-secondary": "#ffffff",
+              "inverse-surface": "#233144",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      .ghost-shadow {
+        box-shadow: 0px 0px 24px 0px rgba(13, 28, 46, 0.04);
+      }
+      .forest-gradient {
+        background: linear-gradient(135deg, #004532 0%, #065f46 100%);
+      }
+    </style>
+    <style>
+      body {
+        min-height: max(884px, 100dvh);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-background font-body text-on-surface min-h-screen flex flex-col"
+  >
+    <!-- Top Navigation (Shell Implementation) -->
+    <header
+      class="bg-white dark:bg-slate-950 flex items-center justify-center w-full h-16 px-6 fixed top-0 z-50"
+    >
+      <div class="flex items-center gap-2">
+        <span
+          class="text-2xl font-bold text-emerald-900 dark:text-emerald-100 tracking-tighter font-headline"
+          >Stima</span
+        >
+      </div>
+    </header>
+    <!-- Main Content Canvas -->
+    <main class="flex-grow flex items-center justify-center px-4 pt-16 pb-24">
+      <div class="w-full max-w-md">
+        <!-- Architectural Header -->
+        <div class="mb-8 text-center md:text-left">
+          <h1
+            class="font-headline text-primary-container text-4xl font-extrabold tracking-tighter mb-2"
+          >
+            Welcome Back
+          </h1>
+        </div>
+        <!-- Login Card -->
+        <div
+          class="bg-surface-container-lowest rounded-lg ghost-shadow p-8 border border-outline-variant/15"
+        >
+          <form class="space-y-6">
+            <!-- Input Group: Email -->
+            <div class="space-y-1.5">
+              <label
+                class="block font-label text-[11px] font-bold uppercase tracking-widest text-on-surface-variant"
+                for="email"
+                >Email</label
+              >
+              <input
+                class="w-full h-12 px-4 rounded bg-surface-container-high border-none focus:ring-2 focus:ring-primary-container transition-all text-on-surface font-body text-sm"
+                id="email"
+                name="email"
+                placeholder="architect@stima.com"
+                type="email"
+              />
+            </div>
+            <!-- Input Group: Password -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-end">
+                <label
+                  class="block font-label text-[11px] font-bold uppercase tracking-widest text-on-surface-variant"
+                  for="password"
+                  >Password</label
+                >
+              </div>
+              <input
+                class="w-full h-12 px-4 rounded bg-surface-container-high border-none focus:ring-2 focus:ring-primary-container transition-all text-on-surface font-body text-sm"
+                id="password"
+                name="password"
+                placeholder="••••••••"
+                type="password"
+              />
+            </div>
+            <!-- Error State Banner -->
+            <div
+              class="bg-error-container text-on-error-container p-3 rounded flex items-center gap-3 border border-error/10"
+            >
+              <span class="material-symbols-outlined text-sm" data-icon="error"
+                >error</span
+              >
+              <p class="font-label text-xs font-medium">
+                Invalid email or password.
+              </p>
+            </div>
+            <!-- Primary Action -->
+            <button
+              class="forest-gradient w-full h-12 text-on-primary font-headline font-bold text-sm tracking-wide rounded-lg shadow-sm active:scale-95 duration-200 transition-all hover:opacity-95 flex items-center justify-center gap-2"
+              type="submit"
+            >
+              Sign In
+              <span
+                class="material-symbols-outlined text-lg"
+                data-icon="arrow_forward"
+                >arrow_forward</span
+              >
+            </button>
+          </form>
+          <!-- Footer Link -->
+          <div class="mt-8 text-center">
+            <p class="text-outline text-xs font-medium">
+              Don't have an account?
+              <a
+                class="text-primary-container font-bold hover:underline transition-all"
+                href="#"
+                >Register</a
+              >
+            </p>
+          </div>
+        </div>
+        <!-- AI Confidence Note (Brand System Element) -->
+      </div>
+    </main>
+    <!-- Bottom Navigation Shell (Login Destination Active) -->
+    <!-- Suppression Logic: Normally hidden on focused task screens, but requested in JSON for navigation context -->
+    <!-- Visual Identity Background Element (Subtle) -->
+    <div
+      class="fixed top-0 right-0 -z-10 w-1/3 h-full opacity-[0.03] pointer-events-none overflow-hidden"
+    >
+      <svg
+        class="w-full h-full stroke-primary"
+        fill="none"
+        viewbox="0 0 100 100"
+      >
+        <path
+          d="M0,10 L100,10 M0,20 L100,20 M0,30 L100,30 M0,40 L100,40 M0,50 L100,50 M0,60 L100,60 M0,70 L100,70 M0,80 L100,80 M0,90 L100,90"
+          stroke-width="0.1"
+        ></path>
+        <path
+          d="M10,0 L10,100 M20,0 L20,100 M30,0 L30,100 M40,0 L40,100 M50,0 L50,100 M60,0 L60,100 M70,0 L70,100 M80,0 L80,100 M90,0 L90,100"
+          stroke-width="0.1"
+        ></path>
+      </svg>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed": "#ffdcbe",
+              "primary": "#004532",
+              "on-secondary-fixed-variant": "#73332f",
+              "secondary-fixed-dim": "#ffb3ac",
+              "secondary-fixed": "#ffdad6",
+              "surface-container-lowest": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              "background": "#f8f9ff",
+              "primary-container": "#065f46",
+              "on-secondary": "#ffffff",
+              "on-background": "#0d1c2e",
+              "outline": "#6f7973",
+              "on-primary-fixed": "#002116",
+              "on-primary-container": "#8bd6b7",
+              "surface-dim": "#ccdbf3",
+              "secondary": "#904a45",
+              "primary-fixed": "#a6f2d1",
+              "on-surface": "#0d1c2e",
+              "surface-container-low": "#eff4ff",
+              "surface-bright": "#f8f9ff",
+              "primary-fixed-dim": "#8bd6b6",
+              "surface-variant": "#d5e3fc",
+              "on-primary": "#ffffff",
+              "on-secondary-container": "#783733",
+              "inverse-surface": "#233144",
+              "secondary-container": "#fda49c",
+              "on-tertiary": "#ffffff",
+              "on-secondary-fixed": "#3b0908",
+              "surface-tint": "#1b6b51",
+              "outline-variant": "#bec9c2",
+              "on-tertiary-fixed-variant": "#693c00",
+              "on-primary-fixed-variant": "#00513b",
+              "surface-container-highest": "#d5e3fc",
+              "error-container": "#ffdad6",
+              "tertiary-fixed-dim": "#ffb870",
+              "surface-container-high": "#dce9ff",
+              "surface-container": "#e6eeff",
+              "error": "#ba1a1a",
+              "on-error": "#ffffff",
+              "on-tertiary-fixed": "#2c1600",
+              "on-error-container": "#93000a",
+              "tertiary-container": "#7b4700",
+              "on-surface-variant": "#3f4944",
+              "surface": "#f8f9ff",
+              "inverse-primary": "#8bd6b6",
+              "tertiary": "#5b3300",
+              "on-tertiary-container": "#ffba73"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .waveform-bar {
+            width: 4px;
+            background-color: #065f46;
+            border-radius: 2px;
+            transition: height 0.2s ease;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-[0_0_24px_rgba(13,28,46,0.04)]">
+<div class="flex items-center px-4 h-16 w-full">
+<button class="mr-4 text-emerald-900 active:scale-95 duration-200">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex flex-col">
+<h1 class="font-['Space_Grotesk'] font-bold tracking-tight text-emerald-900 text-lg leading-tight">Capture Job Notes</h1>
+<p class="text-on-surface-variant text-xs font-medium">Recording your site visit details...</p>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="pt-16 pb-64 px-4 min-h-screen overflow-y-auto">
+<!-- Waveform Visualization -->
+<section class="mt-8 mb-10 bg-surface-container-low h-48 flex items-center justify-center gap-1.5 px-6 rounded-lg overflow-hidden relative">
+<div class="waveform-bar h-12"></div>
+<div class="waveform-bar h-24"></div>
+<div class="waveform-bar h-16"></div>
+<div class="waveform-bar h-32"></div>
+<div class="waveform-bar h-20"></div>
+<div class="waveform-bar h-28"></div>
+<div class="waveform-bar h-40"></div>
+<div class="waveform-bar h-24"></div>
+<div class="waveform-bar h-12"></div>
+<div class="waveform-bar h-32"></div>
+<div class="waveform-bar h-16"></div>
+<div class="waveform-bar h-24"></div>
+<div class="waveform-bar h-36"></div>
+<div class="waveform-bar h-12"></div>
+<div class="waveform-bar h-20"></div>
+<div class="waveform-bar h-28"></div>
+<div class="waveform-bar h-16"></div>
+<div class="waveform-bar h-24"></div>
+<div class="waveform-bar h-12"></div>
+</section>
+<!-- Recorded Clips Section -->
+<section class="mb-8">
+<h2 class="font-headline text-lg font-bold text-on-surface mb-4 tracking-tight">Recorded Clips</h2>
+<div class="bg-surface-container-lowest border border-outline-variant/15 p-4 rounded-lg flex items-center justify-between shadow-[0_0_24px_rgba(13,28,46,0.04)]">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-container/10 flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary-container" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+<div>
+<p class="font-headline font-bold text-on-surface leading-none">Clip 1</p>
+<p class="text-on-surface-variant text-xs mt-1">0:23</p>
+</div>
+</div>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors rounded">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+</section>
+<!-- Written Description -->
+<section>
+<label class="block font-headline text-lg font-bold text-on-surface mb-4 tracking-tight" for="transcription">Written Description</label>
+<div class="relative group">
+<textarea class="w-full bg-surface-container-high border-none rounded-lg p-4 text-on-surface font-body text-sm focus:ring-2 focus:ring-primary transition-all placeholder:text-on-surface-variant/50" id="transcription" placeholder="Recording transcribed in real-time..." rows="6"></textarea>
+<div class="absolute bottom-3 right-3 flex items-center gap-1.5 px-2 py-1 bg-amber-100 rounded border border-amber-200/50">
+<span class="material-symbols-outlined text-amber-600 text-[14px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="text-[10px] font-bold text-amber-700 font-label uppercase tracking-widest">AI Assisted</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Fixed Footer -->
+<footer class="fixed bottom-0 w-full bg-surface/80 backdrop-blur-xl z-50 p-6 flex flex-col items-center border-t border-outline-variant/10">
+<!-- Recording Timer State -->
+<div class="flex items-center gap-2 mb-6">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-error"></span>
+</span>
+<span class="text-error font-headline font-bold text-sm tracking-wide">Recording... 0:23</span>
+</div>
+<!-- Stop Button -->
+<div class="flex flex-col items-center gap-2 mb-8">
+<button class="group relative flex items-center justify-center w-20 h-20 rounded-full bg-error-container text-error active:scale-90 transition-transform shadow-lg">
+<div class="absolute inset-0 rounded-full border-4 border-error/20 animate-[ping_2s_infinite]"></div>
+<div class="bg-error w-8 h-8 rounded-sm"></div>
+</button>
+<span class="font-headline font-bold text-error text-[10px] tracking-[0.2em] uppercase">STOP</span>
+</div>
+<!-- Action Button -->
+<button class="w-full h-14 bg-primary/40 text-on-primary font-headline font-bold tracking-tight rounded-lg cursor-not-allowed flex items-center justify-center gap-2" disabled="">
+<span class="material-symbols-outlined text-[20px]">magic_button</span>
+            Extract Line Items
+        </button>
+</footer>
+</body></html>

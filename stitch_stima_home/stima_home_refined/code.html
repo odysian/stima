@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Stima Quotes - Dashboard</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<!-- Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#73332f",
+                        "surface-bright": "#f8f9ff",
+                        "secondary-fixed": "#ffdad6",
+                        "primary-fixed": "#a6f2d1",
+                        "surface-variant": "#d5e3fc",
+                        "inverse-primary": "#8bd6b6",
+                        "primary-container": "#065f46",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface-variant": "#3f4944",
+                        "on-tertiary-container": "#ffba73",
+                        "on-tertiary-fixed-variant": "#693c00",
+                        "surface-dim": "#ccdbf3",
+                        "on-secondary-container": "#783733",
+                        "surface-tint": "#1b6b51",
+                        "on-primary-fixed-variant": "#00513b",
+                        "tertiary-fixed": "#ffdcbe",
+                        "background": "#f8f9ff",
+                        "primary": "#004532",
+                        "on-tertiary-fixed": "#2c1600",
+                        "surface-container": "#e6eeff",
+                        "outline": "#6f7973",
+                        "on-secondary-fixed": "#3b0908",
+                        "on-error-container": "#93000a",
+                        "on-background": "#0d1c2e",
+                        "outline-variant": "#bec9c2",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "secondary": "#904a45",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#233144",
+                        "on-primary-container": "#8bd6b6",
+                        "surface-container-highest": "#d5e3fc",
+                        "surface": "#f8f9ff",
+                        "tertiary": "#5b3300",
+                        "surface-container-high": "#dce9ff",
+                        "primary-fixed-dim": "#8bd6b6",
+                        "tertiary-container": "#7b4700",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#fda49c",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-primary-fixed": "#002116",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#ffb870",
+                        "secondary-fixed-dim": "#ffb3ac",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#0d1c2e"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased">
+<!-- TopAppBar -->
+<header class="bg-white dark:bg-slate-950 docked full-width top-0 sticky z-40 transition-all">
+<div class="flex justify-between items-center w-full px-6 py-4">
+<div class="flex items-center gap-4">
+<h1 class="text-xl font-bold text-emerald-900 dark:text-emerald-50 tracking-tighter font-['Space_Grotesk']">Stima Quotes</h1>
+</div>
+</div>
+<div class="bg-slate-100 dark:bg-slate-900 h-px"></div>
+</header>
+<main class="max-w-4xl mx-auto px-6 pb-32 pt-6">
+<!-- Summary Bento Grid -->
+<section class="grid grid-cols-2 gap-4 mb-10">
+<div class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_4px_24px_rgba(0,0,0,0.02)] border-l-4 border-primary">
+<p class="text-[0.6875rem] font-bold uppercase tracking-widest text-outline mb-1 font-label">Active Quotes</p>
+<p class="text-3xl font-headline font-bold text-on-surface tracking-tight">12</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_4px_24px_rgba(0,0,0,0.02)] border-l-4 border-amber-500">
+<p class="text-[0.6875rem] font-bold uppercase tracking-widest text-outline mb-1 font-label">Ready to Send</p>
+<p class="text-3xl font-headline font-bold text-on-surface tracking-tight">04</p>
+</div>
+</section>
+<!-- Search & Filter Area -->
+<section class="mb-10">
+<div class="relative group">
+<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline">search</span>
+</div>
+<input class="w-full bg-surface-container-high py-4 pl-12 pr-4 rounded text-sm focus:ring-2 focus:ring-primary-container focus:border-transparent border-none transition-all placeholder:text-outline/60" placeholder="Search customer or quote ID..." type="text"/>
+</div>
+</section>
+<!-- Quotes List Header -->
+<div class="flex justify-between items-end mb-6">
+<h2 class="text-1.5rem font-headline font-bold text-on-surface leading-none">Past Quotes</h2>
+<p class="text-[0.6875rem] text-outline font-medium">Sorted by: Most Recent</p>
+</div>
+<!-- Scrollable List of Past Quotes -->
+<div class="space-y-4">
+<!-- Quote Card: Ready State -->
+<div class="bg-surface-container-lowest p-5 rounded hover:bg-surface-container transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.02)] cursor-pointer group">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h3 class="text-1.125rem font-bold text-on-surface font-body mb-0.5 group-hover:text-primary transition-colors">Harrison &amp; Sons Ltd</h3>
+<p class="text-[0.6875rem] font-medium text-outline">#2024-089 • Oct 12, 2023</p>
+</div>
+<span class="bg-emerald-50 text-emerald-800 text-[0.6875rem] font-bold px-2 py-1 rounded uppercase tracking-wider">Ready</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<span class="text-[0.6875rem] text-outline">4 items</span>
+</div>
+<p class="text-1.5rem font-headline font-bold tracking-tight text-on-surface">$2,450.00</p>
+</div>
+</div>
+<!-- Quote Card: Draft State -->
+<div class="bg-surface-container-lowest p-5 rounded hover:bg-surface-container transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.02)] cursor-pointer group">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h3 class="text-1.125rem font-bold text-on-surface font-body mb-0.5 group-hover:text-primary transition-colors">Elena Rodriguez</h3>
+<p class="text-[0.6875rem] font-medium text-outline">#2024-088 • Oct 10, 2023</p>
+</div>
+<span class="bg-slate-100 text-slate-600 text-[0.6875rem] font-bold px-2 py-1 rounded uppercase tracking-wider">Draft</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<span class="text-[0.6875rem] text-outline">2 items</span>
+</div>
+<p class="text-1.5rem font-headline font-bold tracking-tight text-on-surface">$890.00</p>
+</div>
+</div>
+<!-- Quote Card: Shared State -->
+<div class="bg-surface-container-lowest p-5 rounded hover:bg-surface-container transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.02)] cursor-pointer group">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h3 class="text-1.125rem font-bold text-on-surface font-body mb-0.5 group-hover:text-primary transition-colors">Oakwood Community Hub</h3>
+<p class="text-[0.6875rem] font-medium text-outline">#2024-087 • Oct 08, 2023</p>
+</div>
+<span class="bg-sky-50 text-sky-700 text-[0.6875rem] font-bold px-2 py-1 rounded uppercase tracking-wider bg-sky-100 text-sky-800">Shared</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<span class="text-[0.6875rem] text-outline">12 items</span>
+</div>
+<p class="text-1.5rem font-headline font-bold tracking-tight text-on-surface">$12,750.00</p>
+</div>
+</div>
+<!-- Quote Card: Ready State -->
+<div class="bg-surface-container-lowest p-5 rounded hover:bg-surface-container transition-colors shadow-[0_4px_24px_rgba(0,0,0,0.02)] cursor-pointer group">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h3 class="text-1.125rem font-bold text-on-surface font-body mb-0.5 group-hover:text-primary transition-colors">Sarah Jenkins</h3>
+<p class="text-[0.6875rem] font-medium text-outline">#2024-086 • Oct 05, 2023</p>
+</div>
+<span class="bg-emerald-50 text-emerald-800 text-[0.6875rem] font-bold px-2 py-1 rounded uppercase tracking-wider">Ready</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<span class="text-[0.6875rem] text-outline">1 item</span>
+</div>
+<p class="text-1.5rem font-headline font-bold tracking-tight text-on-surface">$420.00</p>
+</div>
+</div>
+<!-- Empty State / Load More simulation -->
+<div class="pt-8 flex flex-col items-center opacity-40">
+<div class="h-px w-12 bg-outline mb-4"></div>
+<p class="text-[0.6875rem] font-bold uppercase tracking-widest font-label">End of List</p>
+</div>
+</div>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed bottom-24 right-6 h-14 w-14 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded shadow-xl flex items-center justify-center z-50 Active: scale-95 transition-transform duration-200" title="New Quote">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+</button>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-50 border-t border-slate-100 dark:border-slate-800 shadow-[0_-4px_24px_rgba(0,0,0,0.04)]">
+<!-- Home (Active) -->
+<a class="flex flex-col items-center justify-center text-emerald-900 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 rounded-lg px-4 py-1 Active: scale-95 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="text-[10px] font-medium font-['Inter'] uppercase tracking-wider mt-1">Home</span>
+</a>
+<!-- Quotes -->
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-4 py-1 hover:text-emerald-700 dark:hover:text-emerald-300" href="#">
+<span class="material-symbols-outlined">request_quote</span>
+<span class="text-[10px] font-medium font-['Inter'] uppercase tracking-wider mt-1">Quotes</span>
+</a>
+<!-- Settings -->
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-4 py-1 hover:text-emerald-700 dark:hover:text-emerald-300" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-medium font-['Inter'] uppercase tracking-wider mt-1">Settings</span>
+</a>
+</nav>
+</body></html>

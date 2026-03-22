@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Stima - Login</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=Inter:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#ffb870",
+              "surface-dim": "#ccdbf3",
+              "surface-bright": "#f8f9ff",
+              "surface-container-high": "#dce9ff",
+              "on-primary-fixed": "#002116",
+              "on-primary-fixed-variant": "#00513b",
+              "on-primary": "#ffffff",
+              "on-primary-container": "#8bd6b7",
+              "inverse-on-surface": "#eaf1ff",
+              "tertiary": "#5b3300",
+              "secondary-fixed-dim": "#ffb3ac",
+              "surface-container": "#e6eeff",
+              "secondary-fixed": "#ffdad6",
+              "primary": "#004532",
+              "on-secondary-container": "#783733",
+              "tertiary-fixed": "#ffdcbe",
+              "surface-container-lowest": "#ffffff",
+              "on-background": "#0d1c2e",
+              "surface-variant": "#d5e3fc",
+              "on-secondary-fixed": "#3b0908",
+              "error": "#ba1a1a",
+              "on-error": "#ffffff",
+              "on-surface-variant": "#3f4944",
+              "outline-variant": "#bec9c2",
+              "on-surface": "#0d1c2e",
+              "primary-fixed": "#a6f2d1",
+              "on-secondary-fixed-variant": "#73332f",
+              "on-error-container": "#93000a",
+              "primary-fixed-dim": "#8bd6b6",
+              "surface-container-low": "#eff4ff",
+              "surface": "#f8f9ff",
+              "surface-tint": "#1b6b51",
+              "on-tertiary-fixed": "#2c1600",
+              "on-tertiary-fixed-variant": "#693c00",
+              "primary-container": "#065f46",
+              "background": "#f8f9ff",
+              "surface-container-highest": "#d5e3fc",
+              "secondary": "#904a45",
+              "outline": "#6f7973",
+              "on-tertiary-container": "#ffba73",
+              "on-tertiary": "#ffffff",
+              "error-container": "#ffdad6",
+              "inverse-primary": "#8bd6b6",
+              "tertiary-container": "#7b4700",
+              "secondary-container": "#fda49c",
+              "on-secondary": "#ffffff",
+              "inverse-surface": "#233144"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .ghost-shadow {
+        box-shadow: 0px 0px 24px 0px rgba(13, 28, 46, 0.04);
+      }
+      .forest-gradient {
+        background: linear-gradient(135deg, #004532 0%, #065f46 100%);
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background font-body text-on-surface min-h-screen flex flex-col">
+<!-- Top Navigation (Shell Implementation) -->
+<header class="bg-white dark:bg-slate-950 flex items-center justify-center w-full h-16 px-6 fixed top-0 z-50">
+<div class="flex items-center gap-2">
+<span class="text-2xl font-bold text-emerald-900 dark:text-emerald-100 tracking-tighter font-headline">Stima</span>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex items-center justify-center px-4 pt-16 pb-24">
+<div class="w-full max-w-md">
+<!-- Architectural Header -->
+<div class="mb-8 text-center md:text-left">
+<h1 class="font-headline text-primary-container text-4xl font-extrabold tracking-tighter mb-2">Welcome Back</h1>
+</div>
+<!-- Login Card -->
+<div class="bg-surface-container-lowest rounded-lg ghost-shadow p-8 border border-outline-variant/15">
+<form class="space-y-6">
+<!-- Input Group: Email -->
+<div class="space-y-1.5">
+<label class="block font-label text-[11px] font-bold uppercase tracking-widest text-on-surface-variant" for="email">Email</label>
+<input class="w-full h-12 px-4 rounded bg-surface-container-high border-none focus:ring-2 focus:ring-primary-container transition-all text-on-surface font-body text-sm" id="email" name="email" placeholder="architect@stima.com" type="email"/>
+</div>
+<!-- Input Group: Password -->
+<div class="space-y-1.5">
+<div class="flex justify-between items-end">
+<label class="block font-label text-[11px] font-bold uppercase tracking-widest text-on-surface-variant" for="password">Password</label>
+</div>
+<input class="w-full h-12 px-4 rounded bg-surface-container-high border-none focus:ring-2 focus:ring-primary-container transition-all text-on-surface font-body text-sm" id="password" name="password" placeholder="••••••••" type="password"/>
+</div>
+<!-- Error State Banner -->
+<div class="bg-error-container text-on-error-container p-3 rounded flex items-center gap-3 border border-error/10">
+<span class="material-symbols-outlined text-sm" data-icon="error">error</span>
+<p class="font-label text-xs font-medium">Invalid email or password.</p>
+</div>
+<!-- Primary Action -->
+<button class="forest-gradient w-full h-12 text-on-primary font-headline font-bold text-sm tracking-wide rounded-lg shadow-sm active:scale-95 duration-200 transition-all hover:opacity-95 flex items-center justify-center gap-2" type="submit">
+                        Sign In
+                        <span class="material-symbols-outlined text-lg" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</form>
+<!-- Footer Link -->
+<div class="mt-8 text-center">
+<p class="text-outline text-xs font-medium">
+                        Don't have an account? 
+                        <a class="text-primary-container font-bold hover:underline transition-all" href="#">Register</a>
+</p>
+</div>
+</div>
+<!-- AI Confidence Note (Brand System Element) -->
+</div>
+</main>
+<!-- Bottom Navigation Shell (Login Destination Active) -->
+<!-- Suppression Logic: Normally hidden on focused task screens, but requested in JSON for navigation context -->
+<!-- Visual Identity Background Element (Subtle) -->
+<div class="fixed top-0 right-0 -z-10 w-1/3 h-full opacity-[0.03] pointer-events-none overflow-hidden">
+<svg class="w-full h-full stroke-primary" fill="none" viewbox="0 0 100 100">
+<path d="M0,10 L100,10 M0,20 L100,20 M0,30 L100,30 M0,40 L100,40 M0,50 L100,50 M0,60 L100,60 M0,70 L100,70 M0,80 L100,80 M0,90 L100,90" stroke-width="0.1"></path>
+<path d="M10,0 L10,100 M20,0 L20,100 M30,0 L30,100 M40,0 L40,100 M50,0 L50,100 M60,0 L60,100 M70,0 L70,100 M80,0 L80,100 M90,0 L90,100" stroke-width="0.1"></path>
+</svg>
+</div>
+</body></html>
