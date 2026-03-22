@@ -130,9 +130,9 @@ export function CustomerDetailScreen(): React.ReactElement {
     }
 
     const payload: CustomerUpdateRequest = { name: trimmedName };
-    payload.phone = phone.trim();
-    payload.email = email.trim();
-    payload.address = address.trim();
+    payload.phone = phone.trim() || null;
+    payload.email = email.trim() || null;
+    payload.address = address.trim() || null;
 
     setSaveError(null);
     setSaveSuccess(null);

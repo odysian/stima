@@ -140,6 +140,35 @@ describe("CustomerDetailScreen", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Saved");
   });
 
+  it("sends null for optional fields when user clears them", async () => {
+    mockedCustomerService.updateCustomer.mockResolvedValueOnce({
+      id: "cust-1",
+      name: "Alice Johnson",
+      phone: null,
+      email: "alice@example.com",
+      address: "1 Main St",
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-21T00:00:00.000Z",
+    });
+
+    renderScreen();
+    await screen.findByLabelText(/^phone$/i);
+
+    fireEvent.change(screen.getByLabelText(/^phone$/i), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockedCustomerService.updateCustomer).toHaveBeenCalledWith("cust-1", {
+        name: "Alice Johnson",
+        phone: null,
+        email: "alice@example.com",
+        address: "1 Main St",
+      });
+    });
+  });
+
   it("navigates to quote capture for this customer", async () => {
     renderScreen();
     await screen.findByText("Q-001");

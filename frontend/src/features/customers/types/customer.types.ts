@@ -17,7 +17,7 @@ export interface CustomerCreateRequest {
 
 export interface CustomerUpdateRequest {
   name?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
 }
