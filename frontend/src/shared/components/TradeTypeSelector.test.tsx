@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TradeTypeSelector } from "@/shared/components/TradeTypeSelector";
 
+const options = ["Plumber", "Electrician", "Builder", "Painter", "Landscaper", "Other"] as const;
+
 describe("TradeTypeSelector", () => {
   it("renders all six trade options", () => {
-    render(<TradeTypeSelector value="Plumber" onChange={vi.fn()} />);
+    render(<TradeTypeSelector options={options} value="Plumber" onChange={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "Plumber" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Electrician" })).toBeInTheDocument();
@@ -17,7 +19,7 @@ describe("TradeTypeSelector", () => {
 
   it("highlights selected option and fires onChange", () => {
     const onChange = vi.fn();
-    render(<TradeTypeSelector value="Builder" onChange={onChange} />);
+    render(<TradeTypeSelector options={options} value="Builder" onChange={onChange} />);
 
     expect(screen.getByRole("button", { name: "Builder" })).toHaveClass("border-primary", "bg-primary/5", "text-primary");
     expect(screen.getByRole("button", { name: "Plumber" })).toHaveClass("border-outline-variant/30", "text-on-surface-variant");

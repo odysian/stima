@@ -41,7 +41,7 @@ function profileResponse(overrides: Partial<ProfileResponse> = {}): ProfileRespo
     business_name: "Summit Exterior Care",
     first_name: "Jane",
     last_name: "Doe",
-    trade_type: "Landscaping",
+    trade_type: "Landscaper",
     ...overrides,
   };
 }
@@ -66,12 +66,16 @@ describe("OnboardingForm", () => {
   it("renders required onboarding fields with default trade type", () => {
     renderForm();
 
-    expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/business name/i)).toBeRequired();
     expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Landscaping" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Power Washing" })).toBeInTheDocument();
-    expect((screen.getByLabelText(/trade type/i) as HTMLSelectElement).value).toBe("Landscaping");
+    expect(screen.getByRole("button", { name: "Plumber" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Electrician" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Builder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Painter" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Landscaper" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Other" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Plumber" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("submits profile updates and navigates to root on success", async () => {
@@ -86,7 +90,7 @@ describe("OnboardingForm", () => {
       logout: vi.fn(async () => undefined),
     });
     mockedProfileService.updateProfile.mockResolvedValueOnce(
-      profileResponse({ trade_type: "Power Washing" }),
+      profileResponse({ trade_type: "Painter" }),
     );
 
     renderForm();
@@ -100,9 +104,7 @@ describe("OnboardingForm", () => {
     fireEvent.change(screen.getByLabelText(/last name/i), {
       target: { value: "Doe" },
     });
-    fireEvent.change(screen.getByLabelText(/trade type/i), {
-      target: { value: "Power Washing" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Painter" }));
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     await waitFor(() => {
@@ -110,7 +112,7 @@ describe("OnboardingForm", () => {
         business_name: "Summit Exterior Care",
         first_name: "Jane",
         last_name: "Doe",
-        trade_type: "Power Washing",
+        trade_type: "Painter",
       });
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);

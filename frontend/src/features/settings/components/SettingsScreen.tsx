@@ -8,6 +8,7 @@ import {
 } from "@/features/profile/types/profile.types";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
+import { TradeTypeSelector } from "@/shared/components/TradeTypeSelector";
 
 export function SettingsScreen(): React.ReactElement {
   const { logout, refreshUser } = useAuth();
@@ -137,23 +138,14 @@ export function SettingsScreen(): React.ReactElement {
                   value={lastName}
                   onChange={(event) => setLastName(event.target.value)}
                 />
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="settings-trade-type" className="text-sm font-medium text-slate-700">
-                    Trade type
-                  </label>
-                  <select
-                    id="settings-trade-type"
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="mb-1 text-sm font-medium text-slate-700">Trade type</legend>
+                  <TradeTypeSelector
+                    options={TRADE_TYPES}
                     value={tradeType}
-                    onChange={(event) => setTradeType(event.target.value as TradeType)}
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                  >
-                    {TRADE_TYPES.map((tradeOption) => (
-                      <option key={tradeOption} value={tradeOption}>
-                        {tradeOption}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    onChange={(value) => setTradeType(value as TradeType)}
+                  />
+                </fieldset>
               </div>
             </section>
 

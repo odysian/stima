@@ -32,7 +32,7 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
     business_name: "Summit Exterior Care",
     first_name: "Alex",
     last_name: "Stone",
-    trade_type: "Landscaping",
+    trade_type: "Landscaper",
     ...overrides,
   };
 }
@@ -70,7 +70,7 @@ describe("SettingsScreen", () => {
         business_name: "Bright Lawn Care",
         first_name: "Jordan",
         last_name: "Hill",
-        trade_type: "Power Washing",
+        trade_type: "Plumber",
       }),
     );
 
@@ -79,7 +79,7 @@ describe("SettingsScreen", () => {
     expect(await screen.findByDisplayValue("Bright Lawn Care")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Hill")).toBeInTheDocument();
-    expect((screen.getByLabelText(/trade type/i) as HTMLSelectElement).value).toBe("Power Washing");
+    expect(screen.getByRole("button", { name: "Plumber" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
   });
@@ -102,7 +102,7 @@ describe("SettingsScreen", () => {
     expect((screen.getByLabelText(/business name/i) as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText(/first name/i) as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText(/last name/i) as HTMLInputElement).value).toBe("");
-    expect((screen.getByLabelText(/trade type/i) as HTMLSelectElement).value).toBe(TRADE_TYPES[0]);
+    expect(screen.getByRole("button", { name: TRADE_TYPES[0] })).toHaveAttribute("aria-pressed", "true");
 
     const errorOutput = consoleErrorSpy.mock.calls.flat().join(" ");
     expect(errorOutput).not.toContain("A component is changing an uncontrolled input");
@@ -129,7 +129,7 @@ describe("SettingsScreen", () => {
     });
     mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
     mockedProfileService.updateProfile.mockResolvedValueOnce(
-      makeProfileResponse({ trade_type: "Power Washing" }),
+      makeProfileResponse({ trade_type: "Builder" }),
     );
 
     renderScreen();
@@ -145,9 +145,7 @@ describe("SettingsScreen", () => {
     fireEvent.change(screen.getByLabelText(/last name/i), {
       target: { value: "Reed" },
     });
-    fireEvent.change(screen.getByLabelText(/trade type/i), {
-      target: { value: "Power Washing" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Builder" }));
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
@@ -155,7 +153,7 @@ describe("SettingsScreen", () => {
         business_name: "North Star Lawn",
         first_name: "Jamie",
         last_name: "Reed",
-        trade_type: "Power Washing",
+        trade_type: "Builder",
       });
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);

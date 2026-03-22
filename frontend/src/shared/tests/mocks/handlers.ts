@@ -69,7 +69,7 @@ export const handlers = [
         business_name: "Summit Exterior Care",
         first_name: "Alex",
         last_name: "Stone",
-        trade_type: "Landscaping",
+        trade_type: "Landscaper",
       },
       { status: 200 },
     );

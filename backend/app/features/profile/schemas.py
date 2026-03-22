@@ -9,10 +9,14 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class TradeType(str, enum.Enum):
-    """Allowed V0 trade types for onboarding profile completion."""
+    """Allowed trade types for onboarding profile completion."""
 
-    LANDSCAPING = "Landscaping"
-    POWER_WASHING = "Power Washing"
+    PLUMBER = "Plumber"
+    ELECTRICIAN = "Electrician"
+    BUILDER = "Builder"
+    PAINTER = "Painter"
+    LANDSCAPER = "Landscaper"
+    OTHER = "Other"
 
 
 class ProfileResponse(BaseModel):

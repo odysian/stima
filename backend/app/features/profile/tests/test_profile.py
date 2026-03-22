@@ -46,7 +46,7 @@ async def test_patch_profile_updates_onboarding_fields(client: AsyncClient) -> N
         "business_name": "Summit Exterior Care",
         "first_name": "Jane",
         "last_name": "Doe",
-        "trade_type": "Power Washing",
+        "trade_type": "Plumber",
     }
 
     response = await client.patch(
@@ -74,7 +74,7 @@ async def test_patch_profile_requires_business_name(client: AsyncClient) -> None
         json={
             "first_name": "Jane",
             "last_name": "Doe",
-            "trade_type": "Landscaping",
+            "trade_type": "Landscaper",
         },
         headers={"X-CSRF-Token": csrf_token},
     )
@@ -93,7 +93,7 @@ async def test_patch_profile_rejects_empty_first_name(client: AsyncClient) -> No
             "business_name": "Summit Exterior Care",
             "first_name": "",
             "last_name": "Doe",
-            "trade_type": "Landscaping",
+            "trade_type": "Landscaper",
         },
         headers={"X-CSRF-Token": csrf_token},
     )
@@ -111,7 +111,7 @@ async def test_patch_profile_requires_authentication(client: AsyncClient) -> Non
             "business_name": "Summit Exterior Care",
             "first_name": "Jane",
             "last_name": "Doe",
-            "trade_type": "Landscaping",
+            "trade_type": "Landscaper",
         },
         headers={"X-CSRF-Token": "csrf"},
     )
@@ -128,7 +128,7 @@ async def test_patch_profile_requires_csrf_header(client: AsyncClient) -> None:
             "business_name": "Summit Exterior Care",
             "first_name": "Jane",
             "last_name": "Doe",
-            "trade_type": "Landscaping",
+            "trade_type": "Landscaper",
         },
     )
 
@@ -148,7 +148,7 @@ async def test_me_reflects_onboarding_state_after_profile_update(client: AsyncCl
             "business_name": "Summit Exterior Care",
             "first_name": "Jane",
             "last_name": "Doe",
-            "trade_type": "Landscaping",
+            "trade_type": "Landscaper",
         },
         headers={"X-CSRF-Token": csrf_token},
     )
