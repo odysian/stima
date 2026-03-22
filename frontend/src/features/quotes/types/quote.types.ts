@@ -48,6 +48,12 @@ export interface Quote {
   updated_at: string;
 }
 
+export interface QuoteDetail extends Quote {
+  customer_name: string;
+  customer_email: string | null;
+  customer_phone: string | null;
+}
+
 export interface QuoteListItem {
   id: string;
   customer_id: string;

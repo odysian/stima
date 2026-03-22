@@ -1,6 +1,7 @@
 import type {
   ExtractionResult,
   Quote,
+  QuoteDetail,
   QuoteCreateRequest,
   QuoteListItem,
   QuoteUpdateRequest,
@@ -80,8 +81,8 @@ function listQuotes(): Promise<QuoteListItem[]> {
   return request<QuoteListItem[]>("/api/quotes");
 }
 
-function getQuote(id: string): Promise<Quote> {
-  return request<Quote>(`/api/quotes/${id}`);
+function getQuote(id: string): Promise<QuoteDetail> {
+  return request<QuoteDetail>(`/api/quotes/${id}`);
 }
 
 function updateQuote(id: string, data: QuoteUpdateRequest): Promise<Quote> {

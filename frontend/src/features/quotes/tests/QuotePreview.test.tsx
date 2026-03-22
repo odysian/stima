@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QuotePreview } from "@/features/quotes/components/QuotePreview";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { Quote } from "@/features/quotes/types/quote.types";
+import type { Quote, QuoteDetail } from "@/features/quotes/types/quote.types";
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
@@ -23,10 +23,13 @@ const mockedQuoteService = vi.mocked(quoteService);
 const createObjectUrlMock = vi.fn();
 const revokeObjectUrlMock = vi.fn();
 
-function makeQuote(overrides: Partial<Quote> = {}): Quote {
+function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
   return {
     id: "quote-1",
     customer_id: "cust-1",
+    customer_name: "Test Customer",
+    customer_email: null,
+    customer_phone: null,
     doc_number: "Q-001",
     status: "draft",
     source_type: "text",
@@ -46,6 +49,33 @@ function makeQuote(overrides: Partial<Quote> = {}): Quote {
     ],
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function makeQuoteResponse(overrides: Partial<Quote> = {}): Quote {
+  return {
+    id: "quote-1",
+    customer_id: "cust-1",
+    doc_number: "Q-001",
+    status: "shared",
+    source_type: "text",
+    transcript: "5 yards brown mulch",
+    total_amount: 120,
+    notes: "Thanks for your business",
+    shared_at: "2026-03-20T01:00:00.000Z",
+    share_token: "share-token-1",
+    line_items: [
+      {
+        id: "line-1",
+        description: "Brown mulch",
+        details: "5 yards",
+        price: 120,
+        sort_order: 0,
+      },
+    ],
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T01:00:00.000Z",
     ...overrides,
   };
 }
@@ -71,17 +101,11 @@ async function generatePdfAndWaitForShareEnabled(): Promise<void> {
 }
 
 beforeEach(() => {
-  mockedQuoteService.getQuote.mockResolvedValue(makeQuote());
+  mockedQuoteService.getQuote.mockResolvedValue(makeQuoteDetail());
   mockedQuoteService.generatePdf.mockResolvedValue(
     new Blob(["pdf-binary"], { type: "application/pdf" }),
   );
-  mockedQuoteService.shareQuote.mockResolvedValue(
-    makeQuote({
-      status: "shared",
-      shared_at: "2026-03-20T01:00:00.000Z",
-      share_token: "share-token-1",
-    }),
-  );
+  mockedQuoteService.shareQuote.mockResolvedValue(makeQuoteResponse());
   createObjectUrlMock.mockReturnValue("blob:quote-preview");
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
@@ -134,7 +158,12 @@ describe("QuotePreview", () => {
   });
 
   it("renders amount and falls back to customer_id when customer details are unavailable", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ total_amount: 245.5 }));
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        total_amount: 245.5,
+        customer_name: " ",
+      }),
+    );
 
     renderScreen();
 
@@ -183,7 +212,7 @@ describe("QuotePreview", () => {
       writable: true,
       value: shareMock,
     });
-    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ status: "ready" }));
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
 
     renderScreen();
 
@@ -200,6 +229,36 @@ describe("QuotePreview", () => {
     });
   });
 
+  it("preserves existing customer detail fields when share response omits them", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        status: "ready",
+        customer_name: "Preserved Customer",
+        customer_email: "preserved@example.com",
+        customer_phone: "+1-555-0199",
+      }),
+    );
+    mockedQuoteService.shareQuote.mockResolvedValueOnce(
+      makeQuoteResponse({
+        status: "shared",
+        shared_at: "2026-03-20T02:00:00.000Z",
+        share_token: "share-token-2",
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    await generatePdfAndWaitForShareEnabled();
+    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
+    });
+    expect(await screen.findByText("Preserved Customer")).toBeInTheDocument();
+    expect(screen.getByText(/preserved@example.com/i)).toBeInTheDocument();
+  });
+
   it("falls back to clipboard copy when share API is unavailable", async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "share", {
@@ -212,7 +271,7 @@ describe("QuotePreview", () => {
       writable: true,
       value: { writeText: writeTextMock },
     });
-    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ status: "ready" }));
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
 
     renderScreen();
 
@@ -238,7 +297,7 @@ describe("QuotePreview", () => {
       writable: true,
       value: shareMock,
     });
-    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ status: "ready" }));
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
 
     renderScreen();
 
@@ -261,7 +320,7 @@ describe("QuotePreview", () => {
       value: { writeText: writeTextMock },
     });
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuote({ share_token: "already-shared-token" }),
+      makeQuoteDetail({ share_token: "already-shared-token" }),
     );
 
     renderScreen();
@@ -278,7 +337,7 @@ describe("QuotePreview", () => {
 
   it("shows manual-copy guidance when clipboard API is unavailable", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuote({ share_token: "already-shared-token" }),
+      makeQuoteDetail({ share_token: "already-shared-token" }),
     );
 
     renderScreen();
@@ -297,7 +356,7 @@ describe("QuotePreview", () => {
       },
     });
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuote({ share_token: "already-shared-token" }),
+      makeQuoteDetail({ share_token: "already-shared-token" }),
     );
 
     renderScreen();
@@ -308,7 +367,7 @@ describe("QuotePreview", () => {
   });
 
   it("shows an error when share request fails", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote({ status: "ready" }));
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
     mockedQuoteService.shareQuote.mockRejectedValueOnce(new Error("Unable to share quote"));
 
     renderScreen();

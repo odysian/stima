@@ -14,7 +14,11 @@ from sqlalchemy.exc import IntegrityError
 
 from app.features.auth.models import User
 from app.features.quotes.models import Document, QuoteStatus
-from app.features.quotes.repository import QuoteListItemSummary, QuoteRenderContext
+from app.features.quotes.repository import (
+    QuoteDetailRow,
+    QuoteListItemSummary,
+    QuoteRenderContext,
+)
 from app.features.quotes.schemas import (
     ExtractionResult,
     LineItemDraft,
@@ -44,6 +48,8 @@ class QuoteRepositoryProtocol(Protocol):
     async def list_by_user(self, user_id: UUID) -> list[QuoteListItemSummary]: ...
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
+
+    async def get_detail_by_id(self, quote_id: UUID, user_id: UUID) -> QuoteDetailRow | None: ...
 
     async def get_render_context(
         self, quote_id: UUID, user_id: UUID
@@ -260,6 +266,13 @@ class QuoteService:
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
         return quote
+
+    async def get_quote_detail(self, user: User, quote_id: UUID) -> QuoteDetailRow:
+        """Return one user-owned quote detail row or raise not found."""
+        row = await self._repository.get_detail_by_id(quote_id, _resolve_user_id(user))
+        if row is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        return row
 
     async def update_quote(
         self,

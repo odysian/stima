@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type {
   Quote,
+  QuoteDetail,
   QuoteCreateRequest,
   QuoteListItem,
 } from "@/features/quotes/types/quote.types";
@@ -128,6 +129,37 @@ describe("quoteService integration (MSW)", () => {
       created_at: "2026-03-20T00:00:00.000Z",
       updated_at: "2026-03-20T00:00:00.000Z",
     });
+  });
+
+  it("getQuote returns quote detail contract including customer contact fields", async () => {
+    const response: QuoteDetail = {
+      id: "quote-1",
+      customer_id: "cust-1",
+      customer_name: "Alice Johnson",
+      customer_email: "alice@example.com",
+      customer_phone: "+1-555-0100",
+      doc_number: "Q-001",
+      status: "draft",
+      source_type: "text",
+      transcript: "Mulch and edging",
+      total_amount: 120,
+      notes: "Thank you",
+      shared_at: null,
+      share_token: null,
+      line_items: [
+        { id: "line-1", description: "Mulch", details: "5 yards", price: 120, sort_order: 0 },
+      ],
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-20T00:00:00.000Z",
+    };
+
+    server.use(http.get("/api/quotes/:id", () => HttpResponse.json(response, { status: 200 })));
+
+    const quote = await quoteService.getQuote("quote-1");
+
+    expect(quote.customer_name).toBe("Alice Johnson");
+    expect(quote.customer_email).toBe("alice@example.com");
+    expect(quote.customer_phone).toBe("+1-555-0100");
   });
 
   it("listQuotes returns quote summary contract including customer_name", async () => {

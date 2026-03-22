@@ -13,6 +13,7 @@ from app.features.quotes.schemas import (
     ConvertNotesRequest,
     ExtractionResult,
     QuoteCreateRequest,
+    QuoteDetailResponse,
     QuoteListItemResponse,
     QuoteResponse,
     QuoteUpdateRequest,
@@ -156,18 +157,18 @@ async def list_quotes(
     return [QuoteListItemResponse.model_validate(quote) for quote in quotes]
 
 
-@router.get("/{quote_id}", response_model=QuoteResponse)
+@router.get("/{quote_id}", response_model=QuoteDetailResponse)
 async def get_quote(
     quote_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
-) -> QuoteResponse:
+) -> QuoteDetailResponse:
     """Return one quote owned by the authenticated user."""
     try:
-        quote = await quote_service.get_quote(user, quote_id)
+        quote = await quote_service.get_quote_detail(user, quote_id)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    return QuoteResponse.model_validate(quote)
+    return QuoteDetailResponse.model_validate(quote)
 
 
 @router.patch(
