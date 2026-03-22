@@ -111,6 +111,13 @@ def _override_quote_service_dependency() -> Iterator[None]:
     app.dependency_overrides.pop(get_quote_service, None)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> Iterator[None]:
+    quote_api.limiter.reset()
+    yield
+    quote_api.limiter.reset()
+
+
 async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     client: AsyncClient,
 ) -> None:
@@ -372,6 +379,96 @@ async def test_capture_audio_transcription_failure_returns_502(client: AsyncClie
     assert response.json()["detail"].startswith("Transcription failed:")
 
 
+async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "add 10 percent travel surcharge"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["transcript"] == "add 10 percent travel surcharge"
+    assert payload["line_items"]
+    assert payload["confidence_notes"] == []
+
+
+async def test_extract_combined_clips_only_success(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("clips", ("clip-1.webm", b"clip-a", "audio/webm"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["transcript"] == "transcript from stitched-1"
+    assert payload["line_items"][0]["flagged"] is True
+    assert payload["line_items"][0]["flag_reason"]
+
+
+async def test_extract_combined_clips_and_notes_success(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[
+            ("clips", ("clip-1.webm", b"clip-a", "audio/webm")),
+            ("notes", (None, "add 10 percent travel surcharge")),
+        ],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["transcript"] == (
+        "transcript from stitched-1\n\nadd 10 percent travel surcharge"
+    )
+    assert payload["line_items"]
+    assert payload["confidence_notes"] == []
+
+
+async def test_extract_combined_requires_clip_or_notes(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, ""))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Provide at least one audio clip or typed notes."}
+
+
+async def test_extract_combined_rate_limit_returns_429(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    csrf_token = await _register_and_login(client, _credentials())
+
+    for index in range(10):
+        response = await client.post(
+            "/api/quotes/extract",
+            files=[("notes", (None, f"note {index}"))],
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert response.status_code == 200
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "rate limited request"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 429
+
+
 @pytest.mark.parametrize(
     ("method", "path", "payload"),
     [
@@ -431,6 +528,19 @@ async def test_capture_audio_requires_authentication(client: AsyncClient) -> Non
     assert response.status_code == 401
 
 
+async def test_extract_combined_requires_authentication(client: AsyncClient) -> None:
+    client.cookies.clear()
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf", path="/")
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "needs auth"))],
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 401
+
+
 async def test_convert_notes_requires_csrf(client: AsyncClient) -> None:
     await _register_and_login(client, _credentials())
 
@@ -449,6 +559,18 @@ async def test_capture_audio_requires_csrf(client: AsyncClient) -> None:
     response = await client.post(
         "/api/quotes/capture-audio",
         files=[("clips", ("clip-1.webm", b"clip-a", "audio/webm"))],
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
+async def test_extract_combined_requires_csrf(client: AsyncClient) -> None:
+    await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch and edging"))],
     )
 
     assert response.status_code == 403

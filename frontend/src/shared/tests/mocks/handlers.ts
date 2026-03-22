@@ -211,6 +211,40 @@ export const handlers = [
     );
   }),
 
+  http.post("/api/quotes/extract", async ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    let notes = "";
+    let hasClips = false;
+    try {
+      const formData = await request.formData();
+      notes = String(formData.get("notes") ?? "").trim();
+      hasClips = formData.getAll("clips").length > 0;
+    } catch {
+      const rawBody = await request.text();
+      notes = rawBody.includes('name="notes"') ? "typed note" : "";
+      hasClips = rawBody.includes('name="clips"; filename=');
+    }
+    const transcript = notes || (hasClips ? "Transcribed clip transcript" : "");
+
+    return HttpResponse.json(
+      {
+        transcript,
+        line_items: [
+          {
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+          },
+        ],
+        total: 120,
+        confidence_notes: [],
+      },
+      { status: 200 },
+    );
+  }),
+
   http.get("/api/quotes", () => {
     return HttpResponse.json(
       [

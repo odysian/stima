@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
@@ -100,6 +100,48 @@ async def capture_audio(
 
     try:
         return await quote_service.capture_audio(clip_inputs)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/extract",
+    response_model=ExtractionResult,
+    dependencies=[Depends(require_csrf)],
+)
+@limiter.limit("10/minute", key_func=get_ip_key)
+async def extract_combined(
+    request: Request,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    clips: Annotated[list[UploadFile] | None, File()] = None,
+    notes: Annotated[str, Form()] = "",
+) -> ExtractionResult:
+    """Extract structured quote data from optional audio clips and optional notes."""
+    del request
+    del user
+    clip_inputs: list[CaptureAudioClip] = []
+    for clip in clips or []:
+        try:
+            if clip.size is not None and clip.size > MAX_AUDIO_CLIP_BYTES:
+                raise HTTPException(status_code=400, detail="Clip too large")
+
+            content = await clip.read()
+            if len(content) > MAX_AUDIO_CLIP_BYTES:
+                raise HTTPException(status_code=400, detail="Clip too large")
+
+            clip_inputs.append(
+                CaptureAudioClip(
+                    filename=clip.filename,
+                    content_type=clip.content_type,
+                    content=content,
+                )
+            )
+        finally:
+            await clip.close()
+
+    try:
+        return await quote_service.extract_combined(clip_inputs, notes)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 

@@ -214,6 +214,82 @@ describe("quoteService integration (MSW)", () => {
     });
   });
 
+  it("extract sends multipart clips and trimmed notes", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+    let capturedContentType: string | null = null;
+
+    server.use(
+      http.post("/api/quotes/extract", async ({ request }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        capturedContentType = request.headers.get("Content-Type");
+
+        return HttpResponse.json({
+          transcript: "combined transcript",
+          line_items: [],
+          total: null,
+          confidence_notes: [],
+        });
+      }),
+    );
+
+    const result = await quoteService.extract({
+      clips: [
+        new Blob(["clip-1"], { type: "audio/webm" }),
+        new Blob(["clip-2"], { type: "audio/mp4" }),
+      ],
+      notes: "  add 10% travel surcharge  ",
+    });
+
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(capturedContentType).not.toContain("application/json");
+    expect(result.transcript).toBe("combined transcript");
+  });
+
+  it("extract sends notes without clips when notes-only", async () => {
+    setCsrfToken("integration-csrf-token");
+
+    server.use(
+      http.post("/api/quotes/extract", async ({ request }) => {
+        const capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+
+        return HttpResponse.json({
+          transcript: capturedCsrfHeader ? "notes only transcript" : "missing csrf",
+          line_items: [],
+          total: null,
+          confidence_notes: [],
+        });
+      }),
+    );
+
+    const result = await quoteService.extract({ notes: "typed note only" });
+
+    expect(result.transcript).toBe("notes only transcript");
+  });
+
+  it("extract omits notes field when clips-only", async () => {
+    setCsrfToken("integration-csrf-token");
+
+    server.use(
+      http.post("/api/quotes/extract", async ({ request }) => {
+        const capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+
+        return HttpResponse.json({
+          transcript: capturedCsrfHeader ? "clips only transcript" : "missing csrf",
+          line_items: [],
+          total: null,
+          confidence_notes: [],
+        });
+      }),
+    );
+
+    const result = await quoteService.extract({
+      clips: [new Blob(["clip-1"], { type: "audio/webm;codecs=opus" })],
+    });
+
+    expect(result.transcript).toBe("clips only transcript");
+  });
+
   it("generatePdf returns Blob and sends CSRF header", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;
