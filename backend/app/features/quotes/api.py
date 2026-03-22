@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
+from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
 from app.features.quotes.schemas import (
     ConvertNotesRequest,
     ExtractionResult,
@@ -18,13 +19,43 @@ from app.features.quotes.schemas import (
     QuoteResponse,
     QuoteUpdateRequest,
 )
-from app.features.quotes.service import CaptureAudioClip, QuoteService, QuoteServiceError
-from app.shared.dependencies import get_current_user, get_quote_service, require_csrf
+from app.features.quotes.service import QuoteService, QuoteServiceError
+from app.shared.dependencies import (
+    get_current_user,
+    get_extraction_service,
+    get_quote_service,
+    require_csrf,
+)
 from app.shared.rate_limit import get_ip_key, limiter
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
 MAX_AUDIO_CLIP_BYTES = 10 * 1024 * 1024
+
+
+async def _parse_upload_clips(clips: list[UploadFile]) -> list[CaptureAudioClip]:
+    """Read uploaded clips into service payloads while enforcing size limits."""
+    parsed_clips: list[CaptureAudioClip] = []
+    for clip in clips:
+        try:
+            if clip.size is not None and clip.size > MAX_AUDIO_CLIP_BYTES:
+                raise HTTPException(status_code=400, detail="Clip too large")
+
+            content = await clip.read()
+            if len(content) > MAX_AUDIO_CLIP_BYTES:
+                raise HTTPException(status_code=400, detail="Clip too large")
+
+            parsed_clips.append(
+                CaptureAudioClip(
+                    filename=clip.filename,
+                    content_type=clip.content_type,
+                    content=content,
+                )
+            )
+        finally:
+            await clip.close()
+
+    return parsed_clips
 
 
 @router.post(
@@ -35,12 +66,12 @@ MAX_AUDIO_CLIP_BYTES = 10 * 1024 * 1024
 async def convert_notes(
     payload: ConvertNotesRequest,
     user: Annotated[User, Depends(get_current_user)],
-    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
 ) -> ExtractionResult:
     """Convert freeform notes into structured quote extraction output."""
     del user
     try:
-        return await quote_service.convert_notes(payload.notes)
+        return await extraction_service.convert_notes(payload.notes)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -74,33 +105,15 @@ async def capture_audio(
     request: Request,
     clips: Annotated[list[UploadFile], File(...)],
     user: Annotated[User, Depends(get_current_user)],
-    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
 ) -> ExtractionResult:
     """Convert uploaded audio clips into structured quote extraction output."""
     del request
     del user
-    clip_inputs: list[CaptureAudioClip] = []
-    for clip in clips:
-        try:
-            if clip.size is not None and clip.size > MAX_AUDIO_CLIP_BYTES:
-                raise HTTPException(status_code=400, detail="Clip too large")
-
-            content = await clip.read()
-            if len(content) > MAX_AUDIO_CLIP_BYTES:
-                raise HTTPException(status_code=400, detail="Clip too large")
-
-            clip_inputs.append(
-                CaptureAudioClip(
-                    filename=clip.filename,
-                    content_type=clip.content_type,
-                    content=content,
-                )
-            )
-        finally:
-            await clip.close()
+    clip_inputs = await _parse_upload_clips(clips)
 
     try:
-        return await quote_service.capture_audio(clip_inputs)
+        return await extraction_service.capture_audio(clip_inputs)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -114,35 +127,17 @@ async def capture_audio(
 async def extract_combined(
     request: Request,
     user: Annotated[User, Depends(get_current_user)],
-    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
     clips: Annotated[list[UploadFile] | None, File()] = None,
     notes: Annotated[str, Form()] = "",
 ) -> ExtractionResult:
     """Extract structured quote data from optional audio clips and optional notes."""
     del request
     del user
-    clip_inputs: list[CaptureAudioClip] = []
-    for clip in clips or []:
-        try:
-            if clip.size is not None and clip.size > MAX_AUDIO_CLIP_BYTES:
-                raise HTTPException(status_code=400, detail="Clip too large")
-
-            content = await clip.read()
-            if len(content) > MAX_AUDIO_CLIP_BYTES:
-                raise HTTPException(status_code=400, detail="Clip too large")
-
-            clip_inputs.append(
-                CaptureAudioClip(
-                    filename=clip.filename,
-                    content_type=clip.content_type,
-                    content=content,
-                )
-            )
-        finally:
-            await clip.close()
+    clip_inputs = await _parse_upload_clips(clips or [])
 
     try:
-        return await quote_service.extract_combined(clip_inputs, notes)
+        return await extraction_service.extract_combined(clip_inputs, notes)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
