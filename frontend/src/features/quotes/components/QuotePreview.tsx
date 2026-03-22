@@ -1,9 +1,22 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { Quote } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
+import { BottomNav } from "@/shared/components/BottomNav";
+import { StatusBadge } from "@/shared/components/StatusBadge";
+
+type QuoteWithClientDetails = Quote & {
+  customer_name?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+};
+
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
 
 function isShareAbortError(error: unknown): boolean {
   return (
@@ -15,6 +28,7 @@ function isShareAbortError(error: unknown): boolean {
 }
 
 export function QuotePreview(): React.ReactElement {
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [isLoadingQuote, setIsLoadingQuote] = useState(true);
@@ -25,7 +39,6 @@ export function QuotePreview(): React.ReactElement {
   const [isSharing, setIsSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [sharedUrl, setSharedUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -72,7 +85,17 @@ export function QuotePreview(): React.ReactElement {
     };
   }, [pdfUrl]);
 
-  const canShare = quote !== null && (quote.status !== "draft" || pdfUrl !== null);
+  const canShare = quote !== null && pdfUrl !== null;
+  const quoteWithClientDetails = quote as QuoteWithClientDetails | null;
+  const shareUrl = quote?.share_token
+    ? `${window.location.origin}/share/${quote.share_token}`
+    : null;
+  const clientName = quoteWithClientDetails?.customer_name?.trim() || quote?.customer_id || "Unknown customer";
+  const clientContact =
+    [quoteWithClientDetails?.customer_email, quoteWithClientDetails?.customer_phone]
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value))
+      .join(" \u00b7 ") || "No contact details";
 
   async function onGeneratePdf(): Promise<void> {
     if (!id) {
@@ -125,7 +148,6 @@ export function QuotePreview(): React.ReactElement {
       }
 
       const nextSharedUrl = `${window.location.origin}/share/${updatedQuote.share_token}`;
-      setSharedUrl(nextSharedUrl);
 
       const maybeNavigator = navigator as Navigator & {
         share?: (data: ShareData) => Promise<void>;
@@ -158,97 +180,157 @@ export function QuotePreview(): React.ReactElement {
     }
   }
 
-  return (
-    <main className="min-h-screen bg-slate-100 px-4 py-8">
-      <section className="mx-auto w-full max-w-6xl rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">Quote Preview</h1>
+  async function copyToClipboard(): Promise<void> {
+    if (!shareUrl) {
+      return;
+    }
 
+    setShareError(null);
+    setShareMessage(null);
+
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+      setShareMessage("Copy this share link manually.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareMessage("Share link copied to clipboard.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to copy share link";
+      setShareError(message);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-background pb-24 pt-16">
+      <header className="fixed top-0 z-50 flex h-16 w-full items-center gap-3 bg-white/80 px-4 shadow-[0_0_24px_rgba(13,28,46,0.04)] backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="rounded-full p-2 text-emerald-900 transition-all hover:bg-slate-50 active:scale-95"
+          aria-label="Back"
+        >
+          <span className="material-symbols-outlined">arrow_back</span>
+        </button>
+        <h1 className="font-headline text-lg font-bold tracking-tight text-on-surface">
+          {quote?.doc_number ?? "Quote Preview"}
+        </h1>
+        {quote ? <StatusBadge variant={quote.status} /> : null}
+      </header>
+
+      <section className="mx-auto w-full max-w-6xl">
         {isLoadingQuote ? (
-          <p role="status" className="mt-4 text-sm text-slate-700">
+          <p role="status" className="mt-4 px-4 text-sm text-on-surface-variant">
             Loading quote...
           </p>
         ) : null}
 
         {loadError ? (
-          <p role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+          <p role="alert" className="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
             {loadError}
           </p>
         ) : null}
 
-        {quote ? (
-          <p className="mt-2 text-sm text-slate-600">
-            {quote.doc_number} • Status: <span className="font-medium">{quote.status}</span>
-          </p>
-        ) : null}
-
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            onClick={() => {
-              void onGeneratePdf();
-            }}
-            isLoading={isGeneratingPdf}
-            disabled={isLoadingQuote || !!loadError}
-          >
-            Generate PDF
-          </Button>
-          <Button
-            type="button"
-            onClick={() => {
-              void onShare();
-            }}
-            isLoading={isSharing}
-            disabled={!canShare || isLoadingQuote || !!loadError}
-          >
-            Share
-          </Button>
-        </div>
-
-        {isGeneratingPdf ? (
-          <p role="status" className="mt-3 text-sm text-slate-700">
-            Generating PDF...
-          </p>
-        ) : null}
-
-        {pdfError ? (
-          <p role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {pdfError}
-          </p>
-        ) : null}
-
-        {shareError ? (
-          <p role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {shareError}
-          </p>
-        ) : null}
-
-        {shareMessage ? (
-          <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{shareMessage}</p>
-        ) : null}
-
-        {sharedUrl ? (
-          <p className="mt-2 text-sm text-slate-700">
-            Share URL:{" "}
-            <a href={sharedUrl} className="font-medium text-slate-900 underline">
-              {sharedUrl}
-            </a>
-          </p>
-        ) : null}
-
-        <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-          {pdfUrl ? (
-            <iframe
-              title="Quote PDF Preview"
-              src={pdfUrl}
-              className="h-[70vh] w-full border-0"
-            />
-          ) : (
-            <div className="flex h-80 items-center justify-center px-4 text-center text-sm text-slate-600">
-              Generate the PDF to preview it here.
+        {!isLoadingQuote && !loadError ? (
+          <>
+            <div className="mx-4 mt-4 overflow-hidden rounded-xl bg-surface-container-low" style={{ height: "55vh" }}>
+              {pdfUrl ? (
+                <iframe src={pdfUrl} className="h-full w-full border-0" title="Quote PDF preview" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3">
+                  <span className="material-symbols-outlined text-5xl text-outline">description</span>
+                  <p className="text-sm text-outline">Generate the PDF to preview it here.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="mt-4 flex flex-col gap-3 px-4">
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => {
+                  void onGeneratePdf();
+                }}
+                isLoading={isGeneratingPdf}
+                disabled={isLoadingQuote || !!loadError}
+              >
+                Generate PDF
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  void onShare();
+                }}
+                className="w-full rounded-lg border border-primary py-4 font-semibold text-primary transition-all disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]"
+                disabled={!canShare || isLoadingQuote || !!loadError || isSharing}
+              >
+                {isSharing ? "Sharing..." : "Share"}
+              </button>
+            </div>
+
+            {shareUrl ? (
+              <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-surface-container-low p-3">
+                <span className="flex-1 truncate text-sm text-on-surface-variant">{shareUrl}</span>
+                <button
+                  type="button"
+                  className="rounded-lg p-2 transition-all hover:bg-surface-container active:scale-95"
+                  onClick={() => {
+                    void copyToClipboard();
+                  }}
+                  aria-label="Copy share link"
+                >
+                  <span className="material-symbols-outlined text-primary">content_copy</span>
+                </button>
+              </div>
+            ) : null}
+
+            {isGeneratingPdf ? (
+              <p role="status" className="mx-4 mt-3 text-sm text-on-surface-variant">
+                Generating PDF...
+              </p>
+            ) : null}
+
+            {pdfError ? (
+              <p role="alert" className="mx-4 mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
+                {pdfError}
+              </p>
+            ) : null}
+
+            {shareError ? (
+              <p role="alert" className="mx-4 mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
+                {shareError}
+              </p>
+            ) : null}
+
+            {shareMessage ? (
+              <p className="mx-4 mt-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{shareMessage}</p>
+            ) : null}
+
+            {quote ? (
+              <div className="mt-4 flex flex-col gap-3 px-4 pb-6">
+                <section className="ghost-shadow rounded-lg border-l-4 border-primary bg-surface-container-lowest p-4">
+                  <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                    TOTAL AMOUNT
+                  </h2>
+                  <p className="mt-2 font-headline text-2xl font-bold text-primary">
+                    {quote.total_amount === null ? "\u2014" : currencyFormatter.format(quote.total_amount)}
+                  </p>
+                </section>
+
+                <section className="ghost-shadow rounded-lg border-l-4 border-teal-500 bg-surface-container-lowest p-4">
+                  {/* Using border-teal-500 to match Stitch's client accent; it's visually aligned with the surface-tint token. */}
+                  <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">CLIENT</h2>
+                  <p className="mt-2 font-bold text-on-surface">{clientName}</p>
+                  <p className="mt-1 text-sm text-on-surface-variant">{clientContact}</p>
+                </section>
+              </div>
+            ) : null}
+          </>
+        ) : null}
       </section>
+
+      <BottomNav active="quotes" />
     </main>
   );
 }

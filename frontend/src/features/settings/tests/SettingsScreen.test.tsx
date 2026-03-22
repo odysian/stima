@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -38,7 +39,11 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
 }
 
 function renderScreen(): void {
-  render(<SettingsScreen />);
+  render(
+    <MemoryRouter>
+      <SettingsScreen />
+    </MemoryRouter>,
+  );
 }
 
 beforeEach(() => {
@@ -63,7 +68,7 @@ afterEach(() => {
 });
 
 describe("SettingsScreen", () => {
-  it("renders pre-filled form fields from profile response and displays read-only email", async () => {
+  it("renders pre-filled form fields, trade selector, and read-only account email", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({
         email: "owner@example.com",
@@ -79,9 +84,14 @@ describe("SettingsScreen", () => {
     expect(await screen.findByDisplayValue("Bright Lawn Care")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Hill")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: new RegExp(TRADE_TYPES.join("|"), "i") })).toHaveLength(
+      TRADE_TYPES.length,
+    );
     expect(screen.getByRole("button", { name: "Plumber" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
 
   it("normalizes null profile values before binding to controlled inputs", async () => {
@@ -246,8 +256,11 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    await screen.findByRole("button", { name: /sign out/i });
-    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
+    const signOutButton = await screen.findByRole("button", { name: /sign out/i });
+    expect(signOutButton).toHaveClass("bg-secondary", "text-white");
+    expect(signOutButton).not.toHaveClass("border");
+
+    fireEvent.click(signOutButton);
 
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
   });
