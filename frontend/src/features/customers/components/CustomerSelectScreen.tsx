@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { CustomerInlineCreateForm } from "@/features/customers/components/CustomerInlineCreateForm";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { customerService } from "@/features/customers/services/customerService";
 import type {
@@ -182,59 +183,20 @@ export function CustomerSelectScreen(): React.ReactElement {
             ) : null}
           </>
         ) : (
-          <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
-            {createError ? (
-              <div className="mb-4">
-                <FeedbackMessage variant="error">{createError}</FeedbackMessage>
-              </div>
-            ) : null}
-
-            <form className="flex flex-col gap-4" onSubmit={onCreateCustomer}>
-              <Input
-                id="customer-name"
-                label="Full Name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-              <Input
-                id="customer-phone"
-                label="Phone Number"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-              />
-              <Input
-                id="customer-email"
-                label="Email Address"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-
-              <div className="flex flex-col gap-1">
-                <label htmlFor="customer-address" className="text-sm font-medium text-on-surface-variant">
-                  Address
-                </label>
-                <textarea
-                  id="customer-address"
-                  rows={4}
-                  value={address}
-                  onChange={(event) => setAddress(event.target.value)}
-                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
-                />
-              </div>
-
-              <Button type="submit" variant="primary" className="mt-2 w-full" isLoading={isCreating}>
-                Create {"&"} Continue {">"}
-              </Button>
-              <button
-                type="button"
-                className="text-sm font-semibold text-on-surface-variant transition-colors hover:text-on-surface"
-                onClick={onBackToSearch}
-              >
-                Back to search
-              </button>
-            </form>
-          </section>
+          <CustomerInlineCreateForm
+            name={name}
+            phone={phone}
+            email={email}
+            address={address}
+            onNameChange={(event) => setName(event.target.value)}
+            onPhoneChange={(event) => setPhone(event.target.value)}
+            onEmailChange={(event) => setEmail(event.target.value)}
+            onAddressChange={(event) => setAddress(event.target.value)}
+            onSubmit={onCreateCustomer}
+            onCancel={onBackToSearch}
+            isCreating={isCreating}
+            error={createError}
+          />
         )}
       </section>
 
