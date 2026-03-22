@@ -40,7 +40,7 @@ export function CustomerInfoForm({
       </h2>
 
       {saveSuccess ? (
-        <p role="status" className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+        <p role="status" className="mb-4 rounded-lg bg-success-container p-3 text-sm text-success">
           {saveSuccess}
         </p>
       ) : null}
@@ -63,7 +63,7 @@ export function CustomerInfoForm({
         />
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="customer-detail-address" className="text-sm font-medium text-slate-700">
+          <label htmlFor="customer-detail-address" className="text-sm font-medium text-on-surface">
             Address
           </label>
           <textarea

@@ -18,17 +18,19 @@ export function LineItemRow({
   const descriptionInputId = `${rowId}-description`;
   const detailsInputId = `${rowId}-details`;
   const priceInputId = `${rowId}-price`;
+  const inputClassName =
+    "rounded-md border border-outline-variant px-3 py-2 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30";
 
   return (
-    <div className="rounded-md border border-slate-200 p-4">
+    <div className="rounded-md border border-outline-variant p-4">
       {item.flagged ? (
-        <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="mb-3 rounded-md border border-warning-accent/40 bg-warning-container px-3 py-2 text-sm text-warning">
           {item.flagReason ?? "This item may need review"}
         </p>
       ) : null}
       <div className="grid gap-3 md:grid-cols-[1.3fr_1.3fr_0.8fr_auto] md:items-end">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700" htmlFor={descriptionInputId}>
+          <label className="text-sm font-medium text-on-surface" htmlFor={descriptionInputId}>
             Description
           </label>
           <input
@@ -36,13 +38,13 @@ export function LineItemRow({
             type="text"
             value={item.description}
             onChange={(event) => onChange({ ...item, description: event.target.value })}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            className={inputClassName}
           />
-          {descriptionError ? <p className="text-xs text-red-600">{descriptionError}</p> : null}
+          {descriptionError ? <p className="text-xs text-error">{descriptionError}</p> : null}
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700" htmlFor={detailsInputId}>
+          <label className="text-sm font-medium text-on-surface" htmlFor={detailsInputId}>
             Details
           </label>
           <input
@@ -55,12 +57,12 @@ export function LineItemRow({
                 details: event.target.value.trim().length > 0 ? event.target.value : null,
               })
             }
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            className={inputClassName}
           />
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-slate-700" htmlFor={priceInputId}>
+          <label className="text-sm font-medium text-on-surface" htmlFor={priceInputId}>
             Price
           </label>
           <input
@@ -80,14 +82,14 @@ export function LineItemRow({
                 price: Number.isFinite(parsedValue) ? parsedValue : null,
               });
             }}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            className={inputClassName}
           />
         </div>
 
         <button
           type="button"
           onClick={onDelete}
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          className="rounded-md border border-outline-variant px-3 py-2 text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
         >
           Delete
         </button>

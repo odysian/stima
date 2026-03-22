@@ -6,6 +6,14 @@
   --color-on-primary: #ffffff;
   --color-secondary: #904a45;
   --color-on-secondary: #ffffff;
+  --color-success: #166534;
+  --color-success-container: #dcfce7;
+  --color-warning: #92400e;
+  --color-warning-accent: #f59e0b;
+  --color-warning-container: #fef3c7;
+  --color-info: #075985;
+  --color-info-container: #e0f2fe;
+  --color-neutral-container: #f1f5f9;
   --color-error: #ba1a1a;
   --color-on-error: #ffffff;
   --color-error-container: #ffdad6;

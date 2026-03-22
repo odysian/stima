@@ -69,7 +69,7 @@ export function QuotePreviewActions({
       ) : null}
 
       {shareMessage ? (
-        <p className="mx-4 mt-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{shareMessage}</p>
+        <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">{shareMessage}</p>
       ) : null}
     </>
   );

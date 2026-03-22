@@ -88,7 +88,7 @@ export function CustomerCreateScreen(): React.ReactElement {
             />
 
             <div className="flex flex-col gap-1">
-              <label htmlFor="customer-address" className="text-sm font-medium text-slate-700">
+              <label htmlFor="customer-address" className="text-sm font-medium text-on-surface">
                 Address
               </label>
               <textarea

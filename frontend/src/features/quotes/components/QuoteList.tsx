@@ -90,7 +90,7 @@ export function QuoteList(): React.ReactElement {
               {activeQuoteCount}
             </p>
           </div>
-          <div className="rounded-lg border-l-4 border-amber-500 bg-surface-container-lowest p-4 ghost-shadow">
+          <div className="rounded-lg border-l-4 border-warning-accent bg-surface-container-lowest p-4 ghost-shadow">
             <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
               PENDING REVIEW
             </p>

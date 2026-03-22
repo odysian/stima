@@ -17,7 +17,7 @@ export function LineItemCard({
     <button
       type="button"
       className={`w-full bg-surface-container-lowest rounded-lg p-4 ghost-shadow text-left flex items-start justify-between gap-3 active:scale-[0.99] transition-all ${
-        flagged ? "border border-amber-500/20" : ""
+        flagged ? "border border-warning-accent/20" : ""
       }`}
       onClick={onClick}
     >
@@ -25,7 +25,7 @@ export function LineItemCard({
         <div className="flex items-center gap-2">
           <p className="font-bold text-on-surface">{description}</p>
           {flagged ? (
-            <span className="rounded bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-amber-700">
+            <span className="rounded bg-warning-container px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-warning">
               REVIEW
             </span>
           ) : null}
