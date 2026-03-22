@@ -29,7 +29,7 @@ function readOptionalQuoteText(
     return null;
   }
 
-  const value = (quote as Record<string, unknown>)[key];
+  const value = (quote as unknown as Record<string, unknown>)[key];
   if (typeof value !== "string") {
     return null;
   }
