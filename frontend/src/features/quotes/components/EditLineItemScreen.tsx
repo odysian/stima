@@ -90,6 +90,7 @@ export function EditLineItemScreen(): React.ReactElement | null {
         <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
           <button
             type="button"
+            aria-label="Back to review"
             className="rounded-full p-2 transition-transform duration-150 hover:bg-slate-50 active:scale-95"
             onClick={() => navigate("/quotes/review")}
           >

@@ -125,6 +125,7 @@ export function CustomerSelectScreen(): React.ReactElement {
       <header className="fixed top-0 z-50 flex h-16 w-full items-center bg-white/80 px-4 shadow-[0_0_24px_rgba(13,28,46,0.04)] backdrop-blur-md">
         <button
           type="button"
+          aria-label="Go back"
           className="mr-4 rounded-full p-2 text-emerald-900 transition-all hover:bg-slate-50 active:scale-95"
           onClick={() => navigate(-1)}
         >

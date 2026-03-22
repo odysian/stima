@@ -108,6 +108,15 @@ describe("CustomerSelectScreen", () => {
     expect(screen.getByText("Bob Brown")).toBeInTheDocument();
   });
 
+  it("navigates to capture when selecting an existing customer", async () => {
+    renderScreen();
+
+    const customerButton = await screen.findByRole("button", { name: /alice johnson/i });
+    fireEvent.click(customerButton);
+
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-1");
+  });
+
   it("shows create mode with New Customer heading when CTA is clicked", async () => {
     renderScreen();
     await screen.findByText("Alice Johnson");

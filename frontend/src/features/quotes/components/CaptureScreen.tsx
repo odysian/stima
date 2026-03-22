@@ -91,6 +91,7 @@ export function CaptureScreen(): React.ReactElement {
         <div className="mx-auto flex h-16 w-full max-w-2xl items-center px-4">
           <button
             type="button"
+            aria-label="Go back"
             className="mr-4 rounded-full p-2 text-emerald-900 transition-colors active:scale-95"
             onClick={() => navigate(-1)}
           >
