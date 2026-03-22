@@ -196,6 +196,21 @@ describe("quoteService integration (MSW)", () => {
     expect(quotes[0]).not.toHaveProperty("line_items");
   });
 
+  it("listQuotes sends customer_id query param when provided", async () => {
+    let capturedCustomerId: string | null = null;
+
+    server.use(
+      http.get("/api/quotes", ({ request }) => {
+        capturedCustomerId = new URL(request.url).searchParams.get("customer_id");
+        return HttpResponse.json([], { status: 200 });
+      }),
+    );
+
+    await quoteService.listQuotes({ customer_id: "cust-1" });
+
+    expect(capturedCustomerId).toBe("cust-1");
+  });
+
   it("captureAudio sends multipart clips and returns ExtractionResult", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;

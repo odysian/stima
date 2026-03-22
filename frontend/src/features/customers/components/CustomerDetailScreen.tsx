@@ -48,7 +48,7 @@ export function CustomerDetailScreen(): React.ReactElement {
       try {
         const [nextCustomer, nextQuotes] = await Promise.all([
           customerService.getCustomer(customerId),
-          quoteService.listQuotes(),
+          quoteService.listQuotes({ customer_id: customerId }),
         ]);
 
         if (!isActive) {
@@ -61,10 +61,7 @@ export function CustomerDetailScreen(): React.ReactElement {
         setEmail(nextCustomer.email ?? "");
         setAddress(nextCustomer.address ?? "");
 
-        const filteredQuotes = nextQuotes
-          .filter((quote) => quote.customer_id === customerId)
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        setCustomerQuotes(filteredQuotes);
+        setCustomerQuotes(nextQuotes);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load customer";
         if (isActive) {

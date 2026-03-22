@@ -103,7 +103,11 @@ class QuoteRepository:
         )
         return customer is not None
 
-    async def list_by_user(self, user_id: UUID) -> list[QuoteListItemSummary]:
+    async def list_by_user(
+        self,
+        user_id: UUID,
+        customer_id: UUID | None = None,
+    ) -> list[QuoteListItemSummary]:
         """Return quote summaries for a user ordered newest-first."""
         line_item_count = (
             select(func.count(LineItem.id))
@@ -111,7 +115,7 @@ class QuoteRepository:
             .correlate(Document)
             .scalar_subquery()
         )
-        result = await self._session.execute(
+        statement = (
             select(
                 Document.id,
                 Document.customer_id,
@@ -126,6 +130,10 @@ class QuoteRepository:
             .where(Document.user_id == user_id)
             .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
         )
+        if customer_id is not None:
+            statement = statement.where(Document.customer_id == customer_id)
+
+        result = await self._session.execute(statement)
         return [
             QuoteListItemSummary(
                 id=row.id,

@@ -39,7 +39,11 @@ class QuoteRepositoryProtocol(Protocol):
 
     async def customer_exists_for_user(self, *, user_id: UUID, customer_id: UUID) -> bool: ...
 
-    async def list_by_user(self, user_id: UUID) -> list[QuoteListItemSummary]: ...
+    async def list_by_user(
+        self,
+        user_id: UUID,
+        customer_id: UUID | None = None,
+    ) -> list[QuoteListItemSummary]: ...
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
 
@@ -135,9 +139,16 @@ class QuoteService:
 
         raise QuoteServiceError(detail="Unable to create quote", status_code=409)
 
-    async def list_quotes(self, user: User) -> list[QuoteListItemSummary]:
+    async def list_quotes(
+        self,
+        user: User,
+        customer_id: UUID | None = None,
+    ) -> list[QuoteListItemSummary]:
         """List quotes for the authenticated user."""
-        return await self._repository.list_by_user(_resolve_user_id(user))
+        return await self._repository.list_by_user(
+            _resolve_user_id(user),
+            customer_id=customer_id,
+        )
 
     async def get_quote(self, user: User, quote_id: UUID) -> Document:
         """Return one user-owned quote or raise not found."""

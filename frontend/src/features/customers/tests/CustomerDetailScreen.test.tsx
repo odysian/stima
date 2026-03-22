@@ -72,16 +72,6 @@ beforeEach(() => {
       item_count: 1,
       created_at: "2026-03-20T00:00:00.000Z",
     },
-    {
-      id: "quote-2",
-      customer_id: "cust-2",
-      customer_name: "Bob Brown",
-      doc_number: "Q-002",
-      status: "ready",
-      total_amount: 240,
-      item_count: 2,
-      created_at: "2026-03-21T00:00:00.000Z",
-    },
   ]);
   mockedCustomerService.updateCustomer.mockResolvedValue({
     id: "cust-1",
@@ -103,6 +93,7 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "Alice Johnson" })).toBeInTheDocument();
+    expect(mockedQuoteService.listQuotes).toHaveBeenCalledWith({ customer_id: "cust-1" });
     expect(screen.getByLabelText(/^name$/i)).toHaveValue("Alice Johnson");
     expect(screen.getByLabelText(/^phone$/i)).toHaveValue("555-0101");
     expect(screen.getByLabelText(/^email$/i)).toHaveValue("alice@example.com");
@@ -189,18 +180,7 @@ describe("CustomerDetailScreen", () => {
   });
 
   it("renders quote history empty state when customer has no quotes", async () => {
-    mockedQuoteService.listQuotes.mockResolvedValueOnce([
-      {
-        id: "quote-2",
-        customer_id: "cust-2",
-        customer_name: "Bob Brown",
-        doc_number: "Q-002",
-        status: "ready",
-        total_amount: 240,
-        item_count: 2,
-        created_at: "2026-03-21T00:00:00.000Z",
-      },
-    ]);
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([]);
 
     renderScreen();
 
