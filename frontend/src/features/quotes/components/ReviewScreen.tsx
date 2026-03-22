@@ -7,21 +7,16 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
 import { Button } from "@/shared/components/Button";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { ScreenFooter } from "@/shared/components/ScreenFooter";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { formatCurrency } from "@/shared/lib/formatters";
 
 const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   description: "",
   details: null,
   price: null,
 };
-
-function formatCurrency(value: number): string {
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 function normalizeLineItem(item: LineItemDraftWithFlags): LineItemDraftWithFlags {
   const normalizedDetails = item.details?.trim() ?? "";
@@ -132,19 +127,10 @@ export function ReviewScreen(): React.ReactElement | null {
 
   return (
     <main className="min-h-screen bg-background pb-28">
-      <header className="fixed top-0 z-50 flex h-16 w-full items-center bg-white px-4 shadow-[0_0_24px_rgba(0,0,0,0.04)]">
-        <div className="mx-auto flex w-full max-w-2xl items-center gap-4">
-          <button
-            type="button"
-            aria-label="Back to capture"
-            className="rounded-full p-2 text-emerald-900 transition-colors hover:bg-slate-100 active:scale-95"
-            onClick={() => navigate(`/quotes/capture/${currentDraft.customerId}`)}
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <h1 className="font-headline text-lg font-bold text-emerald-900">Review &amp; Edit</h1>
-        </div>
-      </header>
+      <ScreenHeader
+        title="Review & Edit"
+        onBack={() => navigate(`/quotes/capture/${currentDraft.customerId}`)}
+      />
 
       <form
         id="quote-review-form"
@@ -152,9 +138,7 @@ export function ReviewScreen(): React.ReactElement | null {
         onSubmit={onSubmit}
       >
         {saveError ? (
-          <p role="alert" className="rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
-            {saveError}
-          </p>
+          <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
         ) : null}
 
         {shouldRenderAiBanner ? <AIConfidenceBanner message={confidenceMessage} /> : null}
@@ -257,7 +241,7 @@ export function ReviewScreen(): React.ReactElement | null {
         </section>
       </form>
 
-      <footer className="fixed bottom-0 z-40 w-full border-t border-slate-100 bg-white/80 p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] backdrop-blur-md">
+      <ScreenFooter>
         <div className="mx-auto w-full max-w-2xl">
           <Button
             type="submit"
@@ -270,7 +254,7 @@ export function ReviewScreen(): React.ReactElement | null {
             Generate Quote {">"}
           </Button>
         </div>
-      </footer>
+      </ScreenFooter>
     </main>
   );
 }

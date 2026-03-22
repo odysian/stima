@@ -94,7 +94,7 @@ describe("ReviewScreen", () => {
   it("navigates back to customer capture route from header action", () => {
     renderScreen(makeDraft({ customerId: "cust-42" }));
 
-    fireEvent.click(screen.getByRole("button", { name: /back to capture/i }));
+    fireEvent.click(screen.getByRole("button", { name: /back/i }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-42");
   });

@@ -7,6 +7,7 @@ verify: backend-verify frontend-verify ## Run all backend and frontend verificat
 
 backend-verify: ## Run backend lint, type checks, security scan, and tests
 	@bash scripts/check_backend_boundaries.sh
+	@bash scripts/check_file_sizes.sh
 	@test -x backend/.venv/bin/ruff || (echo "Missing backend/.venv. Run: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" && exit 1)
 	@cd backend && \
 		.venv/bin/ruff check . --cache-dir .ruff_cache && \
@@ -16,6 +17,7 @@ backend-verify: ## Run backend lint, type checks, security scan, and tests
 		.venv/bin/pytest -v -m "not live" -o cache_dir=.pytest_cache
 
 frontend-verify: ## Run frontend type checks, lint, tests, and build
+	@bash scripts/check_file_sizes.sh
 	@test -x frontend/node_modules/.bin/tsc || (echo "Missing frontend dependencies. Run: cd frontend && npm install" && exit 1)
 	@cd frontend && \
 		./node_modules/.bin/tsc --noEmit && \

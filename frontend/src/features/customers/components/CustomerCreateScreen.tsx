@@ -4,7 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { customerService } from "@/features/customers/services/customerService";
 import type { CustomerCreateRequest } from "@/features/customers/types/customer.types";
 import { Button } from "@/shared/components/Button";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
 export function CustomerCreateScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -50,23 +52,13 @@ export function CustomerCreateScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-8">
-      <header className="fixed top-0 z-50 flex w-full items-center gap-2 border-b border-outline-variant/40 bg-white/80 px-4 py-3 backdrop-blur-md">
-        <button
-          type="button"
-          aria-label="Back to customers"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-on-surface transition hover:bg-surface-container"
-          onClick={() => navigate("/customers")}
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
-        <h1 className="font-headline text-lg font-bold tracking-tight text-primary">New Customer</h1>
-      </header>
+      <ScreenHeader title="New Customer" onBack={() => navigate("/customers")} />
 
       <section className="mx-auto w-full max-w-3xl px-4 pt-20">
         <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
           {createError ? (
-            <div role="alert" className="mb-4 rounded-lg border-l-4 border-error bg-error-container p-4">
-              <p className="text-sm font-medium text-error">{createError}</p>
+            <div className="mb-4">
+              <FeedbackMessage variant="error">{createError}</FeedbackMessage>
             </div>
           ) : null}
 

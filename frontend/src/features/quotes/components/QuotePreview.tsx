@@ -5,12 +5,10 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { BottomNav } from "@/shared/components/BottomNav";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
+import { formatCurrency } from "@/shared/lib/formatters";
 
 function isShareAbortError(error: unknown): boolean {
   return (
@@ -225,20 +223,11 @@ export function QuotePreview(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
-      <header className="fixed top-0 z-50 flex h-16 w-full items-center gap-3 bg-white/80 px-4 shadow-[0_0_24px_rgba(13,28,46,0.04)] backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="rounded-full p-2 text-emerald-900 transition-all hover:bg-slate-50 active:scale-95"
-          aria-label="Back"
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
-        <h1 className="font-headline text-lg font-bold tracking-tight text-on-surface">
-          {quote?.doc_number ?? "Quote Preview"}
-        </h1>
-        {quote ? <StatusBadge variant={quote.status} /> : null}
-      </header>
+      <ScreenHeader
+        title={quote?.doc_number ?? "Quote Preview"}
+        onBack={() => navigate(-1)}
+        trailing={quote ? <StatusBadge variant={quote.status} /> : null}
+      />
 
       <section className="mx-auto w-full max-w-6xl">
         {isLoadingQuote ? (
@@ -248,9 +237,9 @@ export function QuotePreview(): React.ReactElement {
         ) : null}
 
         {loadError ? (
-          <p role="alert" className="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            {loadError}
-          </p>
+          <div className="mx-4 mt-4">
+            <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
+          </div>
         ) : null}
 
         {!isLoadingQuote && !loadError ? (
@@ -313,15 +302,15 @@ export function QuotePreview(): React.ReactElement {
             ) : null}
 
             {pdfError ? (
-              <p role="alert" className="mx-4 mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
-                {pdfError}
-              </p>
+              <div className="mx-4 mt-3">
+                <FeedbackMessage variant="error">{pdfError}</FeedbackMessage>
+              </div>
             ) : null}
 
             {shareError ? (
-              <p role="alert" className="mx-4 mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
-                {shareError}
-              </p>
+              <div className="mx-4 mt-3">
+                <FeedbackMessage variant="error">{shareError}</FeedbackMessage>
+              </div>
             ) : null}
 
             {shareMessage ? (
@@ -335,7 +324,7 @@ export function QuotePreview(): React.ReactElement {
                     TOTAL AMOUNT
                   </h2>
                   <p className="mt-2 font-headline text-2xl font-bold text-primary">
-                    {quote.total_amount === null ? "\u2014" : currencyFormatter.format(quote.total_amount)}
+                    {formatCurrency(quote.total_amount)}
                   </p>
                 </section>
 

@@ -10,35 +10,11 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-
-function formatTotalAmount(totalAmount: number | null): string {
-  if (totalAmount === null) {
-    return "\u2014";
-  }
-
-  return totalAmount.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatCreatedDate(value: string): string {
-  const parsedDate = new Date(value);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return "Unknown date";
-  }
-
-  return parsedDate.toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 export function CustomerDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -156,19 +132,7 @@ export function CustomerDetailScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-24">
-      <header className="fixed top-0 z-50 flex w-full items-center gap-2 border-b border-outline-variant/40 bg-white/80 px-4 py-3 backdrop-blur-md">
-        <button
-          type="button"
-          aria-label="Back to customers"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-on-surface transition hover:bg-surface-container"
-          onClick={() => navigate("/customers")}
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
-        <h1 className="font-headline text-lg font-bold tracking-tight text-on-surface">
-          {customer?.name ?? "Customer"}
-        </h1>
-      </header>
+      <ScreenHeader title={customer?.name ?? "Customer"} onBack={() => navigate("/customers")} />
 
       <section className="mx-auto w-full max-w-3xl space-y-4 px-4 pt-20">
         {isLoading ? (
@@ -178,9 +142,7 @@ export function CustomerDetailScreen(): React.ReactElement {
         ) : null}
 
         {loadError ? (
-          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            {loadError}
-          </p>
+          <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
         ) : null}
 
         {!isLoading && !loadError && customer ? (
@@ -206,9 +168,9 @@ export function CustomerDetailScreen(): React.ReactElement {
               ) : null}
 
               {saveError ? (
-                <p role="alert" className="mb-4 rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
-                  {saveError}
-                </p>
+                <div className="mb-4">
+                  <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
+                </div>
               ) : null}
 
               <form className="flex flex-col gap-4" onSubmit={onSaveChanges}>
@@ -274,13 +236,13 @@ export function CustomerDetailScreen(): React.ReactElement {
                           <div>
                             <p className="font-headline font-bold text-on-surface">{quote.doc_number}</p>
                             <p className="mt-1 text-sm text-on-surface-variant">
-                              {formatCreatedDate(quote.created_at)}
+                              {formatDate(quote.created_at)}
                             </p>
                           </div>
                           <StatusBadge variant={quote.status} />
                         </div>
                         <p className="mt-3 text-right font-bold text-on-surface">
-                          {formatTotalAmount(quote.total_amount)}
+                          {formatCurrency(quote.total_amount)}
                         </p>
                       </button>
                     </li>

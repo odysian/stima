@@ -8,7 +8,9 @@ import {
   type TradeType,
 } from "@/features/profile/types/profile.types";
 import { Button } from "@/shared/components/Button";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { TradeTypeSelector } from "@/shared/components/TradeTypeSelector";
 
 export function SettingsScreen(): React.ReactElement {
@@ -90,17 +92,7 @@ export function SettingsScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
-      <header className="fixed top-0 z-50 flex h-16 w-full items-center bg-white/80 px-4 shadow-[0_0_24px_rgba(13,28,46,0.04)] backdrop-blur-md">
-        <button
-          type="button"
-          className="mr-4 rounded-full p-2 text-emerald-900 transition-all hover:bg-slate-50 active:scale-95"
-          onClick={() => navigate(-1)}
-          aria-label="Back"
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
-        <h1 className="font-headline text-lg font-bold text-on-surface">Settings</h1>
-      </header>
+      <ScreenHeader title="Settings" onBack={() => navigate(-1)} />
 
       <section className="mx-auto w-full max-w-2xl space-y-4 px-4 pt-4">
         {isLoadingProfile ? (
@@ -110,9 +102,7 @@ export function SettingsScreen(): React.ReactElement {
         ) : null}
 
         {!isLoadingProfile && loadError ? (
-          <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {loadError}
-          </p>
+          <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
         ) : null}
 
         {!isLoadingProfile && !loadError ? (
@@ -124,9 +114,7 @@ export function SettingsScreen(): React.ReactElement {
             ) : null}
 
             {saveError ? (
-              <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-                {saveError}
-              </p>
+              <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
             ) : null}
 
             <section className="ghost-shadow rounded-xl bg-surface-container-lowest p-6">

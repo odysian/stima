@@ -5,7 +5,10 @@ import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
 import { Button } from "@/shared/components/Button";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenFooter } from "@/shared/components/ScreenFooter";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
 function parsePrice(rawPrice: string): number | null {
   const trimmedPrice = rawPrice.trim();
@@ -86,22 +89,11 @@ export function EditLineItemScreen(): React.ReactElement | null {
 
   return (
     <main className="min-h-screen bg-surface-container-low pb-28">
-      <header className="fixed top-0 z-50 flex h-16 w-full items-center bg-white px-4">
-        <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
-          <button
-            type="button"
-            aria-label="Back to review"
-            className="rounded-full p-2 transition-transform duration-150 hover:bg-slate-50 active:scale-95"
-            onClick={() => navigate("/quotes/review")}
-          >
-            <span className="material-symbols-outlined text-emerald-900">arrow_back</span>
-          </button>
-          <div className="flex flex-col">
-            <span className="text-xs font-bold uppercase tracking-wider text-outline">REVIEW &amp; EDIT</span>
-            <h1 className="font-headline text-lg font-bold tracking-tight text-emerald-900">Edit Line Item</h1>
-          </div>
-        </div>
-      </header>
+      <ScreenHeader
+        title="Edit Line Item"
+        subtitle="REVIEW & EDIT"
+        onBack={() => navigate("/quotes/review")}
+      />
 
       <section className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-6 pt-20">
         {currentItem.flagged ? (
@@ -109,9 +101,7 @@ export function EditLineItemScreen(): React.ReactElement | null {
         ) : null}
 
         {saveError ? (
-          <p role="alert" className="rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
-            {saveError}
-          </p>
+          <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
         ) : null}
 
         <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
@@ -153,7 +143,7 @@ export function EditLineItemScreen(): React.ReactElement | null {
         </section>
       </section>
 
-      <footer className="fixed bottom-0 z-50 w-full bg-white/80 px-4 pb-6 pt-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+      <ScreenFooter>
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
           <Button variant="primary" className="w-full" onClick={onSaveChanges}>
             Save Changes
@@ -162,7 +152,7 @@ export function EditLineItemScreen(): React.ReactElement | null {
             Delete Line Item
           </Button>
         </div>
-      </footer>
+      </ScreenFooter>
     </main>
   );
 }

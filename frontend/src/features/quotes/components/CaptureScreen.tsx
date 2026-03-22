@@ -6,6 +6,9 @@ import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { ScreenFooter } from "@/shared/components/ScreenFooter";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
 function formatElapsed(seconds: number): string {
   const mins = Math.floor(seconds / 60)
@@ -87,30 +90,17 @@ export function CaptureScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-36">
-      <header className="fixed top-0 z-50 w-full bg-white/80 shadow-[0_0_24px_rgba(13,28,46,0.04)] backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-2xl items-center px-4">
-          <button
-            type="button"
-            aria-label="Go back"
-            className="mr-4 rounded-full p-2 text-emerald-900 transition-colors active:scale-95"
-            onClick={() => navigate(-1)}
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <div className="flex flex-col">
-            <h1 className="font-headline text-lg font-bold tracking-tight text-emerald-900">
-              Capture Job Notes
-            </h1>
-            <p className="text-xs text-slate-500">Describe the job and we&apos;ll extract the line items</p>
-          </div>
-        </div>
-      </header>
+      <ScreenHeader
+        title="Capture Job Notes"
+        subtitle="Describe the job and we'll extract the line items"
+        onBack={() => navigate(-1)}
+      />
 
       <section className="mx-auto w-full max-w-2xl px-4 pb-24 pt-20">
         {displayedError ? (
-          <p role="alert" className="mb-4 rounded-lg border-l-4 border-error bg-error-container p-4 text-sm text-error">
-            {displayedError}
-          </p>
+          <div className="mb-4">
+            <FeedbackMessage variant="error">{displayedError}</FeedbackMessage>
+          </div>
         ) : null}
 
         {!isSupported ? (
@@ -208,7 +198,7 @@ export function CaptureScreen(): React.ReactElement {
         )}
       </section>
 
-      <footer className="fixed bottom-0 z-40 w-full bg-white/90 p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] backdrop-blur-md">
+      <ScreenFooter>
         <div className="mx-auto w-full max-w-2xl">
           <Button
             variant="primary"
@@ -220,7 +210,7 @@ export function CaptureScreen(): React.ReactElement {
             Extract Line Items ✦
           </Button>
         </div>
-      </footer>
+      </ScreenFooter>
     </main>
   );
 }
