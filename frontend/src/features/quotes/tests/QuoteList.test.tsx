@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -39,6 +39,7 @@ function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListIte
     doc_number: "Q-001",
     status: "draft",
     total_amount: 120,
+    item_count: 1,
     created_at: "2026-03-20T00:00:00.000Z",
     ...overrides,
   };
@@ -57,7 +58,7 @@ afterEach(() => {
 });
 
 describe("QuoteList", () => {
-  it("renders quote rows from listQuotes response", async () => {
+  it("renders quote cards from listQuotes response", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([
       makeQuoteListItem(),
       makeQuoteListItem({
@@ -66,14 +67,17 @@ describe("QuoteList", () => {
         customer_name: "Bob Brown",
         doc_number: "Q-002",
         status: "ready",
+        item_count: 3,
       }),
     ]);
 
     renderScreen();
 
+    expect(await screen.findByText("Stima Quotes")).toBeInTheDocument();
     expect(await screen.findByText("Alice Johnson")).toBeInTheDocument();
-    expect(screen.getByText("Q-002")).toBeInTheDocument();
-    expect(screen.getByText("ready")).toBeInTheDocument();
+    expect(screen.getByText(/Q-002/)).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("3 items")).toBeInTheDocument();
   });
 
   it("renders empty state when no quotes are returned", async () => {
@@ -81,8 +85,9 @@ describe("QuoteList", () => {
 
     renderScreen();
 
-    expect(await screen.findByText("No quotes yet")).toBeInTheDocument();
-    expect(screen.getByText("Create your first one to get started.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No quotes yet. Tap + to create your first."),
+    ).toBeInTheDocument();
   });
 
   it("filters rows by customer name", async () => {
@@ -129,6 +134,19 @@ describe("QuoteList", () => {
     expect(screen.getByText("Bob Brown")).toBeInTheDocument();
   });
 
+  it("shows search empty state when filter has no matches", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    fireEvent.change(screen.getByLabelText("Search quotes"), {
+      target: { value: "does-not-exist" },
+    });
+
+    expect(screen.getByText("No quotes match your search.")).toBeInTheDocument();
+  });
+
   it("navigates to quote preview when a row is clicked", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
@@ -136,6 +154,50 @@ describe("QuoteList", () => {
     fireEvent.click(await screen.findByRole("button", { name: /alice johnson/i }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
+  });
+
+  it("renders stats bar counts for active and pending quotes", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([
+      makeQuoteListItem({ status: "ready" }),
+      makeQuoteListItem({
+        id: "quote-2",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "Q-002",
+        status: "draft",
+      }),
+    ]);
+
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    const activeTile = screen.getByText("ACTIVE QUOTES").closest("div");
+    const pendingTile = screen.getByText("PENDING REVIEW").closest("div");
+
+    expect(activeTile).not.toBeNull();
+    expect(pendingTile).not.toBeNull();
+    expect(within(activeTile as HTMLDivElement).getByText("1")).toBeInTheDocument();
+    expect(within(pendingTile as HTMLDivElement).getByText("1")).toBeInTheDocument();
+  });
+
+  it("renders BottomNav with quotes tab active", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
+  });
+
+  it("navigates to new quote when FAB is clicked", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    fireEvent.click(screen.getByRole("button", { name: "Create quote" }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/new");
   });
 
   it("shows loading state while list request is in flight", async () => {
@@ -165,7 +227,7 @@ describe("QuoteList", () => {
 
     renderScreen();
 
-    expect(await screen.findByText("Mar 21, 2026")).toBeInTheDocument();
+    expect(await screen.findByText(/Q-001\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
   });
 
   it("shows error state when list request fails", async () => {

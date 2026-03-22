@@ -50,7 +50,7 @@ describe("App routes", () => {
 
     renderApp("/login");
 
-    expect(await screen.findByRole("heading", { name: /your quotes/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /stima quotes/i })).toBeInTheDocument();
   });
 
   it("redirects authenticated users who are not onboarded to onboarding", async () => {
@@ -76,7 +76,7 @@ describe("App routes", () => {
 
     renderApp("/onboarding");
 
-    expect(await screen.findByRole("heading", { name: /your quotes/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /stima quotes/i })).toBeInTheDocument();
   });
 
   it("renders settings screen for onboarded users at /settings", async () => {
