@@ -93,6 +93,7 @@ export function CaptureScreen(): React.ReactElement {
       <ScreenHeader
         title="Capture Job Notes"
         subtitle="Describe the job and we'll extract the line items"
+        backLabel="Go back"
         onBack={() => navigate(-1)}
       />
 

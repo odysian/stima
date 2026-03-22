@@ -132,7 +132,11 @@ export function CustomerDetailScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-24">
-      <ScreenHeader title={customer?.name ?? "Customer"} onBack={() => navigate("/customers")} />
+      <ScreenHeader
+        title={customer?.name ?? "Customer"}
+        backLabel="Back to customers"
+        onBack={() => navigate("/customers")}
+      />
 
       <section className="mx-auto w-full max-w-3xl space-y-4 px-4 pt-20">
         {isLoading ? (

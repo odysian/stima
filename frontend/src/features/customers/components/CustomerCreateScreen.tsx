@@ -52,7 +52,11 @@ export function CustomerCreateScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-8">
-      <ScreenHeader title="New Customer" onBack={() => navigate("/customers")} />
+      <ScreenHeader
+        title="New Customer"
+        backLabel="Back to customers"
+        onBack={() => navigate("/customers")}
+      />
 
       <section className="mx-auto w-full max-w-3xl px-4 pt-20">
         <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">

@@ -2,16 +2,20 @@ import type { ReactNode } from "react";
 
 interface ScreenHeaderProps {
   title: string;
+  eyebrow?: string;
   subtitle?: string;
   onBack: () => void;
   trailing?: ReactNode;
+  backLabel?: string;
 }
 
 export function ScreenHeader({
   title,
+  eyebrow,
   subtitle,
   onBack,
   trailing,
+  backLabel = "Back",
 }: ScreenHeaderProps): React.ReactElement {
   return (
     <header className="fixed top-0 z-50 h-16 w-full bg-white/80 backdrop-blur-md shadow-[0_0_24px_rgba(13,28,46,0.04)]">
@@ -19,12 +23,15 @@ export function ScreenHeader({
         <button
           type="button"
           onClick={onBack}
-          aria-label="Back"
+          aria-label={backLabel}
           className="rounded-full p-2 text-emerald-900 transition-all hover:bg-slate-50 active:scale-95"
         >
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
         <div className="min-w-0 flex-1">
+          {eyebrow ? (
+            <p className="truncate text-[0.6875rem] font-bold uppercase tracking-wider text-outline">{eyebrow}</p>
+          ) : null}
           <h1 className="truncate font-headline text-lg font-bold tracking-tight text-on-surface">{title}</h1>
           {subtitle ? <p className="truncate text-xs text-on-surface-variant">{subtitle}</p> : null}
         </div>

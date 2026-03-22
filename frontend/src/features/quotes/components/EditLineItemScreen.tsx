@@ -91,7 +91,8 @@ export function EditLineItemScreen(): React.ReactElement | null {
     <main className="min-h-screen bg-surface-container-low pb-28">
       <ScreenHeader
         title="Edit Line Item"
-        subtitle="REVIEW & EDIT"
+        eyebrow="REVIEW & EDIT"
+        backLabel="Back to review"
         onBack={() => navigate("/quotes/review")}
       />
 

@@ -129,6 +129,7 @@ export function ReviewScreen(): React.ReactElement | null {
     <main className="min-h-screen bg-background pb-28">
       <ScreenHeader
         title="Review & Edit"
+        backLabel="Back to capture"
         onBack={() => navigate(`/quotes/capture/${currentDraft.customerId}`)}
       />
 

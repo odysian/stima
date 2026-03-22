@@ -127,6 +127,7 @@ export function CustomerSelectScreen(): React.ReactElement {
       <ScreenHeader
         title={mode === "search" ? "New Quote" : "New Customer"}
         subtitle={mode === "search" ? "Select a customer to continue" : undefined}
+        backLabel="Go back"
         onBack={() => navigate(-1)}
       />
 

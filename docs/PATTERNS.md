@@ -73,7 +73,10 @@ Record conventions that already exist in code.
   - Import `formatCurrency` / `formatDate` instead of local formatters.
 
 ## File-Size Budgets
-- Enforced by `scripts/check_file_sizes.sh` (runs in both `make backend-verify` and `make frontend-verify`).
+- Enforced by `scripts/check_file_sizes.sh` with scope-aware invocation:
+  - `make frontend-verify` runs `--scope frontend`
+  - `make backend-verify` runs `--scope backend`
+  - `make verify` runs `--scope all` once, then executes backend/frontend verification without duplicate size checks
 - Frontend component files:
   - Warn (non-blocking): `>250` LOC
   - Fail (blocking): `>450` LOC
