@@ -237,6 +237,34 @@ Red, for form validation errors only (not destructive actions):
 <span class="bg-sky-100 text-sky-800 text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg">Shared</span>
 ```
 
+### Confirmation Sheet (Modal)
+Bottom-anchored overlay for destructive or irreversible actions (leave screen, delete item, etc.).
+Scrim covers the full viewport. Sheet slides up from the bottom.
+
+```html
+<!-- Scrim + sheet wrapper -->
+<div class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4">
+  <div class="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
+    <p class="mb-1 font-headline text-base font-semibold text-on-surface">Are you sure?</p>
+    <p class="mb-5 text-sm text-on-surface-variant">Supporting detail about what happens.</p>
+    <div class="flex flex-col gap-2">
+      <!-- Confirm: primary for neutral actions, destructive (secondary) for deletes -->
+      <button class="w-full forest-gradient text-white font-label font-semibold py-4 rounded-lg active:scale-[0.98] transition-all">Confirm</button>
+      <button class="w-full border border-outline-variant text-on-surface font-label font-semibold py-4 rounded-lg hover:bg-surface-container-low active:scale-[0.98] transition-all">Cancel</button>
+    </div>
+  </div>
+</div>
+```
+
+Rules:
+- **Always bottom-anchored** (`items-end`), never centered — keeps the action zone near the thumb.
+- `max-w-sm` caps width on tablet/desktop.
+- Confirm button uses `variant="primary"` (forest gradient) for neutral confirmations (leave, discard).
+- Confirm button uses `variant="destructive"` (terracotta) when the action is irreversible data loss (delete).
+- Cancel is always `variant="ghost"` — outline border, no fill.
+- Two buttons max. Never add a third option.
+- Implemented as shared `ConfirmModal` component in `src/shared/components/ConfirmModal.tsx`.
+
 ### Section Dividers
 Never use `<hr>` or borders. Use `border-b border-outline-variant/20` on section headers only,
 or transition surface colors (white card on #eff4ff background).
