@@ -9,6 +9,7 @@ import {
 } from "@/features/profile/types/profile.types";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
+import { TradeTypeSelector } from "@/shared/components/TradeTypeSelector";
 
 export function OnboardingForm(): React.ReactElement {
   const { refreshUser } = useAuth();
@@ -44,55 +45,57 @@ export function OnboardingForm(): React.ReactElement {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <section className="w-full max-w-md rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="mb-6 text-2xl font-semibold text-slate-900">Complete your business profile</h1>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
+      <h1 className="mb-8 font-headline text-3xl font-bold text-primary">Stima</h1>
+      <section className="w-full max-w-sm rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
+        <h2 className="font-headline text-2xl font-bold text-on-surface">Set up your business</h2>
+        <p className="mb-6 mt-2 text-sm text-on-surface-variant">
+          Tell us a bit about your work so we can tailor your quotes.
+        </p>
         {error ? (
-          <p role="alert" className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {error}
-          </p>
+          <div role="alert" className="mb-4 rounded-lg border-l-4 border-error bg-error-container p-4">
+            <p className="text-sm font-medium text-error">{error}</p>
+          </div>
         ) : null}
 
         <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-          <Input
-            id="business-name"
-            label="Business name"
-            value={businessName}
-            onChange={(event) => setBusinessName(event.target.value)}
-          />
-          <Input
-            id="first-name"
-            label="First name"
-            value={firstName}
-            onChange={(event) => setFirstName(event.target.value)}
-          />
-          <Input
-            id="last-name"
-            label="Last name"
-            value={lastName}
-            onChange={(event) => setLastName(event.target.value)}
-          />
-
           <div className="flex flex-col gap-1">
-            <label htmlFor="trade-type" className="text-sm font-medium text-slate-700">
-              Trade type
+            <label htmlFor="business-name" className="flex items-center justify-between text-sm font-medium text-slate-700">
+              <span>Business name</span>
+              <span className="text-xs font-medium text-error">* required</span>
             </label>
-            <select
-              id="trade-type"
-              value={tradeType}
-              onChange={(event) => setTradeType(event.target.value as TradeType)}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-            >
-              {TRADE_TYPES.map((tradeOption) => (
-                <option key={tradeOption} value={tradeOption}>
-                  {tradeOption}
-                </option>
-              ))}
-            </select>
+            <Input
+              id="business-name"
+              value={businessName}
+              onChange={(event) => setBusinessName(event.target.value)}
+            />
           </div>
 
-          <Button type="submit" isLoading={isSubmitting}>
-            Continue
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              id="first-name"
+              label="First name"
+              value={firstName}
+              onChange={(event) => setFirstName(event.target.value)}
+            />
+            <Input
+              id="last-name"
+              label="Last name"
+              value={lastName}
+              onChange={(event) => setLastName(event.target.value)}
+            />
+          </div>
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-sm font-medium text-slate-700">Trade type</legend>
+            <TradeTypeSelector
+              value={tradeType}
+              onChange={(value) => setTradeType(value as TradeType)}
+            />
+          </fieldset>
+
+          <Button type="submit" isLoading={isSubmitting} className="w-full">
+            Continue →
           </Button>
         </form>
       </section>

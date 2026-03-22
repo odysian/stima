@@ -1,4 +1,11 @@
-export const TRADE_TYPES = ["Landscaping", "Power Washing"] as const;
+export const TRADE_TYPES = [
+  "Plumber",
+  "Electrician",
+  "Builder",
+  "Painter",
+  "Landscaper",
+  "Other",
+] as const;
 
 export type TradeType = (typeof TRADE_TYPES)[number];
 

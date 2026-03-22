@@ -30,15 +30,10 @@ export function RegisterForm(): React.ReactElement {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <section className="w-full max-w-md rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="mb-6 text-2xl font-semibold text-slate-900">Create account</h1>
-        {error ? (
-          <p role="alert" className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {error}
-          </p>
-        ) : null}
-
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
+      <h1 className="mb-8 font-headline text-3xl font-bold text-primary">Stima</h1>
+      <section className="w-full max-w-sm rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
+        <h2 className="mb-6 font-headline text-2xl font-bold text-on-surface">Create your account</h2>
         <form className="flex flex-col gap-4" onSubmit={onSubmit}>
           <Input
             id="email"
@@ -54,13 +49,23 @@ export function RegisterForm(): React.ReactElement {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-          <Button type="submit" isLoading={isSubmitting}>
-            Create account
+
+          {error ? (
+            <div role="alert" className="rounded-lg border-l-4 border-error bg-error-container p-4">
+              <p className="text-sm font-medium text-error">{error}</p>
+            </div>
+          ) : null}
+
+          <Button type="submit" isLoading={isSubmitting} className="w-full">
+            Create Account →
           </Button>
         </form>
 
-        <p className="mt-4 text-sm text-slate-600">
-          Already have an account? <Link to="/login" className="text-slate-900 underline">Sign in</Link>
+        <p className="mt-6 text-sm text-on-surface-variant">
+          Already have an account?{" "}
+          <Link to="/login" className="font-semibold text-primary">
+            Sign In
+          </Link>
         </p>
       </section>
     </main>

@@ -37,7 +37,7 @@ describe("App routes", () => {
 
     renderApp("/onboarding");
 
-    expect(await screen.findByRole("heading", { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
   });
 
   it("redirects authenticated users away from public routes", async () => {
@@ -63,7 +63,7 @@ describe("App routes", () => {
 
     renderApp("/");
 
-    expect(await screen.findByRole("heading", { name: /complete your business profile/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /set up your business/i })).toBeInTheDocument();
   });
 
   it("redirects onboarded users away from /onboarding", async () => {
@@ -98,6 +98,6 @@ describe("App routes", () => {
 
     renderApp("/");
 
-    expect(await screen.findByRole("heading", { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
   });
 });

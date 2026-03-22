@@ -10,7 +10,7 @@ const updatePayload: ProfileUpdateRequest = {
   business_name: "Summit Exterior Care",
   first_name: "Jane",
   last_name: "Doe",
-  trade_type: "Power Washing",
+  trade_type: "Plumber",
 };
 
 describe("profileService integration (MSW)", () => {
@@ -29,7 +29,7 @@ describe("profileService integration (MSW)", () => {
       business_name: "Summit Exterior Care",
       first_name: "Alex",
       last_name: "Stone",
-      trade_type: "Landscaping",
+      trade_type: "Landscaper",
     });
   });
 

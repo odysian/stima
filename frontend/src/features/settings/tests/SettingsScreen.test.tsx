@@ -32,7 +32,7 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
     business_name: "Summit Exterior Care",
     first_name: "Alex",
     last_name: "Stone",
-    trade_type: "Landscaping",
+    trade_type: "Landscaper",
     ...overrides,
   };
 }
@@ -70,7 +70,7 @@ describe("SettingsScreen", () => {
         business_name: "Bright Lawn Care",
         first_name: "Jordan",
         last_name: "Hill",
-        trade_type: "Power Washing",
+        trade_type: "Plumber",
       }),
     );
 
@@ -79,7 +79,7 @@ describe("SettingsScreen", () => {
     expect(await screen.findByDisplayValue("Bright Lawn Care")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Hill")).toBeInTheDocument();
-    expect((screen.getByLabelText(/trade type/i) as HTMLSelectElement).value).toBe("Power Washing");
+    expect((screen.getByLabelText(/trade type/i) as HTMLSelectElement).value).toBe("Plumber");
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
   });
@@ -129,7 +129,7 @@ describe("SettingsScreen", () => {
     });
     mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
     mockedProfileService.updateProfile.mockResolvedValueOnce(
-      makeProfileResponse({ trade_type: "Power Washing" }),
+      makeProfileResponse({ trade_type: "Builder" }),
     );
 
     renderScreen();
@@ -146,7 +146,7 @@ describe("SettingsScreen", () => {
       target: { value: "Reed" },
     });
     fireEvent.change(screen.getByLabelText(/trade type/i), {
-      target: { value: "Power Washing" },
+      target: { value: "Builder" },
     });
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
@@ -155,7 +155,7 @@ describe("SettingsScreen", () => {
         business_name: "North Star Lawn",
         first_name: "Jamie",
         last_name: "Reed",
-        trade_type: "Power Washing",
+        trade_type: "Builder",
       });
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);
