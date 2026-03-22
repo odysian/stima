@@ -174,6 +174,51 @@ class QuoteService:
 
         return await self.convert_notes(transcript)
 
+    async def extract_combined(
+        self,
+        clips: Sequence[CaptureAudioClip],
+        notes: str,
+    ) -> ExtractionResult:
+        """Extract quote line items from optional clips plus optional typed notes."""
+        normalized_notes = notes.strip()
+        combined_text = normalized_notes
+
+        if clips:
+            try:
+                stitched_wav = await asyncio.to_thread(
+                    self._audio.normalize_and_stitch,
+                    [
+                        AudioClip(
+                            filename=clip.filename,
+                            content_type=clip.content_type,
+                            content=clip.content,
+                        )
+                        for clip in clips
+                    ],
+                )
+            except AudioError as exc:
+                raise QuoteServiceError(detail=str(exc), status_code=400) from exc
+
+            try:
+                transcript = await self._transcription.transcribe(stitched_wav)
+            except TranscriptionError as exc:
+                raise QuoteServiceError(
+                    detail=f"Transcription failed: {exc}",
+                    status_code=502,
+                ) from exc
+
+            combined_text = transcript
+            if normalized_notes:
+                combined_text = f"{transcript}\n\n{normalized_notes}"
+
+        if not combined_text:
+            raise QuoteServiceError(
+                detail="Provide at least one audio clip or typed notes.",
+                status_code=400,
+            )
+
+        return await self.convert_notes(combined_text)
+
     async def create_quote(self, user: User, data: QuoteCreateRequest) -> Document:
         """Create a user-owned quote and retry once on sequence collisions."""
         user_id = _resolve_user_id(user)

@@ -51,6 +51,24 @@ function captureAudio(clips: Blob[]): Promise<ExtractionResult> {
   });
 }
 
+function extract(params: { clips?: Blob[]; notes?: string }): Promise<ExtractionResult> {
+  const formData = new FormData();
+  (params.clips ?? []).forEach((clip, index) => {
+    const extension = resolveAudioExtensionFromMimeType(clip.type);
+    formData.append("clips", clip, `clip-${index + 1}.${extension}`);
+  });
+
+  const notes = params.notes?.trim() ?? "";
+  if (notes.length > 0) {
+    formData.append("notes", notes);
+  }
+
+  return request<ExtractionResult>("/api/quotes/extract", {
+    method: "POST",
+    body: formData,
+  });
+}
+
 function createQuote(data: QuoteCreateRequest): Promise<Quote> {
   return request<Quote>("/api/quotes", {
     method: "POST",
@@ -86,6 +104,7 @@ function shareQuote(id: string): Promise<Quote> {
 }
 
 export const quoteService = {
+  extract,
   convertNotes,
   captureAudio,
   createQuote,
