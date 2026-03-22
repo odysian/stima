@@ -88,6 +88,7 @@ class QuoteListItemResponse(BaseModel):
     doc_number: str
     status: str
     total_amount: float | None
+    item_count: int
     created_at: datetime
 
 

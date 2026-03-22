@@ -181,6 +181,8 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert list_payload[1]["id"] == created_quote_1["id"]
     assert list_payload[0]["customer_name"] == "Quote Test Customer"
     assert list_payload[1]["customer_name"] == "Quote Test Customer"
+    assert list_payload[0]["item_count"] == 1
+    assert list_payload[1]["item_count"] == 1
     assert set(list_payload[0].keys()) == {
         "id",
         "customer_id",
@@ -188,6 +190,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
         "doc_number",
         "status",
         "total_amount",
+        "item_count",
         "created_at",
     }
     # Regression guard: list endpoint remains lightweight and does not leak detail payloads.

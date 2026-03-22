@@ -139,6 +139,7 @@ describe("quoteService integration (MSW)", () => {
         doc_number: "Q-002",
         status: "ready",
         total_amount: null,
+        item_count: 1,
         created_at: "2026-03-21T00:00:00.000Z",
       },
       {
@@ -148,6 +149,7 @@ describe("quoteService integration (MSW)", () => {
         doc_number: "Q-001",
         status: "draft",
         total_amount: 120,
+        item_count: 1,
         created_at: "2026-03-20T00:00:00.000Z",
       },
     ];

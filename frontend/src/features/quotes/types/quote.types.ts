@@ -55,6 +55,7 @@ export interface QuoteListItem {
   doc_number: string;
   status: QuoteStatus;
   total_amount: number | null;
+  item_count: number;
   created_at: string;
 }
 

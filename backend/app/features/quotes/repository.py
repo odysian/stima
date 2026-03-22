@@ -61,6 +61,7 @@ class QuoteListItemSummary:
     doc_number: str
     status: str
     total_amount: Decimal | None
+    item_count: int
     created_at: datetime
 
 
@@ -82,6 +83,12 @@ class QuoteRepository:
 
     async def list_by_user(self, user_id: UUID) -> list[QuoteListItemSummary]:
         """Return quote summaries for a user ordered newest-first."""
+        line_item_count = (
+            select(func.count(LineItem.id))
+            .where(LineItem.document_id == Document.id)
+            .correlate(Document)
+            .scalar_subquery()
+        )
         result = await self._session.execute(
             select(
                 Document.id,
@@ -90,6 +97,7 @@ class QuoteRepository:
                 Document.doc_number,
                 Document.status,
                 Document.total_amount,
+                line_item_count.label("item_count"),
                 Document.created_at,
             )
             .join(Customer, Customer.id == Document.customer_id)
@@ -106,6 +114,7 @@ class QuoteRepository:
                     row.status.value if isinstance(row.status, QuoteStatus) else str(row.status)
                 ),
                 total_amount=row.total_amount,
+                item_count=int(row.item_count),
                 created_at=row.created_at,
             )
             for row in result
