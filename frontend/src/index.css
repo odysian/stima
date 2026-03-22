@@ -1,1 +1,81 @@
 @import "tailwindcss";
+
+@theme {
+  --color-primary: #004532;
+  --color-primary-container: #065f46;
+  --color-on-primary: #ffffff;
+  --color-secondary: #904a45;
+  --color-on-secondary: #ffffff;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-background: #f8f9ff;
+  --color-surface: #f8f9ff;
+  --color-surface-bright: #f8f9ff;
+  --color-surface-dim: #ccdbf3;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container: #e6eeff;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-highest: #d5e3fc;
+  --color-surface-variant: #d5e3fc;
+  --color-surface-tint: #1b6b51;
+  --color-on-surface: #0d1c2e;
+  --color-on-surface-variant: #3f4944;
+  --color-on-background: #0d1c2e;
+  --color-on-secondary-container: #783733;
+  --color-outline: #6f7973;
+  --color-outline-variant: #bec9c2;
+  --color-inverse-surface: #233144;
+  --color-inverse-on-surface: #eaf1ff;
+  --color-inverse-primary: #8bd6b6;
+  --color-tertiary: #5b3300;
+  --color-tertiary-container: #7b4700;
+  --color-tertiary-fixed: #ffdcbe;
+  --color-tertiary-fixed-dim: #ffb870;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #ffba73;
+  --color-on-tertiary-fixed: #2c1600;
+  --color-on-tertiary-fixed-variant: #693c00;
+  --color-primary-fixed: #a6f2d1;
+  --color-primary-fixed-dim: #8bd6b6;
+  --color-on-primary-fixed: #002116;
+  --color-on-primary-fixed-variant: #00513b;
+  --color-on-primary-container: #8bd6b6;
+  --color-secondary-fixed: #ffdad6;
+  --color-secondary-fixed-dim: #ffb3ac;
+  --color-on-secondary-fixed: #3b0908;
+  --color-on-secondary-fixed-variant: #73332f;
+  --color-secondary-container: #fda49c;
+
+  --font-headline: "Space Grotesk";
+  --font-body: "Inter";
+  --font-label: "Inter";
+
+  --radius-DEFAULT: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 0.75rem;
+}
+
+.forest-gradient {
+  background: linear-gradient(135deg, #004532 0%, #065f46 100%);
+}
+
+.ghost-shadow {
+  box-shadow: 0 0 24px rgba(13, 28, 46, 0.04);
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Space Grotesk", sans-serif;
+}

@@ -2,25 +2,43 @@ import type { ReactNode } from "react";
 
 interface ButtonProps {
   children: ReactNode;
+  variant?: "primary" | "destructive" | "ghost";
+  className?: string;
   type?: "button" | "submit";
   disabled?: boolean;
   isLoading?: boolean;
   onClick?: () => void;
 }
 
+const variantClasses = {
+  primary: "forest-gradient text-white font-semibold py-4 rounded-lg active:scale-[0.98] transition-all",
+  destructive: "border border-secondary text-secondary font-semibold py-4 rounded-lg active:scale-[0.98] transition-all",
+  ghost: "p-2 rounded-full hover:bg-slate-50 active:scale-95 transition-all",
+} as const;
+
 export function Button({
   children,
+  variant = "primary",
+  className,
   type = "button",
   disabled = false,
   isLoading = false,
   onClick,
 }: ButtonProps): React.ReactElement {
+  const buttonClassName = [
+    "inline-flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60",
+    variantClasses[variant],
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled || isLoading}
-      className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+      className={buttonClassName}
     >
       {isLoading ? "Loading..." : children}
     </button>
