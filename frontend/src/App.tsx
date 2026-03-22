@@ -8,6 +8,9 @@ import {
 
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { RegisterForm } from "@/features/auth/components/RegisterForm";
+import { CustomerCreateScreen } from "@/features/customers/components/CustomerCreateScreen";
+import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
+import { CustomerListScreen } from "@/features/customers/components/CustomerListScreen";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerSelectScreen } from "@/features/customers/components/CustomerSelectScreen";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
@@ -78,6 +81,9 @@ export default function App(): React.ReactElement {
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<QuoteList />} />
+        <Route path="/customers" element={<CustomerListScreen />} />
+        <Route path="/customers/new" element={<CustomerCreateScreen />} />
+        <Route path="/customers/:id" element={<CustomerDetailScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/quotes/new" element={<CustomerSelectScreen />} />
         <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
