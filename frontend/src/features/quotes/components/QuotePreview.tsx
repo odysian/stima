@@ -7,6 +7,7 @@ import { ShareLinkRow } from "@/features/quotes/components/ShareLinkRow";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -43,6 +44,9 @@ export function QuotePreview(): React.ReactElement {
   const [isSharing, setIsSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -180,6 +184,25 @@ export function QuotePreview(): React.ReactElement {
     }
   }
 
+  async function onDelete(): Promise<void> {
+    if (!id || !quote) {
+      return;
+    }
+
+    setDeleteError(null);
+    setShowDeleteConfirm(false);
+    setIsDeleting(true);
+    try {
+      await quoteService.deleteQuote(id);
+      navigate("/", { replace: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to delete quote";
+      setDeleteError(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader
@@ -226,7 +249,7 @@ export function QuotePreview(): React.ReactElement {
             />
 
             {quote && id && quote.status !== "shared" ? (
-              <div className="px-4 mt-3">
+              <div className="mt-3 px-4">
                 <button
                   type="button"
                   onClick={() => navigate(`/quotes/${id}/edit`)}
@@ -234,6 +257,24 @@ export function QuotePreview(): React.ReactElement {
                 >
                   Edit Quote
                 </button>
+              </div>
+            ) : null}
+
+            {quote && quote.status !== "shared" ? (
+              <div className="mt-3 px-4">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full rounded-lg py-3 text-sm text-error transition-all active:scale-[0.98]"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete Quote"}
+                </button>
+                {deleteError ? (
+                  <div className="mt-3">
+                    <FeedbackMessage variant="error">{deleteError}</FeedbackMessage>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -272,6 +313,18 @@ export function QuotePreview(): React.ReactElement {
           </>
         ) : null}
       </section>
+
+      {showDeleteConfirm && quote ? (
+        <ConfirmModal
+          title={`Delete ${quote.doc_number}?`}
+          body="This cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Keep"
+          variant="destructive"
+          onConfirm={() => void onDelete()}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      ) : null}
 
       <BottomNav active="quotes" />
     </main>

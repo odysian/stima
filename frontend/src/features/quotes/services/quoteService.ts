@@ -93,6 +93,12 @@ function updateQuote(id: string, data: QuoteUpdateRequest): Promise<Quote> {
   });
 }
 
+function deleteQuote(id: string): Promise<void> {
+  return request<null>(`/api/quotes/${id}`, {
+    method: "DELETE",
+  }).then(() => undefined);
+}
+
 function generatePdf(id: string): Promise<Blob> {
   return requestBlob(`/api/quotes/${id}/pdf`, {
     method: "POST",
@@ -113,6 +119,7 @@ export const quoteService = {
   listQuotes,
   getQuote,
   updateQuote,
+  deleteQuote,
   generatePdf,
   shareQuote,
 };

@@ -284,6 +284,10 @@ class QuoteRepository:
         await self._session.refresh(document, attribute_names=["line_items"])
         return document
 
+    async def delete(self, document_id: UUID) -> None:
+        """Hard-delete a quote document; line items are removed by cascade."""
+        await self._session.execute(delete(Document).where(Document.id == document_id))
+
     async def update(
         self,
         *,

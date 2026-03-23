@@ -14,6 +14,7 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     listQuotes: vi.fn(),
     getQuote: vi.fn(),
     updateQuote: vi.fn(),
+    deleteQuote: vi.fn(),
     generatePdf: vi.fn(),
     shareQuote: vi.fn(),
   },
@@ -86,6 +87,7 @@ function renderScreen(path = "/quotes/quote-1/preview"): void {
       <Routes>
         <Route path="/quotes/:id/preview" element={<QuotePreview />} />
         <Route path="/quotes/:id/edit" element={<div>Edit Quote Screen</div>} />
+        <Route path="/" element={<div>Quote List Screen</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -106,6 +108,7 @@ beforeEach(() => {
   mockedQuoteService.generatePdf.mockResolvedValue(
     new Blob(["pdf-binary"], { type: "application/pdf" }),
   );
+  mockedQuoteService.deleteQuote.mockResolvedValue(undefined);
   mockedQuoteService.shareQuote.mockResolvedValue(makeQuoteResponse());
   createObjectUrlMock.mockReturnValue("blob:quote-preview");
   Object.defineProperty(URL, "createObjectURL", {
@@ -147,6 +150,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText("Generate the PDF to preview it here.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^share$/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /delete quote/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
   });
 
@@ -157,6 +161,16 @@ describe("QuotePreview", () => {
 
     await screen.findByRole("heading", { name: "Q-001" });
     expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete quote/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the delete button when the quote is ready", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Q-001" });
+    expect(screen.getByRole("button", { name: /delete quote/i })).toBeInTheDocument();
   });
 
   it("navigates to the edit route from the preview action area", async () => {
@@ -435,5 +449,42 @@ describe("QuotePreview", () => {
     });
     expect(await screen.findByText("Unable to share quote")).toBeInTheDocument();
     expect(screen.queryByText(/share\/share-token-1/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a confirmation modal and deletes the quote before navigating home", async () => {
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    fireEvent.click(screen.getByRole("button", { name: /delete quote/i }));
+
+    const dialog = screen.getByRole("dialog", { name: /delete q-001\?/i });
+    expect(within(dialog).getByText("This cannot be undone.")).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.deleteQuote).toHaveBeenCalledWith("quote-1");
+    });
+    expect(await screen.findByText("Quote List Screen")).toBeInTheDocument();
+  });
+
+  it("shows an inline error when deleting the quote fails", async () => {
+    mockedQuoteService.deleteQuote.mockRejectedValueOnce(new Error("Unable to delete quote"));
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    fireEvent.click(screen.getByRole("button", { name: /delete quote/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /delete q-001\?/i })).getByRole("button", {
+        name: /^delete$/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.deleteQuote).toHaveBeenCalledWith("quote-1");
+    });
+    expect(await screen.findByText("Unable to delete quote")).toBeInTheDocument();
+    expect(screen.queryByText("Quote List Screen")).not.toBeInTheDocument();
   });
 });

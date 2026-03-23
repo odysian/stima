@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import Depends
 from httpx import AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes import api as quote_api
 from app.features.quotes.extraction_service import ExtractionService
+from app.features.quotes.models import LineItem
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
 from app.features.quotes.service import QuoteService
@@ -639,6 +641,7 @@ async def test_extract_combined_rate_limit_returns_429(
             "/api/quotes/00000000-0000-0000-0000-000000000000",
             {"notes": "updated"},
         ),
+        ("delete", "/api/quotes/00000000-0000-0000-0000-000000000000", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/pdf", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/share", None),
     ],
@@ -772,6 +775,31 @@ async def test_patch_quote_requires_csrf(client: AsyncClient) -> None:
     assert response.json() == {"detail": "CSRF token missing"}
 
 
+async def test_delete_quote_requires_csrf(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": None}],
+            "total_amount": None,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    response = await client.delete(f"/api/quotes/{quote_id}")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
 async def test_create_quote_returns_404_for_different_users_customer(
     client: AsyncClient,
 ) -> None:
@@ -845,6 +873,112 @@ async def test_patch_quote_returns_404_for_different_users_quote(client: AsyncCl
     response = await client.patch(
         f"/api/quotes/{quote_id}",
         json={"notes": "hijacked"},
+        headers={"X-CSRF-Token": csrf_token_user_b},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+@pytest.mark.parametrize("make_ready", [False, True], ids=["draft", "ready"])
+async def test_delete_quote_returns_204_for_owned_draft_and_ready_quotes_and_cascades(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    make_ready: bool,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [
+                {"description": "Mulch", "details": "5 yards", "price": 120},
+                {"description": "Edging", "details": None, "price": 80},
+            ],
+            "total_amount": 200,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    initial_line_item_count = await db_session.scalar(
+        select(func.count(LineItem.id)).where(LineItem.document_id == UUID(quote_id))
+    )
+    assert int(initial_line_item_count or 0) == 2
+
+    if make_ready:
+        pdf_response = await client.post(
+            f"/api/quotes/{quote_id}/pdf",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert pdf_response.status_code == 200
+
+        detail_response = await client.get(f"/api/quotes/{quote_id}")
+        assert detail_response.status_code == 200
+        assert detail_response.json()["status"] == "ready"
+
+    delete_response = await client.delete(
+        f"/api/quotes/{quote_id}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert delete_response.status_code == 204
+    assert delete_response.content == b""
+
+    detail_after_delete = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_after_delete.status_code == 404
+    assert detail_after_delete.json() == {"detail": "Not found"}
+
+    list_response = await client.get("/api/quotes")
+    assert list_response.status_code == 200
+    assert list_response.json() == []
+
+    remaining_line_item_count = await db_session.scalar(
+        select(func.count(LineItem.id)).where(LineItem.document_id == UUID(quote_id))
+    )
+    assert int(remaining_line_item_count or 0) == 0
+
+
+async def test_delete_quote_returns_404_for_missing_quote(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.delete(
+        "/api/quotes/00000000-0000-0000-0000-000000000000",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_delete_quote_returns_404_for_different_users_quote(client: AsyncClient) -> None:
+    csrf_token_user_a = await _register_and_login(client, _credentials())
+    customer_id_user_a = await _create_customer(client, csrf_token_user_a)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id_user_a,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token_user_a},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    csrf_token_user_b = await _register_and_login(client, _credentials())
+    response = await client.delete(
+        f"/api/quotes/{quote_id}",
         headers={"X-CSRF-Token": csrf_token_user_b},
     )
 
@@ -928,6 +1062,41 @@ async def test_patch_shared_quote_returns_409(client: AsyncClient) -> None:
 
     assert patch_response.status_code == 409
     assert patch_response.json() == {"detail": "Shared quotes cannot be edited"}
+
+
+async def test_delete_shared_quote_returns_409(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    assert share_response.json()["status"] == "shared"
+
+    delete_response = await client.delete(
+        f"/api/quotes/{quote_id}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert delete_response.status_code == 409
+    assert delete_response.json() == {"detail": "Shared quotes cannot be deleted"}
 
 
 async def test_create_quote_persists_voice_source_type(client: AsyncClient) -> None:

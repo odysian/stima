@@ -196,6 +196,23 @@ async def update_quote(
     return QuoteResponse.model_validate(quote)
 
 
+@router.delete(
+    "/{quote_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def delete_quote(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> None:
+    """Delete a user-owned quote unless it has been shared."""
+    try:
+        await quote_service.delete_quote(user, quote_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
 @router.post(
     "/{quote_id}/pdf",
     dependencies=[Depends(require_csrf)],
