@@ -83,6 +83,8 @@ class QuoteRepositoryProtocol(Protocol):
         replace_line_items: bool,
     ) -> Document: ...
 
+    async def delete(self, document_id: UUID) -> None: ...
+
     async def commit(self) -> None: ...
 
     async def refresh(self, document: Document) -> Document: ...
@@ -193,6 +195,20 @@ class QuoteService:
             updated_quote.status = QuoteStatus.DRAFT
         await self._repository.commit()
         return await self._repository.refresh(updated_quote)
+
+    async def delete_quote(self, user: User, quote_id: UUID) -> None:
+        """Delete a user-owned quote unless it has already been shared."""
+        quote = await self._repository.get_by_id(quote_id, _resolve_user_id(user))
+        if quote is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if quote.status == QuoteStatus.SHARED:
+            raise QuoteServiceError(
+                detail="Shared quotes cannot be deleted",
+                status_code=409,
+            )
+
+        await self._repository.delete(quote_id)
+        await self._repository.commit()
 
     async def generate_pdf(self, user: User, quote_id: UUID) -> tuple[str, bytes]:
         """Render and return quote PDF bytes while applying ready transition rules."""

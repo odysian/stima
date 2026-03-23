@@ -357,6 +357,21 @@ describe("quoteService integration (MSW)", () => {
     expect(await blob.text()).toBe("mock-pdf-content");
   });
 
+  it("deleteQuote sends CSRF header and resolves on 204", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.delete("/api/quotes/:id", ({ request }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await expect(quoteService.deleteQuote("quote-1")).resolves.toBeUndefined();
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+  });
+
   it("shareQuote returns updated quote with share token", async () => {
     setCsrfToken("integration-csrf-token");
 
