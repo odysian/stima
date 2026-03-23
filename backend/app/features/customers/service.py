@@ -8,6 +8,7 @@ from uuid import UUID
 from app.features.auth.models import User
 from app.features.customers.models import Customer
 from app.features.customers.schemas import CustomerCreateRequest, CustomerUpdateRequest
+from app.shared.event_logger import log_event
 
 
 class CustomerServiceError(Exception):
@@ -72,6 +73,7 @@ class CustomerService:
             address=data.address,
         )
         await self._repository.commit()
+        log_event("customer.created", user_id=user.id, customer_id=customer.id)
         return customer
 
     async def update_customer(

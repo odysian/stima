@@ -6,12 +6,14 @@ import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
+from uuid import UUID
 
 from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
+from app.shared.event_logger import log_event
 
 
 class ExtractionIntegrationProtocol(Protocol):
@@ -74,15 +76,20 @@ class ExtractionService:
         self,
         clips: Sequence[CaptureAudioClip] | None,
         notes: str | None,
+        *,
+        user_id: UUID | None = None,
     ) -> ExtractionResult:
         """Extract quote line items from optional clips plus optional typed notes."""
         normalized_notes = (notes or "").strip()
         combined_text = normalized_notes
+        source_type = "notes"
 
         if clips:
+            source_type = "audio"
             transcript = await self._transcribe_clips(clips)
             combined_text = transcript
             if normalized_notes:
+                source_type = "audio+notes"
                 combined_text = f"{transcript}\n\n{normalized_notes}"
 
         if not combined_text:
@@ -91,7 +98,9 @@ class ExtractionService:
                 status_code=400,
             )
 
-        return await self.convert_notes(combined_text)
+        extraction = await self.convert_notes(combined_text)
+        log_event("extraction.completed", user_id=user_id, detail=source_type)
+        return extraction
 
     async def _transcribe_clips(self, clips: Sequence[CaptureAudioClip]) -> str:
         """Normalize clip uploads and return the resulting transcript."""

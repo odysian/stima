@@ -13,12 +13,14 @@ from app.features.customers.api import router as customer_router
 from app.features.profile.api import router as profile_router
 from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
+from app.shared.event_logger import configure_event_logging
 from app.shared.rate_limit import limiter
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
+    configure_event_logging()
 
     app = FastAPI(title="Stima API")
     app.state.limiter = limiter

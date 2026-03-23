@@ -143,11 +143,10 @@ async def extract_combined(
 ) -> ExtractionResult:
     """Extract structured quote data from optional audio clips and optional notes."""
     del request
-    del user
     clip_inputs = await _parse_upload_clips(clips or [])
 
     try:
-        return await extraction_service.extract_combined(clip_inputs, notes)
+        return await extraction_service.extract_combined(clip_inputs, notes, user_id=user.id)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 

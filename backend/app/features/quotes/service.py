@@ -23,6 +23,7 @@ from app.features.quotes.schemas import (
     QuoteUpdateRequest,
 )
 from app.integrations.pdf import PdfRenderError
+from app.shared.event_logger import log_event
 
 
 class QuoteServiceError(Exception):
@@ -132,6 +133,12 @@ class QuoteService:
                     source_type=data.source_type,
                 )
                 await self._repository.commit()
+                log_event(
+                    "quote.created",
+                    user_id=user_id,
+                    quote_id=quote.id,
+                    customer_id=quote.customer_id,
+                )
                 return quote
             except IntegrityError as exc:
                 await self._repository.rollback()
@@ -173,7 +180,8 @@ class QuoteService:
         data: QuoteUpdateRequest,
     ) -> Document:
         """Patch editable quote fields and optionally replace line items."""
-        quote = await self._repository.get_by_id(quote_id, _resolve_user_id(user))
+        user_id = _resolve_user_id(user)
+        quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
         if quote.status == QuoteStatus.SHARED:
@@ -194,11 +202,18 @@ class QuoteService:
         if updated_quote.status == QuoteStatus.READY:
             updated_quote.status = QuoteStatus.DRAFT
         await self._repository.commit()
+        log_event(
+            "quote.updated",
+            user_id=user_id,
+            quote_id=updated_quote.id,
+            customer_id=updated_quote.customer_id,
+        )
         return await self._repository.refresh(updated_quote)
 
     async def delete_quote(self, user: User, quote_id: UUID) -> None:
         """Delete a user-owned quote unless it has already been shared."""
-        quote = await self._repository.get_by_id(quote_id, _resolve_user_id(user))
+        user_id = _resolve_user_id(user)
+        quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
         if quote.status == QuoteStatus.SHARED:
@@ -209,6 +224,12 @@ class QuoteService:
 
         await self._repository.delete(quote_id)
         await self._repository.commit()
+        log_event(
+            "quote.deleted",
+            user_id=user_id,
+            quote_id=quote.id,
+            customer_id=quote.customer_id,
+        )
 
     async def generate_pdf(self, user: User, quote_id: UUID) -> tuple[str, bytes]:
         """Render and return quote PDF bytes while applying ready transition rules."""
@@ -224,6 +245,7 @@ class QuoteService:
 
         await self._repository.mark_ready_if_not_shared(quote_id=quote_id, user_id=user_id)
         await self._repository.commit()
+        log_event("quote.pdf_generated", user_id=user_id, quote_id=quote_id)
         return context.doc_number, pdf_bytes
 
     async def generate_shared_pdf(self, share_token: str) -> tuple[str, bytes]:
@@ -241,7 +263,8 @@ class QuoteService:
 
     async def share_quote(self, user: User, quote_id: UUID) -> Document:
         """Set share token/timestamp and transition quote status to shared."""
-        quote = await self._repository.get_by_id(quote_id, _resolve_user_id(user))
+        user_id = _resolve_user_id(user)
+        quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
 
@@ -251,6 +274,12 @@ class QuoteService:
         quote.shared_at = _utcnow()
         quote.status = QuoteStatus.SHARED
         await self._repository.commit()
+        log_event(
+            "quote.shared",
+            user_id=user_id,
+            quote_id=quote.id,
+            customer_id=quote.customer_id,
+        )
         return await self._repository.refresh(quote)
 
 
