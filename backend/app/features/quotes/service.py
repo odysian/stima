@@ -174,6 +174,11 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, _resolve_user_id(user))
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        if quote.status == QuoteStatus.SHARED:
+            raise QuoteServiceError(
+                detail="Shared quotes cannot be edited",
+                status_code=409,
+            )
 
         updated_quote = await self._repository.update(
             document=quote,
@@ -184,6 +189,8 @@ class QuoteService:
             line_items=data.line_items,
             replace_line_items="line_items" in data.model_fields_set,
         )
+        if updated_quote.status == QuoteStatus.READY:
+            updated_quote.status = QuoteStatus.DRAFT
         await self._repository.commit()
         return updated_quote
 

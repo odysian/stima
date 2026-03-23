@@ -1,0 +1,321 @@
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
+import { LineItemCard } from "@/features/quotes/components/LineItemCard";
+import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
+import { useQuoteEdit, type QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
+import { quoteService } from "@/features/quotes/services/quoteService";
+import type { LineItemDraft, LineItemDraftWithFlags, QuoteDetail } from "@/features/quotes/types/quote.types";
+import { Button } from "@/shared/components/Button";
+import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { ScreenFooter } from "@/shared/components/ScreenFooter";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
+
+const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
+  description: "",
+  details: null,
+  price: null,
+};
+
+function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
+  return {
+    quoteId: quote.id,
+    lineItems: quote.line_items.map((item) => ({
+      description: item.description,
+      details: item.details,
+      price: item.price,
+    })),
+    total: quote.total_amount,
+    notes: quote.notes ?? "",
+  };
+}
+
+function normalizeLineItem(item: LineItemDraftWithFlags): LineItemDraftWithFlags {
+  const normalizedDetails = item.details?.trim() ?? "";
+  return {
+    description: item.description.trim(),
+    details: normalizedDetails.length > 0 ? normalizedDetails : null,
+    price: item.price,
+    flagged: item.flagged,
+    flagReason: item.flagReason,
+  };
+}
+
+function isBlankLineItem(item: LineItemDraftWithFlags): boolean {
+  return item.description.length === 0 && item.details === null && item.price === null;
+}
+
+function isInvalidLineItem(item: LineItemDraftWithFlags): boolean {
+  return item.description.length === 0 && !isBlankLineItem(item);
+}
+
+export function QuoteEditScreen(): React.ReactElement {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const { draft, setDraft, clearDraft } = useQuoteEdit();
+  const [quote, setQuote] = useState<QuoteDetail | null>(null);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [shouldSkipSeeding, setShouldSkipSeeding] = useState(false);
+
+  useEffect(() => {
+    setShouldSkipSeeding(false);
+
+    if (!id) {
+      setLoadError("Missing quote id.");
+      setIsLoadingQuote(false);
+      return;
+    }
+
+    const quoteId = id;
+    let isActive = true;
+
+    async function fetchQuote(): Promise<void> {
+      setIsLoadingQuote(true);
+      setLoadError(null);
+      try {
+        const fetchedQuote = await quoteService.getQuote(quoteId);
+        if (isActive) {
+          setQuote(fetchedQuote);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to load quote";
+        if (isActive) {
+          setLoadError(message);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingQuote(false);
+        }
+      }
+    }
+
+    void fetchQuote();
+    return () => { isActive = false; };
+  }, [id]);
+
+  useEffect(() => {
+    if (!quote || shouldSkipSeeding) {
+      return;
+    }
+
+    if (!draft || draft.quoteId !== quote.id) {
+      setDraft(mapQuoteToEditDraft(quote));
+    }
+  }, [draft, quote, setDraft, shouldSkipSeeding]);
+
+  const currentDraft = draft && quote && draft.quoteId === quote.id ? draft : null;
+  const normalizedLineItems = currentDraft?.lineItems.map(normalizeLineItem) ?? [];
+  const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
+  const lineItemsForSubmit: LineItemDraft[] = normalizedLineItems
+    .filter((lineItem) => lineItem.description.length > 0)
+    .map((lineItem) => ({
+      description: lineItem.description,
+      details: lineItem.details,
+      price: lineItem.price,
+    }));
+  const hasNullPrices = lineItemsForSubmit.some((lineItem) => lineItem.price === null);
+  const canSubmit = lineItemsForSubmit.length > 0 && !hasInvalidLineItems && !isLoadingQuote;
+  const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
+    if (lineItem.price === null) {
+      return runningTotal;
+    }
+    return runningTotal + lineItem.price;
+  }, 0);
+
+  function updateDraft(updater: (current: QuoteEditDraft) => QuoteEditDraft): void {
+    if (!currentDraft) {
+      return;
+    }
+    setDraft(updater(currentDraft));
+  }
+
+  function onCancel(): void {
+    setShouldSkipSeeding(true);
+    clearDraft();
+    if (id) {
+      navigate(`/quotes/${id}/preview`);
+      return;
+    }
+    navigate("/");
+  }
+
+  function onLineItemAdd(): void {
+    setSaveError(null);
+    updateDraft((nextDraft) => ({
+      ...nextDraft,
+      lineItems: [...nextDraft.lineItems, { ...EMPTY_LINE_ITEM }],
+    }));
+  }
+
+  async function onSave(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!id || !currentDraft) {
+      return;
+    }
+
+    setSaveError(null);
+
+    if (lineItemsForSubmit.length === 0) {
+      setSaveError("Add at least one line item description before saving the quote.");
+      return;
+    }
+
+    if (hasInvalidLineItems) {
+      setSaveError("Each line item with details or price needs a description.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      await quoteService.updateQuote(id, {
+        line_items: lineItemsForSubmit,
+        total_amount: currentDraft.total,
+        notes: currentDraft.notes.trim().length > 0 ? currentDraft.notes.trim() : null,
+      });
+      setShouldSkipSeeding(true);
+      clearDraft();
+      navigate(`/quotes/${id}/preview`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to save quote";
+      setSaveError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-background pb-28">
+      <ScreenHeader
+        title={quote?.doc_number ?? "Edit Quote"}
+        eyebrow="QUOTE EDITOR"
+        subtitle={quote ? "Update line items, total, and notes" : undefined}
+        backLabel="Cancel edit"
+        onBack={onCancel}
+      />
+
+      <form
+        id="quote-edit-form"
+        className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-24 pt-20"
+        onSubmit={onSave}
+      >
+        {isLoadingQuote ? (
+          <p role="status" className="text-sm text-on-surface-variant">
+            Loading quote...
+          </p>
+        ) : null}
+
+        {loadError ? (
+          <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
+        ) : null}
+
+        {saveError ? (
+          <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
+        ) : null}
+
+        {quote && currentDraft ? (
+          <>
+            <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
+              <h2 className="font-headline text-xl font-bold tracking-tight text-primary">
+                Line Items
+              </h2>
+              <span className="text-[0.6875rem] uppercase tracking-widest text-outline">
+                {currentDraft.lineItems.length} ITEMS
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {currentDraft.lineItems.length > 0 ? (
+                currentDraft.lineItems.map((lineItem, index) => (
+                  <LineItemCard
+                    key={`quote-edit-line-item-${index}`}
+                    description={lineItem.description || "Untitled line item"}
+                    details={lineItem.details}
+                    price={lineItem.price}
+                    flagged={lineItem.flagged}
+                    onClick={() => navigate(`/quotes/${id}/edit/line-items/${index}/edit`)}
+                  />
+                ))
+              ) : (
+                <p className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline">
+                  No line items on this quote yet.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low"
+              onClick={onLineItemAdd}
+            >
+              <span className="material-symbols-outlined text-base">add</span>
+              + Add Line Item
+            </button>
+
+            <TotalAmountSection
+              lineItemSum={lineItemSum}
+              total={currentDraft.total}
+              onTotalChange={(total) => {
+                updateDraft((nextDraft) => ({ ...nextDraft, total }));
+              }}
+            />
+
+            <section className="space-y-2">
+              <label
+                htmlFor="quote-edit-notes"
+                className="text-xs font-bold uppercase tracking-wider text-outline-variant"
+              >
+                CUSTOMER NOTES
+              </label>
+              <textarea
+                id="quote-edit-notes"
+                rows={3}
+                value={currentDraft.notes}
+                onChange={(event) =>
+                  updateDraft((nextDraft) => ({
+                    ...nextDraft,
+                    notes: event.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                placeholder="Any notes to include for the customer."
+              />
+            </section>
+          </>
+        ) : null}
+      </form>
+
+      <ScreenFooter>
+        <div className="mx-auto w-full max-w-2xl">
+          {hasNullPrices ? (
+            <p className="mb-2 rounded-lg bg-warning-container px-3 py-2 text-center text-xs text-warning">
+              Some line items have no price — the quote will show "TBD" for those items.
+            </p>
+          ) : null}
+          <div className="flex flex-col gap-3">
+            <Button
+              type="submit"
+              form="quote-edit-form"
+              variant="primary"
+              className="w-full"
+              disabled={!canSubmit}
+              isLoading={isSaving}
+            >
+              Save Changes
+            </Button>
+            <button
+              type="button"
+              className="w-full rounded-lg border border-outline-variant py-4 font-semibold text-on-surface-variant transition-all active:scale-[0.98]"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </ScreenFooter>
+    </main>
+  );
+}

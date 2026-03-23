@@ -852,6 +852,84 @@ async def test_patch_quote_returns_404_for_different_users_quote(client: AsyncCl
     assert response.json() == {"detail": "Not found"}
 
 
+async def test_patch_ready_quote_reverts_status_to_draft_even_when_values_do_not_change(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    pdf_response = await client.post(
+        f"/api/quotes/{quote_id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert pdf_response.status_code == 200
+
+    detail_after_pdf = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_after_pdf.status_code == 200
+    assert detail_after_pdf.json()["status"] == "ready"
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"notes": "Original note"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert patch_response.status_code == 200
+    assert patch_response.json()["status"] == "draft"
+    assert patch_response.json()["notes"] == "Original note"
+
+
+async def test_patch_shared_quote_returns_409(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    assert share_response.json()["status"] == "shared"
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"notes": "Updated note"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert patch_response.status_code == 409
+    assert patch_response.json() == {"detail": "Shared quotes cannot be edited"}
+
+
 async def test_create_quote_persists_voice_source_type(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)

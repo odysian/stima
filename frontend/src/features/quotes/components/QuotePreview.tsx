@@ -225,6 +225,18 @@ export function QuotePreview(): React.ReactElement {
               shareMessage={shareMessage}
             />
 
+            {quote && id && quote.status !== "shared" ? (
+              <div className="px-4 mt-3">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/quotes/${id}/edit`)}
+                  className="w-full rounded-lg border border-outline-variant py-4 font-semibold text-on-surface-variant transition-all active:scale-[0.98]"
+                >
+                  Edit Quote
+                </button>
+              </div>
+            ) : null}
+
             {shareUrl ? <ShareLinkRow shareUrl={shareUrl} onCopy={copyToClipboard} /> : null}
             {quote ? (
               <section className="mx-4 mt-4">
