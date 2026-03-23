@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
@@ -6,6 +6,7 @@ import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
@@ -22,6 +23,8 @@ export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { customerId } = useParams<{ customerId: string }>();
   const { setDraft } = useQuoteDraft();
+  const isMountedRef = useRef(true);
+  const extractionStageTimerRef = useRef<number | null>(null);
   const {
     clips,
     elapsedSeconds,
@@ -35,8 +38,20 @@ export function CaptureScreen(): React.ReactElement {
   } = useVoiceCapture();
 
   const [notes, setNotes] = useState("");
-  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionStage, setExtractionStage] = useState<string | null>(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isExtracting = extractionStage !== null;
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (extractionStageTimerRef.current !== null) {
+        window.clearTimeout(extractionStageTimerRef.current);
+      }
+    };
+  }, []);
 
   function applyDraft(sourceType: QuoteSourceType, extraction: ExtractionResult): void {
     if (!customerId) {
@@ -68,21 +83,53 @@ export function CaptureScreen(): React.ReactElement {
 
     setError(null);
     clearError();
-    setIsExtracting(true);
+    setExtractionStage(clips.length > 0 ? "Processing audio clips..." : "Analyzing notes...");
+    extractionStageTimerRef.current = window.setTimeout(() => {
+      if (!isMountedRef.current) {
+        return;
+      }
+      setExtractionStage("Extracting line items...");
+    }, 4000);
 
     try {
       const extraction = await quoteService.extract({
         clips: clips.map((clip) => clip.blob),
         notes,
       });
+      if (!isMountedRef.current) {
+        return;
+      }
       applyDraft(clips.length > 0 ? "voice" : "text", extraction);
       navigate("/quotes/review");
     } catch (submitError) {
+      if (!isMountedRef.current) {
+        return;
+      }
       const message = submitError instanceof Error ? submitError.message : "Unable to extract line items";
       setError(message);
     } finally {
-      setIsExtracting(false);
+      const shouldResetExtractionStage = isMountedRef.current;
+      if (extractionStageTimerRef.current !== null) {
+        window.clearTimeout(extractionStageTimerRef.current);
+        extractionStageTimerRef.current = null;
+      }
+      if (shouldResetExtractionStage) {
+        setExtractionStage(null);
+      }
     }
+  }
+
+  function hasUnsavedWork(): boolean {
+    return clips.length > 0 || notes.trim().length > 0;
+  }
+
+  function onBack(): void {
+    if (hasUnsavedWork()) {
+      setShowLeaveConfirm(true);
+      return;
+    }
+
+    navigate(-1);
   }
 
   const displayedError = error ?? voiceError;
@@ -94,7 +141,7 @@ export function CaptureScreen(): React.ReactElement {
         title="Capture Job Notes"
         subtitle="Describe the job and we'll extract the line items"
         backLabel="Go back"
-        onBack={() => navigate(-1)}
+        onBack={onBack}
       />
 
       <section className="mx-auto w-full max-w-2xl px-4 pb-24 pt-20">
@@ -201,6 +248,9 @@ export function CaptureScreen(): React.ReactElement {
 
       <ScreenFooter>
         <div className="mx-auto w-full max-w-2xl">
+          {extractionStage ? (
+            <p className="mb-2 text-center text-sm text-on-surface-variant">{extractionStage}</p>
+          ) : null}
           <Button
             variant="primary"
             className="w-full"
@@ -212,6 +262,17 @@ export function CaptureScreen(): React.ReactElement {
           </Button>
         </div>
       </ScreenFooter>
+
+      {showLeaveConfirm ? (
+        <ConfirmModal
+          title="Leave this screen?"
+          body="Your clips and notes will be lost."
+          confirmLabel="Leave"
+          cancelLabel="Stay"
+          onConfirm={() => navigate(-1)}
+          onCancel={() => setShowLeaveConfirm(false)}
+        />
+      ) : null}
     </main>
   );
 }

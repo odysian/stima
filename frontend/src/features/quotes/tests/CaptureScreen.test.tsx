@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,8 +90,8 @@ function mockVoiceCapture(overrides: Partial<ReturnType<typeof useVoiceCapture>>
   });
 }
 
-function renderScreen(): void {
-  render(
+function renderScreen() {
+  return render(
     <MemoryRouter>
       <CaptureScreen />
     </MemoryRouter>,
@@ -112,6 +112,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
@@ -154,6 +155,62 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Recording... 00:03")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+  });
+
+  it("shows a leave confirmation when navigating back with unsaved clips", () => {
+    mockVoiceCapture({ clips: [clipFixture] });
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: /go back/i }));
+
+    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalledWith(-1);
+  });
+
+  it("shows a leave confirmation when navigating back with unsaved notes", () => {
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /go back/i }));
+
+    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalledWith(-1);
+  });
+
+  it("navigates back immediately when there is no unsaved work", () => {
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: /go back/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith(-1);
+    expect(screen.queryByRole("dialog", { name: "Leave this screen?" })).not.toBeInTheDocument();
+  });
+
+  it("dismisses the leave confirmation when Stay is clicked", () => {
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /go back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Stay" }));
+
+    expect(screen.queryByRole("dialog", { name: "Leave this screen?" })).not.toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalledWith(-1);
+  });
+
+  it("navigates back after confirming Leave", () => {
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /go back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+
+    expect(navigateMock).toHaveBeenCalledWith(-1);
   });
 
   it("submits combined extraction payload and writes voice draft when clips are present", async () => {
@@ -218,6 +275,69 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed");
+    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
+  });
+
+  it("shows staged extraction progress and clears it after extraction resolves", async () => {
+    vi.useFakeTimers();
+
+    let resolveExtraction: ((value: ExtractionResult) => void) | undefined;
+    mockedQuoteService.extract.mockReturnValueOnce(
+      new Promise<ExtractionResult>((resolve) => {
+        resolveExtraction = resolve;
+      }),
+    );
+
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(screen.getByText("Analyzing notes...")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    expect(screen.getByText("Extracting line items...")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveExtraction?.(extractionFixture);
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText("Extracting line items...")).not.toBeInTheDocument();
+  });
+
+  it("does not apply the draft or redirect to review after leaving during in-flight extraction", async () => {
+    let resolveExtraction: ((value: ExtractionResult) => void) | undefined;
+    mockedQuoteService.extract.mockReturnValueOnce(
+      new Promise<ExtractionResult>((resolve) => {
+        resolveExtraction = resolve;
+      }),
+    );
+
+    const view = renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+    fireEvent.click(screen.getByRole("button", { name: /go back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+
+    expect(navigateMock).toHaveBeenCalledWith(-1);
+
+    view.unmount();
+
+    await act(async () => {
+      resolveExtraction?.(extractionFixture);
+      await Promise.resolve();
+    });
+
+    expect(setDraftMock).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
   });
 });
