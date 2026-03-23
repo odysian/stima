@@ -468,6 +468,22 @@ describe("QuotePreview", () => {
     expect(await screen.findByText("Quote List Screen")).toBeInTheDocument();
   });
 
+  it("closes the delete confirmation modal without deleting when kept", async () => {
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    fireEvent.click(screen.getByRole("button", { name: /delete quote/i }));
+
+    const dialog = screen.getByRole("dialog", { name: /delete q-001\?/i });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^keep$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /delete q-001\?/i })).not.toBeInTheDocument();
+    });
+    expect(mockedQuoteService.deleteQuote).not.toHaveBeenCalled();
+    expect(screen.queryByText("Quote List Screen")).not.toBeInTheDocument();
+  });
+
   it("shows an inline error when deleting the quote fails", async () => {
     mockedQuoteService.deleteQuote.mockRejectedValueOnce(new Error("Unable to delete quote"));
 

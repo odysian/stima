@@ -94,6 +94,7 @@ function updateQuote(id: string, data: QuoteUpdateRequest): Promise<Quote> {
 }
 
 function deleteQuote(id: string): Promise<void> {
+  // 204 No Content responses parse as null before we normalize back to void.
   return request<null>(`/api/quotes/${id}`, {
     method: "DELETE",
   }).then(() => undefined);
