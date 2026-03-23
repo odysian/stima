@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -124,9 +124,12 @@ describe("ReviewScreen", () => {
     renderScreen(makeDraft({ transcript: "5 yards brown mulch\nEdge front beds" }));
 
     const transcriptDetails = screen.getByText("TRANSCRIPT").closest("details");
-    const transcriptContent = transcriptDetails?.querySelector("p");
     expect(transcriptDetails).toBeInTheDocument();
+    if (!transcriptDetails) {
+      throw new Error("Expected transcript details section to render");
+    }
     expect(transcriptDetails).not.toHaveAttribute("open");
+    const transcriptContent = within(transcriptDetails).getByText(/5 yards brown mulch/i);
     expect(transcriptContent).toHaveTextContent("5 yards brown mulch Edge front beds");
   });
 

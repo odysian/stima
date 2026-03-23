@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -175,6 +175,7 @@ describe("QuotePreview", () => {
   it("renders quote line items with details and TBD for missing prices", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({
+        total_amount: 300,
         line_items: [
           {
             id: "line-1",
@@ -200,7 +201,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText("2 ITEMS")).toBeInTheDocument();
     expect(screen.getByText("Brown mulch")).toBeInTheDocument();
     expect(screen.getByText("5 yards")).toBeInTheDocument();
-    expect(screen.getAllByText("$120.00")).toHaveLength(2);
+    expect(within(screen.getByRole("list")).getByText("$120.00")).toBeInTheDocument();
     expect(screen.getByText("Edge front beds")).toBeInTheDocument();
     expect(screen.getByText("TBD")).toBeInTheDocument();
   });
