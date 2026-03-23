@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
@@ -23,6 +23,8 @@ export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { customerId } = useParams<{ customerId: string }>();
   const { setDraft } = useQuoteDraft();
+  const isMountedRef = useRef(true);
+  const extractionStageTimerRef = useRef<number | null>(null);
   const {
     clips,
     elapsedSeconds,
@@ -40,6 +42,15 @@ export function CaptureScreen(): React.ReactElement {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isExtracting = extractionStage !== null;
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (extractionStageTimerRef.current !== null) {
+        window.clearTimeout(extractionStageTimerRef.current);
+      }
+    };
+  }, []);
 
   function applyDraft(sourceType: QuoteSourceType, extraction: ExtractionResult): void {
     if (!customerId) {
@@ -72,7 +83,10 @@ export function CaptureScreen(): React.ReactElement {
     setError(null);
     clearError();
     setExtractionStage(clips.length > 0 ? "Processing audio clips..." : "Analyzing notes...");
-    const stageTimer = window.setTimeout(() => {
+    extractionStageTimerRef.current = window.setTimeout(() => {
+      if (!isMountedRef.current) {
+        return;
+      }
       setExtractionStage("Extracting line items...");
     }, 4000);
 
@@ -81,14 +95,26 @@ export function CaptureScreen(): React.ReactElement {
         clips: clips.map((clip) => clip.blob),
         notes,
       });
+      if (!isMountedRef.current) {
+        return;
+      }
       applyDraft(clips.length > 0 ? "voice" : "text", extraction);
       navigate("/quotes/review");
     } catch (submitError) {
+      if (!isMountedRef.current) {
+        return;
+      }
       const message = submitError instanceof Error ? submitError.message : "Unable to extract line items";
       setError(message);
     } finally {
-      window.clearTimeout(stageTimer);
-      setExtractionStage(null);
+      const shouldResetExtractionStage = isMountedRef.current;
+      if (extractionStageTimerRef.current !== null) {
+        window.clearTimeout(extractionStageTimerRef.current);
+        extractionStageTimerRef.current = null;
+      }
+      if (shouldResetExtractionStage) {
+        setExtractionStage(null);
+      }
     }
   }
 

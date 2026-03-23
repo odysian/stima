@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 
 interface ConfirmModalProps {
   title: string;
@@ -26,9 +26,21 @@ export function ConfirmModal({
 }: ConfirmModalProps): React.ReactElement {
   const titleId = useId();
   const bodyId = useId();
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    cancelButtonRef.current?.focus();
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 px-4 pb-4 sm:items-center sm:pb-0">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 px-4 pb-4 sm:items-center sm:pb-0"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          onCancel();
+        }
+      }}
+    >
       <div
         role="dialog"
         aria-modal="true"
@@ -54,6 +66,7 @@ export function ConfirmModal({
           </button>
           <button
             type="button"
+            ref={cancelButtonRef}
             className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
             onClick={onCancel}
           >

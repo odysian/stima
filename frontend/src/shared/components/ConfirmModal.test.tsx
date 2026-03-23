@@ -20,6 +20,7 @@ describe("ConfirmModal", () => {
     expect(screen.getByText("Your clips and notes will be lost.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Leave" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stay" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stay" })).toHaveFocus();
   });
 
   it("fires onConfirm when confirm button is clicked", () => {
@@ -85,5 +86,23 @@ describe("ConfirmModal", () => {
     );
 
     expect(screen.getByRole("button", { name: "Leave" })).toHaveClass("forest-gradient", "text-white");
+  });
+
+  it("dismisses the modal when Escape is pressed", () => {
+    const onCancel = vi.fn();
+
+    render(
+      <ConfirmModal
+        title="Leave this screen?"
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        onConfirm={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Stay" }), { key: "Escape" });
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

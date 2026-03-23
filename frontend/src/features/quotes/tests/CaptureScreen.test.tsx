@@ -90,8 +90,8 @@ function mockVoiceCapture(overrides: Partial<ReturnType<typeof useVoiceCapture>>
   });
 }
 
-function renderScreen(): void {
-  render(
+function renderScreen() {
+  return render(
     <MemoryRouter>
       <CaptureScreen />
     </MemoryRouter>,
@@ -309,5 +309,35 @@ describe("CaptureScreen", () => {
     });
 
     expect(screen.queryByText("Extracting line items...")).not.toBeInTheDocument();
+  });
+
+  it("does not apply the draft or redirect to review after leaving during in-flight extraction", async () => {
+    let resolveExtraction: ((value: ExtractionResult) => void) | undefined;
+    mockedQuoteService.extract.mockReturnValueOnce(
+      new Promise<ExtractionResult>((resolve) => {
+        resolveExtraction = resolve;
+      }),
+    );
+
+    const view = renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+    fireEvent.click(screen.getByRole("button", { name: /go back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+
+    expect(navigateMock).toHaveBeenCalledWith(-1);
+
+    view.unmount();
+
+    await act(async () => {
+      resolveExtraction?.(extractionFixture);
+      await Promise.resolve();
+    });
+
+    expect(setDraftMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
   });
 });

@@ -63,6 +63,10 @@ Record conventions that already exist in code.
 - `FeedbackMessage` (`@/shared/components/FeedbackMessage`):
   - Use for inline error feedback instead of ad-hoc red utility classes.
   - Current variant: `error` with tokenized style (`border-error bg-error-container text-error`).
+- `ConfirmModal` (`@/shared/components/ConfirmModal`):
+  - Use for explicit stay/leave, discard, or destructive confirmation flows instead of `window.confirm`.
+  - Props: `title`, optional `body`, `confirmLabel`, `cancelLabel`, `onConfirm`, `onCancel`, optional `variant`.
+  - Behavior: moves initial focus to cancel, supports `Escape` dismissal, and uses `primary` or `destructive` confirm styling.
 - `formatCurrency` / `formatDate` (`@/shared/lib/formatters`):
   - Use for all money and calendar date display in UI.
   - Do not duplicate local currency/date formatter helpers in screens/components.
@@ -70,6 +74,7 @@ Record conventions that already exist in code.
   - Use `ScreenHeader` for top-bar layout.
   - Use `ScreenFooter` when actions are sticky to bottom.
   - Use `FeedbackMessage` for inline errors.
+  - Use `ConfirmModal` for reusable confirmation dialogs.
   - Import `formatCurrency` / `formatDate` instead of local formatters.
 
 ## File-Size Budgets
