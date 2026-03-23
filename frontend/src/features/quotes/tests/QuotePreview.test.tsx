@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -170,6 +170,40 @@ describe("QuotePreview", () => {
     expect(await screen.findByText("$245.50")).toBeInTheDocument();
     expect(screen.getByText("cust-1")).toBeInTheDocument();
     expect(screen.getByText("No contact details")).toBeInTheDocument();
+  });
+
+  it("renders quote line items with details and TBD for missing prices", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        total_amount: 300,
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+          {
+            id: "line-2",
+            description: "Edge front beds",
+            details: null,
+            price: null,
+            sort_order: 1,
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "LINE ITEMS" })).toBeInTheDocument();
+    expect(screen.getByText("2 ITEMS")).toBeInTheDocument();
+    expect(screen.getByText("Brown mulch")).toBeInTheDocument();
+    expect(screen.getByText("5 yards")).toBeInTheDocument();
+    expect(within(screen.getByRole("list")).getByText("$120.00")).toBeInTheDocument();
+    expect(screen.getByText("Edge front beds")).toBeInTheDocument();
+    expect(screen.getByText("TBD")).toBeInTheDocument();
   });
 
   it("generates PDF and renders iframe preview", async () => {

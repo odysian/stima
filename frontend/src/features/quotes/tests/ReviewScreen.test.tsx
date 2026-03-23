@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -118,6 +118,25 @@ describe("ReviewScreen", () => {
 
     expect(screen.getByText(/ai confidence note/i)).toBeInTheDocument();
     expect(screen.getByText(/price for edging is uncertain/i)).toBeInTheDocument();
+  });
+
+  it("shows a collapsed transcript section when transcript is non-empty", () => {
+    renderScreen(makeDraft({ transcript: "5 yards brown mulch\nEdge front beds" }));
+
+    const transcriptDetails = screen.getByText("TRANSCRIPT").closest("details");
+    expect(transcriptDetails).toBeInTheDocument();
+    if (!transcriptDetails) {
+      throw new Error("Expected transcript details section to render");
+    }
+    expect(transcriptDetails).not.toHaveAttribute("open");
+    const transcriptContent = within(transcriptDetails).getByText(/5 yards brown mulch/i);
+    expect(transcriptContent).toHaveTextContent("5 yards brown mulch Edge front beds");
+  });
+
+  it("hides the transcript section when transcript is blank", () => {
+    renderScreen(makeDraft({ transcript: "   " }));
+
+    expect(screen.queryByText("TRANSCRIPT")).not.toBeInTheDocument();
   });
 
   it("shows AI banner when a line item is flagged even without confidence notes", () => {

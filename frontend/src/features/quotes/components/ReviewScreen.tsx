@@ -144,6 +144,16 @@ export function ReviewScreen(): React.ReactElement | null {
         ) : null}
 
         {shouldRenderAiBanner ? <AIConfidenceBanner message={confidenceMessage} /> : null}
+        {currentDraft.transcript.trim().length > 0 ? (
+          <details className="rounded-lg bg-surface-container-low">
+            <summary className="cursor-pointer select-none px-4 py-3 text-xs font-bold uppercase tracking-widest text-outline">
+              TRANSCRIPT
+            </summary>
+            <p className="whitespace-pre-wrap px-4 pb-3 text-sm text-on-surface-variant">
+              {currentDraft.transcript}
+            </p>
+          </details>
+        ) : null}
 
         <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
           <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>
@@ -156,7 +166,7 @@ export function ReviewScreen(): React.ReactElement | null {
           {currentDraft.lineItems.length > 0 ? (
             currentDraft.lineItems.map((lineItem, index) => (
               <LineItemCard
-                key={`line-item-card-${index}-${lineItem.description}-${lineItem.details ?? ""}`}
+                key={`line-item-card-${index}`}
                 description={lineItem.description || "Untitled line item"}
                 details={lineItem.details}
                 price={lineItem.price}
