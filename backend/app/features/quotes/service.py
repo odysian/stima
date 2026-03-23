@@ -192,7 +192,7 @@ class QuoteService:
         if updated_quote.status == QuoteStatus.READY:
             updated_quote.status = QuoteStatus.DRAFT
         await self._repository.commit()
-        return updated_quote
+        return await self._repository.refresh(updated_quote)
 
     async def generate_pdf(self, user: User, quote_id: UUID) -> tuple[str, bytes]:
         """Render and return quote PDF bytes while applying ready transition rules."""
