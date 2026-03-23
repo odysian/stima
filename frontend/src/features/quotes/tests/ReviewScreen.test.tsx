@@ -120,6 +120,22 @@ describe("ReviewScreen", () => {
     expect(screen.getByText(/price for edging is uncertain/i)).toBeInTheDocument();
   });
 
+  it("shows a collapsed transcript section when transcript is non-empty", () => {
+    renderScreen(makeDraft({ transcript: "5 yards brown mulch\nEdge front beds" }));
+
+    const transcriptDetails = screen.getByText("TRANSCRIPT").closest("details");
+    const transcriptContent = transcriptDetails?.querySelector("p");
+    expect(transcriptDetails).toBeInTheDocument();
+    expect(transcriptDetails).not.toHaveAttribute("open");
+    expect(transcriptContent).toHaveTextContent("5 yards brown mulch Edge front beds");
+  });
+
+  it("hides the transcript section when transcript is blank", () => {
+    renderScreen(makeDraft({ transcript: "   " }));
+
+    expect(screen.queryByText("TRANSCRIPT")).not.toBeInTheDocument();
+  });
+
   it("shows AI banner when a line item is flagged even without confidence notes", () => {
     renderScreen(
       makeDraft({

@@ -172,6 +172,39 @@ describe("QuotePreview", () => {
     expect(screen.getByText("No contact details")).toBeInTheDocument();
   });
 
+  it("renders quote line items with details and TBD for missing prices", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+          {
+            id: "line-2",
+            description: "Edge front beds",
+            details: null,
+            price: null,
+            sort_order: 1,
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "LINE ITEMS" })).toBeInTheDocument();
+    expect(screen.getByText("2 ITEMS")).toBeInTheDocument();
+    expect(screen.getByText("Brown mulch")).toBeInTheDocument();
+    expect(screen.getByText("5 yards")).toBeInTheDocument();
+    expect(screen.getAllByText("$120.00")).toHaveLength(2);
+    expect(screen.getByText("Edge front beds")).toBeInTheDocument();
+    expect(screen.getByText("TBD")).toBeInTheDocument();
+  });
+
   it("generates PDF and renders iframe preview", async () => {
     renderScreen();
 

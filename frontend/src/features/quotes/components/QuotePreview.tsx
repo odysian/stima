@@ -10,6 +10,7 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
+import { formatCurrency } from "@/shared/lib/formatters";
 
 function isShareAbortError(error: unknown): boolean {
   return (
@@ -225,6 +226,36 @@ export function QuotePreview(): React.ReactElement {
             />
 
             {shareUrl ? <ShareLinkRow shareUrl={shareUrl} onCopy={copyToClipboard} /> : null}
+            {quote ? (
+              <section className="mx-4 mt-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                    LINE ITEMS
+                  </h2>
+                  <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                    {quote.line_items.length} ITEMS
+                  </span>
+                </div>
+                <ul className="space-y-2">
+                  {quote.line_items.map((item) => (
+                    <li
+                      key={item.id}
+                      className="ghost-shadow flex items-start justify-between rounded-lg bg-surface-container-lowest p-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-on-surface">{item.description}</p>
+                        {item.details ? (
+                          <p className="mt-1 text-sm text-on-surface-variant">{item.details}</p>
+                        ) : null}
+                      </div>
+                      <p className="ml-4 shrink-0 font-bold text-on-surface">
+                        {item.price !== null ? formatCurrency(item.price) : "TBD"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
             {quote ? <QuoteDetailsCard totalAmount={quote.total_amount} clientName={clientName} clientContact={clientContact} /> : null}
           </>
         ) : null}
