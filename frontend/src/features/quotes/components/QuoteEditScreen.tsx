@@ -117,7 +117,7 @@ export function QuoteEditScreen(): React.ReactElement {
       price: lineItem.price,
     }));
   const hasNullPrices = lineItemsForSubmit.some((lineItem) => lineItem.price === null);
-  const canSubmit = lineItemsForSubmit.length > 0 && !hasInvalidLineItems && !isLoadingQuote;
+  const canSubmit = !isLoadingQuote && !loadError && currentDraft !== null;
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
       return runningTotal;
@@ -158,13 +158,13 @@ export function QuoteEditScreen(): React.ReactElement {
 
     setSaveError(null);
 
-    if (lineItemsForSubmit.length === 0) {
-      setSaveError("Add at least one line item description before saving the quote.");
+    if (hasInvalidLineItems) {
+      setSaveError("Each line item with details or price needs a description.");
       return;
     }
 
-    if (hasInvalidLineItems) {
-      setSaveError("Each line item with details or price needs a description.");
+    if (lineItemsForSubmit.length === 0) {
+      setSaveError("Add at least one line item description before saving the quote.");
       return;
     }
 

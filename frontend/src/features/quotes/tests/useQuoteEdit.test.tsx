@@ -78,6 +78,20 @@ describe("useQuoteEdit", () => {
     });
   });
 
+  it("rejects corrupted stored line items during rehydration", () => {
+    window.sessionStorage.setItem(
+      EDIT_STORAGE_KEY,
+      JSON.stringify({
+        ...draftFixture,
+        lineItems: [{ details: "Missing description", price: 120 }],
+      }),
+    );
+
+    render(<HookHarness />);
+
+    expect(screen.getByTestId("draft-state")).toHaveTextContent("null");
+  });
+
   it("updates one line item and persists it to sessionStorage", () => {
     render(<HookHarness />);
 

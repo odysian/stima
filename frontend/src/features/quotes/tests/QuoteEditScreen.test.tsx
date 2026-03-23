@@ -127,6 +127,15 @@ describe("QuoteEditScreen", () => {
     });
   });
 
+  it("shows a load error when the quote fetch fails", async () => {
+    mockedQuoteService.getQuote.mockRejectedValueOnce(new Error("Unable to load quote"));
+
+    renderScreen();
+
+    expect(await screen.findByText("Unable to load quote")).toBeInTheDocument();
+    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
+  });
+
   it("saves changes, clears the edit draft, and navigates back to preview", async () => {
     window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
 
@@ -151,6 +160,27 @@ describe("QuoteEditScreen", () => {
     });
     expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).toBeNull();
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
+  });
+
+  it("blocks save when a line item has details or price but no description", async () => {
+    window.sessionStorage.setItem(
+      EDIT_STORAGE_KEY,
+      JSON.stringify(
+        makeDraft({
+          lineItems: [{ description: "   ", details: "5 yards", price: 120 }],
+        }),
+      ),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Q-001" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(
+      await screen.findByText("Each line item with details or price needs a description."),
+    ).toBeInTheDocument();
+    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
   });
 
   it("navigates to the line item edit route when a card is clicked", async () => {

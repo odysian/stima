@@ -23,6 +23,28 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function isValidLineItemDraft(value: unknown): value is LineItemDraftWithFlags {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  const {
+    description,
+    details,
+    price,
+    flagged,
+    flagReason,
+  } = value;
+
+  return (
+    typeof description === "string" &&
+    (details === null || details === undefined || typeof details === "string") &&
+    (price === null || price === undefined || typeof price === "number") &&
+    (flagged === undefined || typeof flagged === "boolean") &&
+    (flagReason === undefined || flagReason === null || typeof flagReason === "string")
+  );
+}
+
 function parseStoredDraft(raw: string | null): QuoteEditDraft | null {
   if (!raw) {
     return null;
@@ -53,9 +75,13 @@ function parseStoredDraft(raw: string | null): QuoteEditDraft | null {
       return null;
     }
 
+    if (!lineItems.every(isValidLineItemDraft)) {
+      return null;
+    }
+
     return {
       quoteId,
-      lineItems: lineItems as LineItemDraftWithFlags[],
+      lineItems,
       total,
       notes,
     };
