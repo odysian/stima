@@ -44,6 +44,7 @@ export function CaptureScreen(): React.ReactElement {
   const isExtracting = extractionStage !== null;
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       if (extractionStageTimerRef.current !== null) {
