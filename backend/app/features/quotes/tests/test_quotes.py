@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator, Sequence
 from typing import Annotated
 from uuid import UUID, uuid4
@@ -24,6 +25,7 @@ from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
 from app.main import app
+from app.shared import event_logger
 from app.shared.dependencies import get_extraction_service, get_quote_service
 
 pytestmark = pytest.mark.asyncio
@@ -258,6 +260,115 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert patched["line_items"][0]["price"] is None
     assert patched["total_amount"] == 150
     assert patched["notes"] == "Updated note"
+
+
+async def test_business_events_are_logged_for_quote_customer_and_extraction_flows(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    csrf_token = await _register_and_login(client, _credentials())
+
+    customer_response = await client.post(
+        "/api/customers",
+        json={"name": "Event Test Customer", "email": "customer@example.com"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert customer_response.status_code == 201
+    customer_payload = customer_response.json()
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_payload["id"],
+            "transcript": "Spring cleanup quote",
+            "line_items": [{"description": "Cleanup", "details": None, "price": 200}],
+            "total_amount": 200,
+            "notes": "Initial draft",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_payload = create_response.json()
+
+    extract_response = await client.post(
+        "/api/quotes/extract",
+        data={"notes": "Refresh beds and edge walkway"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert extract_response.status_code == 200
+
+    update_response = await client.patch(
+        f"/api/quotes/{quote_payload['id']}",
+        json={"notes": "Revised draft"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert update_response.status_code == 200
+
+    pdf_response = await client.post(
+        f"/api/quotes/{quote_payload['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert pdf_response.status_code == 200
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_payload['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    delete_create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_payload["id"],
+            "transcript": "Delete me",
+            "line_items": [{"description": "Mulch", "details": None, "price": 80}],
+            "total_amount": 80,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert delete_create_response.status_code == 201
+    delete_quote_payload = delete_create_response.json()
+
+    delete_response = await client.delete(
+        f"/api/quotes/{delete_quote_payload['id']}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert delete_response.status_code == 204
+
+    event_names = [payload["event"] for payload in emitted_events]
+    assert event_names == [
+        "customer.created",
+        "quote.created",
+        "extraction.completed",
+        "quote.updated",
+        "quote.pdf_generated",
+        "quote.shared",
+        "quote.created",
+        "quote.deleted",
+    ]
+    assert emitted_events[0]["customer_id"] == customer_payload["id"]
+    assert emitted_events[1]["quote_id"] == quote_payload["id"]
+    assert emitted_events[2]["detail"] == "notes"
+    assert emitted_events[4]["quote_id"] == quote_payload["id"]
+    assert emitted_events[7]["quote_id"] == delete_quote_payload["id"]
+    assert all(
+        "Event Test Customer" not in payload_text
+        for payload_text in map(json.dumps, emitted_events)
+    )
+    assert all(
+        "customer@example.com" not in payload_text
+        for payload_text in map(json.dumps, emitted_events)
+    )
 
 
 async def test_convert_notes_returns_422_for_extraction_errors(client: AsyncClient) -> None:
