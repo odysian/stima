@@ -364,7 +364,10 @@ describe("quoteService integration (MSW)", () => {
     server.use(
       http.delete("/api/quotes/:id", ({ request }) => {
         capturedCsrfHeader = request.headers.get("X-CSRF-Token");
-        return new HttpResponse(null, { status: 204 });
+        return new HttpResponse(null, {
+          status: 204,
+          headers: { "Content-Type": "application/json" },
+        });
       }),
     );
 

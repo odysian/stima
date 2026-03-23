@@ -94,12 +94,21 @@ function buildHeaders(method: string, headers?: HeadersInit, hasJsonBody?: boole
 }
 
 async function parsePayload(response: Response): Promise<unknown> {
+  if (response.status === 204 || response.status === 205 || response.status === 304) {
+    return null;
+  }
+
   const contentType = response.headers.get("Content-Type");
   if (!contentType || !contentType.includes("application/json")) {
     return null;
   }
 
-  return response.json();
+  const text = await response.text();
+  if (text.trim().length === 0) {
+    return null;
+  }
+
+  return JSON.parse(text) as unknown;
 }
 
 function getErrorMessage(payload: unknown, fallback: string): string {

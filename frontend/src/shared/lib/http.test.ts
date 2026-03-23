@@ -160,4 +160,18 @@ describe("http request helper", () => {
     expect(blob.type).toBe("application/pdf");
     expect(await blob.text()).toBe("mock-pdf-content");
   });
+
+  it("returns null for empty 204 responses even when content-type is json", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, {
+        status: 204,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+    );
+
+    await expect(request<null>("/api/quotes/quote-1", { method: "DELETE" })).resolves.toBeNull();
+  });
 });
