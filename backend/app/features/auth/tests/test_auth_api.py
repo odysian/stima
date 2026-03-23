@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -16,6 +16,8 @@ from app.core.database import get_engine, get_session_maker
 from app.core.security import create_refresh_token, hash_token
 from app.features.auth.models import RefreshToken, User
 from app.features.auth.service import ACCESS_COOKIE_NAME, CSRF_COOKIE_NAME, REFRESH_COOKIE_NAME
+from app.main import app
+from app.shared.rate_limit import limiter as _shared_limiter
 
 pytestmark = pytest.mark.asyncio
 
@@ -37,6 +39,112 @@ def _configure_auth_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_session_maker.cache_clear()
     get_engine.cache_clear()
     get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> Iterator[None]:
+    _shared_limiter.reset()
+    yield
+    _shared_limiter.reset()
+
+
+async def test_register_returns_201_with_user_payload(client: AsyncClient) -> None:
+    credentials = _credentials()
+
+    register_response = await client.post("/api/auth/register", json=credentials)
+
+    assert register_response.status_code == 201
+    payload = register_response.json()
+    user = payload["user"]
+    assert UUID(user["id"])
+    assert user["email"] == credentials["email"]
+    assert user["is_active"] is True
+    assert user["is_onboarded"] is False
+
+
+async def test_register_does_not_set_auth_cookies(client: AsyncClient) -> None:
+    register_response = await client.post("/api/auth/register", json=_credentials())
+
+    assert register_response.status_code == 201
+    set_cookie_values = register_response.headers.get_list("set-cookie")
+    assert not any(f"{ACCESS_COOKIE_NAME}=" in value for value in set_cookie_values)
+    assert not any(f"{REFRESH_COOKIE_NAME}=" in value for value in set_cookie_values)
+    assert not any(f"{CSRF_COOKIE_NAME}=" in value for value in set_cookie_values)
+    assert ACCESS_COOKIE_NAME not in client.cookies
+    assert REFRESH_COOKIE_NAME not in client.cookies
+    assert CSRF_COOKIE_NAME not in client.cookies
+
+
+async def test_register_rejects_invalid_email_format(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/auth/register",
+        json={"email": "not-an-email", "password": "StrongPass123!"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_register_rejects_short_password(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/auth/register",
+        json={"email": "short-password@example.com", "password": "Short1!"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_register_rejects_long_password(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/auth/register",
+        json={"email": "long-password@example.com", "password": f"{'A' * 128}1"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_register_rejects_missing_email(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/auth/register",
+        json={"password": "StrongPass123!"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_register_rejects_missing_password(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/auth/register",
+        json={"email": "missing-password@example.com"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_register_rejects_duplicate_email(client: AsyncClient) -> None:
+    credentials = _credentials()
+    first_response = await client.post("/api/auth/register", json=credentials)
+
+    assert first_response.status_code == 201
+
+    duplicate_response = await client.post("/api/auth/register", json=credentials)
+
+    assert duplicate_response.status_code == 409
+    assert duplicate_response.json() == {"detail": "Email is already registered"}
+
+
+async def test_register_rate_limit_enforced(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+
+    for _ in range(3):
+        response = await client.post("/api/auth/register", json=_credentials())
+        assert response.status_code == 201
+
+    response = await client.post("/api/auth/register", json=_credentials())
+
+    assert response.status_code == 429
 
 
 async def test_login_sets_auth_cookies_and_returns_csrf(client: AsyncClient) -> None:
@@ -81,6 +189,57 @@ async def test_login_uses_env_configured_prod_cookie_domain(
     assert all("Domain=.stima.odysian.dev" in value for value in set_cookie_values)
 
 
+async def test_login_rejects_invalid_email_format(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/auth/login",
+        json={"email": "not-an-email", "password": "StrongPass123!"},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_login_rejects_wrong_password(client: AsyncClient) -> None:
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+
+    login_response = await client.post(
+        "/api/auth/login",
+        json={"email": credentials["email"], "password": "WrongPass123!"},
+    )
+
+    assert login_response.status_code == 401
+    assert login_response.json() == {"detail": "Invalid credentials"}
+
+
+async def test_login_rejects_nonexistent_email(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/auth/login",
+        json={"email": "missing@example.com", "password": "StrongPass123!"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid credentials"}
+
+
+async def test_login_rate_limit_enforced(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+
+    for _ in range(5):
+        response = await client.post("/api/auth/login", json=credentials)
+        assert response.status_code == 200
+
+    response = await client.post("/api/auth/login", json=credentials)
+
+    assert response.status_code == 429
+
+
 async def test_refresh_rejects_missing_csrf_header(client: AsyncClient) -> None:
     await _register_and_login(client, _credentials())
 
@@ -100,6 +259,32 @@ async def test_refresh_rejects_csrf_mismatch(client: AsyncClient) -> None:
 
     assert refresh_response.status_code == 403
     assert refresh_response.json() == {"detail": "CSRF token mismatch"}
+
+
+async def test_refresh_rate_limit_enforced(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    await _register_and_login(client, _credentials())
+
+    for _ in range(10):
+        csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+        assert csrf_token is not None
+        response = await client.post(
+            "/api/auth/refresh",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert response.status_code == 200
+
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token is not None
+    response = await client.post(
+        "/api/auth/refresh",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 429
 
 
 async def test_refresh_rotates_token_and_soft_revokes_consumed_token(
@@ -224,6 +409,42 @@ async def test_logout_clears_auth_cookies_and_revokes_refresh_token(
     )
     assert revoked_row is not None
     assert revoked_row.revoked_at is not None
+
+
+async def test_logout_rate_limit_enforced(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    logout_sessions: list[tuple[str, str]] = []
+    for _ in range(11):
+        await _register_and_login(client, _credentials())
+        refresh_token = client.cookies.get(REFRESH_COOKIE_NAME)
+        csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+        assert refresh_token is not None
+        assert csrf_token is not None
+        logout_sessions.append((refresh_token, csrf_token))
+        client.cookies.clear()
+
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+
+    for refresh_token, csrf_token in logout_sessions[:10]:
+        client.cookies.set(REFRESH_COOKIE_NAME, refresh_token, path="/api/auth/")
+        client.cookies.set(CSRF_COOKIE_NAME, csrf_token, path="/")
+        response = await client.post(
+            "/api/auth/logout",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert response.status_code == 204
+
+    refresh_token, csrf_token = logout_sessions[10]
+    client.cookies.set(REFRESH_COOKIE_NAME, refresh_token, path="/api/auth/")
+    client.cookies.set(CSRF_COOKIE_NAME, csrf_token, path="/")
+    response = await client.post(
+        "/api/auth/logout",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 429
 
 
 async def test_logout_with_expired_refresh_token_still_clears_cookies(
