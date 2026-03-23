@@ -15,7 +15,9 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerSelectScreen } from "@/features/customers/components/CustomerSelectScreen";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
+import { EditLineItemForEditScreen } from "@/features/quotes/components/EditLineItemForEditScreen";
 import { EditLineItemScreen } from "@/features/quotes/components/EditLineItemScreen";
+import { QuoteEditScreen } from "@/features/quotes/components/QuoteEditScreen";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { QuotePreview } from "@/features/quotes/components/QuotePreview";
 import { ReviewScreen } from "@/features/quotes/components/ReviewScreen";
@@ -90,6 +92,8 @@ export default function App(): React.ReactElement {
         <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
         <Route path="/quotes/review" element={<ReviewScreen />} />
         <Route path="/quotes/review/line-items/:lineItemIndex/edit" element={<EditLineItemScreen />} />
+        <Route path="/quotes/:id/edit" element={<QuoteEditScreen />} />
+        <Route path="/quotes/:id/edit/line-items/:lineItemIndex/edit" element={<EditLineItemForEditScreen />} />
         <Route path="/quotes/:id/preview" element={<QuotePreview />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

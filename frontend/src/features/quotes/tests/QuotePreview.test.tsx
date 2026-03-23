@@ -85,6 +85,7 @@ function renderScreen(path = "/quotes/quote-1/preview"): void {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/quotes/:id/preview" element={<QuotePreview />} />
+        <Route path="/quotes/:id/edit" element={<div>Edit Quote Screen</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -145,7 +146,26 @@ describe("QuotePreview", () => {
     expect(screen.getByText("Draft")).toBeInTheDocument();
     expect(screen.getByText("Generate the PDF to preview it here.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^share$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
+  });
+
+  it("hides the edit button when the quote is shared", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "shared" }));
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Q-001" });
+    expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
+  });
+
+  it("navigates to the edit route from the preview action area", async () => {
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Q-001" });
+    fireEvent.click(screen.getByRole("button", { name: /edit quote/i }));
+
+    expect(await screen.findByText("Edit Quote Screen")).toBeInTheDocument();
   });
 
   it("shows an error when quote fetch fails", async () => {
