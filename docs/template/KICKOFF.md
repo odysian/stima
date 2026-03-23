@@ -29,11 +29,45 @@ Constraints:
 
 
 
+## Feature Discovery
+
+What are the highest-value features or improvements I could add next?
+
+Explore the codebase to understand the current state, then suggest 3-5 candidates ranked by impact. The project is currently <pre-launch | post-launch>.
+
+For each candidate:
+- What it is (one sentence)
+- Why it's high value at this stage
+- Rough effort signal (small / medium / large)
+
+Output a ranked list. We'll pick one and move into a whiteboard session.
+
 ## Whiteboard
 
 Lets whiteboard out feature Task <TaskNumber> from <FileLocation>
 
-I'd like to talk through the specifics and get the plan concrete enough to draw out the task and gh issue
+I'd like to talk through the specifics and get the plan concrete enough to draw out the task and gh issue.
+
+We're working toward — by the end of our discussion, not immediately:
+1. Problem framing (goal, non-goals, constraints).
+2. Implementation plan (3-5 steps, smallest viable path first).
+3. Risks and edge cases.
+4. Acceptance criteria (testable checks, not prose).
+5. Verification plan (exact commands).
+6. Issue artifact markdown ready for `gh issue create --body-file`.
+
+## Plan Review
+
+Review the plan above before we move to execution.
+
+Check for:
+1. Scope creep — anything beyond the stated goal.
+2. Missing edge cases or error paths.
+3. Acceptance criteria that aren't testable.
+4. Verification gaps (missing commands, untestable claims).
+5. Unresolved decisions that will block implementation.
+
+Output: READY or NEEDS WORK, with one-line findings if NEEDS WORK.
 
 ## 2) Planning-Only Kickoff (No Code Changes)
 

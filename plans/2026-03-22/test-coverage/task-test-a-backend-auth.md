@@ -24,20 +24,35 @@ The register endpoint (`POST /api/auth/register`) is called as a setup step in 1
 - `test_register_rejects_missing_password` — `{ "email": "..." }` → 422
 
 **Conflict (409):**
-- `test_register_rejects_duplicate_email` — register same email twice → 409 with `"Email already registered"` (or whatever the current service error detail is)
+- `test_register_rejects_duplicate_email` — register same email twice → 409 with `"Email is already registered"` (exact string from `AuthService.register` in service.py)
 
 **Rate limiting (429):**
 - `test_register_rate_limit_enforced` — 4th registration attempt within the hour → 429
 
 ### 2. Auth rate limit tests (in `test_auth_api.py`)
 
-These follow the same pattern already established in `test_quotes.py` (lines 505-527) for extraction rate limits:
+These follow the same pattern already established in `test_quotes.py` for extraction rate limits (see `test_extract_combined_rate_limit_returns_429` at ~line 597):
 
 - `test_login_rate_limit_enforced` — 6th login attempt within a minute → 429
 - `test_refresh_rate_limit_enforced` — 11th refresh attempt within a minute → 429
 - `test_logout_rate_limit_enforced` — 11th logout attempt within a minute → 429
 
-**Note:** Rate limit tests should use the existing `client` fixture and may need to account for the test runner's slowapi configuration. Follow the pattern from `test_capture_audio_enforces_rate_limit` in test_quotes.py.
+**Implementation note — rate limit tests require two things:**
+
+1. **Enable the limiter** via `monkeypatch.setattr(app.state.limiter, "enabled", True)` where `app` is imported from `app.main`. By default the limiter is disabled in tests.
+
+2. **Reset the limiter** between tests to prevent bleed-over. Add an autouse fixture (mirrors `_reset_rate_limiter` in `test_quotes.py`):
+   ```python
+   from app.shared.rate_limit import limiter as _shared_limiter
+
+   @pytest.fixture(autouse=True)
+   def _reset_rate_limiter() -> Iterator[None]:
+       _shared_limiter.reset()
+       yield
+       _shared_limiter.reset()
+   ```
+
+Reference implementation: `test_extract_combined_rate_limit_returns_429` in `test_quotes.py` (around line 597) — it performs N successful requests then asserts the (N+1)th returns 429.
 
 ### 3. Login validation tests (in `test_auth_api.py`)
 
