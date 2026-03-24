@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -37,6 +38,11 @@ def create_app() -> FastAPI:
     app.include_router(customer_router, prefix="/api")
     app.include_router(quote_router, prefix="/api")
     app.include_router(quote_public_router)
+
+    @app.get("/health", include_in_schema=False)
+    async def health() -> JSONResponse:
+        return JSONResponse({"status": "ok"})
+
     return app
 
 

@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# VM startup script (runs on every boot).
+# Responsibility: install dependencies and write infra config.
+# NGINX config and TLS are handled by the deploy script on every deploy.
+set -euo pipefail
+
+SSH_USER="${ssh_user}"
+BOOTSTRAP_MARKER="/opt/stima/.bootstrap_v1_done"
+
+export DEBIAN_FRONTEND=noninteractive
+
+# ── Directories (idempotent on every boot) ────────────────────────────────────
+install -d -m 755 /opt/stima
+install -d -m 755 /opt/stima/env
+install -d -m 755 /opt/stima/nginx
+install -d -m 755 /opt/stima/logs
+install -d -m 755 /var/www/acme-challenge
+
+# ── Ensure deploy user exists ─────────────────────────────────────────────────
+if ! id -u "$SSH_USER" >/dev/null 2>&1; then
+  useradd -m -s /bin/bash "$SSH_USER"
+fi
+
+# ── Infra config for deploy script ───────────────────────────────────────────
+# Written on every boot so it stays current if Terraform variables change.
+# The deploy script sources this to get domain/email for NGINX and certbot.
+cat > /opt/stima/env/infra.env <<EOF
+API_DOMAIN=${api_domain}
+CERTBOT_EMAIL=${certbot_email}
+FRONTEND_URL=${frontend_url}
+EOF
+chmod 644 /opt/stima/env/infra.env
+
+# ── Sudo: deploy user needs root for docker ops, NGINX, and certbot ──────────
+echo "$${SSH_USER} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/stima-deploy
+chmod 440 /etc/sudoers.d/stima-deploy
+
+# ── Bootstrap: install packages once ─────────────────────────────────────────
+if [[ ! -f "$BOOTSTRAP_MARKER" ]]; then
+  apt-get update
+  apt-get install -y ca-certificates curl nginx python3-venv
+
+  if ! command -v docker >/dev/null 2>&1; then
+    curl -fsSL https://get.docker.com | sh
+  fi
+  systemctl enable --now docker
+
+  # Certbot in a venv — survives distro upgrades.
+  python3 -m venv /opt/certbot-venv
+  /opt/certbot-venv/bin/pip install --quiet certbot
+
+  # Certbot auto-renewal twice daily.
+  cat > /etc/cron.d/certbot-renew <<'CRON'
+0 0,12 * * * root /opt/certbot-venv/bin/certbot renew --webroot -w /var/www/acme-challenge --quiet --post-hook "systemctl reload nginx"
+CRON
+  chmod 644 /etc/cron.d/certbot-renew
+
+  touch "$BOOTSTRAP_MARKER"
+fi
+
+# ── Final user setup ──────────────────────────────────────────────────────────
+usermod -aG docker "$SSH_USER" || true
+chown -R "$SSH_USER:$SSH_USER" /opt/stima
+
+# NGINX must be enabled so the deploy script can reload it.
+systemctl enable nginx

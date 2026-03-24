@@ -1,5 +1,6 @@
 .env
 .env.local
+backend.prod.env
 __pycache__/
 *.pyc
 .mypy_cache/
@@ -20,3 +21,8 @@ frontend/coverage/
 npm-debug.log*
 *.pem
 venv/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
