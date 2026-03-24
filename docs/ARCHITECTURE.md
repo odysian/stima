@@ -186,6 +186,7 @@ Rules:
 - `doc_number`
 - `status`
 - `total_amount`
+- `item_count`
 - `created_at`
 
 ### Error format

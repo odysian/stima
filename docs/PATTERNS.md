@@ -51,6 +51,11 @@ Record conventions that already exist in code.
 - Use MSW v2 API only (`http.*`, `HttpResponse.json()`). Do not use v1 patterns (`rest.*`, `ctx.json()`).
 - `onUnhandledRequest: 'error'` in test setup to catch unmocked network calls.
 
+## Design System (Mandatory For Frontend Work)
+- All frontend visual decisions (colors, typography, elevation, card patterns, interaction states, icons) are defined in `docs/DESIGN.md`.
+- `docs/DESIGN.md` is the authoritative reference for how things should look. This file (`PATTERNS.md`) covers code structure and which shared components to use.
+- When building or modifying frontend UI, read `docs/DESIGN.md` first.
+
 ## Shared Screen Primitives (Mandatory For New Screens)
 - `ScreenHeader` (`@/shared/components/ScreenHeader`):
   - Use for top app bars with back navigation on screen-style views.

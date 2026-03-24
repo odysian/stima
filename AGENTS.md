@@ -12,7 +12,7 @@ Must-read in this order:
 
 Read conditionally (only when relevant):
 - `GREENFIELD_BLUEPRINT.md` for greenfield repos or explicit restructuring tasks
-- `docs/README.md`, `docs/ARCHITECTURE.md`, `docs/PATTERNS.md`, `docs/REVIEW_CHECKLIST.md` for domain/contract/pattern changes
+- `docs/README.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/PATTERNS.md`, `docs/REVIEW_CHECKLIST.md` for domain/contract/pattern/UI changes
 - `skills/*` playbooks only when explicitly requested or clearly required by the task
 
 ## Unit of Work Rule
