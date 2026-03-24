@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
 import { customerService } from "@/features/customers/services/customerService";
+import type { Customer } from "@/features/customers/types/customer.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
 
 const navigateMock = vi.fn();
@@ -100,6 +101,22 @@ describe("CustomerDetailScreen", () => {
     expect(screen.getByLabelText(/^address$/i)).toHaveValue("1 Main St");
   });
 
+  it("shows loading state while fetching", () => {
+    mockedCustomerService.getCustomer.mockImplementationOnce(() => new Promise<Customer>(() => {}));
+
+    renderScreen();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading customer...");
+  });
+
+  it("shows error when customer fetch fails", async () => {
+    mockedCustomerService.getCustomer.mockRejectedValueOnce(new Error("Unable to load customer"));
+
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load customer");
+  });
+
   it("calls updateCustomer with edited values and shows success feedback", async () => {
     renderScreen();
     await screen.findByLabelText(/^name$/i);
@@ -129,6 +146,17 @@ describe("CustomerDetailScreen", () => {
     });
 
     expect(await screen.findByRole("status")).toHaveTextContent("Saved");
+  });
+
+  it("shows save error when update fails", async () => {
+    mockedCustomerService.updateCustomer.mockRejectedValueOnce(new Error("Unable to save customer"));
+
+    renderScreen();
+    await screen.findByLabelText(/^name$/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to save customer");
   });
 
   it("sends null for optional fields when user clears them", async () => {

@@ -96,6 +96,14 @@ describe("CustomerSelectScreen", () => {
     expect(await screen.findByText("Alice Johnson")).toBeInTheDocument();
   });
 
+  it("shows error when customer list fails", async () => {
+    mockedCustomerService.listCustomers.mockRejectedValueOnce(new Error("Unable to load customers"));
+
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load customers");
+  });
+
   it("filters list when user types in search input", async () => {
     renderScreen();
     await screen.findByText("Alice Johnson");
