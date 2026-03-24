@@ -157,25 +157,32 @@ export function CustomerSelectScreen(): React.ReactElement {
             {!loading && !loadError ? (
               <div className="mt-4">
                 {filteredCustomers.length > 0 ? (
-                  filteredCustomers.map((customer) => {
-                    const subtitle = [customer.phone, customer.email].filter(Boolean).join(" · ");
-                    return (
-                      <button
-                        key={customer.id}
-                        type="button"
-                        className="mb-2 flex w-full items-center justify-between rounded-lg bg-surface-container-lowest p-4 text-left transition-all active:scale-[0.99]"
-                        onClick={() => onSelectCustomer(customer.id)}
-                      >
-                        <div>
-                          <p className="font-bold text-on-surface">{customer.name}</p>
-                          {subtitle ? (
-                            <p className="text-sm text-on-surface-variant">{subtitle}</p>
-                          ) : null}
-                        </div>
-                        <span className="material-symbols-outlined text-outline">chevron_right</span>
-                      </button>
-                    );
-                  })
+                  <div className="rounded-xl bg-surface-container-low p-3">
+                    <ul className="flex flex-col gap-3">
+                      {filteredCustomers.map((customer) => {
+                        const subtitle = [customer.phone, customer.email].filter(Boolean).join(" · ");
+                        return (
+                          <li key={customer.id}>
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low"
+                              onClick={() => onSelectCustomer(customer.id)}
+                            >
+                              <div>
+                                <p className="font-bold text-on-surface">{customer.name}</p>
+                                {subtitle ? (
+                                  <p className="text-sm text-on-surface-variant">{subtitle}</p>
+                                ) : null}
+                              </div>
+                              <span className="material-symbols-outlined text-outline">
+                                chevron_right
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 ) : (
                   <p className="mt-6 text-center text-sm text-outline">No customers found.</p>
                 )}
