@@ -191,6 +191,15 @@ describe("QuotePreview", () => {
     expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
   });
 
+  it("shows loading state while fetching quote", () => {
+    mockedQuoteService.getQuote.mockImplementationOnce(() => new Promise<QuoteDetail>(() => {}));
+
+    renderScreen();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading quote...");
+    expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
+  });
+
   it("renders amount and falls back to customer_id when customer details are unavailable", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({

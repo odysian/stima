@@ -224,6 +224,15 @@ describe("ReviewScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
   });
 
+  it("shows save error when create fails", async () => {
+    mockedQuoteService.createQuote.mockRejectedValueOnce(new Error("Unable to create quote"));
+    renderScreen(makeDraft());
+
+    fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to create quote");
+  });
+
   it("filters blank rows before submit and only sends described line items", async () => {
     renderScreen(
       makeDraft({
@@ -292,5 +301,24 @@ describe("ReviewScreen", () => {
     );
 
     expect(screen.getByRole("button", { name: /generate quote >/i })).toBeDisabled();
+  });
+
+  it("disables submit when there are no line items", () => {
+    renderScreen(
+      makeDraft({
+        lineItems: [],
+      }),
+    );
+
+    expect(screen.getByText("No line items extracted yet.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate quote >/i })).toBeDisabled();
+  });
+
+  it("redirects to home when no draft is available", async () => {
+    renderScreen(null);
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
+    });
   });
 });

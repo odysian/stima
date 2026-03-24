@@ -157,6 +157,17 @@ describe("CaptureScreen", () => {
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
   });
 
+  it("shows browser unsupported warning", () => {
+    mockVoiceCapture({ isSupported: false });
+    renderScreen();
+
+    expect(
+      screen.getByText(
+        "Voice capture is not supported in this browser. You can still type notes and extract line items.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows a leave confirmation when navigating back with unsaved clips", () => {
     mockVoiceCapture({ clips: [clipFixture] });
     renderScreen();
