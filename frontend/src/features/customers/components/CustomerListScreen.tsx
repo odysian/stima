@@ -93,7 +93,7 @@ export function CustomerListScreen(): React.ReactElement {
 
         {!isLoading && !loadError && filteredCustomers.length > 0 ? (
           <div className="mx-4 rounded-xl bg-surface-container-low p-3">
-            <ul className="flex flex-col gap-3 pb-2">
+            <ul className="flex flex-col gap-3">
               {filteredCustomers.map((customer) => (
                 <li key={customer.id}>
                   <button

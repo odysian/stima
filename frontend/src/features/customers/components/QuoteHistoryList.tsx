@@ -45,7 +45,7 @@ export function QuoteHistoryList({
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <p className="text-sm text-on-surface-variant">
-                        {formatDate(quote.created_at)} {" · "} {itemCountLabel}
+                        {formatDate(quote.created_at)}{" · "}{itemCountLabel}
                       </p>
                       <StatusBadge variant={quote.status} />
                     </div>

@@ -59,6 +59,14 @@ describe("QuoteHistoryList", () => {
     expect(onQuoteClick).toHaveBeenCalledWith("quote-1");
   });
 
+  it("renders em dash when total_amount is null", () => {
+    render(
+      <QuoteHistoryList quotes={[makeQuote({ total_amount: null })]} onQuoteClick={vi.fn()} />,
+    );
+
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
   it("renders the empty state when no quotes exist", () => {
     render(<QuoteHistoryList quotes={[]} onQuoteClick={vi.fn()} />);
 

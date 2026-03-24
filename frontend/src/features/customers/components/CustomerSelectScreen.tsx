@@ -165,7 +165,7 @@ export function CustomerSelectScreen(): React.ReactElement {
                           <li key={customer.id}>
                             <button
                               type="button"
-                              className="flex w-full items-center justify-between rounded-xl bg-surface-container-lowest p-4 text-left transition-all active:scale-[0.98] active:bg-surface-container-low"
+                              className="flex w-full items-center justify-between rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low"
                               onClick={() => onSelectCustomer(customer.id)}
                             >
                               <div>
