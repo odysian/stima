@@ -41,6 +41,11 @@ export function ConfirmModal({
     queueMicrotask(restoreFocus);
   }
 
+  function handleConfirm(): void {
+    onConfirm();
+    queueMicrotask(restoreFocus);
+  }
+
   return (
     <Dialog.Root
       open
@@ -52,7 +57,7 @@ export function ConfirmModal({
         <Dialog.Overlay data-testid="confirm-modal-overlay" className="fixed inset-0 z-50 bg-black/35" />
         <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0">
           <Dialog.Content
-            aria-describedby={body ? undefined : undefined}
+            {...(!body ? { "aria-describedby": undefined } : {})}
             className="pointer-events-auto w-full max-w-md rounded-[1.75rem] bg-white p-6 shadow-[0_24px_64px_rgba(13,28,46,0.24)]"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
@@ -69,7 +74,7 @@ export function ConfirmModal({
               <button
                 type="button"
                 className={`inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] ${confirmButtonClasses[variant]}`}
-                onClick={onConfirm}
+                onClick={handleConfirm}
               >
                 {confirmLabel}
               </button>
