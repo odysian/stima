@@ -79,32 +79,17 @@ export function QuoteList(): React.ReactElement {
           <h1 className="font-headline text-2xl font-bold tracking-tight text-primary">
             Stima Quotes
           </h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            {activeQuoteCount} active {"\u00b7"} {pendingReviewCount} pending review
+          </p>
         </div>
-
-        <section className="mb-4 grid grid-cols-2 gap-3 px-4">
-          <div className="rounded-lg border-l-4 border-primary bg-surface-container-lowest p-4 ghost-shadow">
-            <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-              ACTIVE QUOTES
-            </p>
-            <p className="mt-2 font-headline text-3xl font-bold text-on-surface">
-              {activeQuoteCount}
-            </p>
-          </div>
-          <div className="rounded-lg border-l-4 border-warning-accent bg-surface-container-lowest p-4 ghost-shadow">
-            <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-              PENDING REVIEW
-            </p>
-            <p className="mt-2 font-headline text-3xl font-bold text-on-surface">
-              {pendingReviewCount}
-            </p>
-          </div>
-        </section>
 
         <div className="mb-4 px-4">
           <Input
             label="Search quotes"
             id="quote-search"
             placeholder="Search customer or quote ID..."
+            hideLabel
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -143,33 +128,36 @@ export function QuoteList(): React.ReactElement {
                 Sorted by: Most Recent
               </p>
             </div>
-            <ul className="px-4 pb-2">
-              {filteredQuotes.map((quote) => (
-                <li key={quote.id} className="mb-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/quotes/${quote.id}/preview`)}
-                    className="w-full rounded-lg bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.99]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
+            <div className="mx-4 rounded-xl bg-surface-container-low p-3">
+              <ul className="flex flex-col gap-3">
+                {filteredQuotes.map((quote) => (
+                  <li key={quote.id}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/quotes/${quote.id}/preview`)}
+                      className="w-full rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
                         <p className="font-headline font-bold text-on-surface">
                           {quote.customer_name}
                         </p>
-                        <p className="mt-1 text-sm text-on-surface-variant">
-                          {quote.doc_number} {" \u00b7 "} {formatDate(quote.created_at)}
+                        <p className="font-headline font-bold text-on-surface">
+                          {formatCurrency(quote.total_amount)}
                         </p>
                       </div>
-                      <StatusBadge variant={quote.status} />
-                    </div>
-                    <p className="mt-2 text-xs text-outline">{quote.item_count} items</p>
-                    <p className="mt-3 text-right font-bold text-on-surface">
-                      {formatCurrency(quote.total_amount)}
-                    </p>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                      <div className="mt-1 flex items-center justify-between gap-3">
+                        <p className="text-sm text-on-surface-variant">
+                          {quote.doc_number} {" \u00b7 "} {formatDate(quote.created_at)} {" \u00b7 "}
+                          {" "}
+                          {quote.item_count} {quote.item_count === 1 ? "item" : "items"}
+                        </p>
+                        <StatusBadge variant={quote.status} />
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </>
         ) : null}
       </section>

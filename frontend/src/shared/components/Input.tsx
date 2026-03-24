@@ -7,6 +7,7 @@ interface InputProps {
   className?: string;
   type?: string;
   required?: boolean;
+  hideLabel?: boolean;
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
   error?: string;
@@ -19,6 +20,7 @@ export function Input({
   className,
   type = "text",
   required = false,
+  hideLabel = false,
   value,
   onChange,
   error,
@@ -34,7 +36,10 @@ export function Input({
   return (
     <div className="flex flex-col gap-1">
       {label ? (
-        <label htmlFor={id} className="text-sm font-medium text-on-surface">
+        <label
+          htmlFor={id}
+          className={hideLabel ? "sr-only" : "text-sm font-medium text-on-surface"}
+        >
           {label}
         </label>
       ) : null}
