@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
@@ -104,5 +106,110 @@ describe("ConfirmModal", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: "Stay" }), { key: "Escape" });
 
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses the modal when the backdrop is clicked", async () => {
+    const onCancel = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ConfirmModal
+        title="Leave this screen?"
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        onConfirm={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
+
+    await user.click(screen.getByTestId("confirm-modal-overlay"));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("traps tab focus within the modal", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ConfirmModal
+        title="Leave this screen?"
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Stay" })).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Leave" })).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Stay" })).toHaveFocus();
+  });
+
+  it("returns focus to the previously active element when dismissed", async () => {
+    const user = userEvent.setup();
+
+    function Harness(): React.ReactElement {
+      const [isOpen, setIsOpen] = useState(false);
+
+      return (
+        <>
+          <button type="button" onClick={() => setIsOpen(true)}>
+            Open modal
+          </button>
+          {isOpen ? (
+            <ConfirmModal
+              title="Leave this screen?"
+              confirmLabel="Leave"
+              cancelLabel="Stay"
+              onConfirm={vi.fn()}
+              onCancel={() => setIsOpen(false)}
+            />
+          ) : null}
+        </>
+      );
+    }
+
+    render(<Harness />);
+
+    await user.click(screen.getByRole("button", { name: "Open modal" }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Stay" }), { key: "Escape" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open modal" })).toHaveFocus());
+  });
+
+  it("returns focus to the previously active element when Stay is clicked", async () => {
+    const user = userEvent.setup();
+
+    function Harness(): React.ReactElement {
+      const [isOpen, setIsOpen] = useState(false);
+
+      return (
+        <>
+          <button type="button" onClick={() => setIsOpen(true)}>
+            Open modal
+          </button>
+          {isOpen ? (
+            <ConfirmModal
+              title="Leave this screen?"
+              confirmLabel="Leave"
+              cancelLabel="Stay"
+              onConfirm={vi.fn()}
+              onCancel={() => setIsOpen(false)}
+            />
+          ) : null}
+        </>
+      );
+    }
+
+    render(<Harness />);
+
+    await user.click(screen.getByRole("button", { name: "Open modal" }));
+    await user.click(screen.getByRole("button", { name: "Stay" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open modal" })).toHaveFocus());
   });
 });

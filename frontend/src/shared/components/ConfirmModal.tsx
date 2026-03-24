@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef } from "react";
+import { useRef } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 interface ConfirmModalProps {
   title: string;
@@ -24,56 +25,71 @@ export function ConfirmModal({
   onCancel,
   variant = "primary",
 }: ConfirmModalProps): React.ReactElement {
-  const titleId = useId();
-  const bodyId = useId();
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusTargetRef = useRef<HTMLElement | null>(
+    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+  );
 
-  useEffect(() => {
-    cancelButtonRef.current?.focus();
-  }, []);
+  function restoreFocus(): void {
+    if (restoreFocusTargetRef.current?.isConnected) {
+      restoreFocusTargetRef.current.focus();
+    }
+  }
+
+  function handleCancel(): void {
+    onCancel();
+    queueMicrotask(restoreFocus);
+  }
+
+  function handleConfirm(): void {
+    onConfirm();
+    queueMicrotask(restoreFocus);
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 px-4 pb-4 sm:items-center sm:pb-0"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          onCancel();
-        }
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open) handleCancel();
       }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={body ? bodyId : undefined}
-        className="w-full max-w-md rounded-[1.75rem] bg-white p-6 shadow-[0_24px_64px_rgba(13,28,46,0.24)]"
-      >
-        <h2 id={titleId} className="font-headline text-xl font-bold tracking-tight text-on-surface">
-          {title}
-        </h2>
-        {body ? (
-          <p id={bodyId} className="mt-2 text-sm leading-6 text-on-surface-variant">
-            {body}
-          </p>
-        ) : null}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
-          <button
-            type="button"
-            className={`inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] ${confirmButtonClasses[variant]}`}
-            onClick={onConfirm}
+      <Dialog.Portal>
+        <Dialog.Overlay data-testid="confirm-modal-overlay" className="fixed inset-0 z-50 bg-black/35" />
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0">
+          <Dialog.Content
+            {...(!body ? { "aria-describedby": undefined } : {})}
+            className="pointer-events-auto w-full max-w-md rounded-[1.75rem] bg-white p-6 shadow-[0_24px_64px_rgba(13,28,46,0.24)]"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              cancelButtonRef.current?.focus();
+            }}
           >
-            {confirmLabel}
-          </button>
-          <button
-            type="button"
-            ref={cancelButtonRef}
-            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
-            onClick={onCancel}
-          >
-            {cancelLabel}
-          </button>
+            <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">{title}</Dialog.Title>
+            {body ? (
+              <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
+                {body}
+              </Dialog.Description>
+            ) : null}
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
+              <button
+                type="button"
+                className={`inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] ${confirmButtonClasses[variant]}`}
+                onClick={handleConfirm}
+              >
+                {confirmLabel}
+              </button>
+              <button
+                type="button"
+                ref={cancelButtonRef}
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+                onClick={handleCancel}
+              >
+                {cancelLabel}
+              </button>
+            </div>
+          </Dialog.Content>
         </div>
-      </div>
-    </div>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
