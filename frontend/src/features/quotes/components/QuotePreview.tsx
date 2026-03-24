@@ -243,7 +243,7 @@ export function QuotePreview(): React.ReactElement {
                   href={pdfUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 rounded-lg py-1 text-sm font-medium text-primary"
+                  className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-primary"
                 >
                   <span className="material-symbols-outlined text-base">open_in_new</span>
                   Open PDF
