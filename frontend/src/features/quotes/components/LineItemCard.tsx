@@ -16,7 +16,7 @@ export function LineItemCard({
   return (
     <button
       type="button"
-      className={`w-full bg-surface-container-lowest rounded-lg p-4 ghost-shadow text-left flex items-start justify-between gap-3 active:scale-[0.99] transition-all ${
+      className={`flex w-full items-start justify-between gap-3 rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low ${
         flagged ? "border border-warning-accent/20" : ""
       }`}
       onClick={onClick}

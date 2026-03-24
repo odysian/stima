@@ -92,23 +92,25 @@ export function CustomerListScreen(): React.ReactElement {
         ) : null}
 
         {!isLoading && !loadError && filteredCustomers.length > 0 ? (
-          <ul className="px-4 pb-2">
-            {filteredCustomers.map((customer) => (
-              <li key={customer.id} className="mb-2 last:mb-0">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-lg bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.99]"
-                  onClick={() => navigate(`/customers/${customer.id}`)}
-                >
-                  <div>
-                    <p className="font-bold text-on-surface">{customer.name}</p>
-                    <p className="text-sm text-on-surface-variant">{contactLine(customer)}</p>
-                  </div>
-                  <span className="material-symbols-outlined text-outline">chevron_right</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="mx-4 rounded-xl bg-surface-container-low p-3">
+            <ul className="flex flex-col gap-3 pb-2">
+              {filteredCustomers.map((customer) => (
+                <li key={customer.id}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low"
+                    onClick={() => navigate(`/customers/${customer.id}`)}
+                  >
+                    <div>
+                      <p className="font-bold text-on-surface">{customer.name}</p>
+                      <p className="text-sm text-on-surface-variant">{contactLine(customer)}</p>
+                    </div>
+                    <span className="material-symbols-outlined text-outline">chevron_right</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         {showNoCustomersState ? (
