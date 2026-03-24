@@ -1,6 +1,7 @@
 import type { AuthResponse } from "@/features/auth/types/auth.types";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 const CSRF_COOKIE_NAME = "stima_csrf_token";
 
 let csrfToken: string | null = null;
@@ -181,7 +182,7 @@ async function requestWithParser<T>(
       ? window.fetch.bind(window)
       : fetch;
 
-  const response = await fetchImpl(url, {
+  const response = await fetchImpl(`${API_BASE}${url}`, {
     ...options,
     method,
     credentials: "include",
