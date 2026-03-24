@@ -78,7 +78,8 @@ export function QuotePreview(): React.ReactElement {
   useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
 
   const canShare = !!quote && !!pdfUrl;
-  const shareUrl = quote?.share_token ? `${window.location.origin}/share/${quote.share_token}` : null;
+  const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
+  const shareUrl = quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null;
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact =
     [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]
@@ -138,7 +139,7 @@ export function QuotePreview(): React.ReactElement {
       if (!updatedQuote.share_token) {
         throw new Error("Share link unavailable");
       }
-      const nextSharedUrl = `${window.location.origin}/share/${updatedQuote.share_token}`;
+      const nextSharedUrl = `${apiBase}/share/${updatedQuote.share_token}`;
       const maybeNavigator = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
 
       if (typeof maybeNavigator.share === "function") {
@@ -235,6 +236,20 @@ export function QuotePreview(): React.ReactElement {
                 </div>
               )}
             </div>
+
+            {pdfUrl ? (
+              <div className="mx-4 mt-2 flex justify-end">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-primary"
+                >
+                  <span className="material-symbols-outlined text-base">open_in_new</span>
+                  Open PDF
+                </a>
+              </div>
+            ) : null}
 
             <QuotePreviewActions
               onGeneratePdf={onGeneratePdf}
