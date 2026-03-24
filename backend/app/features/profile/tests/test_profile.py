@@ -101,6 +101,63 @@ async def test_patch_profile_rejects_empty_first_name(client: AsyncClient) -> No
     assert response.status_code == 422
 
 
+async def test_patch_profile_rejects_invalid_trade_type(client: AsyncClient) -> None:
+    await _register_and_login(client, _credentials())
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token is not None
+
+    response = await client.patch(
+        "/api/profile",
+        json={
+            "business_name": "Summit Exterior Care",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "trade_type": "InvalidType",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+    assert any(error["loc"][-1] == "trade_type" for error in response.json()["detail"])
+
+
+async def test_patch_profile_rejects_partial_update_and_preserves_existing_values(
+    client: AsyncClient,
+) -> None:
+    credentials = _credentials()
+    await _register_and_login(client, credentials)
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token is not None
+
+    initial_response = await client.patch(
+        "/api/profile",
+        json={
+            "business_name": "Summit Exterior Care",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "trade_type": "Landscaper",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert initial_response.status_code == 200
+
+    partial_response = await client.patch(
+        "/api/profile",
+        json={"first_name": "Janet"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert partial_response.status_code == 422
+
+    profile_response = await client.get("/api/profile")
+    assert profile_response.status_code == 200
+    payload = profile_response.json()
+    assert payload["business_name"] == "Summit Exterior Care"
+    assert payload["first_name"] == "Jane"
+    assert payload["last_name"] == "Doe"
+    assert payload["trade_type"] == "Landscaper"
+
+
 async def test_patch_profile_requires_authentication(client: AsyncClient) -> None:
     client.cookies.clear()
     client.cookies.set(CSRF_COOKIE_NAME, "csrf", path="/")

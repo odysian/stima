@@ -98,6 +98,15 @@ async def test_get_customer_by_id_returns_owned_customer(client: AsyncClient) ->
     assert response.json()["id"] == created_customer["id"]
 
 
+async def test_get_customer_returns_404_for_nonexistent_id(client: AsyncClient) -> None:
+    await _register_and_login(client, _credentials())
+
+    response = await client.get(f"/api/customers/{uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
 async def test_patch_customer_updates_customer(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     created_customer = await _create_customer(
@@ -114,6 +123,46 @@ async def test_patch_customer_updates_customer(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["name"] == "Alice Smith"
+
+
+async def test_patch_customer_returns_404_for_nonexistent_id(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.patch(
+        f"/api/customers/{uuid4()}",
+        json={"name": "Ghost Customer"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_patch_customer_updates_only_provided_fields(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    created_customer = await _create_customer(
+        client,
+        csrf_token,
+        {
+            "name": "Alice Johnson",
+            "phone": "555-0102",
+            "email": "alice@example.com",
+            "address": "10 Main St",
+        },
+    )
+
+    response = await client.patch(
+        f"/api/customers/{created_customer['id']}",
+        json={"phone": "555-9999"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["name"] == "Alice Johnson"
+    assert payload["phone"] == "555-9999"
+    assert payload["email"] == "alice@example.com"
+    assert payload["address"] == "10 Main St"
 
 
 async def test_patch_customer_rejects_null_name(client: AsyncClient) -> None:

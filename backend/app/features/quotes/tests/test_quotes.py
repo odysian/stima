@@ -262,6 +262,163 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert patched["notes"] == "Updated note"
 
 
+async def test_get_quote_returns_404_for_nonexistent_id(client: AsyncClient) -> None:
+    await _register_and_login(client, _credentials())
+
+    response = await client.get(f"/api/quotes/{uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_update_quote_returns_404_for_nonexistent_id(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.patch(
+        f"/api/quotes/{uuid4()}",
+        json={"notes": "updated"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_create_quote_returns_404_for_nonexistent_customer(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": str(uuid4()),
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_create_quote_allows_empty_line_items_and_returns_empty_list(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [],
+            "total_amount": None,
+            "notes": "No line items yet",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["line_items"] == []
+
+    list_response = await client.get("/api/quotes")
+    assert list_response.status_code == 200
+    assert list_response.json()[0]["item_count"] == 0
+
+
+async def test_update_quote_preserves_line_items_when_omitted(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [
+                {"description": "Mulch", "details": "5 yards", "price": 120},
+                {"description": "Edging", "details": None, "price": 80},
+            ],
+            "total_amount": 200,
+            "notes": "Initial note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"notes": "Updated note only"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["description"] for item in payload["line_items"]] == ["Mulch", "Edging"]
+    assert [item["price"] for item in payload["line_items"]] == [120, 80]
+    assert payload["notes"] == "Updated note only"
+    assert payload["total_amount"] == 200
+
+
+async def test_update_quote_replaces_line_items_when_provided(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [
+                {"description": "Mulch", "details": "5 yards", "price": 120},
+                {"description": "Edging", "details": None, "price": 80},
+            ],
+            "total_amount": 200,
+            "notes": "Initial note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={
+            "line_items": [
+                {
+                    "description": "Premium mulch refresh",
+                    "details": "6 yards",
+                    "price": 180,
+                }
+            ]
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["line_items"] == [
+        {
+            "id": payload["line_items"][0]["id"],
+            "description": "Premium mulch refresh",
+            "details": "6 yards",
+            "price": 180,
+            "sort_order": 0,
+        }
+    ]
+
+
 async def test_business_events_are_logged_for_quote_customer_and_extraction_flows(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,

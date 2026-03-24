@@ -152,6 +152,30 @@ async def test_generate_pdf_returns_422_when_render_fails(
     assert response.json() == {"detail": "Unable to render quote PDF"}
 
 
+async def test_generate_pdf_returns_404_for_nonexistent_quote(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        f"/api/quotes/{uuid4()}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_share_quote_returns_404_for_nonexistent_quote(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        f"/api/quotes/{uuid4()}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
 async def test_pdf_endpoint_requires_csrf(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
