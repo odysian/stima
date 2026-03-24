@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://api.stima.odysian.dev/api/:path*" },
+    { "source": "/share/:path*", "destination": "https://api.stima.odysian.dev/share/:path*" }
+  ]
+}
