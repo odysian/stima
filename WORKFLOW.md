@@ -48,6 +48,7 @@ Use this as the default human-in-the-loop sequence to reduce handoff overhead:
 5. If verdict is `ACTIONABLE`, patch in the implementation branch and rerun targeted verification only.
 6. When verdict is `APPROVED` and relayed back to the implementation agent, generate `docs/learning/YYYY-MM-DD-feature-slug-learning.md` using the canonical static header/template.
 7. Merge PR and sync local branch.
+8. If this Task belongs to a Spec, check whether all sibling Tasks are now done or deferred; if so, close the Spec issue.
 
 ## Issues Workflow (Control Plane)
 
