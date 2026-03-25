@@ -506,18 +506,22 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
     assert event_names == [
         "customer.created",
         "quote.created",
-        "extraction.completed",
+        "quote_started",
+        "draft_generated",
         "quote.updated",
         "quote.pdf_generated",
+        "quote_pdf_generated",
         "quote.shared",
+        "quote_shared",
         "quote.created",
         "quote.deleted",
     ]
     assert emitted_events[0]["customer_id"] == customer_payload["id"]
     assert emitted_events[1]["quote_id"] == quote_payload["id"]
     assert emitted_events[2]["detail"] == "notes"
-    assert emitted_events[4]["quote_id"] == quote_payload["id"]
-    assert emitted_events[7]["quote_id"] == delete_quote_payload["id"]
+    assert emitted_events[3]["detail"] == "notes"
+    assert emitted_events[5]["quote_id"] == quote_payload["id"]
+    assert emitted_events[9]["quote_id"] == delete_quote_payload["id"]
     assert all(
         "Event Test Customer" not in payload_text
         for payload_text in map(json.dumps, emitted_events)
@@ -783,6 +787,33 @@ async def test_capture_audio_transcription_failure_returns_502(client: AsyncClie
     assert response.json()["detail"].startswith("Transcription failed:")
 
 
+async def test_extract_combined_failure_logs_pilot_failure_events_to_stdout(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    csrf_token = await _register_and_login(client, _credentials())
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("clips", ("clip-1.webm", b"trigger-transcription-error", "audio/webm"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 502
+    assert [payload["event"] for payload in emitted_events] == [
+        "quote_started",
+        "audio_uploaded",
+        "draft_generation_failed",
+    ]
+    assert all(payload["detail"] == "audio" for payload in emitted_events)
+
+
 async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -847,6 +878,27 @@ async def test_extract_combined_clips_and_notes_success(client: AsyncClient) -> 
     )
     assert payload["line_items"]
     assert payload["confidence_notes"] == []
+
+
+async def test_event_log_persistence_failure_does_not_fail_quote_operations(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _boom(**_: object) -> None:
+        raise RuntimeError("db sink unavailable")
+
+    monkeypatch.setattr(event_logger, "_persist_event_record", _boom)
+    event_logger.configure_event_logging(session_factory=object())  # type: ignore[arg-type]
+
+    csrf_token = await _register_and_login(client, _credentials())
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the side yard"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    await event_logger.flush_event_tasks()
 
 
 async def test_extract_combined_requires_clip_or_notes(client: AsyncClient) -> None:

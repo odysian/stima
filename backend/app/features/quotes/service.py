@@ -246,6 +246,7 @@ class QuoteService:
         await self._repository.mark_ready_if_not_shared(quote_id=quote_id, user_id=user_id)
         await self._repository.commit()
         log_event("quote.pdf_generated", user_id=user_id, quote_id=quote_id)
+        log_event("quote_pdf_generated", user_id=user_id, quote_id=quote_id)
         return context.doc_number, pdf_bytes
 
     async def generate_shared_pdf(self, share_token: str) -> tuple[str, bytes]:
@@ -274,13 +275,20 @@ class QuoteService:
         quote.shared_at = _utcnow()
         quote.status = QuoteStatus.SHARED
         await self._repository.commit()
+        refreshed_quote = await self._repository.refresh(quote)
         log_event(
             "quote.shared",
             user_id=user_id,
-            quote_id=quote.id,
-            customer_id=quote.customer_id,
+            quote_id=refreshed_quote.id,
+            customer_id=refreshed_quote.customer_id,
         )
-        return await self._repository.refresh(quote)
+        log_event(
+            "quote_shared",
+            user_id=user_id,
+            quote_id=refreshed_quote.id,
+            customer_id=refreshed_quote.customer_id,
+        )
+        return refreshed_quote
 
 
 def _resolve_user_id(user: User) -> UUID:

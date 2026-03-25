@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event, text
@@ -16,6 +17,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes")
 from app.core.database import Base, get_db
 from app.features import registry as feature_registry  # noqa: F401
 from app.main import app
+from app.shared import event_logger
 
 TEST_SCHEMA = "stima_test"
 TEST_DATABASE_URL = os.getenv(
@@ -33,6 +35,14 @@ TestAsyncSession = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+
+@pytest.fixture(autouse=True)
+def _disable_db_event_persistence_by_default() -> Iterator[None]:
+    """Keep integration tests isolated unless a test explicitly enables event persistence."""
+    event_logger.configure_event_logging(session_factory=None)
+    yield
+    event_logger.configure_event_logging(session_factory=None)
 
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")

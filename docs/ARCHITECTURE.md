@@ -110,6 +110,23 @@ Unique constraint: `(user_id, doc_sequence)`.
 | sort_order | Integer | deterministic display order |
 | created_at, updated_at | DateTime(tz) | server defaults |
 
+### `event_logs`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → users) | cascade delete |
+| event_name | String(64) | pilot event name, underscore format |
+| metadata_json | JSON | lightweight `quote_id`, `customer_id`, `detail` payload |
+| created_at | DateTime(tz) | server default |
+
+Pilot event set:
+- `quote_started`
+- `audio_uploaded`
+- `draft_generated`
+- `draft_generation_failed`
+- `quote_pdf_generated`
+- `quote_shared`
+
 ## API Contracts
 
 ### Auth endpoints (`/api/auth/`)
