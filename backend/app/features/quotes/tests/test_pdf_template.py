@@ -6,10 +6,18 @@ import re
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
-from app.features.quotes.repository import QuoteRenderContext, QuoteRenderLineItem
+from app.features.auth.models import User
+from app.features.customers.models import Customer
+from app.features.quotes.models import Document, QuoteStatus
+from app.features.quotes.repository import (
+    QuoteRenderContext,
+    QuoteRenderLineItem,
+    _build_render_context,
+)
 from app.integrations.pdf import PdfIntegration
 
 
@@ -41,6 +49,8 @@ def _make_context(
         ],
         created_at=created_at,
         updated_at=updated_at,
+        issued_date="Mar 01, 2026",
+        updated_date=updated_at.strftime("%b %d, %Y"),
     )
 
 
@@ -128,3 +138,44 @@ def test_render_blanks_null_line_item_and_total_prices(
         rendered_html,
         re.DOTALL,
     )
+
+
+def test_build_render_context_formats_dates_in_business_timezone() -> None:
+    context = _build_render_context(
+        document=Document(
+            id=uuid4(),
+            user_id=uuid4(),
+            customer_id=uuid4(),
+            doc_sequence=1,
+            doc_number="Q-001",
+            status=QuoteStatus.READY,
+            source_type="text",
+            transcript="Notes",
+            total_amount=Decimal("120.00"),
+            notes=None,
+            created_at=datetime(2026, 3, 25, 0, 0, tzinfo=UTC),
+            updated_at=datetime(2026, 3, 25, 0, 6, tzinfo=UTC),
+            line_items=[],
+        ),
+        customer=Customer(
+            id=uuid4(),
+            user_id=uuid4(),
+            name="Jamie Customer",
+            phone=None,
+            email=None,
+            address=None,
+        ),
+        user=User(
+            id=uuid4(),
+            email="owner@example.com",
+            password_hash="hashed",
+            business_name="Acme Landscaping",
+            first_name="Taylor",
+            last_name="Owner",
+            trade_type="Landscaper",
+            timezone="America/New_York",
+        ),
+    )
+
+    assert context.issued_date == "Mar 24, 2026"
+    assert context.updated_date == "Mar 24, 2026"

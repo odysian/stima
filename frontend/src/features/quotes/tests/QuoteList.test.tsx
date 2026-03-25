@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { profileService } from "@/features/profile/services/profileService";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
@@ -29,7 +30,15 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
+vi.mock("@/features/profile/services/profileService", () => ({
+  profileService: {
+    getProfile: vi.fn(),
+    updateProfile: vi.fn(),
+  },
+}));
+
 const mockedQuoteService = vi.mocked(quoteService);
+const mockedProfileService = vi.mocked(profileService);
 
 function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListItem {
   return {
@@ -45,6 +54,20 @@ function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListIte
   };
 }
 
+function mockProfile(timezone: string | null = "UTC"): void {
+  mockedProfileService.getProfile.mockResolvedValueOnce({
+    id: "user-1",
+    email: "test@example.com",
+    is_active: true,
+    is_onboarded: true,
+    business_name: "Summit Exterior Care",
+    first_name: "Alex",
+    last_name: "Stone",
+    trade_type: "Landscaper",
+    timezone,
+  });
+}
+
 function renderScreen(): void {
   render(
     <MemoryRouter>
@@ -52,6 +75,10 @@ function renderScreen(): void {
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => {
+  mockProfile();
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -213,17 +240,19 @@ describe("QuoteList", () => {
     });
   });
 
-  it("renders created_at using a timezone-stable calendar day", async () => {
+  it("renders created_at using the saved business timezone", async () => {
+    mockedProfileService.getProfile.mockReset();
+    mockProfile("America/New_York");
     mockedQuoteService.listQuotes.mockResolvedValueOnce([
       makeQuoteListItem({
         id: "quote-utc-midnight",
-        created_at: "2026-03-21T00:00:00.000Z",
+        created_at: "2026-03-25T00:00:00.000Z",
       }),
     ]);
 
     renderScreen();
 
-    expect(await screen.findByText(/Q-001\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
+    expect(await screen.findByText(/Q-001\s*·\s*Mar 24, 2026/)).toBeInTheDocument();
   });
 
   it("renders an em dash when total_amount is null", async () => {

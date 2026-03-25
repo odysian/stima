@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import enum
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class TradeType(str, enum.Enum):
@@ -30,6 +31,7 @@ class ProfileResponse(BaseModel):
     last_name: str | None
     business_name: str | None
     trade_type: TradeType | None
+    timezone: str | None
     is_active: bool
     is_onboarded: bool
 
@@ -41,3 +43,22 @@ class ProfileUpdateRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     trade_type: TradeType
+    timezone: str | None = Field(default=None, max_length=64)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str | None) -> str | None:
+        """Accept only valid IANA timezone identifiers when provided."""
+        if value is None:
+            return None
+
+        normalized_value = value.strip()
+        if not normalized_value:
+            raise ValueError("Timezone must be a valid IANA timezone identifier")
+
+        try:
+            ZoneInfo(normalized_value)
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError("Timezone must be a valid IANA timezone identifier") from exc
+
+        return normalized_value

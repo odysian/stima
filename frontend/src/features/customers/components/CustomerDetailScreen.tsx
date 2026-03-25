@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { CustomerInfoForm } from "@/features/customers/components/CustomerInfoForm";
 import { QuoteHistoryList } from "@/features/customers/components/QuoteHistoryList";
+import { profileService } from "@/features/profile/services/profileService";
 import { customerService } from "@/features/customers/services/customerService";
 import type {
   Customer,
@@ -21,6 +22,7 @@ export function CustomerDetailScreen(): React.ReactElement {
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerQuotes, setCustomerQuotes] = useState<QuoteListItem[]>([]);
+  const [timezone, setTimezone] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -46,9 +48,10 @@ export function CustomerDetailScreen(): React.ReactElement {
       setLoadError(null);
 
       try {
-        const [nextCustomer, nextQuotes] = await Promise.all([
+        const [nextCustomer, nextQuotes, profile] = await Promise.all([
           customerService.getCustomer(customerId),
           quoteService.listQuotes({ customer_id: customerId }),
+          profileService.getProfile(),
         ]);
 
         if (!isActive) {
@@ -62,6 +65,7 @@ export function CustomerDetailScreen(): React.ReactElement {
         setAddress(nextCustomer.address ?? "");
 
         setCustomerQuotes(nextQuotes);
+        setTimezone(profile.timezone);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load customer";
         if (isActive) {
@@ -169,6 +173,7 @@ export function CustomerDetailScreen(): React.ReactElement {
             <QuoteHistoryList
               quotes={customerQuotes}
               onQuoteClick={(quoteId) => navigate(`/quotes/${quoteId}/preview`)}
+              timezone={timezone}
             />
           </>
         ) : null}

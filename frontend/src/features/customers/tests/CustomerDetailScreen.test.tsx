@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
+import { profileService } from "@/features/profile/services/profileService";
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer } from "@/features/customers/types/customer.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -41,8 +42,16 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
+vi.mock("@/features/profile/services/profileService", () => ({
+  profileService: {
+    getProfile: vi.fn(),
+    updateProfile: vi.fn(),
+  },
+}));
+
 const mockedCustomerService = vi.mocked(customerService);
 const mockedQuoteService = vi.mocked(quoteService);
+const mockedProfileService = vi.mocked(profileService);
 
 function renderScreen(): void {
   render(
@@ -71,9 +80,20 @@ beforeEach(() => {
       status: "draft",
       total_amount: 120,
       item_count: 1,
-      created_at: "2026-03-20T00:00:00.000Z",
+      created_at: "2026-03-25T00:00:00.000Z",
     },
   ]);
+  mockedProfileService.getProfile.mockResolvedValue({
+    id: "user-1",
+    email: "owner@example.com",
+    is_active: true,
+    is_onboarded: true,
+    business_name: "Summit Exterior Care",
+    first_name: "Alex",
+    last_name: "Stone",
+    trade_type: "Landscaper",
+    timezone: "America/New_York",
+  });
   mockedCustomerService.updateCustomer.mockResolvedValue({
     id: "cust-1",
     name: "Alice A. Johnson",
@@ -201,6 +221,7 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Q-001")).toBeInTheDocument();
+    expect(screen.getByText(/Mar 24, 2026\s*·\s*1 item/)).toBeInTheDocument();
     expect(screen.queryByText("Q-002")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /q-001/i }));

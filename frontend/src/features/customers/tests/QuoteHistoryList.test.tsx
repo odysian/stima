@@ -33,6 +33,7 @@ describe("QuoteHistoryList", () => {
           }),
         ]}
         onQuoteClick={vi.fn()}
+        timezone="UTC"
       />,
     );
 
@@ -52,7 +53,7 @@ describe("QuoteHistoryList", () => {
   it("calls onQuoteClick with the selected quote id", () => {
     const onQuoteClick = vi.fn();
 
-    render(<QuoteHistoryList quotes={[makeQuote()]} onQuoteClick={onQuoteClick} />);
+    render(<QuoteHistoryList quotes={[makeQuote()]} onQuoteClick={onQuoteClick} timezone="UTC" />);
 
     fireEvent.click(screen.getByRole("button", { name: /q-001/i }));
 
@@ -61,15 +62,31 @@ describe("QuoteHistoryList", () => {
 
   it("renders em dash when total_amount is null", () => {
     render(
-      <QuoteHistoryList quotes={[makeQuote({ total_amount: null })]} onQuoteClick={vi.fn()} />,
+      <QuoteHistoryList
+        quotes={[makeQuote({ total_amount: null })]}
+        onQuoteClick={vi.fn()}
+        timezone="UTC"
+      />,
     );
 
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("renders the empty state when no quotes exist", () => {
-    render(<QuoteHistoryList quotes={[]} onQuoteClick={vi.fn()} />);
+    render(<QuoteHistoryList quotes={[]} onQuoteClick={vi.fn()} timezone="UTC" />);
 
     expect(screen.getByText("No quotes yet.")).toBeInTheDocument();
+  });
+
+  it("renders dates using the provided timezone", () => {
+    render(
+      <QuoteHistoryList
+        quotes={[makeQuote({ created_at: "2026-03-25T00:00:00.000Z" })]}
+        onQuoteClick={vi.fn()}
+        timezone="America/New_York"
+      />,
+    );
+
+    expect(screen.getByText(/Mar 24, 2026\s*·\s*3 items/)).toBeInTheDocument();
   });
 });

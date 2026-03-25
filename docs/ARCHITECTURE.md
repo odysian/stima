@@ -54,6 +54,7 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | phone_number | String(30) | nullable (onboarding) |
 | business_name | String(255) | nullable (onboarding) |
 | trade_type | String(50) | nullable (onboarding enum string) |
+| timezone | String(64) | nullable IANA timezone identifier used for quote-facing date rendering |
 | is_active | Boolean | default true |
 | created_at, updated_at | DateTime(tz) | server defaults |
 
@@ -125,8 +126,8 @@ Unique constraint: `(user_id, doc_sequence)`.
 
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
-| `/profile` | GET | no | cookie | — | `200 { id, email, first_name, last_name, business_name, trade_type, is_active, is_onboarded }` |
-| `/profile` | PATCH | yes | cookie | `{ business_name, first_name, last_name, trade_type }` | `200` with updated profile payload |
+| `/profile` | GET | no | cookie | — | `200 { id, email, first_name, last_name, business_name, trade_type, timezone, is_active, is_onboarded }` |
+| `/profile` | PATCH | yes | cookie | `{ business_name, first_name, last_name, trade_type, timezone? }` | `200` with updated profile payload |
 
 ### Customer endpoints (`/api/customers`)
 

@@ -70,6 +70,7 @@ export const handlers = [
         first_name: "Alex",
         last_name: "Stone",
         trade_type: "Landscaper",
+        timezone: null,
       },
       { status: 200 },
     );

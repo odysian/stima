@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { detectBrowserTimezone } from "@/features/profile/lib/timezones";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
 import { profileService } from "@/features/profile/services/profileService";
 import type { ProfileResponse } from "@/features/profile/types/profile.types";
@@ -18,8 +19,13 @@ vi.mock("@/features/profile/services/profileService", () => ({
   },
 }));
 
+vi.mock("@/features/profile/lib/timezones", () => ({
+  detectBrowserTimezone: vi.fn(),
+}));
+
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedProfileService = vi.mocked(profileService);
+const mockedDetectBrowserTimezone = vi.mocked(detectBrowserTimezone);
 
 function renderForm(): void {
   render(
@@ -42,6 +48,7 @@ function profileResponse(overrides: Partial<ProfileResponse> = {}): ProfileRespo
     first_name: "Jane",
     last_name: "Doe",
     trade_type: "Landscaper",
+    timezone: null,
     ...overrides,
   };
 }
@@ -56,6 +63,7 @@ beforeEach(() => {
     register: vi.fn(async () => undefined),
     logout: vi.fn(async () => undefined),
   });
+  mockedDetectBrowserTimezone.mockReturnValue("America/New_York");
 });
 
 afterEach(() => {
@@ -113,6 +121,7 @@ describe("OnboardingForm", () => {
         first_name: "Jane",
         last_name: "Doe",
         trade_type: "Painter",
+        timezone: "America/New_York",
       });
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);

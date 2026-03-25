@@ -29,18 +29,21 @@ class ProfileRepository:
         first_name: str,
         last_name: str,
         trade_type: str,
+        timezone: str | None,
+        update_timezone: bool,
     ) -> User | None:
         """Update onboarding-relevant user profile fields and return the updated user."""
+        values: dict[str, str | None] = {
+            "business_name": business_name,
+            "first_name": first_name,
+            "last_name": last_name,
+            "trade_type": trade_type,
+        }
+        if update_timezone:
+            values["timezone"] = timezone
+
         result = await self._session.execute(
-            update(User)
-            .where(User.id == user_id)
-            .values(
-                business_name=business_name,
-                first_name=first_name,
-                last_name=last_name,
-                trade_type=trade_type,
-            )
-            .returning(User)
+            update(User).where(User.id == user_id).values(**values).returning(User)
         )
         return result.scalar_one_or_none()
 

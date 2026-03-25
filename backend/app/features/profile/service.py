@@ -30,6 +30,8 @@ class ProfileRepositoryProtocol(Protocol):
         first_name: str,
         last_name: str,
         trade_type: str,
+        timezone: str | None,
+        update_timezone: bool,
     ) -> User | None: ...
 
     async def commit(self) -> None: ...
@@ -56,6 +58,8 @@ class ProfileService:
         first_name: str,
         last_name: str,
         trade_type: str,
+        timezone: str | None,
+        update_timezone: bool,
     ) -> User:
         """Persist onboarding fields and return the updated user profile."""
         updated_profile = await self._repository.update_user_fields(
@@ -64,6 +68,8 @@ class ProfileService:
             first_name=first_name,
             last_name=last_name,
             trade_type=trade_type,
+            timezone=timezone,
+            update_timezone=update_timezone,
         )
         if updated_profile is None:
             raise ProfileServiceError(detail="Profile not found", status_code=404)

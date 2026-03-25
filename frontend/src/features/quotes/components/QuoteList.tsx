@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { profileService } from "@/features/profile/services/profileService";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -12,6 +13,7 @@ import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 export function QuoteList(): React.ReactElement {
   const navigate = useNavigate();
   const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
+  const [timezone, setTimezone] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -23,8 +25,12 @@ export function QuoteList(): React.ReactElement {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const nextQuotes = await quoteService.listQuotes();
+        const [profile, nextQuotes] = await Promise.all([
+          profileService.getProfile(),
+          quoteService.listQuotes(),
+        ]);
         if (isActive) {
+          setTimezone(profile.timezone);
           setQuotes(nextQuotes);
         }
       } catch (error) {
@@ -147,8 +153,8 @@ export function QuoteList(): React.ReactElement {
                       </div>
                       <div className="mt-1 flex items-center justify-between gap-3">
                         <p className="text-sm text-on-surface-variant">
-                          {quote.doc_number} {" \u00b7 "} {formatDate(quote.created_at)} {" \u00b7 "}
-                          {" "}
+                          {quote.doc_number} {" \u00b7 "} {formatDate(quote.created_at, timezone)}{" "}
+                          {"\u00b7"}{" "}
                           {quote.item_count} {quote.item_count === 1 ? "item" : "items"}
                         </p>
                         <StatusBadge variant={quote.status} />

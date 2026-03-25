@@ -13,16 +13,27 @@ export function formatCurrency(value: number | null | undefined): string {
   return currencyFormatter.format(value);
 }
 
-export function formatDate(isoString: string): string {
+export function formatDate(isoString: string, timezone?: string | null): string {
   const parsedDate = new Date(isoString);
   if (Number.isNaN(parsedDate.getTime())) {
     return "Unknown date";
   }
 
-  return parsedDate.toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const resolvedTimezone = timezone ?? "UTC";
+
+  try {
+    return parsedDate.toLocaleDateString("en-US", {
+      timeZone: resolvedTimezone,
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return parsedDate.toLocaleDateString("en-US", {
+      timeZone: "UTC",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
 }
