@@ -307,9 +307,12 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     expect(screen.getByText("Analyzing notes...")).toBeInTheDocument();
+    expect(
+      screen.getByText("We will turn your notes into draft line items. If extraction fails, your notes stay here."),
+    ).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(4000);
+      vi.advanceTimersByTime(2500);
     });
 
     expect(screen.getByText("Extracting line items...")).toBeInTheDocument();
@@ -320,6 +323,103 @@ describe("CaptureScreen", () => {
     });
 
     expect(screen.queryByText("Extracting line items...")).not.toBeInTheDocument();
+  });
+
+  it("shows audio-specific staged copy when extracting recorded clips", async () => {
+    vi.useFakeTimers();
+
+    let resolveExtraction: ((value: ExtractionResult) => void) | undefined;
+    mockedQuoteService.extract.mockReturnValueOnce(
+      new Promise<ExtractionResult>((resolve) => {
+        resolveExtraction = resolve;
+      }),
+    );
+    mockVoiceCapture({ clips: [clipFixture] });
+
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
+    expect(
+      screen.getByText("Audio uploads and transcription can take a few moments. If extraction fails, your clips stay here."),
+    ).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+
+    expect(screen.getByText("Transcribing audio...")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+
+    expect(screen.getByText("Extracting line items...")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveExtraction?.(extractionFixture);
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText("Extracting line items...")).not.toBeInTheDocument();
+  });
+
+  it("shows mixed-input staged copy when clips and notes are both present", async () => {
+    vi.useFakeTimers();
+
+    let resolveExtraction: ((value: ExtractionResult) => void) | undefined;
+    mockedQuoteService.extract.mockReturnValueOnce(
+      new Promise<ExtractionResult>((resolve) => {
+        resolveExtraction = resolve;
+      }),
+    );
+    mockVoiceCapture({ clips: [clipFixture] });
+
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Also edge the front beds" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
+    expect(
+      screen.getByText("We will combine your recording and notes into one draft. If extraction fails, both stay here."),
+    ).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+
+    expect(screen.getByText("Transcribing audio...")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+
+    expect(screen.getByText("Extracting line items from audio and notes...")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveExtraction?.(extractionFixture);
+      await Promise.resolve();
+    });
+  });
+
+  it("preserves typed notes and recorded clips after extraction fails", async () => {
+    mockedQuoteService.extract.mockRejectedValueOnce(new Error("Extraction failed"));
+    mockVoiceCapture({ clips: [clipFixture] });
+
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed");
+    expect(screen.getByLabelText(/written description/i)).toHaveValue("Install sod in backyard");
+    expect(screen.getByText("Clip 1 · 4s")).toBeInTheDocument();
   });
 
   it("does not apply the draft or redirect to review after leaving during in-flight extraction", async () => {

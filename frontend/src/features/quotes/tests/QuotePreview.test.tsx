@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -282,6 +282,32 @@ describe("QuotePreview", () => {
     expect(screen.queryByTitle("Quote PDF preview")).not.toBeInTheDocument();
   });
 
+  it("shows loading feedback while generating a PDF and clears it after failure", async () => {
+    let rejectGeneratePdf: ((reason?: unknown) => void) | undefined;
+    mockedQuoteService.generatePdf.mockReturnValueOnce(
+      new Promise<Blob>((_, reject) => {
+        rejectGeneratePdf = reject;
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Generating PDF preview. This can take a few moments.");
+
+    await act(async () => {
+      rejectGeneratePdf?.(new Error("Unable to render quote PDF"));
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByText("Unable to render quote PDF")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("Generating PDF preview. This can take a few moments.")).not.toBeInTheDocument();
+    });
+  });
+
   it("uses navigator.share when available", async () => {
     const shareMock = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "share", {
@@ -362,6 +388,33 @@ describe("QuotePreview", () => {
       );
     });
     expect(await screen.findByText(/copied to clipboard/i)).toBeInTheDocument();
+  });
+
+  it("shows loading feedback while sharing and clears it after the share request resolves", async () => {
+    let resolveShareQuote: ((value: Quote) => void) | undefined;
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
+    mockedQuoteService.shareQuote.mockReturnValueOnce(
+      new Promise<Quote>((resolve) => {
+        resolveShareQuote = resolve;
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    await generatePdfAndWaitForShareEnabled();
+    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Preparing share link...");
+
+    await act(async () => {
+      resolveShareQuote?.(makeQuoteResponse());
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Preparing share link...")).not.toBeInTheDocument();
+    });
   });
 
   it("does not show an error when native share is dismissed", async () => {
