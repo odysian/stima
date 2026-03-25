@@ -20,6 +20,7 @@ class EventLog(Base):
     user_id: Mapped[UUID] = mapped_column(
         sa.ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     event_name: Mapped[str] = mapped_column(sa.String(64), nullable=False)
     metadata_json: Mapped[dict[str, str]] = mapped_column(sa.JSON, nullable=False, default=dict)
