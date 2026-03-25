@@ -81,25 +81,34 @@ class ExtractionService:
     ) -> ExtractionResult:
         """Extract quote line items from optional clips plus optional typed notes."""
         normalized_notes = (notes or "").strip()
-        combined_text = normalized_notes
-        source_type = "notes"
-
-        if clips:
-            source_type = "audio"
-            transcript = await self._transcribe_clips(clips)
-            combined_text = transcript
-            if normalized_notes:
-                source_type = "audio+notes"
-                combined_text = f"{transcript}\n\n{normalized_notes}"
-
-        if not combined_text:
+        has_clips = bool(clips)
+        if not has_clips and not normalized_notes:
             raise QuoteServiceError(
                 detail="Provide at least one audio clip or typed notes.",
                 status_code=400,
             )
 
-        extraction = await self.convert_notes(combined_text)
-        log_event("extraction.completed", user_id=user_id, detail=source_type)
+        source_type = (
+            "audio+notes" if has_clips and normalized_notes else "audio" if has_clips else "notes"
+        )
+        log_event("quote_started", user_id=user_id, detail=source_type)
+        if has_clips:
+            log_event("audio_uploaded", user_id=user_id, detail=source_type)
+
+        combined_text = normalized_notes
+        try:
+            if clips:
+                transcript = await self._transcribe_clips(clips)
+                combined_text = transcript
+                if normalized_notes:
+                    combined_text = f"{transcript}\n\n{normalized_notes}"
+
+            extraction = await self.convert_notes(combined_text)
+        except QuoteServiceError:
+            log_event("draft_generation_failed", user_id=user_id, detail=source_type)
+            raise
+
+        log_event("draft_generated", user_id=user_id, detail=source_type)
         return extraction
 
     async def _transcribe_clips(self, clips: Sequence[CaptureAudioClip]) -> str:
