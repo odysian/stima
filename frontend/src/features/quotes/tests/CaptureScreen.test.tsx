@@ -389,7 +389,13 @@ describe("CaptureScreen", () => {
     ).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(2500);
+    });
+
+    expect(screen.getByText("Transcribing audio...")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(2500);
     });
 
     expect(screen.getByText("Extracting line items from audio and notes...")).toBeInTheDocument();

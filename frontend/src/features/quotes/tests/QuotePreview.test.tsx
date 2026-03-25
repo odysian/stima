@@ -390,6 +390,33 @@ describe("QuotePreview", () => {
     expect(await screen.findByText(/copied to clipboard/i)).toBeInTheDocument();
   });
 
+  it("shows loading feedback while sharing and clears it after the share request resolves", async () => {
+    let resolveShareQuote: ((value: Quote) => void) | undefined;
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
+    mockedQuoteService.shareQuote.mockReturnValueOnce(
+      new Promise<Quote>((resolve) => {
+        resolveShareQuote = resolve;
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    await generatePdfAndWaitForShareEnabled();
+    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Preparing share link...");
+
+    await act(async () => {
+      resolveShareQuote?.(makeQuoteResponse());
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Preparing share link...")).not.toBeInTheDocument();
+    });
+  });
+
   it("does not show an error when native share is dismissed", async () => {
     const shareAbortError = Object.assign(new Error("Share canceled"), {
       name: "AbortError",
