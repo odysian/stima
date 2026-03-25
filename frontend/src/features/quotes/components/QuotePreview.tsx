@@ -135,7 +135,9 @@ export function QuotePreview(): React.ReactElement {
     : canShare
       ? "ready"
       : "draft";
-  const openPdfUrl = pdfUrl ?? shareUrl;
+  // Card messaging follows persisted quote status, while actions depend on whether
+  // this device has a locally generated PDF blob available right now.
+  const openPdfUrl = pdfUrl;
   const statusCardCopy = getStatusCardCopy(cardState, hasLocalPdf);
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact =

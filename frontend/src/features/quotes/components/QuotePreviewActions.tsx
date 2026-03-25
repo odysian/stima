@@ -59,7 +59,11 @@ export function QuotePreviewActions({
     }
 
     return (
-      <button type="button" className={className} disabled>
+      <button
+        type="button"
+        className={`${className} disabled:cursor-not-allowed disabled:opacity-40`}
+        disabled
+      >
         <span className="material-symbols-outlined text-base">open_in_new</span>
         Open PDF
       </button>

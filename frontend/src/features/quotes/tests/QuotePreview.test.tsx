@@ -173,7 +173,23 @@ describe("QuotePreview", () => {
 
     await screen.findByRole("heading", { name: "Q-001" });
     expect(screen.getByText("PDF ready")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /share quote/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete quote/i })).toBeInTheDocument();
+  });
+
+  it("shows a disabled open-pdf primary action for shared quotes without a local blob", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "shared", share_token: "share-token-1" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Q-001" });
+    const openPdfButton = screen.getByRole("button", { name: /open pdf/i });
+    expect(openPdfButton).toBeDisabled();
+    expect(screen.getByText("Copy Share Link")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /open pdf/i })).not.toBeInTheDocument();
   });
 
   it("navigates to the edit route from the preview action area", async () => {
