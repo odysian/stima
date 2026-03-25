@@ -3,6 +3,7 @@ interface LineItemCardProps {
   details: string | null;
   price: number | null;
   flagged?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }
 
@@ -11,11 +12,13 @@ export function LineItemCard({
   details,
   price,
   flagged = false,
+  disabled = false,
   onClick,
 }: LineItemCardProps): React.ReactElement {
   return (
     <button
       type="button"
+      disabled={disabled}
       className={`flex w-full items-start justify-between gap-3 rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low ${
         flagged ? "border border-warning-accent/20" : ""
       }`}

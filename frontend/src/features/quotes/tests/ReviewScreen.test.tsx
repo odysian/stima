@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -39,6 +41,21 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
 const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
 const mockedQuoteService = vi.mocked(quoteService);
 
+function createDeferredPromise<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 function makeDraft(overrides: Partial<QuoteDraft> = {}): QuoteDraft {
   return {
     customerId: "cust-1",
@@ -52,13 +69,23 @@ function makeDraft(overrides: Partial<QuoteDraft> = {}): QuoteDraft {
   };
 }
 
-function renderScreen(draft: QuoteDraft | null): void {
-  mockedUseQuoteDraft.mockReturnValue({
-    draft,
-    setDraft: setDraftMock,
-    updateLineItem: vi.fn(),
-    removeLineItem: vi.fn(),
-    clearDraft: clearDraftMock,
+function renderScreen(initialDraft: QuoteDraft | null): void {
+  mockedUseQuoteDraft.mockImplementation(() => {
+    const [draft, setDraftState] = useState<QuoteDraft | null>(initialDraft);
+
+    return {
+      draft,
+      setDraft: (nextDraft: QuoteDraft) => {
+        setDraftMock(nextDraft);
+        setDraftState(nextDraft);
+      },
+      updateLineItem: vi.fn(),
+      removeLineItem: vi.fn(),
+      clearDraft: () => {
+        clearDraftMock();
+        setDraftState(null);
+      },
+    };
   });
 
   render(
@@ -83,6 +110,20 @@ beforeEach(() => {
     line_items: [],
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
+  });
+  mockedQuoteService.convertNotes.mockResolvedValue({
+    transcript: "Corrected transcript",
+    line_items: [
+      {
+        description: "Brown mulch",
+        details: "6 yards",
+        price: 275,
+        flagged: true,
+        flag_reason: "Verify soil depth before sending",
+      },
+    ],
+    total: 275,
+    confidence_notes: ["Verify soil depth before sending"],
   });
 });
 
@@ -113,14 +154,7 @@ describe("ReviewScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/review/line-items/0/edit");
   });
 
-  it("shows AI banner when confidence notes exist", () => {
-    renderScreen(makeDraft({ confidenceNotes: ["Price for edging is uncertain"] }));
-
-    expect(screen.getByText(/ai confidence note/i)).toBeInTheDocument();
-    expect(screen.getByText(/price for edging is uncertain/i)).toBeInTheDocument();
-  });
-
-  it("shows a collapsed transcript section when transcript is non-empty", () => {
+  it("shows transcript card with edit affordance when transcript is present", () => {
     renderScreen(makeDraft({ transcript: "5 yards brown mulch\nEdge front beds" }));
 
     const transcriptDetails = screen.getByText("TRANSCRIPT").closest("details");
@@ -128,18 +162,30 @@ describe("ReviewScreen", () => {
     if (!transcriptDetails) {
       throw new Error("Expected transcript details section to render");
     }
+
     expect(transcriptDetails).not.toHaveAttribute("open");
-    const transcriptContent = within(transcriptDetails).getByText(/5 yards brown mulch/i);
-    expect(transcriptContent).toHaveTextContent("5 yards brown mulch Edge front beds");
+    expect(within(transcriptDetails).getByText(/5 yards brown mulch/i)).toHaveTextContent(
+      "5 yards brown mulch Edge front beds",
+    );
+    expect(screen.getByRole("button", { name: /edit transcript notes/i })).toBeInTheDocument();
   });
 
-  it("hides the transcript section when transcript is blank", () => {
+  it("shows an empty transcript state and edit affordance when transcript is blank", () => {
     renderScreen(makeDraft({ transcript: "   " }));
 
-    expect(screen.queryByText("TRANSCRIPT")).not.toBeInTheDocument();
+    expect(screen.getByText("TRANSCRIPT")).toBeInTheDocument();
+    expect(screen.getByText(/no transcript captured yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit transcript notes/i })).toBeInTheDocument();
   });
 
-  it("shows AI banner when a line item is flagged even without confidence notes", () => {
+  it("shows review-required guidance when confidence notes exist", () => {
+    renderScreen(makeDraft({ confidenceNotes: ["Price for edging is uncertain"] }));
+
+    expect(screen.getByText(/review required before generating/i)).toBeInTheDocument();
+    expect(screen.getByText(/price for edging is uncertain/i)).toBeInTheDocument();
+  });
+
+  it("shows review-required guidance when a line item is flagged", () => {
     renderScreen(
       makeDraft({
         lineItems: [
@@ -154,19 +200,21 @@ describe("ReviewScreen", () => {
       }),
     );
 
-    expect(screen.getByText(/ai confidence note/i)).toBeInTheDocument();
+    expect(screen.getByText(/review required before generating/i)).toBeInTheDocument();
+    expect(screen.getByText(/brown mulch: unit phrasing may be ambiguous/i)).toBeInTheDocument();
   });
 
-  it("hides AI banner when there are no confidence notes and no flagged items", () => {
+  it("hides review guidance when there are no confidence notes and no flagged items", () => {
     renderScreen(makeDraft());
 
-    expect(screen.queryByText(/ai confidence note/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/review required before generating/i)).not.toBeInTheDocument();
   });
 
-  it("shows a null-price warning when any submitted line item has no price", () => {
+  it("shows a clearer null-price warning when any submitted line item has no price", () => {
     renderScreen(makeDraft());
 
-    expect(screen.getByText(/some line items have no price/i)).toBeInTheDocument();
+    expect(screen.getByText(/review missing prices before sharing/i)).toBeInTheDocument();
+    expect(screen.getByText(/render as "TBD"/i)).toBeInTheDocument();
   });
 
   it("hides the null-price warning when all submitted line items have prices", () => {
@@ -176,14 +224,181 @@ describe("ReviewScreen", () => {
       }),
     );
 
-    expect(screen.queryByText(/some line items have no price/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/review missing prices before sharing/i)).not.toBeInTheDocument();
   });
 
   it("keeps quote generation enabled when the null-price warning is shown", () => {
     renderScreen(makeDraft());
 
-    expect(screen.getByText(/some line items have no price/i)).toBeInTheDocument();
+    expect(screen.getByText(/review missing prices before sharing/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /generate quote >/i })).toBeEnabled();
+  });
+
+  it("lets users edit transcript notes locally", async () => {
+    const user = userEvent.setup();
+    renderScreen(makeDraft());
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+
+    const textarea = screen.getByRole("textbox", { name: /transcript notes/i });
+    expect(textarea).toHaveValue("5 yards brown mulch and edge front beds");
+
+    await user.clear(textarea);
+    await user.type(textarea, "Corrected transcript");
+
+    expect(textarea).toHaveValue("Corrected transcript");
+    expect(setDraftMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ transcript: "Corrected transcript" }),
+    );
+  });
+
+  it("regenerates directly from the edited transcript when no line items exist", async () => {
+    const user = userEvent.setup();
+    renderScreen(makeDraft({ lineItems: [], total: null }));
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+    const textarea = screen.getByRole("textbox", { name: /transcript notes/i });
+    await user.clear(textarea);
+    await user.type(textarea, "Corrected transcript");
+    await user.click(screen.getByRole("button", { name: /regenerate from transcript/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.convertNotes).toHaveBeenCalledWith("Corrected transcript");
+    });
+    expect(screen.queryByRole("dialog", { name: /replace current draft/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a confirmation modal before regeneration when line items exist", async () => {
+    const user = userEvent.setup();
+    renderScreen(makeDraft());
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+    await user.click(screen.getByRole("button", { name: /regenerate from transcript/i }));
+
+    expect(screen.getByRole("dialog", { name: /replace current draft/i })).toBeInTheDocument();
+    expect(mockedQuoteService.convertNotes).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /replace draft/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.convertNotes).toHaveBeenCalledWith(
+        "5 yards brown mulch and edge front beds",
+      );
+    });
+  });
+
+  it("blocks quote submission while regeneration is pending", async () => {
+    const user = userEvent.setup();
+    const regeneration = createDeferredPromise<Awaited<ReturnType<typeof quoteService.convertNotes>>>();
+    mockedQuoteService.convertNotes.mockReturnValueOnce(regeneration.promise);
+    renderScreen(makeDraft());
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+    await user.click(screen.getByRole("button", { name: /regenerate from transcript/i }));
+    await user.click(screen.getByRole("button", { name: /replace draft/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /generate quote >/i })).toBeDisabled();
+    });
+
+    await user.click(screen.getByRole("button", { name: /generate quote >/i }));
+    expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+
+    regeneration.resolve({
+      transcript: "Corrected transcript",
+      line_items: [{ description: "Brown mulch", details: "6 yards", price: 275 }],
+      total: 275,
+      confidence_notes: [],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /generate quote >/i })).toBeEnabled();
+    });
+  });
+
+  it("replaces transcript, line items, total, and confidence notes after successful regeneration", async () => {
+    const user = userEvent.setup();
+    mockedQuoteService.convertNotes.mockResolvedValueOnce({
+      transcript: "Corrected transcript",
+      line_items: [
+        {
+          description: "Compost top dress",
+          details: "Front beds",
+          price: 275,
+          flagged: true,
+          flag_reason: "Verify soil depth before sending",
+        },
+      ],
+      total: 275,
+      confidence_notes: ["Verify soil depth before sending"],
+    });
+    renderScreen(makeDraft({ notes: "Keep customer note" }));
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+    const textarea = screen.getByRole("textbox", { name: /transcript notes/i });
+    await user.clear(textarea);
+    await user.type(textarea, "Corrected transcript");
+    await user.click(screen.getByRole("button", { name: /regenerate from transcript/i }));
+    await user.click(screen.getByRole("button", { name: /replace draft/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /compost top dress/i })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Corrected transcript")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("275")).toBeInTheDocument();
+    expect(screen.getByText(/verify soil depth before sending/i)).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /customer notes/i })).toHaveValue("Keep customer note");
+    expect(screen.queryByRole("textbox", { name: /transcript notes/i })).not.toBeInTheDocument();
+  });
+
+  it("locks customer notes during regeneration and preserves them after success", async () => {
+    const user = userEvent.setup();
+    const regeneration = createDeferredPromise<Awaited<ReturnType<typeof quoteService.convertNotes>>>();
+    mockedQuoteService.convertNotes.mockReturnValueOnce(regeneration.promise);
+    renderScreen(makeDraft({ notes: "Keep customer note" }));
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+    await user.click(screen.getByRole("button", { name: /regenerate from transcript/i }));
+    await user.click(screen.getByRole("button", { name: /replace draft/i }));
+
+    const customerNotes = screen.getByRole("textbox", { name: /customer notes/i });
+    await waitFor(() => {
+      expect(customerNotes).toBeDisabled();
+    });
+
+    regeneration.resolve({
+      transcript: "Corrected transcript",
+      line_items: [{ description: "Brown mulch", details: "6 yards", price: 275 }],
+      total: 275,
+      confidence_notes: [],
+    });
+
+    await waitFor(() => {
+      expect(customerNotes).toBeEnabled();
+    });
+    expect(customerNotes).toHaveValue("Keep customer note");
+  });
+
+  it("preserves the edited transcript and current draft when regeneration fails", async () => {
+    const user = userEvent.setup();
+    mockedQuoteService.convertNotes.mockRejectedValueOnce(new Error("Unable to regenerate draft"));
+    renderScreen(makeDraft({ notes: "Keep customer note" }));
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+    const textarea = screen.getByRole("textbox", { name: /transcript notes/i });
+    await user.clear(textarea);
+    await user.type(textarea, "Corrected transcript");
+    await user.click(screen.getByRole("button", { name: /regenerate from transcript/i }));
+    await user.click(screen.getByRole("button", { name: /replace draft/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to regenerate draft");
+    expect(screen.getByRole("textbox", { name: /transcript notes/i })).toHaveValue(
+      "Corrected transcript",
+    );
+    expect(screen.getByRole("button", { name: /brown mulch/i })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("120")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /customer notes/i })).toHaveValue("Keep customer note");
   });
 
   it("adds a blank manual line item", () => {

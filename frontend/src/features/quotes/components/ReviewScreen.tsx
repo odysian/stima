@@ -5,9 +5,13 @@ import { LineItemCard } from "@/features/quotes/components/LineItemCard";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
-import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
+import type {
+  ExtractionResult,
+  LineItemDraft,
+  LineItemDraftWithFlags,
+} from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
@@ -37,10 +41,42 @@ function isInvalidLineItem(item: LineItemDraftWithFlags): boolean {
   return item.description.length === 0 && !isBlankLineItem(item);
 }
 
+function mapExtractedLineItems(extraction: ExtractionResult): LineItemDraftWithFlags[] {
+  return extraction.line_items.map((lineItem) => ({
+    description: lineItem.description,
+    details: lineItem.details,
+    price: lineItem.price,
+    flagged: lineItem.flagged,
+    flagReason: lineItem.flag_reason,
+  }));
+}
+
+function getReviewMessages(draft: QuoteDraft): string[] {
+  const flaggedReasonSet = new Set<string>();
+  const flaggedMessages = draft.lineItems.flatMap((lineItem, index) => {
+    if (!lineItem.flagged) {
+      return [];
+    }
+
+    const lineItemLabel = lineItem.description.trim() || `Line item ${index + 1}`;
+    const reason = lineItem.flagReason?.trim() || "Needs manual review before generating the quote.";
+    flaggedReasonSet.add(reason.toLowerCase());
+    return [`${lineItemLabel}: ${reason}`];
+  });
+  const confidenceMessages = draft.confidenceNotes
+    .map((note) => note.trim())
+    .filter((note) => note.length > 0 && !flaggedReasonSet.has(note.toLowerCase()));
+
+  return [...new Set([...confidenceMessages, ...flaggedMessages])];
+}
+
 export function ReviewScreen(): React.ReactElement | null {
   const navigate = useNavigate();
   const { draft, setDraft, clearDraft } = useQuoteDraft();
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isTranscriptEditorVisible, setIsTranscriptEditorVisible] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const hasSubmittedRef = useRef(false);
 
@@ -72,11 +108,9 @@ export function ReviewScreen(): React.ReactElement | null {
     }
     return runningTotal + lineItem.price;
   }, 0);
-  const hasFlaggedItems = currentDraft.lineItems.some((lineItem) => lineItem.flagged);
-  const shouldRenderAiBanner = currentDraft.confidenceNotes.length > 0 || hasFlaggedItems;
-  const confidenceMessage = currentDraft.confidenceNotes.length > 0
-    ? currentDraft.confidenceNotes.join(" ")
-    : "One or more line items were flagged for review.";
+  const trimmedTranscript = currentDraft.transcript.trim();
+  const reviewMessages = getReviewMessages(currentDraft);
+  const isInteractionLocked = isSaving || isRegenerating;
 
   function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void {
     setDraft(updater(currentDraft));
@@ -88,6 +122,44 @@ export function ReviewScreen(): React.ReactElement | null {
       ...nextDraft,
       lineItems: [...nextDraft.lineItems, { ...EMPTY_LINE_ITEM }],
     }));
+  }
+
+  async function regenerateFromTranscript(): Promise<void> {
+    setSaveError(null);
+    setIsRegenerating(true);
+
+    try {
+      const extraction = await quoteService.convertNotes(trimmedTranscript);
+      setDraft({
+        ...currentDraft,
+        transcript: extraction.transcript,
+        lineItems: mapExtractedLineItems(extraction),
+        total: extraction.total,
+        confidenceNotes: extraction.confidence_notes,
+      });
+      setIsTranscriptEditorVisible(false);
+    } catch (regenerateError) {
+      const message = regenerateError instanceof Error
+        ? regenerateError.message
+        : "Unable to regenerate draft from transcript";
+      setSaveError(message);
+    } finally {
+      setIsRegenerating(false);
+    }
+  }
+
+  function onRegenerateRequest(): void {
+    if (trimmedTranscript.length === 0) {
+      setSaveError("Add transcript notes before regenerating the draft.");
+      return;
+    }
+
+    if (currentDraft.lineItems.length > 0) {
+      setShowRegenerateConfirm(true);
+      return;
+    }
+
+    void regenerateFromTranscript();
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -131,7 +203,12 @@ export function ReviewScreen(): React.ReactElement | null {
       <ScreenHeader
         title="Review & Edit"
         backLabel="Back to capture"
-        onBack={() => navigate(`/quotes/capture/${currentDraft.customerId}`)}
+        onBack={() => {
+          if (isInteractionLocked) {
+            return;
+          }
+          navigate(`/quotes/capture/${currentDraft.customerId}`);
+        }}
       />
 
       <form
@@ -143,17 +220,88 @@ export function ReviewScreen(): React.ReactElement | null {
           <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
         ) : null}
 
-        {shouldRenderAiBanner ? <AIConfidenceBanner message={confidenceMessage} /> : null}
-        {currentDraft.transcript.trim().length > 0 ? (
-          <details className="rounded-lg bg-surface-container-low">
-            <summary className="cursor-pointer select-none px-4 py-3 text-xs font-bold uppercase tracking-widest text-outline">
-              TRANSCRIPT
-            </summary>
-            <p className="whitespace-pre-wrap px-4 pb-3 text-sm text-on-surface-variant">
-              {currentDraft.transcript}
+        {reviewMessages.length > 0 ? (
+          <section className="rounded-lg border border-warning-accent/30 bg-warning-container p-4 text-warning">
+            <p className="text-[0.6875rem] font-bold uppercase tracking-widest">
+              Review required before generating
             </p>
-          </details>
+            <p className="mt-2 text-sm font-medium">
+              Check these items so the quote matches the job before you continue.
+            </p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm">
+              {reviewMessages.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          </section>
         ) : null}
+
+        <details className="rounded-lg bg-surface-container-low">
+          <summary className="cursor-pointer select-none px-4 py-3 text-xs font-bold uppercase tracking-widest text-outline">
+            TRANSCRIPT
+          </summary>
+          <div className="space-y-4 px-4 pb-4">
+            {trimmedTranscript.length > 0 ? (
+              <p className="whitespace-pre-wrap text-sm text-on-surface-variant">
+                {currentDraft.transcript}
+              </p>
+            ) : (
+              <p className="text-sm text-outline">No transcript captured yet.</p>
+            )}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                disabled={isInteractionLocked}
+                className="text-left text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                onClick={() => setIsTranscriptEditorVisible((isVisible) => !isVisible)}
+              >
+                {isTranscriptEditorVisible ? "Hide Transcript Editor" : "Edit Transcript Notes"}
+              </button>
+
+              {isTranscriptEditorVisible ? (
+                <Button
+                  type="button"
+                  className="w-full px-4 py-3 sm:w-auto"
+                  onClick={onRegenerateRequest}
+                  disabled={trimmedTranscript.length === 0 || isInteractionLocked}
+                  isLoading={isRegenerating}
+                >
+                  Regenerate From Transcript
+                </Button>
+              ) : null}
+            </div>
+
+            {isTranscriptEditorVisible ? (
+              <section className="space-y-2">
+                <label
+                  htmlFor="transcript-notes"
+                  className="text-xs font-bold uppercase tracking-wider text-outline-variant"
+                >
+                  TRANSCRIPT NOTES
+                </label>
+                <textarea
+                  id="transcript-notes"
+                  rows={6}
+                  disabled={isInteractionLocked}
+                  value={currentDraft.transcript}
+                  onChange={(event) =>
+                    updateDraft((nextDraft) => ({
+                      ...nextDraft,
+                      transcript: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  placeholder="Correct the transcript notes before regenerating."
+                />
+                <p className="text-sm text-outline">
+                  Regenerating replaces current line items, total, and AI review notes. Customer
+                  notes stay as-is.
+                </p>
+              </section>
+            ) : null}
+          </div>
+        </details>
 
         <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
           <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>
@@ -171,6 +319,7 @@ export function ReviewScreen(): React.ReactElement | null {
                 details={lineItem.details}
                 price={lineItem.price}
                 flagged={lineItem.flagged}
+                disabled={isInteractionLocked}
                 onClick={() => navigate(`/quotes/review/line-items/${index}/edit`)}
               />
             ))
@@ -183,6 +332,7 @@ export function ReviewScreen(): React.ReactElement | null {
 
         <button
           type="button"
+          disabled={isInteractionLocked}
           className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low"
           onClick={onLineItemAdd}
         >
@@ -193,6 +343,7 @@ export function ReviewScreen(): React.ReactElement | null {
         <TotalAmountSection
           lineItemSum={lineItemSum}
           total={currentDraft.total}
+          disabled={isInteractionLocked}
           onTotalChange={(total) => {
             updateDraft((nextDraft) => ({ ...nextDraft, total }));
           }}
@@ -208,6 +359,7 @@ export function ReviewScreen(): React.ReactElement | null {
           <textarea
             id="quote-notes"
             rows={3}
+            disabled={isInteractionLocked}
             value={currentDraft.notes}
             onChange={(event) =>
               updateDraft((nextDraft) => ({
@@ -225,7 +377,8 @@ export function ReviewScreen(): React.ReactElement | null {
         <div className="mx-auto w-full max-w-2xl">
           {hasNullPrices ? (
             <p className="mb-2 rounded-lg bg-warning-container px-3 py-2 text-center text-xs text-warning">
-              Some line items have no price — the quote will show "TBD" for those items.
+              Review missing prices before sharing. Quote generation stays enabled, and any blank
+              prices will render as "TBD".
             </p>
           ) : null}
           <Button
@@ -233,13 +386,28 @@ export function ReviewScreen(): React.ReactElement | null {
             form="quote-review-form"
             variant="primary"
             className="w-full"
-            disabled={!canSubmit}
+            disabled={!canSubmit || isInteractionLocked}
             isLoading={isSaving}
           >
             Generate Quote {">"}
           </Button>
         </div>
       </ScreenFooter>
+
+      {showRegenerateConfirm ? (
+        <ConfirmModal
+          title="Replace current draft?"
+          body="Regenerating from the edited transcript will replace the current line items, total, and AI review notes."
+          confirmLabel="Replace Draft"
+          cancelLabel="Keep Current Draft"
+          onConfirm={() => {
+            setShowRegenerateConfirm(false);
+            void regenerateFromTranscript();
+          }}
+          onCancel={() => setShowRegenerateConfirm(false)}
+          variant="destructive"
+        />
+      ) : null}
     </main>
   );
 }
