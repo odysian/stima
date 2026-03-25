@@ -5,13 +5,16 @@ import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard"
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
 import { ShareLinkRow } from "@/features/quotes/components/ShareLinkRow";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { QuoteDetail } from "@/features/quotes/types/quote.types";
+import type { QuoteDetail, QuoteStatus } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatCurrency } from "@/shared/lib/formatters";
+
+type QuotePreviewCardState = QuoteStatus;
+type QuotePreviewActionState = "draft" | "ready" | "shared";
 
 function isShareAbortError(error: unknown): boolean {
   return (
@@ -30,6 +33,47 @@ function readOptionalQuoteText(
   if (typeof value !== "string") return null;
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
+function getStatusCardCopy(
+  cardState: QuotePreviewCardState,
+  hasLocalPdf: boolean,
+): {
+  label: string;
+  title: string;
+  description: string;
+  icon: string;
+  iconClasses: string;
+} {
+  if (cardState === "shared") {
+    return {
+      label: "SHARE STATUS",
+      title: "Quote shared",
+      description: "Use the link below to copy or resend the quote.",
+      icon: "ios_share",
+      iconClasses: "bg-info-container text-info",
+    };
+  }
+
+  if (cardState === "ready") {
+    return {
+      label: "PDF STATUS",
+      title: "PDF ready",
+      description: hasLocalPdf
+        ? "Open the PDF or share the quote link with your customer."
+        : "Generate the PDF on this device to open it or share it with your customer.",
+      icon: "description",
+      iconClasses: "bg-success-container text-success",
+    };
+  }
+
+  return {
+    label: "PDF STATUS",
+    title: "PDF not generated",
+    description: "Generate the quote PDF to open it or share it with your customer.",
+    icon: "description",
+    iconClasses: "bg-surface-container-high text-on-surface-variant",
+  };
 }
 
 export function QuotePreview(): React.ReactElement {
@@ -80,6 +124,19 @@ export function QuotePreview(): React.ReactElement {
   const canShare = !!quote && !!pdfUrl;
   const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
   const shareUrl = quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null;
+  const hasLocalPdf = Boolean(pdfUrl);
+  const cardState: QuotePreviewCardState = quote?.status === "shared"
+    ? "shared"
+    : quote?.status === "ready" || hasLocalPdf
+      ? "ready"
+      : "draft";
+  const actionState: QuotePreviewActionState = quote?.status === "shared"
+    ? "shared"
+    : canShare
+      ? "ready"
+      : "draft";
+  const openPdfUrl = pdfUrl ?? shareUrl;
+  const statusCardCopy = getStatusCardCopy(cardState, hasLocalPdf);
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact =
     [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]
@@ -223,77 +280,53 @@ export function QuotePreview(): React.ReactElement {
 
         {!isLoadingQuote && !loadError ? (
           <>
-            <div
-              className="mx-4 mt-4 overflow-hidden rounded-xl bg-surface-container-low"
-              style={{ height: "55vh" }}
-            >
-              {pdfUrl ? (
-                <iframe src={pdfUrl} className="h-full w-full border-0" title="Quote PDF preview" />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3">
-                  <span className="material-symbols-outlined text-5xl text-outline">description</span>
-                  <p className="text-sm text-outline">Generate the PDF to preview it here.</p>
+            {quote ? (
+              <section className="mx-4 mt-4 rounded-xl bg-surface-container-low p-3">
+                <div className="ghost-shadow rounded-xl bg-surface-container-lowest p-5">
+                  <div className="flex items-start gap-4">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${statusCardCopy.iconClasses}`}>
+                      <span className="material-symbols-outlined text-2xl">{statusCardCopy.icon}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                          {statusCardCopy.label}
+                        </p>
+                        <StatusBadge variant={quote.status} />
+                      </div>
+                      <h2 className="mt-3 font-headline text-2xl font-bold tracking-tight text-on-surface">
+                        {statusCardCopy.title}
+                      </h2>
+                      <p className="mt-2 text-sm text-on-surface-variant">
+                        {statusCardCopy.description}
+                      </p>
+                      <div className="mt-4">
+                        <p className="font-bold text-on-surface">{clientName}</p>
+                        <p className="mt-1 text-xs text-outline">{quote.doc_number}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-
-            {pdfUrl ? (
-              <div className="mx-4 mt-2 flex justify-end">
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-primary"
-                >
-                  <span className="material-symbols-outlined text-base">open_in_new</span>
-                  Open PDF
-                </a>
-              </div>
+              </section>
             ) : null}
 
             <QuotePreviewActions
+              actionState={actionState}
               onGeneratePdf={onGeneratePdf}
               onShare={onShare}
+              onCopyShareLink={copyToClipboard}
+              openPdfUrl={openPdfUrl}
+              shareUrl={shareUrl}
               isGeneratingPdf={isGeneratingPdf}
               isSharing={isSharing}
-              canShare={canShare}
               disabled={isLoadingQuote || !!loadError}
               pdfError={pdfError}
               shareError={shareError}
               shareMessage={shareMessage}
             />
 
-            {quote && id && quote.status !== "shared" ? (
-              <div className="mt-3 px-4">
-                <button
-                  type="button"
-                  onClick={() => navigate(`/quotes/${id}/edit`)}
-                  className="w-full rounded-lg border border-outline-variant py-4 font-semibold text-on-surface-variant transition-all active:scale-[0.98]"
-                >
-                  Edit Quote
-                </button>
-              </div>
-            ) : null}
-
-            {quote && quote.status !== "shared" ? (
-              <div className="mt-3 px-4">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="w-full rounded-lg py-3 text-sm text-error transition-all active:scale-[0.98]"
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? "Deleting..." : "Delete Quote"}
-                </button>
-                {deleteError ? (
-                  <div className="mt-3">
-                    <FeedbackMessage variant="error">{deleteError}</FeedbackMessage>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
             {shareUrl ? <ShareLinkRow shareUrl={shareUrl} onCopy={copyToClipboard} /> : null}
+            {quote ? <QuoteDetailsCard totalAmount={quote.total_amount} clientName={clientName} clientContact={clientContact} /> : null}
             {quote ? (
               <section className="mx-4 mt-4">
                 <div className="mb-2 flex items-center justify-between">
@@ -324,7 +357,36 @@ export function QuotePreview(): React.ReactElement {
                 </ul>
               </section>
             ) : null}
-            {quote ? <QuoteDetailsCard totalAmount={quote.total_amount} clientName={clientName} clientContact={clientContact} /> : null}
+
+            {quote && id && quote.status !== "shared" ? (
+              <div className="mt-3 px-4">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/quotes/${id}/edit`)}
+                  className="w-full rounded-lg border border-outline-variant py-4 font-semibold text-on-surface-variant transition-all active:scale-[0.98]"
+                >
+                  Edit Quote
+                </button>
+              </div>
+            ) : null}
+
+            {quote && quote.status !== "shared" ? (
+              <div className="mt-3 px-4">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full rounded-lg py-3 text-sm text-error transition-all active:scale-[0.98]"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete Quote"}
+                </button>
+                {deleteError ? (
+                  <div className="mt-3">
+                    <FeedbackMessage variant="error">{deleteError}</FeedbackMessage>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </>
         ) : null}
       </section>

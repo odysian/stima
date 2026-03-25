@@ -99,7 +99,7 @@ async function generatePdfAndWaitForShareEnabled(): Promise<void> {
     expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
   });
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: /^share$/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /share quote/i })).toBeEnabled();
   });
 }
 
@@ -138,7 +138,7 @@ afterEach(() => {
 });
 
 describe("QuotePreview", () => {
-  it("fetches quote on mount and renders the header, placeholder, and nav", async () => {
+  it("fetches quote on mount and renders the mobile-first status card and nav", async () => {
     renderScreen();
 
     await waitFor(() => {
@@ -146,9 +146,11 @@ describe("QuotePreview", () => {
     });
 
     expect(await screen.findByRole("heading", { name: "Q-001" })).toBeInTheDocument();
-    expect(screen.getByText("Draft")).toBeInTheDocument();
-    expect(screen.getByText("Generate the PDF to preview it here.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^share$/i })).toBeDisabled();
+    expect(screen.getAllByText("Draft")).toHaveLength(2);
+    expect(screen.getByText("PDF not generated")).toBeInTheDocument();
+    expect(screen.getByText("Generate the quote PDF to open it or share it with your customer.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /share quote/i })).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Quote PDF preview")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete quote/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
@@ -170,6 +172,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Q-001" });
+    expect(screen.getByText("PDF ready")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete quote/i })).toBeInTheDocument();
   });
 
@@ -211,7 +214,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     expect(await screen.findByText("$245.50")).toBeInTheDocument();
-    expect(screen.getByText("cust-1")).toBeInTheDocument();
+    expect(screen.getAllByText("cust-1")).toHaveLength(2);
     expect(screen.getByText("No contact details")).toBeInTheDocument();
   });
 
@@ -249,10 +252,10 @@ describe("QuotePreview", () => {
     expect(screen.getByText("TBD")).toBeInTheDocument();
   });
 
-  it("generates PDF and renders iframe preview", async () => {
+  it("generates PDF and promotes open/share actions", async () => {
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     await waitFor(() => {
@@ -260,9 +263,13 @@ describe("QuotePreview", () => {
       expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
     });
 
-    const frame = screen.getByTitle("Quote PDF preview") as HTMLIFrameElement;
-    expect(frame.src).toContain("blob:quote-preview");
-    expect(screen.getByRole("button", { name: /^share$/i })).toBeEnabled();
+    expect(screen.queryByTitle("Quote PDF preview")).not.toBeInTheDocument();
+    expect(screen.getByText("PDF ready")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /share quote/i })).toBeEnabled();
+    expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
+      "href",
+      "blob:quote-preview",
+    );
   });
 
   it("shows an error when PDF generation fails", async () => {
@@ -272,13 +279,14 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
     });
     expect(await screen.findByText("Unable to render quote PDF")).toBeInTheDocument();
+    expect(screen.getByText("PDF not generated")).toBeInTheDocument();
     expect(screen.queryByTitle("Quote PDF preview")).not.toBeInTheDocument();
   });
 
@@ -292,7 +300,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     expect(screen.getByRole("status")).toHaveTextContent("Generating PDF preview. This can take a few moments.");
@@ -319,9 +327,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     await generatePdfAndWaitForShareEnabled();
-    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /share quote/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
@@ -351,14 +359,14 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     await generatePdfAndWaitForShareEnabled();
-    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /share quote/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
     });
-    expect(await screen.findByText("Preserved Customer")).toBeInTheDocument();
+    expect(await screen.findAllByText("Preserved Customer")).toHaveLength(2);
     expect(screen.getByText(/preserved@example.com/i)).toBeInTheDocument();
   });
 
@@ -378,9 +386,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     await generatePdfAndWaitForShareEnabled();
-    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /share quote/i }));
 
     await waitFor(() => {
       expect(writeTextMock).toHaveBeenCalledWith(
@@ -401,9 +409,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     await generatePdfAndWaitForShareEnabled();
-    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /share quote/i }));
 
     expect(screen.getByRole("status")).toHaveTextContent("Preparing share link...");
 
@@ -431,14 +439,15 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     await generatePdfAndWaitForShareEnabled();
-    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /share quote/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
     });
     expect(screen.queryByText("Share canceled")).not.toBeInTheDocument();
+    expect(screen.getByText("Quote shared")).toBeInTheDocument();
     expect(await screen.findByText(/share\/share-token-1/i)).toBeInTheDocument();
   });
 
@@ -455,7 +464,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /copy share link/i }));
+    const shareLinkRow = (await screen.findByText(/share\/already-shared-token/i)).closest("section");
+    expect(shareLinkRow).not.toBeNull();
+    fireEvent.click(within(shareLinkRow as HTMLElement).getByRole("button", { name: /copy share link/i }));
 
     await waitFor(() => {
       expect(writeTextMock).toHaveBeenCalledWith(
@@ -472,7 +483,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /copy share link/i }));
+    const shareLinkRow = (await screen.findByText(/share\/already-shared-token/i)).closest("section");
+    expect(shareLinkRow).not.toBeNull();
+    fireEvent.click(within(shareLinkRow as HTMLElement).getByRole("button", { name: /copy share link/i }));
 
     expect(await screen.findByText("Copy this share link manually.")).toBeInTheDocument();
   });
@@ -491,7 +504,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /copy share link/i }));
+    const shareLinkRow = (await screen.findByText(/share\/already-shared-token/i)).closest("section");
+    expect(shareLinkRow).not.toBeNull();
+    fireEvent.click(within(shareLinkRow as HTMLElement).getByRole("button", { name: /copy share link/i }));
 
     expect(await screen.findByText("Clipboard denied")).toBeInTheDocument();
   });
@@ -502,9 +517,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     await generatePdfAndWaitForShareEnabled();
-    fireEvent.click(screen.getByRole("button", { name: /^share$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /share quote/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
@@ -516,7 +531,7 @@ describe("QuotePreview", () => {
   it("shows a confirmation modal and deletes the quote before navigating home", async () => {
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     fireEvent.click(screen.getByRole("button", { name: /delete quote/i }));
 
     const dialog = screen.getByRole("dialog", { name: /delete q-001\?/i });
@@ -533,7 +548,7 @@ describe("QuotePreview", () => {
   it("closes the delete confirmation modal without deleting when kept", async () => {
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     fireEvent.click(screen.getByRole("button", { name: /delete quote/i }));
 
     const dialog = screen.getByRole("dialog", { name: /delete q-001\?/i });
@@ -551,7 +566,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByText(/Q-001/i);
+    await screen.findByRole("heading", { name: "Q-001" });
     fireEvent.click(screen.getByRole("button", { name: /delete quote/i }));
     fireEvent.click(
       within(screen.getByRole("dialog", { name: /delete q-001\?/i })).getByRole("button", {
