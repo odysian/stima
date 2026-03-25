@@ -509,9 +509,7 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
         "quote_started",
         "draft_generated",
         "quote.updated",
-        "quote.pdf_generated",
         "quote_pdf_generated",
-        "quote.shared",
         "quote_shared",
         "quote.created",
         "quote.deleted",
@@ -521,7 +519,7 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
     assert emitted_events[2]["detail"] == "notes"
     assert emitted_events[3]["detail"] == "notes"
     assert emitted_events[5]["quote_id"] == quote_payload["id"]
-    assert emitted_events[9]["quote_id"] == delete_quote_payload["id"]
+    assert emitted_events[7]["quote_id"] == delete_quote_payload["id"]
     assert all(
         "Event Test Customer" not in payload_text
         for payload_text in map(json.dumps, emitted_events)

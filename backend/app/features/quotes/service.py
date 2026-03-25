@@ -245,7 +245,6 @@ class QuoteService:
 
         await self._repository.mark_ready_if_not_shared(quote_id=quote_id, user_id=user_id)
         await self._repository.commit()
-        log_event("quote.pdf_generated", user_id=user_id, quote_id=quote_id)
         log_event("quote_pdf_generated", user_id=user_id, quote_id=quote_id)
         return context.doc_number, pdf_bytes
 
@@ -276,12 +275,6 @@ class QuoteService:
         quote.status = QuoteStatus.SHARED
         await self._repository.commit()
         refreshed_quote = await self._repository.refresh(quote)
-        log_event(
-            "quote.shared",
-            user_id=user_id,
-            quote_id=refreshed_quote.id,
-            customer_id=refreshed_quote.customer_id,
-        )
         log_event(
             "quote_shared",
             user_id=user_id,

@@ -127,6 +127,8 @@ Pilot event set:
 - `quote_pdf_generated`
 - `quote_shared`
 
+These underscore names are the canonical quote-flow vocabulary for pilot instrumentation; dot-notation events such as `quote.created`, `quote.updated`, `quote.deleted`, and `customer.created` remain separate operational logs outside the pilot analytics scope.
+
 ## API Contracts
 
 ### Auth endpoints (`/api/auth/`)
