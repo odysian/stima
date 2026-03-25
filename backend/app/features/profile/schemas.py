@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
-class TradeType(str, enum.Enum):
+class TradeType(enum.StrEnum):
     """Allowed trade types for onboarding profile completion."""
 
     PLUMBER = "Plumber"

@@ -46,6 +46,7 @@ describe("App routes", () => {
       email: "user@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     });
 
     renderApp("/login");
@@ -59,6 +60,7 @@ describe("App routes", () => {
       email: "user@example.com",
       is_active: true,
       is_onboarded: false,
+      timezone: null,
     });
 
     renderApp("/");
@@ -72,6 +74,7 @@ describe("App routes", () => {
       email: "user@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     });
 
     renderApp("/onboarding");
@@ -85,6 +88,7 @@ describe("App routes", () => {
       email: "user@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     });
 
     renderApp("/settings");

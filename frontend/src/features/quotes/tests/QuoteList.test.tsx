@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { profileService } from "@/features/profile/services/profileService";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
@@ -30,15 +30,12 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
-vi.mock("@/features/profile/services/profileService", () => ({
-  profileService: {
-    getProfile: vi.fn(),
-    updateProfile: vi.fn(),
-  },
+vi.mock("@/features/auth/hooks/useAuth", () => ({
+  useAuth: vi.fn(),
 }));
 
 const mockedQuoteService = vi.mocked(quoteService);
-const mockedProfileService = vi.mocked(profileService);
+const mockedUseAuth = vi.mocked(useAuth);
 
 function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListItem {
   return {
@@ -55,16 +52,20 @@ function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListIte
 }
 
 function mockProfile(timezone: string | null = "UTC"): void {
-  mockedProfileService.getProfile.mockResolvedValueOnce({
-    id: "user-1",
-    email: "test@example.com",
-    is_active: true,
-    is_onboarded: true,
-    business_name: "Summit Exterior Care",
-    first_name: "Alex",
-    last_name: "Stone",
-    trade_type: "Landscaper",
-    timezone,
+  mockedUseAuth.mockReturnValue({
+    isLoading: false,
+    isOnboarded: true,
+    login: vi.fn(async () => undefined),
+    logout: vi.fn(async () => undefined),
+    refreshUser: vi.fn(async () => undefined),
+    register: vi.fn(async () => undefined),
+    user: {
+      id: "user-1",
+      email: "test@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone,
+    },
   });
 }
 
@@ -241,7 +242,6 @@ describe("QuoteList", () => {
   });
 
   it("renders created_at using the saved business timezone", async () => {
-    mockedProfileService.getProfile.mockReset();
     mockProfile("America/New_York");
     mockedQuoteService.listQuotes.mockResolvedValueOnce([
       makeQuoteListItem({

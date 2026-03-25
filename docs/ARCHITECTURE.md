@@ -116,11 +116,11 @@ Unique constraint: `(user_id, doc_sequence)`.
 
 | Endpoint | Method | Rate Limit | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|---|
-| `/register` | POST | 3/hr | no | no | `{ email, password }` | `201 { user: { id, email, is_active, is_onboarded } }` |
-| `/login` | POST | 5/min | no | no | `{ email, password }` | `200 { user: { id, email, is_active, is_onboarded }, csrf_token }` + sets cookies |
-| `/refresh` | POST | 10/min | yes | cookie | — | `200 { user: { id, email, is_active, is_onboarded }, csrf_token }` + rotates cookies |
+| `/register` | POST | 3/hr | no | no | `{ email, password }` | `201 { user: { id, email, is_active, is_onboarded, timezone } }` |
+| `/login` | POST | 5/min | no | no | `{ email, password }` | `200 { user: { id, email, is_active, is_onboarded, timezone }, csrf_token }` + sets cookies |
+| `/refresh` | POST | 10/min | yes | cookie | — | `200 { user: { id, email, is_active, is_onboarded, timezone }, csrf_token }` + rotates cookies |
 | `/logout` | POST | 10/min | yes | cookie | — | `204` + clears cookies |
-| `/me` | GET | — | no | cookie | — | `200 { id, email, is_active, is_onboarded }` |
+| `/me` | GET | — | no | cookie | — | `200 { id, email, is_active, is_onboarded, timezone }` |
 
 ### Profile endpoints (`/api/profile`)
 

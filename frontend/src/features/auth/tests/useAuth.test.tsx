@@ -61,6 +61,7 @@ describe("useAuth", () => {
       email: "user@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     });
 
     render(
@@ -82,6 +83,7 @@ describe("useAuth", () => {
       email: "new@example.com",
       is_active: true,
       is_onboarded: false,
+      timezone: null,
     });
     mockedAuthService.logout.mockResolvedValueOnce();
 

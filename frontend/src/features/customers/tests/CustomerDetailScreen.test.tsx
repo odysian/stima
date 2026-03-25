@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
-import { profileService } from "@/features/profile/services/profileService";
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer } from "@/features/customers/types/customer.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -42,16 +42,13 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
-vi.mock("@/features/profile/services/profileService", () => ({
-  profileService: {
-    getProfile: vi.fn(),
-    updateProfile: vi.fn(),
-  },
+vi.mock("@/features/auth/hooks/useAuth", () => ({
+  useAuth: vi.fn(),
 }));
 
 const mockedCustomerService = vi.mocked(customerService);
 const mockedQuoteService = vi.mocked(quoteService);
-const mockedProfileService = vi.mocked(profileService);
+const mockedUseAuth = vi.mocked(useAuth);
 
 function renderScreen(): void {
   render(
@@ -83,16 +80,20 @@ beforeEach(() => {
       created_at: "2026-03-25T00:00:00.000Z",
     },
   ]);
-  mockedProfileService.getProfile.mockResolvedValue({
-    id: "user-1",
-    email: "owner@example.com",
-    is_active: true,
-    is_onboarded: true,
-    business_name: "Summit Exterior Care",
-    first_name: "Alex",
-    last_name: "Stone",
-    trade_type: "Landscaper",
-    timezone: "America/New_York",
+  mockedUseAuth.mockReturnValue({
+    isLoading: false,
+    isOnboarded: true,
+    login: vi.fn(async () => undefined),
+    logout: vi.fn(async () => undefined),
+    refreshUser: vi.fn(async () => undefined),
+    register: vi.fn(async () => undefined),
+    user: {
+      id: "user-1",
+      email: "owner@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "America/New_York",
+    },
   });
   mockedCustomerService.updateCustomer.mockResolvedValue({
     id: "cust-1",

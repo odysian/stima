@@ -28,6 +28,7 @@ class AuthUserResponse(BaseModel):
     email: EmailStr
     is_active: bool
     is_onboarded: bool
+    timezone: str | None
 
 
 class RegisterResponse(BaseModel):

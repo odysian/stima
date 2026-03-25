@@ -29,6 +29,7 @@ export const handlers = [
           email: body.email,
           is_active: true,
           is_onboarded: false,
+          timezone: null,
         },
       },
       { status: 201 },
@@ -54,7 +55,13 @@ export const handlers = [
 
   http.get("/api/auth/me", () => {
     return HttpResponse.json(
-      { id: "user-1", email: "test@example.com", is_active: true, is_onboarded: true },
+      {
+        id: "user-1",
+        email: "test@example.com",
+        is_active: true,
+        is_onboarded: true,
+        timezone: null,
+      },
       { status: 200 },
     );
   }),

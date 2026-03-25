@@ -186,6 +186,42 @@ async def test_patch_profile_rejects_partial_update_and_preserves_existing_value
     assert payload["trade_type"] == "Landscaper"
 
 
+async def test_patch_profile_preserves_saved_timezone_when_field_is_omitted(
+    client: AsyncClient,
+) -> None:
+    credentials = _credentials()
+    await _register_and_login(client, credentials)
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token is not None
+
+    initial_response = await client.patch(
+        "/api/profile",
+        json={
+            "business_name": "Summit Exterior Care",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "trade_type": "Landscaper",
+            "timezone": "America/New_York",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert initial_response.status_code == 200
+
+    second_response = await client.patch(
+        "/api/profile",
+        json={
+            "business_name": "Summit Exterior Care",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "trade_type": "Landscaper",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert second_response.status_code == 200
+    assert second_response.json()["timezone"] == "America/New_York"
+
+
 async def test_patch_profile_requires_authentication(client: AsyncClient) -> None:
     client.cookies.clear()
     client.cookies.set(CSRF_COOKIE_NAME, "csrf", path="/")
@@ -234,6 +270,7 @@ async def test_me_reflects_onboarding_state_after_profile_update(client: AsyncCl
             "first_name": "Jane",
             "last_name": "Doe",
             "trade_type": "Landscaper",
+            "timezone": "America/New_York",
         },
         headers={"X-CSRF-Token": csrf_token},
     )
@@ -242,6 +279,7 @@ async def test_me_reflects_onboarding_state_after_profile_update(client: AsyncCl
     me_response = await client.get("/api/auth/me")
     assert me_response.status_code == 200
     assert me_response.json()["is_onboarded"] is True
+    assert me_response.json()["timezone"] == "America/New_York"
 
 
 async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) -> None:

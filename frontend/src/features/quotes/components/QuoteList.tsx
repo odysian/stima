@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { profileService } from "@/features/profile/services/profileService";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -12,8 +12,8 @@ import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 export function QuoteList(): React.ReactElement {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
-  const [timezone, setTimezone] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -25,12 +25,8 @@ export function QuoteList(): React.ReactElement {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const [profile, nextQuotes] = await Promise.all([
-          profileService.getProfile(),
-          quoteService.listQuotes(),
-        ]);
+        const nextQuotes = await quoteService.listQuotes();
         if (isActive) {
-          setTimezone(profile.timezone);
           setQuotes(nextQuotes);
         }
       } catch (error) {
@@ -77,6 +73,7 @@ export function QuoteList(): React.ReactElement {
     () => quotes.filter((quote) => quote.status === "draft").length,
     [quotes],
   );
+  const timezone = user?.timezone ?? null;
 
   return (
     <main className="min-h-screen bg-background pb-24">
