@@ -3,12 +3,14 @@ import { formatCurrency } from "@/shared/lib/formatters";
 interface TotalAmountSectionProps {
   lineItemSum: number;
   total: number | null;
+  disabled?: boolean;
   onTotalChange: (value: number | null) => void;
 }
 
 export function TotalAmountSection({
   lineItemSum,
   total,
+  disabled = false,
   onTotalChange,
 }: TotalAmountSectionProps): React.ReactElement {
   return (
@@ -32,6 +34,7 @@ export function TotalAmountSection({
             id="quote-total"
             type="number"
             step="0.01"
+            disabled={disabled}
             value={total ?? ""}
             onChange={(event) => {
               const rawValue = event.target.value.trim();

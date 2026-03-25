@@ -41,6 +41,21 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
 const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
 const mockedQuoteService = vi.mocked(quoteService);
 
+function createDeferredPromise<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 function makeDraft(overrides: Partial<QuoteDraft> = {}): QuoteDraft {
   return {
     customerId: "cust-1",
@@ -272,6 +287,35 @@ describe("ReviewScreen", () => {
     });
   });
 
+  it("blocks quote submission while regeneration is pending", async () => {
+    const user = userEvent.setup();
+    const regeneration = createDeferredPromise<Awaited<ReturnType<typeof quoteService.convertNotes>>>();
+    mockedQuoteService.convertNotes.mockReturnValueOnce(regeneration.promise);
+    renderScreen(makeDraft());
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+    await user.click(screen.getByRole("button", { name: /regenerate from transcript/i }));
+    await user.click(screen.getByRole("button", { name: /replace draft/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /generate quote >/i })).toBeDisabled();
+    });
+
+    await user.click(screen.getByRole("button", { name: /generate quote >/i }));
+    expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+
+    regeneration.resolve({
+      transcript: "Corrected transcript",
+      line_items: [{ description: "Brown mulch", details: "6 yards", price: 275 }],
+      total: 275,
+      confidence_notes: [],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /generate quote >/i })).toBeEnabled();
+    });
+  });
+
   it("replaces transcript, line items, total, and confidence notes after successful regeneration", async () => {
     const user = userEvent.setup();
     mockedQuoteService.convertNotes.mockResolvedValueOnce({
@@ -306,6 +350,34 @@ describe("ReviewScreen", () => {
     expect(screen.getByText(/verify soil depth before sending/i)).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /customer notes/i })).toHaveValue("Keep customer note");
     expect(screen.queryByRole("textbox", { name: /transcript notes/i })).not.toBeInTheDocument();
+  });
+
+  it("locks customer notes during regeneration and preserves them after success", async () => {
+    const user = userEvent.setup();
+    const regeneration = createDeferredPromise<Awaited<ReturnType<typeof quoteService.convertNotes>>>();
+    mockedQuoteService.convertNotes.mockReturnValueOnce(regeneration.promise);
+    renderScreen(makeDraft({ notes: "Keep customer note" }));
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+    await user.click(screen.getByRole("button", { name: /regenerate from transcript/i }));
+    await user.click(screen.getByRole("button", { name: /replace draft/i }));
+
+    const customerNotes = screen.getByRole("textbox", { name: /customer notes/i });
+    await waitFor(() => {
+      expect(customerNotes).toBeDisabled();
+    });
+
+    regeneration.resolve({
+      transcript: "Corrected transcript",
+      line_items: [{ description: "Brown mulch", details: "6 yards", price: 275 }],
+      total: 275,
+      confidence_notes: [],
+    });
+
+    await waitFor(() => {
+      expect(customerNotes).toBeEnabled();
+    });
+    expect(customerNotes).toHaveValue("Keep customer note");
   });
 
   it("preserves the edited transcript and current draft when regeneration fails", async () => {

@@ -110,6 +110,7 @@ export function ReviewScreen(): React.ReactElement | null {
   }, 0);
   const trimmedTranscript = currentDraft.transcript.trim();
   const reviewMessages = getReviewMessages(currentDraft);
+  const isInteractionLocked = isSaving || isRegenerating;
 
   function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void {
     setDraft(updater(currentDraft));
@@ -202,7 +203,12 @@ export function ReviewScreen(): React.ReactElement | null {
       <ScreenHeader
         title="Review & Edit"
         backLabel="Back to capture"
-        onBack={() => navigate(`/quotes/capture/${currentDraft.customerId}`)}
+        onBack={() => {
+          if (isInteractionLocked) {
+            return;
+          }
+          navigate(`/quotes/capture/${currentDraft.customerId}`);
+        }}
       />
 
       <form
@@ -246,6 +252,7 @@ export function ReviewScreen(): React.ReactElement | null {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
+                disabled={isInteractionLocked}
                 className="text-left text-sm font-semibold text-primary underline-offset-4 hover:underline"
                 onClick={() => setIsTranscriptEditorVisible((isVisible) => !isVisible)}
               >
@@ -257,7 +264,7 @@ export function ReviewScreen(): React.ReactElement | null {
                   type="button"
                   className="w-full px-4 py-3 sm:w-auto"
                   onClick={onRegenerateRequest}
-                  disabled={trimmedTranscript.length === 0 || isSaving}
+                  disabled={trimmedTranscript.length === 0 || isInteractionLocked}
                   isLoading={isRegenerating}
                 >
                   Regenerate From Transcript
@@ -276,6 +283,7 @@ export function ReviewScreen(): React.ReactElement | null {
                 <textarea
                   id="transcript-notes"
                   rows={6}
+                  disabled={isInteractionLocked}
                   value={currentDraft.transcript}
                   onChange={(event) =>
                     updateDraft((nextDraft) => ({
@@ -311,6 +319,7 @@ export function ReviewScreen(): React.ReactElement | null {
                 details={lineItem.details}
                 price={lineItem.price}
                 flagged={lineItem.flagged}
+                disabled={isInteractionLocked}
                 onClick={() => navigate(`/quotes/review/line-items/${index}/edit`)}
               />
             ))
@@ -323,6 +332,7 @@ export function ReviewScreen(): React.ReactElement | null {
 
         <button
           type="button"
+          disabled={isInteractionLocked}
           className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low"
           onClick={onLineItemAdd}
         >
@@ -333,6 +343,7 @@ export function ReviewScreen(): React.ReactElement | null {
         <TotalAmountSection
           lineItemSum={lineItemSum}
           total={currentDraft.total}
+          disabled={isInteractionLocked}
           onTotalChange={(total) => {
             updateDraft((nextDraft) => ({ ...nextDraft, total }));
           }}
@@ -348,6 +359,7 @@ export function ReviewScreen(): React.ReactElement | null {
           <textarea
             id="quote-notes"
             rows={3}
+            disabled={isInteractionLocked}
             value={currentDraft.notes}
             onChange={(event) =>
               updateDraft((nextDraft) => ({
@@ -374,7 +386,7 @@ export function ReviewScreen(): React.ReactElement | null {
             form="quote-review-form"
             variant="primary"
             className="w-full"
-            disabled={!canSubmit}
+            disabled={!canSubmit || isInteractionLocked}
             isLoading={isSaving}
           >
             Generate Quote {">"}
