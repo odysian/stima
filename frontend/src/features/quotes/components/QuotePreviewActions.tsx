@@ -24,6 +24,12 @@ export function QuotePreviewActions({
   shareError,
   shareMessage,
 }: QuotePreviewActionsProps): React.ReactElement {
+  const statusCopy = isGeneratingPdf
+    ? "Generating PDF preview. This can take a few moments."
+    : isSharing
+      ? "Preparing share link..."
+      : null;
+
   return (
     <>
       <div className="mt-4 flex flex-col gap-3 px-4">
@@ -50,9 +56,9 @@ export function QuotePreviewActions({
         </button>
       </div>
 
-      {isGeneratingPdf ? (
+      {statusCopy ? (
         <p role="status" className="mx-4 mt-3 text-sm text-on-surface-variant">
-          Generating PDF...
+          {statusCopy}
         </p>
       ) : null}
 

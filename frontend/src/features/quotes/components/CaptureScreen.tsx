@@ -11,6 +11,8 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
+const EXTRACTION_STAGE_DELAY_MS = 2500;
+
 function formatElapsed(seconds: number): string {
   const mins = Math.floor(seconds / 60)
     .toString()
@@ -19,12 +21,35 @@ function formatElapsed(seconds: number): string {
   return `${mins}:${secs}`;
 }
 
+function getExtractionStages(hasClips: boolean, hasNotes: boolean): string[] {
+  if (hasClips && hasNotes) {
+    return ["Uploading audio...", "Transcribing audio...", "Extracting line items from audio and notes..."];
+  }
+  if (hasClips) {
+    return ["Uploading audio...", "Transcribing audio...", "Extracting line items..."];
+  }
+  return ["Analyzing notes...", "Extracting line items..."];
+}
+
+function getExtractionHelperCopy(hasClips: boolean, hasNotes: boolean): string | null {
+  if (hasClips && hasNotes) {
+    return "We will combine your recording and notes into one draft. If extraction fails, both stay here.";
+  }
+  if (hasClips) {
+    return "Audio uploads and transcription can take a few moments. If extraction fails, your clips stay here.";
+  }
+  if (hasNotes) {
+    return "We will turn your notes into draft line items. If extraction fails, your notes stay here.";
+  }
+  return null;
+}
+
 export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { customerId } = useParams<{ customerId: string }>();
   const { setDraft } = useQuoteDraft();
   const isMountedRef = useRef(true);
-  const extractionStageTimerRef = useRef<number | null>(null);
+  const extractionStageTimerRefs = useRef<number[]>([]);
   const {
     clips,
     elapsedSeconds,
@@ -42,14 +67,25 @@ export function CaptureScreen(): React.ReactElement {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isExtracting = extractionStage !== null;
+  const hasClips = clips.length > 0;
+  const hasNotes = notes.trim().length > 0;
+  const extractionHelperCopy = getExtractionHelperCopy(hasClips, hasNotes);
+
+  function clearExtractionStageTimers(): void {
+    extractionStageTimerRefs.current.forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    extractionStageTimerRefs.current = [];
+  }
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (extractionStageTimerRef.current !== null) {
-        window.clearTimeout(extractionStageTimerRef.current);
-      }
+      extractionStageTimerRefs.current.forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+      extractionStageTimerRefs.current = [];
     };
   }, []);
 
@@ -83,13 +119,18 @@ export function CaptureScreen(): React.ReactElement {
 
     setError(null);
     clearError();
-    setExtractionStage(clips.length > 0 ? "Processing audio clips..." : "Analyzing notes...");
-    extractionStageTimerRef.current = window.setTimeout(() => {
-      if (!isMountedRef.current) {
-        return;
-      }
-      setExtractionStage("Extracting line items...");
-    }, 4000);
+    clearExtractionStageTimers();
+    const stages = getExtractionStages(hasClips, hasNotes);
+    setExtractionStage(stages[0]);
+    stages.slice(1).forEach((stage, index) => {
+      const timerId = window.setTimeout(() => {
+        if (!isMountedRef.current) {
+          return;
+        }
+        setExtractionStage(stage);
+      }, EXTRACTION_STAGE_DELAY_MS * (index + 1));
+      extractionStageTimerRefs.current.push(timerId);
+    });
 
     try {
       const extraction = await quoteService.extract({
@@ -109,10 +150,7 @@ export function CaptureScreen(): React.ReactElement {
       setError(message);
     } finally {
       const shouldResetExtractionStage = isMountedRef.current;
-      if (extractionStageTimerRef.current !== null) {
-        window.clearTimeout(extractionStageTimerRef.current);
-        extractionStageTimerRef.current = null;
-      }
+      clearExtractionStageTimers();
       if (shouldResetExtractionStage) {
         setExtractionStage(null);
       }
@@ -133,7 +171,7 @@ export function CaptureScreen(): React.ReactElement {
   }
 
   const displayedError = error ?? voiceError;
-  const canExtract = (clips.length > 0 || notes.trim().length > 0) && !isExtracting && !isRecording;
+  const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording;
 
   return (
     <main className="min-h-screen bg-background pb-36">
@@ -250,6 +288,9 @@ export function CaptureScreen(): React.ReactElement {
         <div className="mx-auto w-full max-w-2xl">
           {extractionStage ? (
             <p className="mb-2 text-center text-sm text-on-surface-variant">{extractionStage}</p>
+          ) : null}
+          {extractionHelperCopy ? (
+            <p className="mb-3 text-center text-xs text-on-surface-variant">{extractionHelperCopy}</p>
           ) : null}
           <Button
             variant="primary"

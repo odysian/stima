@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -280,6 +280,32 @@ describe("QuotePreview", () => {
     });
     expect(await screen.findByText("Unable to render quote PDF")).toBeInTheDocument();
     expect(screen.queryByTitle("Quote PDF preview")).not.toBeInTheDocument();
+  });
+
+  it("shows loading feedback while generating a PDF and clears it after failure", async () => {
+    let rejectGeneratePdf: ((reason?: unknown) => void) | undefined;
+    mockedQuoteService.generatePdf.mockReturnValueOnce(
+      new Promise<Blob>((_, reject) => {
+        rejectGeneratePdf = reject;
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/i);
+    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Generating PDF preview. This can take a few moments.");
+
+    await act(async () => {
+      rejectGeneratePdf?.(new Error("Unable to render quote PDF"));
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByText("Unable to render quote PDF")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("Generating PDF preview. This can take a few moments.")).not.toBeInTheDocument();
+    });
   });
 
   it("uses navigator.share when available", async () => {
