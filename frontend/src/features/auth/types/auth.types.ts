@@ -3,6 +3,7 @@ export interface User {
   email: string;
   is_active: boolean;
   is_onboarded: boolean;
+  timezone: string | null;
 }
 
 export interface LoginRequest {

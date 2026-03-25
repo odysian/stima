@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getTimezoneOptions } from "@/features/profile/lib/timezones";
 import { profileService } from "@/features/profile/services/profileService";
 import {
   TRADE_TYPES,
@@ -21,8 +22,13 @@ vi.mock("@/features/profile/services/profileService", () => ({
   },
 }));
 
+vi.mock("@/features/profile/lib/timezones", () => ({
+  getTimezoneOptions: vi.fn(),
+}));
+
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedProfileService = vi.mocked(profileService);
+const mockedGetTimezoneOptions = vi.mocked(getTimezoneOptions);
 
 function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileResponse {
   return {
@@ -34,6 +40,7 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
     first_name: "Alex",
     last_name: "Stone",
     trade_type: "Landscaper",
+    timezone: "America/New_York",
     ...overrides,
   };
 }
@@ -53,6 +60,7 @@ beforeEach(() => {
       email: "test@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     },
     isLoading: false,
     isOnboarded: true,
@@ -60,6 +68,13 @@ beforeEach(() => {
     login: vi.fn(async () => undefined),
     register: vi.fn(async () => undefined),
     logout: vi.fn(async () => undefined),
+  });
+  mockedGetTimezoneOptions.mockImplementation((selectedTimezone?: string | null) => {
+    if (!selectedTimezone) {
+      return ["America/New_York", "UTC"];
+    }
+
+    return selectedTimezone === "UTC" ? ["UTC"] : [selectedTimezone, "UTC"];
   });
 });
 
@@ -89,6 +104,7 @@ describe("SettingsScreen", () => {
       TRADE_TYPES.length,
     );
     expect(screen.getByRole("button", { name: "Plumber" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue("America/New_York");
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
@@ -102,6 +118,7 @@ describe("SettingsScreen", () => {
         first_name: null,
         last_name: null,
         trade_type: null,
+        timezone: null,
       }),
     );
 
@@ -113,6 +130,7 @@ describe("SettingsScreen", () => {
     expect((screen.getByLabelText(/first name/i) as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText(/last name/i) as HTMLInputElement).value).toBe("");
     expect(screen.getByRole("button", { name: TRADE_TYPES[0] })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue("UTC");
 
     const errorOutput = consoleErrorSpy.mock.calls.flat().join(" ");
     expect(errorOutput).not.toContain("A component is changing an uncontrolled input");
@@ -129,6 +147,7 @@ describe("SettingsScreen", () => {
         email: "test@example.com",
         is_active: true,
         is_onboarded: true,
+        timezone: "America/New_York",
       },
       isLoading: false,
       isOnboarded: true,
@@ -156,6 +175,9 @@ describe("SettingsScreen", () => {
       target: { value: "Reed" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Builder" }));
+    fireEvent.change(screen.getByLabelText(/timezone/i), {
+      target: { value: "UTC" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
@@ -164,6 +186,7 @@ describe("SettingsScreen", () => {
         first_name: "Jamie",
         last_name: "Reed",
         trade_type: "Builder",
+        timezone: "UTC",
       });
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);
@@ -180,6 +203,7 @@ describe("SettingsScreen", () => {
         email: "test@example.com",
         is_active: true,
         is_onboarded: true,
+        timezone: "America/New_York",
       },
       isLoading: false,
       isOnboarded: true,
@@ -244,6 +268,7 @@ describe("SettingsScreen", () => {
         email: "test@example.com",
         is_active: true,
         is_onboarded: true,
+        timezone: "America/New_York",
       },
       isLoading: false,
       isOnboarded: true,

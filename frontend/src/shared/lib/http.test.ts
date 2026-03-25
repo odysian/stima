@@ -58,6 +58,7 @@ describe("http request helper", () => {
           email: "user@example.com",
           is_active: true,
           is_onboarded: true,
+          timezone: "America/New_York",
         }),
       );
 
@@ -68,6 +69,7 @@ describe("http request helper", () => {
       email: "user@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     });
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/auth/refresh");
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerInfoForm } from "@/features/customers/components/CustomerInfoForm";
 import { QuoteHistoryList } from "@/features/customers/components/QuoteHistoryList";
 import { customerService } from "@/features/customers/services/customerService";
@@ -18,6 +19,7 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 export function CustomerDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerQuotes, setCustomerQuotes] = useState<QuoteListItem[]>([]);
@@ -169,6 +171,7 @@ export function CustomerDetailScreen(): React.ReactElement {
             <QuoteHistoryList
               quotes={customerQuotes}
               onQuoteClick={(quoteId) => navigate(`/quotes/${quoteId}/preview`)}
+              timezone={user?.timezone}
             />
           </>
         ) : null}

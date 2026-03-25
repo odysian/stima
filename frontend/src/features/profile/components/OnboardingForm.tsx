@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { detectBrowserTimezone } from "@/features/profile/lib/timezones";
 import { profileService } from "@/features/profile/services/profileService";
 import {
   TRADE_TYPES,
@@ -33,6 +34,7 @@ export function OnboardingForm(): React.ReactElement {
         first_name: firstName,
         last_name: lastName,
         trade_type: tradeType,
+        timezone: detectBrowserTimezone(),
       });
       await refreshUser();
       navigate("/", { replace: true });

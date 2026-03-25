@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer } from "@/features/customers/types/customer.types";
@@ -41,8 +42,13 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
+vi.mock("@/features/auth/hooks/useAuth", () => ({
+  useAuth: vi.fn(),
+}));
+
 const mockedCustomerService = vi.mocked(customerService);
 const mockedQuoteService = vi.mocked(quoteService);
+const mockedUseAuth = vi.mocked(useAuth);
 
 function renderScreen(): void {
   render(
@@ -71,9 +77,24 @@ beforeEach(() => {
       status: "draft",
       total_amount: 120,
       item_count: 1,
-      created_at: "2026-03-20T00:00:00.000Z",
+      created_at: "2026-03-25T00:00:00.000Z",
     },
   ]);
+  mockedUseAuth.mockReturnValue({
+    isLoading: false,
+    isOnboarded: true,
+    login: vi.fn(async () => undefined),
+    logout: vi.fn(async () => undefined),
+    refreshUser: vi.fn(async () => undefined),
+    register: vi.fn(async () => undefined),
+    user: {
+      id: "user-1",
+      email: "owner@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "America/New_York",
+    },
+  });
   mockedCustomerService.updateCustomer.mockResolvedValue({
     id: "cust-1",
     name: "Alice A. Johnson",
@@ -201,6 +222,7 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Q-001")).toBeInTheDocument();
+    expect(screen.getByText(/Mar 24, 2026\s*·\s*1 item/)).toBeInTheDocument();
     expect(screen.queryByText("Q-002")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /q-001/i }));

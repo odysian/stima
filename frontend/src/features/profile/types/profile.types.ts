@@ -16,6 +16,7 @@ export interface ProfileResponse {
   last_name: string | null;
   business_name: string | null;
   trade_type: TradeType | null;
+  timezone: string | null;
   is_active: boolean;
   is_onboarded: boolean;
 }
@@ -25,4 +26,5 @@ export interface ProfileUpdateRequest {
   first_name: string;
   last_name: string;
   trade_type: TradeType;
+  timezone?: string | null;
 }

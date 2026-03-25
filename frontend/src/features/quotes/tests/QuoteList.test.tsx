@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
@@ -29,7 +30,12 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
+vi.mock("@/features/auth/hooks/useAuth", () => ({
+  useAuth: vi.fn(),
+}));
+
 const mockedQuoteService = vi.mocked(quoteService);
+const mockedUseAuth = vi.mocked(useAuth);
 
 function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListItem {
   return {
@@ -45,6 +51,24 @@ function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListIte
   };
 }
 
+function mockProfile(timezone: string | null = "UTC"): void {
+  mockedUseAuth.mockReturnValue({
+    isLoading: false,
+    isOnboarded: true,
+    login: vi.fn(async () => undefined),
+    logout: vi.fn(async () => undefined),
+    refreshUser: vi.fn(async () => undefined),
+    register: vi.fn(async () => undefined),
+    user: {
+      id: "user-1",
+      email: "test@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone,
+    },
+  });
+}
+
 function renderScreen(): void {
   render(
     <MemoryRouter>
@@ -52,6 +76,10 @@ function renderScreen(): void {
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => {
+  mockProfile();
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -213,17 +241,18 @@ describe("QuoteList", () => {
     });
   });
 
-  it("renders created_at using a timezone-stable calendar day", async () => {
+  it("renders created_at using the saved business timezone", async () => {
+    mockProfile("America/New_York");
     mockedQuoteService.listQuotes.mockResolvedValueOnce([
       makeQuoteListItem({
         id: "quote-utc-midnight",
-        created_at: "2026-03-21T00:00:00.000Z",
+        created_at: "2026-03-25T00:00:00.000Z",
       }),
     ]);
 
     renderScreen();
 
-    expect(await screen.findByText(/Q-001\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
+    expect(await screen.findByText(/Q-001\s*·\s*Mar 24, 2026/)).toBeInTheDocument();
   });
 
   it("renders an em dash when total_amount is null", async () => {

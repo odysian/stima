@@ -46,6 +46,7 @@ describe("RegisterForm", () => {
       email: "new@example.com",
       is_active: true,
       is_onboarded: false,
+      timezone: null,
     });
 
     renderRegister();

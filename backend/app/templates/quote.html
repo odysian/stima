@@ -137,10 +137,10 @@
               <p class="label">Quote Number</p>
               <p class="value">{{ doc_number }}</p>
               <p class="label" style="margin-top: 10px">Issued</p>
-              <p class="value">{{ created_at.strftime("%b %d, %Y") }}</p>
+              <p class="value">{{ issued_date }}</p>
               {% if show_updated_date %}
               <p class="label" style="margin-top: 10px">Updated</p>
-              <p class="value">{{ updated_at.strftime("%b %d, %Y") }}</p>
+              <p class="value">{{ updated_date }}</p>
               {% endif %}
             </td>
           </tr>

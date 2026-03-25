@@ -60,6 +60,7 @@ async def test_register_returns_201_with_user_payload(client: AsyncClient) -> No
     assert user["email"] == credentials["email"]
     assert user["is_active"] is True
     assert user["is_onboarded"] is False
+    assert user["timezone"] is None
 
 
 async def test_register_does_not_set_auth_cookies(client: AsyncClient) -> None:
@@ -487,6 +488,7 @@ async def test_me_returns_authenticated_user(client: AsyncClient) -> None:
     assert payload["email"] == credentials["email"]
     assert payload["is_active"] is True
     assert payload["is_onboarded"] is False
+    assert payload["timezone"] is None
 
 
 async def test_me_requires_authentication(client: AsyncClient) -> None:

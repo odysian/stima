@@ -33,6 +33,7 @@ describe("authService integration (MSW)", () => {
               email: capturedBody.email,
               is_active: true,
               is_onboarded: false,
+              timezone: null,
             },
           },
           { status: 201 },
@@ -82,7 +83,13 @@ describe("authService integration (MSW)", () => {
           return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
         }
         return HttpResponse.json(
-          { id: "user-1", email: "test@example.com", is_active: true, is_onboarded: true },
+          {
+            id: "user-1",
+            email: "test@example.com",
+            is_active: true,
+            is_onboarded: true,
+            timezone: "America/New_York",
+          },
           { status: 200 },
         );
       }),
@@ -95,6 +102,7 @@ describe("authService integration (MSW)", () => {
       email: "test@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     });
     expect(meCallCount).toBe(2);
   });

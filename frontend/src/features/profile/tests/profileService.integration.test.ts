@@ -11,6 +11,7 @@ const updatePayload: ProfileUpdateRequest = {
   first_name: "Jane",
   last_name: "Doe",
   trade_type: "Plumber",
+  timezone: "America/New_York",
 };
 
 describe("profileService integration (MSW)", () => {
@@ -30,6 +31,7 @@ describe("profileService integration (MSW)", () => {
       first_name: "Alex",
       last_name: "Stone",
       trade_type: "Landscaper",
+      timezone: null,
     });
   });
 

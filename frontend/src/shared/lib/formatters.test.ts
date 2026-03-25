@@ -23,12 +23,20 @@ describe("formatCurrency", () => {
 });
 
 describe("formatDate", () => {
-  it("formats valid ISO dates in UTC", () => {
+  it("formats valid ISO dates in UTC when timezone is omitted", () => {
     expect(formatDate("2026-03-21T00:00:00.000Z")).toBe("Mar 21, 2026");
   });
 
-  it("applies timezone conversion before rendering", () => {
-    expect(formatDate("2026-03-21T23:30:00-05:00")).toBe("Mar 22, 2026");
+  it("renders quote dates in the provided business timezone", () => {
+    expect(formatDate("2026-03-25T00:00:00.000Z", "America/New_York")).toBe("Mar 24, 2026");
+  });
+
+  it("falls back to UTC when timezone is null", () => {
+    expect(formatDate("2026-03-21T00:00:00.000Z", null)).toBe("Mar 21, 2026");
+  });
+
+  it("falls back to UTC when timezone is invalid", () => {
+    expect(formatDate("2026-03-21T00:00:00.000Z", "Not/AZone")).toBe("Mar 21, 2026");
   });
 
   it("returns fallback for invalid dates", () => {

@@ -46,6 +46,7 @@ describe("LoginForm", () => {
       email: "user@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     });
 
     renderLogin();
@@ -76,6 +77,7 @@ describe("LoginForm", () => {
       email: "user@example.com",
       is_active: true,
       is_onboarded: true,
+      timezone: "America/New_York",
     });
 
     renderLogin({

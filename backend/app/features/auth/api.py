@@ -142,6 +142,7 @@ def _serialize_user(user: User) -> AuthUserResponse:
         email=user.email,
         is_active=user.is_active,
         is_onboarded=user.is_onboarded,
+        timezone=user.timezone,
     )
 
 

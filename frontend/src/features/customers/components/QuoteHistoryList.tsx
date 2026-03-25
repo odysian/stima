@@ -5,11 +5,13 @@ import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 interface QuoteHistoryListProps {
   quotes: QuoteListItem[];
   onQuoteClick: (quoteId: string) => void;
+  timezone?: string | null;
 }
 
 export function QuoteHistoryList({
   quotes,
   onQuoteClick,
+  timezone,
 }: QuoteHistoryListProps): React.ReactElement {
   const quoteCountLabel = `${quotes.length} ${quotes.length === 1 ? "QUOTE" : "QUOTES"}`;
 
@@ -45,7 +47,7 @@ export function QuoteHistoryList({
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <p className="text-sm text-on-surface-variant">
-                        {formatDate(quote.created_at)}{" · "}{itemCountLabel}
+                        {formatDate(quote.created_at, timezone)}{" · "}{itemCountLabel}
                       </p>
                       <StatusBadge variant={quote.status} />
                     </div>

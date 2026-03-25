@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, tzinfo
 from decimal import Decimal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +45,8 @@ class QuoteRenderContext:
     line_items: list[QuoteRenderLineItem]
     created_at: datetime
     updated_at: datetime
+    issued_date: str
+    updated_date: str
 
     @property
     def has_meaningful_update(self) -> bool:
@@ -390,4 +393,17 @@ def _build_render_context(
         ],
         created_at=document.created_at,
         updated_at=document.updated_at,
+        issued_date=_format_quote_date(document.created_at, user.timezone),
+        updated_date=_format_quote_date(document.updated_at, user.timezone),
     )
+
+
+def _format_quote_date(value: datetime, timezone: str | None) -> str:
+    resolved_tz: tzinfo = UTC
+    if timezone:
+        try:
+            resolved_tz = ZoneInfo(timezone)
+        except ZoneInfoNotFoundError:
+            resolved_tz = UTC
+
+    return value.astimezone(resolved_tz).strftime("%b %d, %Y")

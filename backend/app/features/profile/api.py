@@ -45,6 +45,8 @@ async def update_profile(
             first_name=payload.first_name,
             last_name=payload.last_name,
             trade_type=payload.trade_type.value,
+            timezone=payload.timezone,
+            update_timezone="timezone" in payload.model_fields_set,
         )
     except ProfileServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

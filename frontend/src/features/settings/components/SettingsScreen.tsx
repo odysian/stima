@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getTimezoneOptions } from "@/features/profile/lib/timezones";
 import { profileService } from "@/features/profile/services/profileService";
 import {
   TRADE_TYPES,
@@ -21,6 +22,7 @@ export function SettingsScreen(): React.ReactElement {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [tradeType, setTradeType] = useState<TradeType>(TRADE_TYPES[0]);
+  const [timezone, setTimezone] = useState("UTC");
   const [email, setEmail] = useState("");
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -42,6 +44,7 @@ export function SettingsScreen(): React.ReactElement {
           setFirstName(profile.first_name ?? "");
           setLastName(profile.last_name ?? "");
           setTradeType(profile.trade_type ?? TRADE_TYPES[0]);
+          setTimezone(profile.timezone ?? "UTC");
           setEmail(profile.email);
         }
       } catch (error) {
@@ -75,6 +78,7 @@ export function SettingsScreen(): React.ReactElement {
         first_name: firstName,
         last_name: lastName,
         trade_type: tradeType,
+        timezone,
       });
       try {
         await refreshUser();
@@ -148,6 +152,26 @@ export function SettingsScreen(): React.ReactElement {
                     onChange={(value) => setTradeType(value as TradeType)}
                   />
                 </fieldset>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="settings-timezone"
+                    className="text-sm font-medium text-on-surface"
+                  >
+                    Timezone
+                  </label>
+                  <select
+                    id="settings-timezone"
+                    value={timezone}
+                    onChange={(event) => setTimezone(event.target.value)}
+                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {getTimezoneOptions(timezone).map((timezoneOption) => (
+                      <option key={timezoneOption} value={timezoneOption}>
+                        {timezoneOption}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </section>
 

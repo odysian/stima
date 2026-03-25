@@ -24,6 +24,7 @@ class User(Base):
     phone_number: Mapped[str | None] = mapped_column(sa.String(30), nullable=True)
     business_name: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
     trade_type: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
+    timezone: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
     is_active: Mapped[bool] = mapped_column(
         sa.Boolean,
         nullable=False,
