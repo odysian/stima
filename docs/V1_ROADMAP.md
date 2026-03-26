@@ -47,6 +47,97 @@ Stima without leaving the app or copy-pasting links.
 
 ---
 
+## Public Endpoint Security Model
+
+V1 introduces two unauthenticated endpoints. Both require explicit security design
+because they are externally reachable without a contractor account.
+
+### Token-as-credential model
+
+The share token is the authorization mechanism for the public document page and the
+customer respond endpoint. Possession of the link is proof of authorization — the same
+model used by DocuSign, HelloSign, and every major quoting tool. Customers do not create
+accounts or enter PINs.
+
+This model is secure when:
+- V0 already persists a server-generated `share_token` on `documents`; today the token
+  is created on first share, not pre-generated at `ready`
+- The current V0 token format is `uuid4()` (~122 bits of entropy). If V1 upgrades to
+  `secrets.token_hex(32)` (256 bits), existing tokens must be preserved or explicitly
+  migrated.
+- If V1 hardens the token format or generation timing, treat that as explicit migration
+  work rather than an already-shipped V0 contract
+- Transport is HTTPS only (tokens travel in URLs and must not be logged or leaked)
+- Status transitions are one-way and enforced server-side
+- The token is validated on every write action, not just on page load
+
+### GET /doc/:token (view landing page)
+
+- No authentication required
+- No write side effects beyond status transition (`shared → viewed`) and event log
+- Returns 404 for unknown tokens — do not distinguish "wrong token" from "not found"
+  (enumeration resistance)
+
+### POST /api/quotes/:id/respond (customer action)
+
+This is a public write endpoint. It must enforce the following before accepting any
+action:
+
+**Token validation:**
+- `share_token` must be included in the request body (not a query parameter — query
+  params appear in server logs and referrer headers)
+- Resolve the document by `quote_id` and `share_token` together; do not first load by
+  `quote_id` alone and then reveal whether the token was wrong
+- If no matching row exists → generic 404 "Link is not valid"
+- If implementation compares tokens in memory after lookup, use a timing-safe string
+  comparison
+
+**Status guard:**
+- Load the document and check current status before applying any transition
+- If status is already terminal (`approved`, `declined`, `expired`) → 409 with message
+  "This quote has already been responded to"
+- Status transitions are one-way: the service layer must enforce this regardless of
+  what the frontend sends
+- `request_changes` does not introduce a new status in V1. The quote remains in
+  `viewed`, `customer_response_note` is populated, and `quote_changes_requested` is
+  logged. The contractor can then edit and re-share the quote, and re-sharing must not
+  regress a quote already at `viewed` or later back to `shared`.
+
+**Idempotency:**
+- If the same action is submitted twice and the status is already the target state →
+  return 200 silently, do not error
+- If the status is a different terminal state → return 409
+
+**Rate limiting:**
+- 10 requests per minute per IP on this endpoint
+- Applies to both valid and invalid token submissions
+- Returns 429 on breach
+
+**Input validation:**
+- `action` field: enum — only `approved`, `declined`, `request_changes` are accepted.
+  Reject anything else with 422.
+- `note` field (for request_changes): max 1000 characters, strip whitespace, sanitize
+  for XSS before storage
+
+**No PII in error responses:**
+- Error messages must not reveal whether a document ID exists, who the contractor is,
+  or any details about the document
+- On token mismatch: generic "Link is not valid" message only
+
+### Event logging on public actions
+
+All public endpoint activity must be logged in event_logs:
+- `quote_viewed` — on GET /doc/:token when doc_type = quote
+- `invoice_viewed` — on GET /doc/:token when doc_type = invoice
+- `quote_approved` — on POST respond with action = approved
+- `quote_declined` — on POST respond with action = declined
+- `quote_changes_requested` — on POST respond with action = request_changes
+
+Log the document_id and action. Do NOT log the share_token, customer IP, or any
+customer-provided note content in event_logs metadata.
+
+---
+
 ## Quote Status Contract Change
 
 This is the first migration V1 requires. The current status lifecycle is:
@@ -63,9 +154,26 @@ draft → ready → shared → viewed → approved | declined | expired
 
 All existing quotes with `shared` status are unaffected. New statuses only apply
 to quotes sent through the V1 delivery flow. `expired` is set automatically when a
-shared quote receives no response within a configurable window (default: 30 days).
+shared or viewed quote receives no response within a configurable window (default:
+30 days).
 
 This schema change is a prerequisite for Milestones 1, 2, and 3 below.
+
+---
+
+## Admin Access Model
+
+V1 does not introduce a contractor-facing admin role or a new `is_admin` user contract.
+
+Any V1 admin/support routes are internal operator tooling only:
+
+- not part of the normal contractor UI
+- not authorized through standard contractor sessions alone
+- protected by an explicit internal-only access mechanism such as environment-gated
+  route enablement plus infra auth, IP allowlisting, or a server-side admin secret
+
+If Stima later needs true in-product admin accounts, that should be scoped as a
+separate authentication/authorization task rather than hidden inside Milestone 6.
 
 ---
 
@@ -87,6 +195,13 @@ This schema change is a prerequisite for Milestones 1, 2, and 3 below.
 - Logo upload is optional — no gate on quote flow if skipped
 - Supported formats: JPEG, PNG. Max size: 2MB.
 
+**Storage design note:** The cloud storage integration introduced here must be built as
+a general-purpose file storage utility, not a logo-specific one. V2 introduces photo
+documentation — both logo and photo uploads need the same operations (upload, delete,
+generate URL). The correct implementation is a `storage_service` that accepts a path
+prefix and file bytes and returns a URL. M0 calls it with prefix `logos/{user_id}/`.
+V2 calls it with `photos/{user_id}/{document_id}/`. One service, multiple consumers.
+
 **Why first:** Every quote the contractor sends from this point forward carries their
 brand. This is low-risk and high-visibility. It also unblocks the customer-facing
 landing page (Milestone 2) which needs the same logo asset.
@@ -103,6 +218,8 @@ landing page (Milestone 2) which needs the same logo asset.
 - Backend: status transition logic and validation
 - Backend: `POST /api/quotes/:id/respond` endpoint for customer response actions
   (used by the public landing page in Milestone 2)
+- Database migration: add `source_document_id UUID NULL REFERENCES documents(id) ON
+  DELETE SET NULL` to `documents` so quote→invoice linkage exists before later V1 work
 - Backend: expiry job or on-read expiry check for quotes older than 30 days with
   no response
 - Frontend: updated status badges for new states
@@ -111,7 +228,8 @@ landing page (Milestone 2) which needs the same logo asset.
 **Acceptance criteria:**
 - All five new statuses are valid and enforced at the DB level
 - A quote can only move forward through the lifecycle, not backward
-- `expired` is applied to quotes in `shared` status with no response after 30 days
+- `expired` is applied to quotes in `shared` or `viewed` status with no response after
+  30 days
 - New status badges render correctly in quote list and detail views
 - Existing `draft`, `ready`, `shared` behavior is unchanged
 
@@ -122,26 +240,58 @@ landing page (Milestone 2) which needs the same logo asset.
 **Goal:** Replace the direct PDF stream with a branded customer-facing page where the
 customer can view the quote and take action.
 
+**Schema notes:**
+- `share_token` column already exists on `documents` from V0 (migration
+  `20260320_0005_add_share_token_to_documents`). In the shipped V0 implementation, the
+  token is created on first share and then reused. If V1 changes token format or
+  generation timing, that should be explicit migration work rather than an assumed
+  existing contract.
+- Add `customer_response_note TEXT NULL` to `documents` in the Milestone 1 migration.
+  Set when a customer submits a "Request Changes" action. Displayed in the contractor's
+  quote detail view. Never customer-facing.
+
+**Route:** `/doc/:token` (unauthenticated, token-gated)
+
+Milestone 2 is quote-first. It introduces the public document route for quote pages.
+Milestone 5 extends the same route shape to invoices once invoice documents exist.
+
+Resolution logic for Milestone 2 quote pages:
+
+1. Look up document by `share_token` column (exact match)
+2. Not found → 404 page ("This link is not valid")
+3. Found but `expired` → closed state ("This quote has expired")
+4. Found and terminal (`approved` or `declined`) → closed state appropriate to status
+5. Otherwise → render the quote document page for `doc_type = "quote"`
+
+**Status transition on page load:**
+- If status = `shared` → transition to `viewed`
+- Log a `quote_viewed` event on page load
+
 **Scope:**
-- New public route: `/q/:token` (unauthenticated, token-gated)
-- Page renders: contractor logo, business name, quote number, date, line items, total,
-  optional notes
+- Page renders: contractor logo, business name, quote number, title (if present), date,
+  line items, total, optional notes
 - Page is mobile-first and readable without an account
-- Viewing the page transitions the quote from `shared` → `viewed`
-- Customer action buttons: **Approve**, **Decline**, **Request Changes**
+- Customer action buttons on quote pages: **Approve**, **Decline**, **Request Changes**
 - Request Changes shows a short text field for the customer to leave a note
 - Submitting any action calls `POST /api/quotes/:id/respond` and shows a confirmation
-- Existing PDF share link (`/api/quotes/:id/pdf/:token`) remains available as a fallback
+- Existing public PDF route (`/share/:token`) remains available; landing page includes
+  a "Download PDF" link that points to that route
 
 **Acceptance criteria:**
 - Public page loads without authentication using the existing share token
 - Page is readable on mobile (primary) and desktop
 - Viewing the page records a `quote_viewed` event and transitions status to `viewed`
-- Approve/Decline/Request Changes each transition status correctly and record an event
-- Customer response note is stored and visible to the contractor in quote detail
+- Approve/Decline each transition status correctly and record an event
+- Request Changes stores `customer_response_note`, logs `quote_changes_requested`, and
+  leaves the quote in `viewed`
+- Customer response note is stored in `customer_response_note` and visible to the
+  contractor in quote detail
 - Confirmation state is shown to the customer after any action
 - If the quote is already approved, declined, or expired, the page shows an appropriate
   closed state rather than the action buttons
+
+**Forward-compatibility note:** Milestone 5 reuses `/doc/:token` for invoice documents.
+At that point, invoice pages render read-only with no action buttons.
 
 ---
 
@@ -160,6 +310,7 @@ Stima — no copy-pasting.
 - Email is only available if the customer record has an email address
 - If no customer email exists, prompt to add one or fall back to copy-link
 - Sent email transitions quote status to `shared` (if not already)
+- Re-sharing a quote already at `viewed` or later does not regress the status
 - Delivery provider: SendGrid (or equivalent transactional email service)
 
 **Acceptance criteria:**
@@ -170,8 +321,17 @@ Stima — no copy-pasting.
 - A `quote_shared` event is recorded on send
 - Rate limiting or send guards prevent accidental duplicate sends
 
-**Open dependency:** Requires a transactional email provider to be configured in the
-backend environment. This is a new infrastructure dependency.
+**Pre-work required before Milestone 3 build begins:**
+- [ ] Sending domain confirmed (e.g., `noreply@stima.dev` or `mail.stima.dev`)
+- [ ] SendGrid account created and API key generated
+- [ ] SPF record added to domain DNS
+- [ ] DKIM record added to domain DNS
+- [ ] DMARC record added (prevents spoofing of the sending domain)
+- [ ] Domain verification confirmed in SendGrid dashboard
+- [ ] Test email sent and received successfully before writing any application code
+
+Note: DNS propagation can take 24–48 hours. Start this before reaching Milestone 3 in
+the build sequence, not on the day Milestone 3 begins.
 
 ---
 
@@ -185,7 +345,8 @@ quote.
   in the quote detail view
 - "Resend" action: re-sends the quote email with a short "just following up" wrapper
 - "Mark as Lost" action: manually closes the quote without a customer response (sets
-  status to `declined`)
+  status to `declined` and logs a contractor-originated event distinct from a
+  customer decline)
 - Reminder prompt is informational, not a push notification (V2 can add push)
 
 **Acceptance criteria:**
@@ -194,6 +355,7 @@ quote.
 - Resend is rate-limited (maximum once per 24 hours per quote)
 - Mark as Lost transitions status to `declined` with an internal `closed_by_contractor`
   note, not a customer-visible action
+- Mark as Lost emits `quote_marked_lost`, not `quote_declined`
 - Reminder banner disappears once the quote receives a response or is manually closed
 
 ---
@@ -207,15 +369,22 @@ action, without re-entering any line items.
 - "Convert to Invoice" action on approved quotes
 - Creates a new document record with `doc_type: "invoice"` seeded from the quote's
   line items, total, and customer
+- Invoice inherits the source quote title when present
 - Invoice document gets its own sequential number in `I-001` format
 - Invoice adds one new field: **Due Date** (required, date picker, defaults to 30 days
   out)
 - Invoice PDF uses the same template as the quote PDF with "Invoice" in the header and
   the due date in the document metadata block
-- Invoice can be sent by email using the same delivery flow as Milestone 3
-- Invoice status lifecycle: `draft → ready → sent` (no approve/decline — invoices are
-  not two-way)
+- Invoice can be sent by email using the same delivery flow as Milestone 3; the
+  customer-facing page is served at `/doc/:token` and renders read-only (no action
+  buttons — invoices are not two-way)
+- Invoice status lifecycle: `draft → ready → sent` (no approve/decline)
 - Invoices appear in the quote list alongside quotes, differentiated by doc type badge
+
+**Schema note:** `source_document_id` should already exist from the Milestone 1 schema
+expansion. Milestone 5 populates it at conversion time and never updates it after.
+The quote detail screen queries `SELECT * FROM documents WHERE source_document_id =
+:quote_id` to find and surface the resulting invoice.
 
 **Acceptance criteria:**
 - "Convert to Invoice" is available on quotes with `approved` status
@@ -223,8 +392,10 @@ action, without re-entering any line items.
 - Invoice number is sequential per user in `I-001` format
 - Due date is required before the invoice can be sent
 - Invoice PDF renders correctly with "Invoice" header and due date
-- Invoice can be emailed directly to the customer
-- The source quote and the invoice are linked (quote detail shows the resulting invoice)
+- Invoice inherits the source quote title when present
+- Invoice can be emailed directly to the customer via `/doc/:token` landing page
+- The source quote and the invoice are linked via `source_document_id`; quote detail
+  shows the resulting invoice
 - Converting a quote to an invoice does not change the quote's status or data
 
 ---
@@ -237,11 +408,15 @@ depend on the app.
 **Scope:**
 - Error monitoring integration (Sentry or equivalent) on both backend and frontend
 - Basic admin analytics route: `GET /api/admin/events` returning aggregated counts
-  of pilot event names over a time window (authenticated, admin-only)
+  of pilot event names over a time window (internal-only operator route; see Admin
+  Access Model above)
 - Extend event logging with new V1 events:
   - `quote_viewed`
+  - `invoice_viewed`
   - `quote_approved`
   - `quote_declined`
+  - `quote_changes_requested`
+  - `quote_marked_lost`
   - `quote_expired`
   - `invoice_created`
   - `email_sent`
@@ -307,9 +482,10 @@ required — blank is fine.
    building on top of it)
 2. Milestone 0 — Branding (low risk, high visibility, unblocks landing page)
 3. Milestone 1 — Status expansion (schema foundation everything else depends on)
-4. Milestone 2 — Public landing page (the core V1 experience)
-5. Milestone 3 — Email delivery (makes the landing page reachable without copy-paste)
-6. Milestone 6 — Operational visibility (run in parallel with 4–6, ship before real users)
+4. Milestone 6 — Operational visibility (Sentry setup must ship before any public URL
+   exists — the first public-facing endpoint is M2, so monitoring comes first)
+5. Milestone 2 — Public landing page (the core V1 experience)
+6. Milestone 3 — Email delivery (makes the landing page reachable without copy-paste)
 7. Milestone 4 — Reminder workflow (builds on delivery + status)
 8. Milestone 5 — Invoice conversion (completes the quoting-to-invoice loop)
 
@@ -335,9 +511,10 @@ Once V1 is complete, the following should be treated as stable:
 
 - Quote status lifecycle: `draft → ready → shared → viewed → approved | declined | expired`
 - Invoice status lifecycle: `draft → ready → sent`
-- Public quote route: `/q/:token`
+- Public document route: `/doc/:token` (handles both quotes and invoices, branches on `doc_type`)
 - Customer response endpoint: `POST /api/quotes/:id/respond`
 - Invoice doc type and `I-001` numbering format
+- `source_document_id` on `documents` as the quote→invoice link
 - Canonical event log names for all V1 user actions
 
 ---

@@ -90,11 +90,12 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | doc_number | String(20) | stored display ID, format `Q-001` |
 | status | String(20) | `draft \| ready \| shared` with DB check constraint |
 | source_type | String(20) | `"text"` or `"voice"` based on capture mode |
-| transcript | Text | raw typed notes |
+| transcript | Text | stored source transcript/notes for the quote draft |
 | total_amount | Numeric(10,2) | nullable, user-editable |
 | notes | Text | nullable, customer-facing notes |
-| pdf_url | Text | nullable (future PDF task) |
-| shared_at | DateTime(tz) | nullable (future sharing task) |
+| pdf_url | Text | nullable legacy field; PDFs are streamed directly in V0 and this is not populated by the current flow |
+| share_token | Text | nullable, unique, set on first share and reused for public PDF access |
+| shared_at | DateTime(tz) | nullable, set when a quote transitions to `shared` |
 | created_at, updated_at | DateTime(tz) | server defaults |
 
 Unique constraint: `(user_id, doc_sequence)`.
@@ -225,4 +226,11 @@ FastAPI validation errors use `422` with array-style `detail`.
 
 ## Deployment
 
-TBD — not yet deployed.
+Stima is deployed in production with same-site subdomains:
+
+- Frontend: Vercel at `stima.odysian.dev`
+- Backend: GCP VM + NGINX at `api.stima.odysian.dev`
+- Database: Cloud SQL PostgreSQL
+- Container registry: GHCR
+
+Cookie auth is configured for the shared parent domain `.stima.odysian.dev`.

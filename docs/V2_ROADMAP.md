@@ -87,6 +87,26 @@ The quote and invoice total section gains structured support for:
 These are display-only in V2 — Stima does not process payments. The deposit line tells
 the customer what is due upfront; collection happens outside the app.
 
+**PDF template note:** When V1 builds the PDF template, the total section must be
+implemented as a conditional block, not a hardcoded single-line total. This feature
+depends on that structure being in place:
+
+```jinja2
+{% if quote.deposit %}
+<tr class="deposit-line">...</tr>
+{% endif %}
+{% if quote.discount %}
+<tr class="discount-line">...</tr>
+{% endif %}
+{% if quote.tax_rate %}
+<tr class="tax-line">...</tr>
+{% endif %}
+<tr class="total-line">...</tr>
+```
+
+If V1 hardcodes the total block, V2 must restructure the template rather than just
+populating new variables. The V1 agent should be aware of this when building the PDF.
+
 **Revision history**
 A quote keeps a lightweight record of when it was edited and what the total was at each
 save point. Not a full diff — just a timestamped snapshot of the total and line item
@@ -135,6 +155,26 @@ When the AI generates a draft for a returning customer, it has access to the tit
 prior line items for that customer. It does not auto-fill pricing, but it can suggest
 matching descriptions when the new transcript is similar to past jobs. This makes the
 draft feel more personalized and reduces editing time on repeat work.
+
+**V1 seam required:** The extraction path should be built in V1 so an optional
+`customer_context` parameter can be added without rewriting every quote intake call site.
+In the current codebase, that likely means extending `ExtractionService.convert_notes()`
+and/or the underlying extraction integration contract rather than inventing a brand-new
+entrypoint.
+
+```python
+async def convert_notes(
+    transcript: str,
+    customer_context: CustomerContext | None = None  # pass None always in V1
+) -> QuoteDraft: ...
+```
+
+Where `CustomerContext` will eventually contain:
+- `customer_id: UUID`
+- `prior_line_item_descriptions: list[str]` — populated from prior quotes in V2
+
+Building this seam in V1 costs nothing. Skipping it means every call site must be
+updated when V2 adds context injection.
 
 ---
 

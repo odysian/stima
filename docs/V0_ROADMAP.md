@@ -2,7 +2,7 @@
 
 **Version:** 1.1 — March 2026
 **Status:** Finalized
-**Tracks against:** `docs/Stima_V0_Vertical_Slice_Spec.md` (sections 14-15) and `docs/Stima_Project_Setup_v1.1.md`
+**Tracks against:** `docs/archive/Stima_V0_Vertical_Slice_Spec.md` (sections 14-15) and `docs/archive/Stima_Project_Setup_v1.1.md`
 
 ---
 
@@ -149,7 +149,8 @@ The following contracts should be treated as stable V0 behavior:
   - `shared`
 - Quote numbering is sequential per user using `Q-001` formatting
 - Quote list payload is intentionally lightweight and distinct from quote detail payload
-- PDF share links stream the quote PDF directly; there is no branded public landing page in V0
+- Public share links stream the quote PDF directly via `GET /share/{share_token}`; there
+  is no branded public landing page in V0
 - Pilot analytics uses canonical underscore event names; dot-notation events remain operational logs
 - Quote dates are rendered in the saved business timezone when available
 
