@@ -193,9 +193,16 @@ describe("QuotePreview", () => {
   });
 
   it("falls back to customer name for the header title and keeps doc number as subtitle", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        title: null,
+        customer_name: "Explicit Customer",
+      }),
+    );
+
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Test Customer" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explicit Customer" })).toBeInTheDocument();
     expect(screen.getByText("Q-001")).toBeInTheDocument();
   });
 
