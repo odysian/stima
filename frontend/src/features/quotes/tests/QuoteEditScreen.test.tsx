@@ -170,6 +170,39 @@ describe("QuoteEditScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
   });
 
+  it("falls back to the doc number after clearing a saved title and submits null", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        title: "Patio Refresh",
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Patio Refresh" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Q-001 · Update line items, total, and notes"),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/quote title/i), {
+      target: { value: "   " },
+    });
+
+    expect(screen.getByRole("heading", { name: "Q-001" })).toBeInTheDocument();
+    expect(screen.getByText("Update line items, total, and notes")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-1", {
+        title: null,
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total_amount: 120,
+        notes: "Thanks for your business",
+      });
+    });
+  });
+
   it("blocks save when a line item has details or price but no description", async () => {
     window.sessionStorage.setItem(
       EDIT_STORAGE_KEY,

@@ -6,6 +6,7 @@ import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSect
 import { useQuoteEdit, type QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft, LineItemDraftWithFlags, QuoteDetail } from "@/features/quotes/types/quote.types";
+import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
@@ -29,11 +30,6 @@ function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
     total: quote.total_amount,
     notes: quote.notes ?? "",
   };
-}
-
-function normalizeOptionalTitle(title: string): string | null {
-  const trimmed = title.trim();
-  return trimmed.length > 0 ? trimmed : null;
 }
 
 function normalizeLineItem(item: LineItemDraftWithFlags): LineItemDraftWithFlags {
@@ -131,7 +127,7 @@ export function QuoteEditScreen(): React.ReactElement {
     return runningTotal + lineItem.price;
   }, 0);
   const draftTitle = currentDraft?.title.trim() ?? "";
-  const headerTitle = draftTitle || quote?.title || quote?.doc_number || "Edit Quote";
+  const headerTitle = draftTitle || quote?.doc_number || "Edit Quote";
   const headerSubtitle = quote
     ? draftTitle
       ? `${quote.doc_number} · Update line items, total, and notes`
@@ -235,7 +231,7 @@ export function QuoteEditScreen(): React.ReactElement {
             <section className="space-y-2">
               <label
                 htmlFor="quote-edit-title"
-                className="text-xs font-bold uppercase tracking-wider text-outline-variant"
+                className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
               >
                 QUOTE TITLE
               </label>
@@ -249,7 +245,7 @@ export function QuoteEditScreen(): React.ReactElement {
                     title: event.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-outline-variant/30 bg-white px-4 py-3 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="Front yard refresh (optional)"
                 maxLength={120}
               />
