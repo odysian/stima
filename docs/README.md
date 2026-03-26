@@ -9,6 +9,8 @@ Use this index to keep template docs easy to traverse.
 - `REVIEW_CHECKLIST.md`
 - `CODE_COMMENTING_CONTRACT.md`
 - `ISSUES_WORKFLOW.md`
+- `V0_ROADMAP.md`
+- `V1_ROADMAP.md`
 
 ## Architecture Decision Records
 
