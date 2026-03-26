@@ -16,6 +16,20 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
+function getCustomerDraftValues(nextCustomer: Customer): {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+} {
+  return {
+    name: nextCustomer.name,
+    phone: nextCustomer.phone ?? "",
+    email: nextCustomer.email ?? "",
+    address: nextCustomer.address ?? "",
+  };
+}
+
 export function CustomerDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -32,6 +46,33 @@ export function CustomerDetailScreen(): React.ReactElement {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
+  function populateDraftFields(nextCustomer: Customer): void {
+    const draftValues = getCustomerDraftValues(nextCustomer);
+    setName(draftValues.name);
+    setPhone(draftValues.phone);
+    setEmail(draftValues.email);
+    setAddress(draftValues.address);
+  }
+
+  function resetEditState(nextCustomer: Customer): void {
+    populateDraftFields(nextCustomer);
+    setSaveError(null);
+    setSaveSuccess(null);
+    setIsEditing(false);
+  }
+
+  function openEditMode(): void {
+    if (!customer) {
+      return;
+    }
+
+    populateDraftFields(customer);
+    setSaveError(null);
+    setSaveSuccess(null);
+    setIsEditing(true);
+  }
 
   useEffect(() => {
     if (!id) {
@@ -58,11 +99,11 @@ export function CustomerDetailScreen(): React.ReactElement {
         }
 
         setCustomer(nextCustomer);
-        setName(nextCustomer.name);
-        setPhone(nextCustomer.phone ?? "");
-        setEmail(nextCustomer.email ?? "");
-        setAddress(nextCustomer.address ?? "");
-
+        const draftValues = getCustomerDraftValues(nextCustomer);
+        setName(draftValues.name);
+        setPhone(draftValues.phone);
+        setEmail(draftValues.email);
+        setAddress(draftValues.address);
         setCustomerQuotes(nextQuotes);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load customer";
@@ -110,17 +151,25 @@ export function CustomerDetailScreen(): React.ReactElement {
     try {
       const updatedCustomer = await customerService.updateCustomer(id, payload);
       setCustomer(updatedCustomer);
-      setName(updatedCustomer.name);
-      setPhone(updatedCustomer.phone ?? "");
-      setEmail(updatedCustomer.email ?? "");
-      setAddress(updatedCustomer.address ?? "");
       setSaveSuccess("Saved");
+      setSaveError(null);
+      setIsEditing(false);
+      populateDraftFields(updatedCustomer);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save customer";
       setSaveError(message);
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function formatSummaryValue(value: string | null | undefined, fallback: string): string {
+    if (!value) {
+      return fallback;
+    }
+
+    const trimmedValue = value.trim();
+    return trimmedValue || fallback;
   }
 
   return (
@@ -144,29 +193,80 @@ export function CustomerDetailScreen(): React.ReactElement {
 
         {!isLoading && !loadError && customer ? (
           <>
-            <Button
-              type="button"
-              variant="primary"
-              className="w-full"
-              onClick={() => navigate(`/quotes/capture/${customer.id}`)}
-            >
-              Create Quote {"->"}
-            </Button>
+            {!isEditing ? (
+              <section className="rounded-xl bg-surface-container-lowest p-4 ghost-shadow">
+                <div className="flex flex-col gap-3">
+                  {saveSuccess ? (
+                    <p
+                      role="status"
+                      className="rounded-lg bg-success-container px-3 py-2 text-sm text-success"
+                    >
+                      {saveSuccess}
+                    </p>
+                  ) : null}
 
-            <CustomerInfoForm
-              name={name}
-              phone={phone}
-              email={email}
-              address={address}
-              onNameChange={(event) => setName(event.target.value)}
-              onPhoneChange={(event) => setPhone(event.target.value)}
-              onEmailChange={(event) => setEmail(event.target.value)}
-              onAddressChange={(event) => setAddress(event.target.value)}
-              onSubmit={onSaveChanges}
-              isSaving={isSaving}
-              saveError={saveError}
-              saveSuccess={saveSuccess}
-            />
+                  <dl className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-3">
+                      <dt className="w-16 shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                        Phone
+                      </dt>
+                      <dd className="text-sm text-on-surface">
+                        {formatSummaryValue(customer.phone, "—")}
+                      </dd>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <dt className="w-16 shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                        Email
+                      </dt>
+                      <dd className="min-w-0 truncate text-sm text-on-surface">
+                        {formatSummaryValue(customer.email, "—")}
+                      </dd>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <dt className="w-16 shrink-0 pt-0.5 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                        Address
+                      </dt>
+                      <dd className="whitespace-pre-wrap text-sm text-on-surface">
+                        {formatSummaryValue(customer.address, "—")}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      className="flex-1"
+                      onClick={() => navigate(`/quotes/capture/${customer.id}`)}
+                    >
+                      Create Quote {"->"}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={openEditMode}
+                      className="rounded-lg border border-outline/20 px-4 py-4 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low active:scale-[0.98]"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <CustomerInfoForm
+                name={name}
+                phone={phone}
+                email={email}
+                address={address}
+                onNameChange={(event) => setName(event.target.value)}
+                onPhoneChange={(event) => setPhone(event.target.value)}
+                onEmailChange={(event) => setEmail(event.target.value)}
+                onAddressChange={(event) => setAddress(event.target.value)}
+                onSubmit={onSaveChanges}
+                onCancel={() => resetEditState(customer)}
+                isSaving={isSaving}
+                saveError={saveError}
+              />
+            )}
 
             <QuoteHistoryList
               quotes={customerQuotes}

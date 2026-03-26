@@ -14,9 +14,9 @@ interface CustomerInfoFormProps {
   onEmailChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onAddressChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onCancel?: () => void;
   isSaving: boolean;
   saveError: string | null;
-  saveSuccess: string | null;
 }
 
 export function CustomerInfoForm({
@@ -29,21 +29,15 @@ export function CustomerInfoForm({
   onEmailChange,
   onAddressChange,
   onSubmit,
+  onCancel,
   isSaving,
   saveError,
-  saveSuccess,
 }: CustomerInfoFormProps): React.ReactElement {
   return (
     <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
       <h2 className="mb-4 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
         Customer Info
       </h2>
-
-      {saveSuccess ? (
-        <p role="status" className="mb-4 rounded-lg bg-success-container p-3 text-sm text-success">
-          {saveSuccess}
-        </p>
-      ) : null}
 
       {saveError ? (
         <div className="mb-4">
@@ -75,9 +69,22 @@ export function CustomerInfoForm({
           />
         </div>
 
-        <Button type="submit" variant="primary" className="mt-2 w-full" isLoading={isSaving}>
-          Save Changes
-        </Button>
+        <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          {onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isSaving}
+              className="w-full rounded-lg border border-outline/20 px-4 py-3 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              Cancel
+            </button>
+          ) : null}
+
+          <Button type="submit" variant="primary" className="w-full px-6 sm:w-auto" isLoading={isSaving}>
+            Save Changes
+          </Button>
+        </div>
       </form>
     </section>
   );
