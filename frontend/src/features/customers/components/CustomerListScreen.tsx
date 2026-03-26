@@ -115,14 +115,14 @@ export function CustomerListScreen(): React.ReactElement {
 
         {showNoCustomersState ? (
           <section className="mx-4 mt-8 flex flex-col items-center rounded-lg bg-surface-container-lowest p-8 text-center ghost-shadow">
-            <span className="material-symbols-outlined mb-2 text-5xl text-outline">group</span>
+            <span className="material-symbols-outlined mb-2 text-3xl text-outline">group</span>
             <p className="text-sm text-outline">No customers yet.</p>
           </section>
         ) : null}
 
         {showNoSearchMatches ? (
           <section className="mx-4 mt-8 flex flex-col items-center rounded-lg bg-surface-container-lowest p-8 text-center ghost-shadow">
-            <span className="material-symbols-outlined mb-2 text-5xl text-outline">group</span>
+            <span className="material-symbols-outlined mb-2 text-3xl text-outline">group</span>
             <p className="text-sm text-outline">No customers match your search.</p>
           </section>
         ) : null}

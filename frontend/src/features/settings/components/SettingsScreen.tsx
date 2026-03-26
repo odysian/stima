@@ -112,7 +112,7 @@ export function SettingsScreen(): React.ReactElement {
         {!isLoadingProfile && !loadError ? (
           <form className="space-y-4" onSubmit={onSubmit}>
             {saveSuccess ? (
-              <p role="status" className="rounded-md bg-success-container p-3 text-sm text-success">
+              <p role="status" className="rounded-lg bg-success-container p-3 text-sm text-success">
                 {saveSuccess}
               </p>
             ) : null}
@@ -179,12 +179,12 @@ export function SettingsScreen(): React.ReactElement {
               <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Account</h2>
               <div className="mt-4 space-y-4">
                 <div className="flex flex-col gap-1">
-                  <p className="text-xs uppercase tracking-wide text-outline">Email</p>
+                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Email</p>
                   <p className="text-sm text-on-surface">{email}</p>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="text-xs uppercase tracking-wide text-outline">Session</span>
+                  <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Session</span>
                   {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
                   <button
                     type="button"

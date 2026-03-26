@@ -96,7 +96,24 @@ describe("CustomerListScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByText("No customers yet.")).toBeInTheDocument();
+    const emptyState = (await screen.findByText("No customers yet.")).closest("section");
+    expect(emptyState).not.toBeNull();
+    expect(emptyState?.querySelector(".material-symbols-outlined")).toHaveClass("text-3xl");
+  });
+
+  it("renders the search-empty icon with the compact token size", async () => {
+    mockedCustomerService.listCustomers.mockResolvedValueOnce([makeCustomer()]);
+
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    fireEvent.change(screen.getByLabelText("Search customers"), {
+      target: { value: "zzz" },
+    });
+
+    const emptyState = (await screen.findByText("No customers match your search.")).closest("section");
+    expect(emptyState).not.toBeNull();
+    expect(emptyState?.querySelector(".material-symbols-outlined")).toHaveClass("text-3xl");
   });
 
   it("navigates to customer detail when a row is clicked", async () => {
