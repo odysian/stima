@@ -31,6 +31,12 @@ export function QuoteHistoryList({
           <ul className="flex flex-col gap-3">
             {quotes.map((quote) => {
               const itemCountLabel = `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`;
+              const primaryLabel = quote.title ?? quote.doc_number;
+              const supportingDetails = [
+                ...(quote.title ? [quote.doc_number] : []),
+                formatDate(quote.created_at, timezone),
+                itemCountLabel,
+              ].join(" · ");
 
               return (
                 <li key={quote.id}>
@@ -40,15 +46,13 @@ export function QuoteHistoryList({
                     onClick={() => onQuoteClick(quote.id)}
                   >
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="font-headline font-bold text-on-surface">{quote.doc_number}</p>
+                      <p className="font-headline font-bold text-on-surface">{primaryLabel}</p>
                       <p className="font-headline font-bold text-on-surface">
                         {formatCurrency(quote.total_amount)}
                       </p>
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-3">
-                      <p className="text-sm text-on-surface-variant">
-                        {formatDate(quote.created_at, timezone)}{" · "}{itemCountLabel}
-                      </p>
+                      <p className="text-sm text-on-surface-variant">{supportingDetails}</p>
                       <StatusBadge variant={quote.status} />
                     </div>
                   </button>

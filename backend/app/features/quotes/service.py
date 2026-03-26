@@ -65,6 +65,7 @@ class QuoteRepositoryProtocol(Protocol):
         *,
         user_id: UUID,
         customer_id: UUID,
+        title: str | None,
         transcript: str,
         line_items: list[LineItemDraft],
         total_amount: float | None,
@@ -76,6 +77,8 @@ class QuoteRepositoryProtocol(Protocol):
         self,
         *,
         document: Document,
+        title: str | None,
+        update_title: bool,
         total_amount: float | None,
         update_total_amount: bool,
         notes: str | None,
@@ -126,6 +129,7 @@ class QuoteService:
                 quote = await self._repository.create(
                     user_id=user_id,
                     customer_id=data.customer_id,
+                    title=data.title,
                     transcript=data.transcript,
                     line_items=data.line_items,
                     total_amount=data.total_amount,
@@ -192,6 +196,8 @@ class QuoteService:
 
         updated_quote = await self._repository.update(
             document=quote,
+            title=data.title,
+            update_title="title" in data.model_fields_set,
             total_amount=data.total_amount,
             update_total_amount="total_amount" in data.model_fields_set,
             notes=data.notes,

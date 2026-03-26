@@ -57,9 +57,11 @@ export function QuoteList(): React.ReactElement {
     return quotes.filter((quote) => {
       const customerName = quote.customer_name.toLowerCase();
       const docNumber = quote.doc_number.toLowerCase();
+      const title = quote.title?.toLowerCase() ?? "";
       return (
         customerName.includes(normalizedSearchQuery) ||
-        docNumber.includes(normalizedSearchQuery)
+        docNumber.includes(normalizedSearchQuery) ||
+        title.includes(normalizedSearchQuery)
       );
     });
   }, [normalizedSearchQuery, quotes]);
@@ -91,7 +93,7 @@ export function QuoteList(): React.ReactElement {
           <Input
             label="Search quotes"
             id="quote-search"
-            placeholder="Search customer or quote ID..."
+            placeholder="Search customer, title, or quote ID..."
             hideLabel
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -133,32 +135,40 @@ export function QuoteList(): React.ReactElement {
             </div>
             <div className="mx-4 rounded-xl bg-surface-container-low p-3">
               <ul className="flex flex-col gap-3">
-                {filteredQuotes.map((quote) => (
-                  <li key={quote.id}>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/quotes/${quote.id}/preview`)}
-                      className="w-full rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="font-headline font-bold text-on-surface">
-                          {quote.customer_name}
-                        </p>
-                        <p className="font-headline font-bold text-on-surface">
-                          {formatCurrency(quote.total_amount)}
-                        </p>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between gap-3">
-                        <p className="text-sm text-on-surface-variant">
-                          {quote.doc_number} {" \u00b7 "} {formatDate(quote.created_at, timezone)}{" "}
-                          {"\u00b7"}{" "}
-                          {quote.item_count} {quote.item_count === 1 ? "item" : "items"}
-                        </p>
-                        <StatusBadge variant={quote.status} />
-                      </div>
-                    </button>
-                  </li>
-                ))}
+                {filteredQuotes.map((quote) => {
+                  const primaryLabel = quote.title ?? quote.doc_number;
+                  const supportingDetails = [
+                    quote.customer_name,
+                    ...(quote.title ? [quote.doc_number] : []),
+                    formatDate(quote.created_at, timezone),
+                    `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
+                  ].join(" · ");
+
+                  return (
+                    <li key={quote.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/quotes/${quote.id}/preview`)}
+                        className="w-full rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="font-headline font-bold text-on-surface">
+                            {primaryLabel}
+                          </p>
+                          <p className="font-headline font-bold text-on-surface">
+                            {formatCurrency(quote.total_amount)}
+                          </p>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <p className="text-sm text-on-surface-variant">
+                            {supportingDetails}
+                          </p>
+                          <StatusBadge variant={quote.status} />
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </>

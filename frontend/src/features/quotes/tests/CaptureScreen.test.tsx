@@ -241,6 +241,7 @@ describe("CaptureScreen", () => {
     });
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",
+      title: "",
       transcript: "5 yards brown mulch",
       lineItems: [
         {

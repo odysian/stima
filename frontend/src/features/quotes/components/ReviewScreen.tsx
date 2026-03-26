@@ -10,6 +10,7 @@ import type {
   LineItemDraft,
   LineItemDraftWithFlags,
 } from "@/features/quotes/types/quote.types";
+import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -132,6 +133,7 @@ export function ReviewScreen(): React.ReactElement | null {
       const extraction = await quoteService.convertNotes(trimmedTranscript);
       setDraft({
         ...currentDraft,
+        title: currentDraft.title,
         transcript: extraction.transcript,
         lineItems: mapExtractedLineItems(extraction),
         total: extraction.total,
@@ -181,6 +183,7 @@ export function ReviewScreen(): React.ReactElement | null {
     try {
       const createdQuote = await quoteService.createQuote({
         customer_id: currentDraft.customerId,
+        title: normalizeOptionalTitle(currentDraft.title),
         transcript: currentDraft.transcript,
         line_items: lineItemsForSubmit,
         total_amount: currentDraft.total,
@@ -302,6 +305,30 @@ export function ReviewScreen(): React.ReactElement | null {
             ) : null}
           </div>
         </details>
+
+        <section className="space-y-2">
+          <label
+            htmlFor="quote-title"
+            className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
+          >
+            QUOTE TITLE
+          </label>
+          <input
+            id="quote-title"
+            type="text"
+            disabled={isInteractionLocked}
+            value={currentDraft.title}
+            onChange={(event) =>
+              updateDraft((nextDraft) => ({
+                ...nextDraft,
+                title: event.target.value,
+              }))
+            }
+            className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+            placeholder="Front yard refresh (optional)"
+            maxLength={120}
+          />
+        </section>
 
         <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
           <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>

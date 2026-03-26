@@ -44,6 +44,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     customer_email: null,
     customer_phone: null,
     doc_number: "Q-001",
+    title: null,
     status: "ready",
     source_type: "text",
     transcript: "5 yards brown mulch",
@@ -69,6 +70,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
 function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
   return {
     quoteId: "quote-1",
+    title: "",
     lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
     total: 120,
     notes: "Thanks for your business",
@@ -92,6 +94,7 @@ beforeEach(() => {
     id: "quote-1",
     customer_id: "cust-1",
     doc_number: "Q-001",
+    title: "Patio Refresh",
     status: "draft",
     source_type: "text",
     transcript: "5 yards brown mulch",
@@ -120,6 +123,7 @@ describe("QuoteEditScreen", () => {
     await waitFor(() => {
       expect(JSON.parse(window.sessionStorage.getItem(EDIT_STORAGE_KEY) ?? "")).toEqual({
         quoteId: "quote-1",
+        title: "",
         lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total: 120,
         notes: "Thanks for your business",
@@ -143,6 +147,9 @@ describe("QuoteEditScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Q-001" })).toBeInTheDocument();
 
+    fireEvent.change(screen.getByLabelText(/quote title/i), {
+      target: { value: "  Patio Refresh  " },
+    });
     fireEvent.change(screen.getByLabelText(/customer notes/i), {
       target: { value: "Updated note" },
     });
@@ -153,6 +160,7 @@ describe("QuoteEditScreen", () => {
 
     await waitFor(() => {
       expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-1", {
+        title: "Patio Refresh",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total_amount: 145,
         notes: "Updated note",
@@ -160,6 +168,39 @@ describe("QuoteEditScreen", () => {
     });
     expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).toBeNull();
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
+  });
+
+  it("falls back to the doc number after clearing a saved title and submits null", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        title: "Patio Refresh",
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Patio Refresh" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Q-001 · Update line items, total, and notes"),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/quote title/i), {
+      target: { value: "   " },
+    });
+
+    expect(screen.getByRole("heading", { name: "Q-001" })).toBeInTheDocument();
+    expect(screen.getByText("Update line items, total, and notes")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-1", {
+        title: null,
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total_amount: 120,
+        notes: "Thanks for your business",
+      });
+    });
   });
 
   it("blocks save when a line item has details or price but no description", async () => {

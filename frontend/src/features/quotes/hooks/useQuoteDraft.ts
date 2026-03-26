@@ -6,6 +6,7 @@ const DRAFT_STORAGE_KEY = "stima_quote_draft";
 
 export interface QuoteDraft {
   customerId: string;
+  title: string;
   transcript: string;
   lineItems: LineItemDraftWithFlags[];
   total: number | null;
@@ -39,6 +40,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
 
     const {
       customerId,
+      title,
       transcript,
       lineItems,
       total,
@@ -49,6 +51,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
 
     if (
       typeof customerId !== "string" ||
+      (title !== undefined && typeof title !== "string") ||
       typeof transcript !== "string" ||
       !Array.isArray(lineItems) ||
       !Array.isArray(confidenceNotes) ||
@@ -66,6 +69,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
 
     return {
       customerId,
+      title: typeof title === "string" ? title : "",
       transcript,
       lineItems: lineItems as LineItemDraftWithFlags[],
       total,

@@ -28,6 +28,7 @@ const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
 function makeDraft(overrides: Partial<QuoteDraft> = {}): QuoteDraft {
   return {
     customerId: "cust-1",
+    title: "",
     transcript: "5 yards brown mulch and edge front beds",
     lineItems: [
       {

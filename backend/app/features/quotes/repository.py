@@ -39,6 +39,7 @@ class QuoteRenderContext:
     customer_email: str | None
     customer_address: str | None
     doc_number: str
+    title: str | None
     status: str
     total_amount: Decimal | None
     notes: str | None
@@ -62,6 +63,7 @@ class QuoteListItemSummary:
     customer_id: UUID
     customer_name: str
     doc_number: str
+    title: str | None
     status: str
     total_amount: Decimal | None
     item_count: int
@@ -78,6 +80,7 @@ class QuoteDetailRow:
     customer_email: str | None
     customer_phone: str | None
     doc_number: str
+    title: str | None
     status: str
     source_type: str
     transcript: str
@@ -124,6 +127,7 @@ class QuoteRepository:
                 Document.customer_id,
                 Customer.name.label("customer_name"),
                 Document.doc_number,
+                Document.title,
                 Document.status,
                 Document.total_amount,
                 line_item_count.label("item_count"),
@@ -143,6 +147,7 @@ class QuoteRepository:
                 customer_id=row.customer_id,
                 customer_name=row.customer_name,
                 doc_number=row.doc_number,
+                title=row.title,
                 status=(
                     row.status.value if isinstance(row.status, QuoteStatus) else str(row.status)
                 ),
@@ -188,6 +193,7 @@ class QuoteRepository:
             customer_email=customer.email,
             customer_phone=customer.phone,
             doc_number=document.doc_number,
+            title=document.title,
             status=(
                 document.status.value
                 if isinstance(document.status, QuoteStatus)
@@ -258,6 +264,7 @@ class QuoteRepository:
         *,
         user_id: UUID,
         customer_id: UUID,
+        title: str | None,
         transcript: str,
         line_items: list[LineItemDraft],
         total_amount: float | None,
@@ -271,6 +278,7 @@ class QuoteRepository:
             customer_id=customer_id,
             doc_sequence=next_sequence,
             doc_number=f"Q-{next_sequence:03d}",
+            title=title,
             source_type=source_type,
             transcript=transcript,
             total_amount=_to_decimal(total_amount),
@@ -295,6 +303,8 @@ class QuoteRepository:
         self,
         *,
         document: Document,
+        title: str | None,
+        update_title: bool,
         total_amount: float | None,
         update_total_amount: bool,
         notes: str | None,
@@ -303,6 +313,8 @@ class QuoteRepository:
         replace_line_items: bool,
     ) -> Document:
         """Apply partial quote updates and optional full line-item replacement."""
+        if update_title:
+            document.title = title
         if update_total_amount:
             document.total_amount = _to_decimal(total_amount)
         if update_notes:
@@ -380,6 +392,7 @@ def _build_render_context(
         customer_email=customer.email,
         customer_address=customer.address,
         doc_number=document.doc_number,
+        title=document.title,
         status=document.status.value,
         total_amount=document.total_amount,
         notes=document.notes,

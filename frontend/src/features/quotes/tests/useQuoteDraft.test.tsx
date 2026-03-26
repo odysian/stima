@@ -7,6 +7,7 @@ const DRAFT_STORAGE_KEY = "stima_quote_draft";
 
 const draftFixture: QuoteDraft = {
   customerId: "cust-1",
+  title: "Front Yard Refresh",
   transcript: "5 yards brown mulch",
   lineItems: [
     {
@@ -97,8 +98,13 @@ describe("useQuoteDraft", () => {
 
   it("rehydrates older drafts that do not include flag metadata", () => {
     const legacyDraft = {
-      ...draftFixture,
+      customerId: draftFixture.customerId,
+      transcript: draftFixture.transcript,
       lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      total: draftFixture.total,
+      confidenceNotes: draftFixture.confidenceNotes,
+      notes: draftFixture.notes,
+      sourceType: draftFixture.sourceType,
     };
     window.sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(legacyDraft));
 
@@ -107,6 +113,7 @@ describe("useQuoteDraft", () => {
     expect(screen.getByTestId("draft-state")).toHaveTextContent(
       JSON.stringify({
         ...draftFixture,
+        title: "",
         lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
       }),
     );

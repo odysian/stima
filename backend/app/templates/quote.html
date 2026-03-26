@@ -57,6 +57,12 @@
         font-size: 14px;
       }
 
+      .quote-title {
+        margin: 0 0 10px;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
       table.line-items {
         width: 100%;
         border-collapse: collapse;
@@ -134,6 +140,10 @@
               {% endif %}
             </td>
             <td>
+              {% if title %}
+              <p class="label">Quote Title</p>
+              <p class="quote-title">{{ title }}</p>
+              {% endif %}
               <p class="label">Quote Number</p>
               <p class="value">{{ doc_number }}</p>
               <p class="label" style="margin-top: 10px">Issued</p>

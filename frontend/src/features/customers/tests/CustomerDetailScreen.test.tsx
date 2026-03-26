@@ -79,6 +79,7 @@ beforeEach(() => {
       customer_id: "cust-1",
       customer_name: "Alice Johnson",
       doc_number: "Q-001",
+      title: null,
       status: "draft",
       total_amount: 120,
       item_count: 1,

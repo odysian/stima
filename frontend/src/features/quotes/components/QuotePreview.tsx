@@ -27,7 +27,7 @@ function isShareAbortError(error: unknown): boolean {
 
 function readOptionalQuoteText(
   quote: QuoteDetail | null,
-  key: "customer_name" | "customer_email" | "customer_phone",
+  key: "customer_name" | "customer_email" | "customer_phone" | "title",
 ): string | null {
   const value = quote?.[key];
   if (typeof value !== "string") return null;
@@ -139,6 +139,7 @@ export function QuotePreview(): React.ReactElement {
   // this device has a locally generated PDF blob available right now.
   const openPdfUrl = pdfUrl;
   const statusCardCopy = getStatusCardCopy(cardState, hasLocalPdf);
+  const quoteTitle = readOptionalQuoteText(quote, "title");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact =
     [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]
@@ -188,6 +189,7 @@ export function QuotePreview(): React.ReactElement {
         if (!currentQuote) return currentQuote;
         return {
           ...currentQuote,
+          title: updatedQuote.title,
           status: updatedQuote.status,
           shared_at: updatedQuote.shared_at,
           share_token: updatedQuote.share_token,
@@ -203,7 +205,7 @@ export function QuotePreview(): React.ReactElement {
 
       if (typeof maybeNavigator.share === "function") {
         await maybeNavigator.share({
-          title: `Quote ${updatedQuote.doc_number}`,
+          title: updatedQuote.title ?? `Quote ${updatedQuote.doc_number}`,
           url: nextSharedUrl,
         });
         setShareMessage("Quote link shared.");
@@ -266,7 +268,8 @@ export function QuotePreview(): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader
-        title={quote?.doc_number ?? "Quote Preview"}
+        title={quoteTitle ?? quote?.doc_number ?? "Quote Preview"}
+        subtitle={quoteTitle ? quote?.doc_number : undefined}
         onBack={() => navigate(-1)}
         trailing={quote ? <StatusBadge variant={quote.status} /> : null}
       />
@@ -303,6 +306,9 @@ export function QuotePreview(): React.ReactElement {
                         {statusCardCopy.description}
                       </p>
                       <div className="mt-4">
+                        {quoteTitle ? (
+                          <p className="font-headline font-bold text-on-surface">{quoteTitle}</p>
+                        ) : null}
                         <p className="font-bold text-on-surface">{clientName}</p>
                         <p className="mt-1 text-xs text-outline">{quote.doc_number}</p>
                       </div>
@@ -395,7 +401,7 @@ export function QuotePreview(): React.ReactElement {
 
       {showDeleteConfirm && quote ? (
         <ConfirmModal
-          title={`Delete ${quote.doc_number}?`}
+          title={`Delete ${quote.title ?? quote.doc_number}?`}
           body="This cannot be undone."
           confirmLabel="Delete"
           cancelLabel="Keep"

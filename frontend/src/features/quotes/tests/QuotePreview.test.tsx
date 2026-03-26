@@ -32,6 +32,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     customer_email: null,
     customer_phone: null,
     doc_number: "Q-001",
+    title: null,
     status: "draft",
     source_type: "text",
     transcript: "5 yards brown mulch",
@@ -59,6 +60,7 @@ function makeQuoteResponse(overrides: Partial<Quote> = {}): Quote {
     id: "quote-1",
     customer_id: "cust-1",
     doc_number: "Q-001",
+    title: null,
     status: "shared",
     source_type: "text",
     transcript: "5 yards brown mulch",
@@ -176,6 +178,17 @@ describe("QuotePreview", () => {
     expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /share quote/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete quote/i })).toBeInTheDocument();
+  });
+
+  it("renders quote title as the primary header when present", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ title: "Front Yard Refresh" }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Front Yard Refresh" })).toBeInTheDocument();
+    expect(screen.getAllByText("Q-001").length).toBeGreaterThan(0);
   });
 
   it("shows a disabled open-pdf primary action for shared quotes without a local blob", async () => {

@@ -59,6 +59,7 @@ function createDeferredPromise<T>(): {
 function makeDraft(overrides: Partial<QuoteDraft> = {}): QuoteDraft {
   return {
     customerId: "cust-1",
+    title: "",
     transcript: "5 yards brown mulch and edge front beds",
     lineItems: [{ description: "Brown mulch", details: "5 yards", price: null }],
     total: 120,
@@ -100,6 +101,7 @@ beforeEach(() => {
     id: "quote-1",
     customer_id: "cust-1",
     doc_number: "Q-001",
+    title: null,
     status: "draft",
     source_type: "text",
     transcript: "5 yards brown mulch and edge front beds",
@@ -408,6 +410,7 @@ describe("ReviewScreen", () => {
 
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",
+      title: "",
       transcript: "5 yards brown mulch and edge front beds",
       lineItems: [
         { description: "Brown mulch", details: "5 yards", price: null },
@@ -421,13 +424,14 @@ describe("ReviewScreen", () => {
   });
 
   it("creates quote, clears draft, and navigates to preview", async () => {
-    renderScreen(makeDraft({ notes: "Thanks for your business" }));
+    renderScreen(makeDraft({ title: "  Front Yard Refresh  ", notes: "Thanks for your business" }));
 
     fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.createQuote).toHaveBeenCalledWith({
         customer_id: "cust-1",
+        title: "Front Yard Refresh",
         transcript: "5 yards brown mulch and edge front beds",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
         total_amount: 120,
