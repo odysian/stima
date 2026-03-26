@@ -328,9 +328,6 @@ export function ReviewScreen(): React.ReactElement | null {
             placeholder="Front yard refresh (optional)"
             maxLength={120}
           />
-          <p className="text-sm text-outline">
-            Optional job name shown on quote lists, preview, and the PDF.
-          </p>
         </section>
 
         <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
