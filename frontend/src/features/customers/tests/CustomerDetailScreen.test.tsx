@@ -58,6 +58,11 @@ function renderScreen(): void {
   );
 }
 
+async function openEditForm(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: /edit customer/i }));
+  await screen.findByLabelText(/^name$/i);
+}
+
 beforeEach(() => {
   mockedCustomerService.getCustomer.mockResolvedValue({
     id: "cust-1",
@@ -111,15 +116,16 @@ afterEach(() => {
 });
 
 describe("CustomerDetailScreen", () => {
-  it("renders customer name in app bar and populates editable fields", async () => {
+  it("renders the condensed customer summary by default", async () => {
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Alice Johnson" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
     expect(mockedQuoteService.listQuotes).toHaveBeenCalledWith({ customer_id: "cust-1" });
-    expect(screen.getByLabelText(/^name$/i)).toHaveValue("Alice Johnson");
-    expect(screen.getByLabelText(/^phone$/i)).toHaveValue("555-0101");
-    expect(screen.getByLabelText(/^email$/i)).toHaveValue("alice@example.com");
-    expect(screen.getByLabelText(/^address$/i)).toHaveValue("1 Main St");
+    expect(screen.getByRole("heading", { level: 2, name: "Alice Johnson" })).toBeInTheDocument();
+    expect(screen.getByText("555-0101")).toBeInTheDocument();
+    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+    expect(screen.getByText("1 Main St")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument();
   });
 
   it("shows loading state while fetching", () => {
@@ -140,7 +146,7 @@ describe("CustomerDetailScreen", () => {
 
   it("calls updateCustomer with edited values and shows success feedback", async () => {
     renderScreen();
-    await screen.findByLabelText(/^name$/i);
+    await openEditForm();
 
     fireEvent.change(screen.getByLabelText(/^name$/i), {
       target: { value: "  Alice A. Johnson  " },
@@ -167,13 +173,15 @@ describe("CustomerDetailScreen", () => {
     });
 
     expect(await screen.findByRole("status")).toHaveTextContent("Saved");
+    expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Alice A. Johnson" })).toBeInTheDocument();
   });
 
   it("shows save error when update fails", async () => {
     mockedCustomerService.updateCustomer.mockRejectedValueOnce(new Error("Unable to save customer"));
 
     renderScreen();
-    await screen.findByLabelText(/^name$/i);
+    await openEditForm();
 
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
@@ -192,7 +200,7 @@ describe("CustomerDetailScreen", () => {
     });
 
     renderScreen();
-    await screen.findByLabelText(/^phone$/i);
+    await openEditForm();
 
     fireEvent.change(screen.getByLabelText(/^phone$/i), {
       target: { value: "   " },
@@ -207,6 +215,24 @@ describe("CustomerDetailScreen", () => {
         address: "1 Main St",
       });
     });
+  });
+
+  it("shows clear fallback copy for missing optional details in read view", async () => {
+    mockedCustomerService.getCustomer.mockResolvedValueOnce({
+      id: "cust-1",
+      name: "Alice Johnson",
+      phone: null,
+      email: null,
+      address: null,
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-20T00:00:00.000Z",
+    });
+
+    renderScreen();
+
+    expect(await screen.findByText("No phone added")).toBeInTheDocument();
+    expect(screen.getByText("No email added")).toBeInTheDocument();
+    expect(screen.getByText("No address added")).toBeInTheDocument();
   });
 
   it("navigates to quote capture for this customer", async () => {
