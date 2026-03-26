@@ -140,6 +140,7 @@ export function QuotePreview(): React.ReactElement {
   const openPdfUrl = pdfUrl;
   const statusCardCopy = getStatusCardCopy(cardState, hasLocalPdf);
   const quoteTitle = readOptionalQuoteText(quote, "title");
+  const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact =
     [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]
@@ -268,8 +269,8 @@ export function QuotePreview(): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader
-        title={quoteTitle ?? quote?.doc_number ?? "Quote Preview"}
-        subtitle={quoteTitle ? quote?.doc_number : undefined}
+        title={quoteTitle ?? customerNameForHeader ?? quote?.doc_number ?? "Quote Preview"}
+        subtitle={quoteTitle || customerNameForHeader ? quote?.doc_number : undefined}
         onBack={() => navigate(-1)}
         trailing={quote ? <StatusBadge variant={quote.status} /> : null}
       />
@@ -285,7 +286,7 @@ export function QuotePreview(): React.ReactElement {
 
         {!isLoadingQuote && !loadError ? (
           <>
-            {quote ? (
+            {quote && cardState !== "draft" ? (
               <section className="mx-4 mt-4 rounded-xl bg-surface-container-low p-3">
                 <div className="ghost-shadow rounded-xl bg-surface-container-lowest p-5">
                   <div className="flex items-start gap-4">
@@ -305,13 +306,6 @@ export function QuotePreview(): React.ReactElement {
                       <p className="mt-2 text-sm text-on-surface-variant">
                         {statusCardCopy.description}
                       </p>
-                      <div className="mt-4">
-                        {quoteTitle ? (
-                          <p className="font-headline font-bold text-on-surface">{quoteTitle}</p>
-                        ) : null}
-                        <p className="font-bold text-on-surface">{clientName}</p>
-                        <p className="mt-1 text-xs text-outline">{quote.doc_number}</p>
-                      </div>
                     </div>
                   </div>
                 </div>

@@ -96,7 +96,9 @@ describe("CustomerListScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByText("No customers yet.")).toBeInTheDocument();
+    const emptyState = (await screen.findByText("No customers yet.")).closest("section");
+    expect(emptyState).not.toBeNull();
+    expect(emptyState?.querySelector(".material-symbols-outlined")).toHaveClass("text-3xl");
   });
 
   it("navigates to customer detail when a row is clicked", async () => {

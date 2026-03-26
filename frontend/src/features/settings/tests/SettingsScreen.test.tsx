@@ -106,6 +106,20 @@ describe("SettingsScreen", () => {
     expect(screen.getByRole("button", { name: "Plumber" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText(/timezone/i)).toHaveValue("America/New_York");
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Email")).toHaveClass(
+      "text-[0.6875rem]",
+      "font-bold",
+      "uppercase",
+      "tracking-widest",
+      "text-outline",
+    );
+    expect(screen.getByText("Session")).toHaveClass(
+      "text-[0.6875rem]",
+      "font-bold",
+      "uppercase",
+      "tracking-widest",
+      "text-outline",
+    );
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
@@ -190,7 +204,7 @@ describe("SettingsScreen", () => {
       });
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(await screen.findByText("Saved")).toHaveClass("rounded-lg");
   });
 
   it("keeps save success when refreshUser fails after successful profile update", async () => {
