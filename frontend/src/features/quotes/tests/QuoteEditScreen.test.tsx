@@ -44,6 +44,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     customer_email: null,
     customer_phone: null,
     doc_number: "Q-001",
+    title: null,
     status: "ready",
     source_type: "text",
     transcript: "5 yards brown mulch",
@@ -69,6 +70,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
 function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
   return {
     quoteId: "quote-1",
+    title: "",
     lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
     total: 120,
     notes: "Thanks for your business",
@@ -92,6 +94,7 @@ beforeEach(() => {
     id: "quote-1",
     customer_id: "cust-1",
     doc_number: "Q-001",
+    title: "Patio Refresh",
     status: "draft",
     source_type: "text",
     transcript: "5 yards brown mulch",
@@ -120,6 +123,7 @@ describe("QuoteEditScreen", () => {
     await waitFor(() => {
       expect(JSON.parse(window.sessionStorage.getItem(EDIT_STORAGE_KEY) ?? "")).toEqual({
         quoteId: "quote-1",
+        title: "",
         lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total: 120,
         notes: "Thanks for your business",
@@ -143,6 +147,9 @@ describe("QuoteEditScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Q-001" })).toBeInTheDocument();
 
+    fireEvent.change(screen.getByLabelText(/quote title/i), {
+      target: { value: "  Patio Refresh  " },
+    });
     fireEvent.change(screen.getByLabelText(/customer notes/i), {
       target: { value: "Updated note" },
     });
@@ -153,6 +160,7 @@ describe("QuoteEditScreen", () => {
 
     await waitFor(() => {
       expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-1", {
+        title: "Patio Refresh",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total_amount: 145,
         notes: "Updated note",

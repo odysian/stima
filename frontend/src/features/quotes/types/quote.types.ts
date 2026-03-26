@@ -36,6 +36,7 @@ export interface Quote {
   id: string;
   customer_id: string;
   doc_number: string;
+  title: string | null;
   status: QuoteStatus;
   source_type: QuoteSourceType;
   transcript: string;
@@ -59,6 +60,7 @@ export interface QuoteListItem {
   customer_id: string;
   customer_name: string;
   doc_number: string;
+  title: string | null;
   status: QuoteStatus;
   total_amount: number | null;
   item_count: number;
@@ -67,6 +69,7 @@ export interface QuoteListItem {
 
 export interface QuoteCreateRequest {
   customer_id: string;
+  title: string | null;
   transcript: string;
   line_items: LineItemDraft[];
   total_amount: number | null;
@@ -75,6 +78,7 @@ export interface QuoteCreateRequest {
 }
 
 export interface QuoteUpdateRequest {
+  title?: string | null;
   line_items?: LineItemDraft[];
   total_amount?: number | null;
   notes?: string | null;

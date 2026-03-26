@@ -43,6 +43,7 @@ function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListIte
     customer_id: "cust-1",
     customer_name: "Alice Johnson",
     doc_number: "Q-001",
+    title: null,
     status: "draft",
     total_amount: 120,
     item_count: 1,
@@ -94,6 +95,7 @@ describe("QuoteList", () => {
         customer_id: "cust-2",
         customer_name: "Bob Brown",
         doc_number: "Q-002",
+        title: "Spring Cleanup",
         status: "ready",
         item_count: 3,
       }),
@@ -102,8 +104,9 @@ describe("QuoteList", () => {
     renderScreen();
 
     expect(await screen.findByText("Stima Quotes")).toBeInTheDocument();
-    expect(await screen.findByText("Alice Johnson")).toBeInTheDocument();
-    expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026\s*·\s*3 items/)).toBeInTheDocument();
+    expect(await screen.findByText("Q-001")).toBeInTheDocument();
+    expect(screen.getByText("Spring Cleanup")).toBeInTheDocument();
+    expect(screen.getByText(/Bob Brown\s*·\s*Q-002\s*·\s*Mar 20, 2026\s*·\s*3 items/)).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getAllByText("$120.00")).toHaveLength(2);
   });
@@ -130,17 +133,17 @@ describe("QuoteList", () => {
     ]);
 
     renderScreen();
-    await screen.findByText("Alice Johnson");
+    await screen.findByText("Q-001");
 
     fireEvent.change(screen.getByLabelText("Search quotes"), {
       target: { value: "bob" },
     });
 
     expect(screen.queryByText("Alice Johnson")).not.toBeInTheDocument();
-    expect(screen.getByText("Bob Brown")).toBeInTheDocument();
+    expect(screen.getByText(/Bob Brown\s*·\s*Mar 20, 2026\s*·\s*1 item/)).toBeInTheDocument();
   });
 
-  it("filters rows by doc number", async () => {
+  it("filters rows by quote title", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([
       makeQuoteListItem(),
       makeQuoteListItem({
@@ -148,25 +151,26 @@ describe("QuoteList", () => {
         customer_id: "cust-2",
         customer_name: "Bob Brown",
         doc_number: "Q-002",
+        title: "Spring Cleanup",
       }),
     ]);
 
     renderScreen();
-    await screen.findByText("Alice Johnson");
+    await screen.findByText("Q-001");
 
     fireEvent.change(screen.getByLabelText("Search quotes"), {
-      target: { value: "q-002" },
+      target: { value: "spring" },
     });
 
-    expect(screen.queryByText("Alice Johnson")).not.toBeInTheDocument();
-    expect(screen.getByText("Bob Brown")).toBeInTheDocument();
+    expect(screen.queryByText("Q-001")).not.toBeInTheDocument();
+    expect(screen.getByText("Spring Cleanup")).toBeInTheDocument();
   });
 
   it("shows search empty state when filter has no matches", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    await screen.findByText("Alice Johnson");
+    await screen.findByText("Q-001");
 
     fireEvent.change(screen.getByLabelText("Search quotes"), {
       target: { value: "does-not-exist" },
@@ -179,7 +183,7 @@ describe("QuoteList", () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: /alice johnson/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /q-001/i }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
   });
@@ -197,7 +201,7 @@ describe("QuoteList", () => {
     ]);
 
     renderScreen();
-    await screen.findByText("Alice Johnson");
+    await screen.findByText("Q-001");
 
     expect(screen.getByText(/1 active\s*·\s*1 pending review/i)).toBeInTheDocument();
     expect(screen.queryByText("ACTIVE QUOTES")).not.toBeInTheDocument();
@@ -208,7 +212,7 @@ describe("QuoteList", () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    await screen.findByText("Alice Johnson");
+    await screen.findByText("Q-001");
 
     expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
   });
@@ -217,7 +221,7 @@ describe("QuoteList", () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    await screen.findByText("Alice Johnson");
+    await screen.findByText("Q-001");
 
     fireEvent.click(screen.getByRole("button", { name: "Create quote" }));
 
@@ -252,7 +256,7 @@ describe("QuoteList", () => {
 
     renderScreen();
 
-    expect(await screen.findByText(/Q-001\s*·\s*Mar 24, 2026/)).toBeInTheDocument();
+    expect(await screen.findByText(/Alice Johnson\s*·\s*Mar 24, 2026/)).toBeInTheDocument();
   });
 
   it("renders an em dash when total_amount is null", async () => {
@@ -272,7 +276,7 @@ describe("QuoteList", () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    await screen.findByText("Alice Johnson");
+    await screen.findByText("Q-001");
 
     const searchInput = screen.getByLabelText("Search quotes");
     const searchLabel = document.querySelector('label[for="quote-search"]');

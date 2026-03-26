@@ -51,6 +51,11 @@ function mapExtractedLineItems(extraction: ExtractionResult): LineItemDraftWithF
   }));
 }
 
+function normalizeOptionalTitle(title: string): string | null {
+  const trimmed = title.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function getReviewMessages(draft: QuoteDraft): string[] {
   const flaggedReasonSet = new Set<string>();
   const flaggedMessages = draft.lineItems.flatMap((lineItem, index) => {
@@ -132,6 +137,7 @@ export function ReviewScreen(): React.ReactElement | null {
       const extraction = await quoteService.convertNotes(trimmedTranscript);
       setDraft({
         ...currentDraft,
+        title: currentDraft.title,
         transcript: extraction.transcript,
         lineItems: mapExtractedLineItems(extraction),
         total: extraction.total,
@@ -181,6 +187,7 @@ export function ReviewScreen(): React.ReactElement | null {
     try {
       const createdQuote = await quoteService.createQuote({
         customer_id: currentDraft.customerId,
+        title: normalizeOptionalTitle(currentDraft.title),
         transcript: currentDraft.transcript,
         line_items: lineItemsForSubmit,
         total_amount: currentDraft.total,
@@ -302,6 +309,33 @@ export function ReviewScreen(): React.ReactElement | null {
             ) : null}
           </div>
         </details>
+
+        <section className="space-y-2">
+          <label
+            htmlFor="quote-title"
+            className="text-xs font-bold uppercase tracking-wider text-outline-variant"
+          >
+            QUOTE TITLE
+          </label>
+          <input
+            id="quote-title"
+            type="text"
+            disabled={isInteractionLocked}
+            value={currentDraft.title}
+            onChange={(event) =>
+              updateDraft((nextDraft) => ({
+                ...nextDraft,
+                title: event.target.value,
+              }))
+            }
+            className="w-full rounded-lg border border-outline-variant/30 bg-white px-4 py-3 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+            placeholder="Front yard refresh (optional)"
+            maxLength={120}
+          />
+          <p className="text-sm text-outline">
+            Optional job name shown on quote lists, preview, and the PDF.
+          </p>
+        </section>
 
         <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
           <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>

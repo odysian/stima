@@ -10,6 +10,7 @@ function makeQuote(overrides: Partial<QuoteListItem> = {}): QuoteListItem {
     customer_id: "cust-1",
     customer_name: "Alice Johnson",
     doc_number: "Q-001",
+    title: null,
     status: "draft",
     total_amount: 1250,
     item_count: 3,
@@ -23,7 +24,7 @@ describe("QuoteHistoryList", () => {
     render(
       <QuoteHistoryList
         quotes={[
-          makeQuote(),
+          makeQuote({ title: "Front Yard Refresh" }),
           makeQuote({
             id: "quote-2",
             doc_number: "Q-002",
@@ -39,12 +40,12 @@ describe("QuoteHistoryList", () => {
 
     expect(screen.getByText("Quote History")).toBeInTheDocument();
     expect(screen.getByText("2 QUOTES")).toBeInTheDocument();
-    expect(screen.getByText("Q-001")).toBeInTheDocument();
+    expect(screen.getByText("Front Yard Refresh")).toBeInTheDocument();
+    expect(screen.getByText(/Q-001\s*·\s*Mar 14, 2026\s*·\s*3 items/)).toBeInTheDocument();
     expect(screen.getByText("$1,250.00")).toBeInTheDocument();
-    expect(screen.getByText(/Mar 14, 2026\s*·\s*3 items/)).toBeInTheDocument();
     expect(screen.getByText(/Mar 14, 2026\s*·\s*1 item/)).toBeInTheDocument();
 
-    const quoteButton = screen.getByRole("button", { name: /q-001/i });
+    const quoteButton = screen.getByRole("button", { name: /front yard refresh/i });
     expect(quoteButton).toHaveClass("rounded-xl");
     expect(quoteButton).toHaveClass("active:scale-[0.98]");
     expect(quoteButton).toHaveClass("active:bg-surface-container-low");

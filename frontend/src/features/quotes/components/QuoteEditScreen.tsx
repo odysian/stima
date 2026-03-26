@@ -20,6 +20,7 @@ const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
 function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
   return {
     quoteId: quote.id,
+    title: quote.title ?? "",
     lineItems: quote.line_items.map((item) => ({
       description: item.description,
       details: item.details,
@@ -28,6 +29,11 @@ function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
     total: quote.total_amount,
     notes: quote.notes ?? "",
   };
+}
+
+function normalizeOptionalTitle(title: string): string | null {
+  const trimmed = title.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function normalizeLineItem(item: LineItemDraftWithFlags): LineItemDraftWithFlags {
@@ -124,6 +130,13 @@ export function QuoteEditScreen(): React.ReactElement {
     }
     return runningTotal + lineItem.price;
   }, 0);
+  const draftTitle = currentDraft?.title.trim() ?? "";
+  const headerTitle = draftTitle || quote?.title || quote?.doc_number || "Edit Quote";
+  const headerSubtitle = quote
+    ? draftTitle
+      ? `${quote.doc_number} · Update line items, total, and notes`
+      : "Update line items, total, and notes"
+    : undefined;
 
   function updateDraft(updater: (current: QuoteEditDraft) => QuoteEditDraft): void {
     if (!currentDraft) {
@@ -172,6 +185,7 @@ export function QuoteEditScreen(): React.ReactElement {
 
     try {
       await quoteService.updateQuote(id, {
+        title: normalizeOptionalTitle(currentDraft.title),
         line_items: lineItemsForSubmit,
         total_amount: currentDraft.total,
         notes: currentDraft.notes.trim().length > 0 ? currentDraft.notes.trim() : null,
@@ -190,9 +204,9 @@ export function QuoteEditScreen(): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-28">
       <ScreenHeader
-        title={quote?.doc_number ?? "Edit Quote"}
+        title={headerTitle}
         eyebrow="QUOTE EDITOR"
-        subtitle={quote ? "Update line items, total, and notes" : undefined}
+        subtitle={headerSubtitle}
         backLabel="Cancel edit"
         onBack={onCancel}
       />
@@ -218,6 +232,29 @@ export function QuoteEditScreen(): React.ReactElement {
 
         {quote && currentDraft ? (
           <>
+            <section className="space-y-2">
+              <label
+                htmlFor="quote-edit-title"
+                className="text-xs font-bold uppercase tracking-wider text-outline-variant"
+              >
+                QUOTE TITLE
+              </label>
+              <input
+                id="quote-edit-title"
+                type="text"
+                value={currentDraft.title}
+                onChange={(event) =>
+                  updateDraft((nextDraft) => ({
+                    ...nextDraft,
+                    title: event.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-outline-variant/30 bg-white px-4 py-3 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                placeholder="Front yard refresh (optional)"
+                maxLength={120}
+              />
+            </section>
+
             <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
               <h2 className="font-headline text-xl font-bold tracking-tight text-primary">
                 Line Items

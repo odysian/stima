@@ -28,6 +28,7 @@ const mockedUseQuoteEdit = vi.mocked(useQuoteEdit);
 function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
   return {
     quoteId: "quote-1",
+    title: "",
     lineItems: [
       {
         description: "Brown mulch",

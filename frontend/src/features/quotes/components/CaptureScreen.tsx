@@ -96,6 +96,7 @@ export function CaptureScreen(): React.ReactElement {
 
     setDraft({
       customerId,
+      title: "",
       transcript: extraction.transcript,
       lineItems: extraction.line_items.map((lineItem) => ({
         description: lineItem.description,

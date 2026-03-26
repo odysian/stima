@@ -6,7 +6,15 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+def _normalize_optional_title(value: object) -> object:
+    """Trim optional title values and collapse blanks to null."""
+    if value is None or not isinstance(value, str):
+        return value
+    trimmed = value.strip()
+    return trimmed or None
 
 
 class LineItemDraft(BaseModel):
@@ -43,19 +51,25 @@ class QuoteCreateRequest(BaseModel):
     """Request payload for creating a quote from a draft."""
 
     customer_id: UUID
+    title: str | None = Field(default=None, max_length=120)
     transcript: str = Field(min_length=1)
     line_items: list[LineItemDraft] = Field(default_factory=list)
     total_amount: float | None = None
     notes: str | None = None
     source_type: Literal["text", "voice"]
 
+    _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
+
 
 class QuoteUpdateRequest(BaseModel):
     """Request payload for partial quote updates with full line-item replacement."""
 
+    title: str | None = Field(default=None, max_length=120)
     line_items: list[LineItemDraft] | None = None
     total_amount: float | None = None
     notes: str | None = None
+
+    _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
 
     @model_validator(mode="after")
     def validate_line_items_not_null_when_provided(self) -> QuoteUpdateRequest:
@@ -86,6 +100,7 @@ class QuoteListItemResponse(BaseModel):
     customer_id: UUID
     customer_name: str
     doc_number: str
+    title: str | None
     status: str
     total_amount: float | None
     item_count: int
@@ -100,6 +115,7 @@ class QuoteResponse(BaseModel):
     id: UUID
     customer_id: UUID
     doc_number: str
+    title: str | None
     status: str
     source_type: Literal["text", "voice"]
     transcript: str

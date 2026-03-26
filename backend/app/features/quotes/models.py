@@ -47,6 +47,7 @@ class Document(Base):
     )
     doc_sequence: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     doc_number: Mapped[str] = mapped_column(sa.String(20), nullable=False)
+    title: Mapped[str | None] = mapped_column(sa.String(120), nullable=True)
     status: Mapped[QuoteStatus] = mapped_column(
         sa.Enum(
             QuoteStatus,

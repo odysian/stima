@@ -166,6 +166,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
         "/api/quotes",
         json={
             "customer_id": customer_id,
+            "title": "  Front Bed Refresh  ",
             "transcript": extraction_payload["transcript"],
             "line_items": extraction_payload["line_items"],
             "total_amount": extraction_payload["total"],
@@ -177,6 +178,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert create_response_1.status_code == 201
     created_quote_1 = create_response_1.json()
     assert created_quote_1["doc_number"] == "Q-001"
+    assert created_quote_1["title"] == "Front Bed Refresh"
     assert created_quote_1["status"] == "draft"
     assert created_quote_1["source_type"] == "text"
 
@@ -201,6 +203,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert create_response_2.status_code == 201
     created_quote_2 = create_response_2.json()
     assert created_quote_2["doc_number"] == "Q-002"
+    assert created_quote_2["title"] is None
 
     list_response = await client.get("/api/quotes")
     assert list_response.status_code == 200
@@ -217,6 +220,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
         "customer_id",
         "customer_name",
         "doc_number",
+        "title",
         "status",
         "total_amount",
         "item_count",
@@ -228,6 +232,8 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert "line_items" not in list_payload[0]
     assert "share_token" not in list_payload[0]
     assert "updated_at" not in list_payload[0]
+    assert list_payload[0]["title"] is None
+    assert list_payload[1]["title"] == "Front Bed Refresh"
 
     detail_response = await client.get(f"/api/quotes/{created_quote_1['id']}")
     assert detail_response.status_code == 200
@@ -236,11 +242,13 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert detail_payload["customer_name"] == "Quote Test Customer"
     assert detail_payload["customer_email"] == "customer@example.com"
     assert detail_payload["customer_phone"] == "+1-555-123-4567"
+    assert detail_payload["title"] == "Front Bed Refresh"
     assert detail_payload["line_items"]
 
     patch_response = await client.patch(
         f"/api/quotes/{created_quote_1['id']}",
         json={
+            "title": "   ",
             "line_items": [
                 {
                     "description": "Premium brown mulch",
@@ -258,6 +266,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert len(patched["line_items"]) == 1
     assert patched["line_items"][0]["description"] == "Premium brown mulch"
     assert patched["line_items"][0]["price"] is None
+    assert patched["title"] is None
     assert patched["total_amount"] == 150
     assert patched["notes"] == "Updated note"
 
@@ -621,6 +630,7 @@ async def test_list_quotes_can_filter_by_customer_id(client: AsyncClient) -> Non
             "customer_id": customer_id_b,
             "customer_name": "Customer B",
             "doc_number": "Q-002",
+            "title": None,
             "status": "draft",
             "total_amount": 220,
             "item_count": 1,

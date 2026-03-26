@@ -7,6 +7,7 @@ const EDIT_STORAGE_KEY = "stima_quote_edit";
 
 const draftFixture: QuoteEditDraft = {
   quoteId: "quote-1",
+  title: "Front Yard Refresh",
   lineItems: [
     {
       description: "Brown mulch",
