@@ -17,7 +17,6 @@ interface CustomerInfoFormProps {
   onCancel?: () => void;
   isSaving: boolean;
   saveError: string | null;
-  saveSuccess: string | null;
 }
 
 export function CustomerInfoForm({
@@ -33,19 +32,12 @@ export function CustomerInfoForm({
   onCancel,
   isSaving,
   saveError,
-  saveSuccess,
 }: CustomerInfoFormProps): React.ReactElement {
   return (
     <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
       <h2 className="mb-4 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
         Customer Info
       </h2>
-
-      {saveSuccess ? (
-        <p role="status" className="mb-4 rounded-lg bg-success-container p-3 text-sm text-success">
-          {saveSuccess}
-        </p>
-      ) : null}
 
       {saveError ? (
         <div className="mb-4">

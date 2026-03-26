@@ -193,80 +193,65 @@ export function CustomerDetailScreen(): React.ReactElement {
 
         {!isLoading && !loadError && customer ? (
           <>
-            <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
-              <div className="flex flex-col gap-5">
-                <div className="space-y-1">
-                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                    Customer Overview
-                  </p>
-                  <h2 className="font-headline text-2xl font-bold tracking-tight text-on-surface">
-                    {customer.name}
-                  </h2>
-                </div>
+            {!isEditing ? (
+              <section className="rounded-xl bg-surface-container-lowest p-4 ghost-shadow">
+                <div className="flex flex-col gap-3">
+                  {saveSuccess ? (
+                    <p
+                      role="status"
+                      className="rounded-lg bg-success-container px-3 py-2 text-sm text-success"
+                    >
+                      {saveSuccess}
+                    </p>
+                  ) : null}
 
-                {saveSuccess ? (
-                  <p
-                    role="status"
-                    className="rounded-lg bg-success-container px-4 py-3 text-sm text-success"
-                  >
-                    {saveSuccess}
-                  </p>
-                ) : null}
+                  <dl className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-3">
+                      <dt className="w-16 shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                        Phone
+                      </dt>
+                      <dd className="text-sm text-on-surface">
+                        {formatSummaryValue(customer.phone, "—")}
+                      </dd>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <dt className="w-16 shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                        Email
+                      </dt>
+                      <dd className="min-w-0 truncate text-sm text-on-surface">
+                        {formatSummaryValue(customer.email, "—")}
+                      </dd>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <dt className="w-16 shrink-0 pt-0.5 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                        Address
+                      </dt>
+                      <dd className="whitespace-pre-wrap text-sm text-on-surface">
+                        {formatSummaryValue(customer.address, "—")}
+                      </dd>
+                    </div>
+                  </dl>
 
-                <dl className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1 rounded-lg bg-surface-container-low px-4 py-3">
-                    <dt className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                      Phone
-                    </dt>
-                    <dd className="text-sm text-on-surface">
-                      {formatSummaryValue(customer.phone, "No phone added")}
-                    </dd>
-                  </div>
-                  <div className="space-y-1 rounded-lg bg-surface-container-low px-4 py-3">
-                    <dt className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                      Email
-                    </dt>
-                    <dd className="text-sm text-on-surface">
-                      {formatSummaryValue(customer.email, "No email added")}
-                    </dd>
-                  </div>
-                  <div className="space-y-1 rounded-lg bg-surface-container-low px-4 py-3 sm:col-span-2">
-                    <dt className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                      Address
-                    </dt>
-                    <dd className="whitespace-pre-wrap text-sm text-on-surface">
-                      {formatSummaryValue(customer.address, "No address added")}
-                    </dd>
-                  </div>
-                </dl>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    type="button"
-                    variant="primary"
-                    className="w-full sm:flex-1"
-                    onClick={() => navigate(`/quotes/capture/${customer.id}`)}
-                  >
-                    Create Quote {"->"}
-                  </Button>
-                  {!isEditing ? (
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      className="flex-1"
+                      onClick={() => navigate(`/quotes/capture/${customer.id}`)}
+                    >
+                      Create Quote {"->"}
+                    </Button>
                     <button
                       type="button"
                       onClick={openEditMode}
-                      className="w-full rounded-lg border border-outline/20 px-4 py-4 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low sm:w-auto sm:min-w-36"
+                      className="rounded-lg border border-outline/20 px-4 py-4 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low active:scale-[0.98]"
                     >
-                      Edit Customer
+                      Edit
                     </button>
-                  ) : (
-                    <div className="flex items-center justify-center rounded-lg border border-primary/20 bg-primary/5 px-4 py-4 text-sm font-medium text-primary sm:min-w-36">
-                      Editing details
-                    </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </section>
-
-            {isEditing ? (
+              </section>
+            ) : (
               <CustomerInfoForm
                 name={name}
                 phone={phone}
@@ -280,9 +265,8 @@ export function CustomerDetailScreen(): React.ReactElement {
                 onCancel={() => resetEditState(customer)}
                 isSaving={isSaving}
                 saveError={saveError}
-                saveSuccess={saveSuccess}
               />
-            ) : null}
+            )}
 
             <QuoteHistoryList
               quotes={customerQuotes}

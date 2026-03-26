@@ -59,7 +59,7 @@ function renderScreen(): void {
 }
 
 async function openEditForm(): Promise<void> {
-  fireEvent.click(await screen.findByRole("button", { name: /edit customer/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /^edit$/i }));
   await screen.findByLabelText(/^name$/i);
 }
 
@@ -121,7 +121,6 @@ describe("CustomerDetailScreen", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
     expect(mockedQuoteService.listQuotes).toHaveBeenCalledWith({ customer_id: "cust-1" });
-    expect(screen.getByRole("heading", { level: 2, name: "Alice Johnson" })).toBeInTheDocument();
     expect(screen.getByText("555-0101")).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
     expect(screen.getByText("1 Main St")).toBeInTheDocument();
@@ -174,7 +173,7 @@ describe("CustomerDetailScreen", () => {
 
     expect(await screen.findByRole("status")).toHaveTextContent("Saved");
     expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "Alice A. Johnson" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Alice A. Johnson" })).toBeInTheDocument();
   });
 
   it("shows save error when update fails", async () => {
@@ -217,7 +216,7 @@ describe("CustomerDetailScreen", () => {
     });
   });
 
-  it("shows clear fallback copy for missing optional details in read view", async () => {
+  it("shows em dash fallback for missing optional details in read view", async () => {
     mockedCustomerService.getCustomer.mockResolvedValueOnce({
       id: "cust-1",
       name: "Alice Johnson",
@@ -230,9 +229,8 @@ describe("CustomerDetailScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByText("No phone added")).toBeInTheDocument();
-    expect(screen.getByText("No email added")).toBeInTheDocument();
-    expect(screen.getByText("No address added")).toBeInTheDocument();
+    await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
+    expect(screen.getAllByText("—")).toHaveLength(3);
   });
 
   it("navigates to quote capture for this customer", async () => {
