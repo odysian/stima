@@ -29,6 +29,16 @@ resource "google_storage_bucket" "private_assets" {
   public_access_prevention    = "enforced"
 }
 
+resource "google_storage_bucket" "dev_private_assets" {
+  count = var.dev_private_asset_bucket_name == "" ? 0 : 1
+
+  name                        = var.dev_private_asset_bucket_name
+  project                     = var.project_id
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+}
+
 resource "google_project_iam_member" "backend_vm_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
@@ -43,7 +53,7 @@ resource "google_project_iam_member" "backend_vm_metric_writer" {
 
 resource "google_storage_bucket_iam_member" "backend_vm_object_admin" {
   bucket = google_storage_bucket.private_assets.name
-  role   = "roles/storage.objectAdmin"
+  role   = "roles/storage.objectUser"
   member = "serviceAccount:${google_service_account.backend_vm.email}"
 }
 

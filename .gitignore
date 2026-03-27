@@ -27,3 +27,4 @@ venv/
 **/.terraform/
 *.tfstate
 *.tfstate.backup
+infra/terraform/envs/*.tfvars
