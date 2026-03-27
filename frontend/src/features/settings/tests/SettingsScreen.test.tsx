@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +19,8 @@ vi.mock("@/features/profile/services/profileService", () => ({
   profileService: {
     getProfile: vi.fn(),
     updateProfile: vi.fn(),
+    uploadLogo: vi.fn(),
+    deleteLogo: vi.fn(),
   },
 }));
 
@@ -41,6 +43,7 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
     last_name: "Stone",
     trade_type: "Landscaper",
     timezone: "America/New_York",
+    has_logo: false,
     ...overrides,
   };
 }
@@ -83,7 +86,7 @@ afterEach(() => {
 });
 
 describe("SettingsScreen", () => {
-  it("renders pre-filled form fields, trade selector, and read-only account email", async () => {
+  it("renders pre-filled form fields, trade selector, read-only account email, and logo upload control", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({
         email: "owner@example.com",
@@ -100,9 +103,9 @@ describe("SettingsScreen", () => {
     expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Hill")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: new RegExp(TRADE_TYPES.join("|"), "i") })).toHaveLength(
-      TRADE_TYPES.length,
-    );
+    expect(
+      screen.getAllByRole("button", { name: new RegExp(TRADE_TYPES.join("|"), "i") }),
+    ).toHaveLength(TRADE_TYPES.length);
     expect(screen.getByRole("button", { name: "Plumber" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText(/timezone/i)).toHaveValue("America/New_York");
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
@@ -120,6 +123,7 @@ describe("SettingsScreen", () => {
       "tracking-widest",
       "text-outline",
     );
+    expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
@@ -302,6 +306,84 @@ describe("SettingsScreen", () => {
     fireEvent.click(signOutButton);
 
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
+  });
+
+  it("renders logo preview and remove action when profile has a logo", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(
+      makeProfileResponse({ has_logo: true }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByAltText(/business logo preview/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/upload new/i)).toBeInTheDocument();
+  });
+
+  it("uploads a new logo and refreshes the preview state", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+    mockedProfileService.uploadLogo.mockResolvedValueOnce(
+      makeProfileResponse({ has_logo: true }),
+    );
+
+    renderScreen();
+
+    const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
+    const file = new File(["fake-logo"], "logo.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(mockedProfileService.uploadLogo).toHaveBeenCalledWith(file));
+    expect(await screen.findByAltText(/business logo preview/i)).toBeInTheDocument();
+  });
+
+  it("opens the remove confirmation modal and cancels without deleting", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(
+      makeProfileResponse({ has_logo: true }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /remove/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Remove logo?")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Remove logo?")).not.toBeInTheDocument();
+    });
+    expect(mockedProfileService.deleteLogo).not.toHaveBeenCalled();
+  });
+
+  it("confirms logo removal and hides the preview", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(
+      makeProfileResponse({ has_logo: true }),
+    );
+    mockedProfileService.deleteLogo.mockResolvedValueOnce(undefined);
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /remove/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: /^remove$/i }));
+
+    await waitFor(() => expect(mockedProfileService.deleteLogo).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      expect(screen.queryByAltText(/business logo preview/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows inline upload errors without affecting save feedback", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+    mockedProfileService.uploadLogo.mockRejectedValueOnce(new Error("Unable to upload logo"));
+
+    renderScreen();
+
+    const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
+    const file = new File(["fake-logo"], "logo.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to upload logo");
   });
 
   it("shows a loading state while profile fetch is in-flight and does not render the form", async () => {

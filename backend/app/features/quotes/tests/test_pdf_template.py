@@ -27,12 +27,15 @@ def _make_context(
     updated_at: datetime,
     line_item_price: Decimal | None,
     total: Decimal | None,
+    logo_data_uri: str | None = None,
 ) -> QuoteRenderContext:
     created_at = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
     return QuoteRenderContext(
         business_name="Acme Landscaping",
         first_name="Taylor",
         last_name="Owner",
+        logo_path=None,
+        logo_data_uri=logo_data_uri,
         customer_name="Jamie Customer",
         customer_phone=None,
         customer_email=None,
@@ -182,6 +185,39 @@ def test_render_shows_quote_title_only_when_present(
     assert len(captured_html) == 1
     assert ("Quote Title" in captured_html[0]) is should_render_title
     assert ("Front Yard Refresh" in captured_html[0]) is should_render_title
+
+
+def test_render_includes_logo_image_only_when_logo_data_uri_is_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+    updated_at = datetime(2026, 3, 1, 12, 6, tzinfo=UTC)
+
+    result = integration.render(
+        _make_context(
+            updated_at=updated_at,
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            logo_data_uri="data:image/png;base64,ZmFrZS1sb2dv",
+        )
+    )
+
+    assert result == b"fake-pdf"
+    assert len(captured_html) == 1
+    assert 'class="company-logo"' in captured_html[0]
+    assert "max-height: 48px" in captured_html[0]
 
 
 def test_build_render_context_formats_dates_in_business_timezone() -> None:

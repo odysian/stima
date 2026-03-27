@@ -13,6 +13,16 @@ output "vm_service_account_email" {
   value       = google_service_account.backend_vm.email
 }
 
+output "private_asset_bucket_name" {
+  description = "Private GCS bucket used for app-managed assets."
+  value       = google_storage_bucket.private_assets.name
+}
+
+output "dev_private_asset_bucket_name" {
+  description = "Optional private GCS bucket used for local/dev app-managed assets."
+  value       = try(google_storage_bucket.dev_private_assets[0].name, null)
+}
+
 output "wif_provider_name" {
   description = "Full Workload Identity Provider resource name for GitHub Actions auth. Set as GCP_WIF_PROVIDER repository variable."
   value       = google_iam_workload_identity_pool_provider.github_actions.name

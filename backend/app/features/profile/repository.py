@@ -47,6 +47,20 @@ class ProfileRepository:
         )
         return result.scalar_one_or_none()
 
+    async def update_logo_path(self, *, user_id: UUID, path: str) -> User | None:
+        """Persist one user's current logo object path."""
+        result = await self._session.execute(
+            update(User).where(User.id == user_id).values(logo_path=path).returning(User)
+        )
+        return result.scalar_one_or_none()
+
+    async def clear_logo_path(self, *, user_id: UUID) -> User | None:
+        """Clear the stored logo path for one user."""
+        result = await self._session.execute(
+            update(User).where(User.id == user_id).values(logo_path=None).returning(User)
+        )
+        return result.scalar_one_or_none()
+
     async def commit(self) -> None:
         """Commit pending profile writes."""
         await self._session.commit()

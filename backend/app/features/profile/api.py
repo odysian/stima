@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 
 from app.features.auth.models import User
 from app.features.profile.schemas import ProfileResponse, ProfileUpdateRequest
@@ -51,3 +51,59 @@ async def update_profile(
     except ProfileServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return ProfileResponse.model_validate(profile)
+
+
+@router.post(
+    "/logo",
+    response_model=ProfileResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def upload_logo(
+    file: Annotated[UploadFile, File(...)],
+    user: Annotated[User, Depends(get_current_user)],
+    profile_service: Annotated[ProfileService, Depends(get_profile_service)],
+) -> ProfileResponse:
+    """Upload or replace the authenticated user's logo."""
+    try:
+        content = await file.read()
+    finally:
+        await file.close()
+
+    try:
+        profile = await profile_service.upload_logo(user, content=content)
+    except ProfileServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return ProfileResponse.model_validate(profile)
+
+
+@router.get("/logo")
+async def get_logo(
+    user: Annotated[User, Depends(get_current_user)],
+    profile_service: Annotated[ProfileService, Depends(get_profile_service)],
+) -> Response:
+    """Proxy the authenticated user's logo bytes without exposing storage URLs."""
+    try:
+        logo = await profile_service.get_logo(user)
+    except ProfileServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return Response(
+        content=logo.content,
+        media_type=logo.content_type,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.delete(
+    "/logo",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def delete_logo(
+    user: Annotated[User, Depends(get_current_user)],
+    profile_service: Annotated[ProfileService, Depends(get_profile_service)],
+) -> None:
+    """Delete the authenticated user's logo."""
+    try:
+        await profile_service.delete_logo(user)
+    except ProfileServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

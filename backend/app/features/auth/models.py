@@ -25,6 +25,7 @@ class User(Base):
     business_name: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
     trade_type: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     timezone: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
+    logo_path: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(
         sa.Boolean,
         nullable=False,
@@ -51,6 +52,11 @@ class User(Base):
     def is_onboarded(self) -> bool:
         """Return true when all required onboarding profile fields are populated."""
         return bool(self.business_name and self.first_name and self.last_name and self.trade_type)
+
+    @property
+    def has_logo(self) -> bool:
+        """Return true when the user currently has a stored logo path."""
+        return bool(self.logo_path)
 
 
 class RefreshToken(Base):

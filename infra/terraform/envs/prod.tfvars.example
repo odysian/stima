@@ -1,0 +1,30 @@
+project_id = "your-gcp-project-id"
+region     = "us-east1"
+zone       = "us-east1-c"
+
+network        = "default"
+subnetwork     = "default"
+vm_name        = "stima-backend"
+machine_type   = "e2-micro"
+static_ip_name = "stima-backend-ip"
+private_asset_bucket_name     = "your-prod-private-assets-bucket"
+dev_private_asset_bucket_name = "your-dev-private-assets-bucket"
+
+ssh_user             = "your-ssh-user"
+api_domain           = "api.example.com"
+frontend_url         = "https://app.example.com"
+backend_port         = 8000
+enable_tls_bootstrap = true
+certbot_email        = "you@example.com"
+github_repository    = "owner/repo"
+
+github_oidc_pool_id     = "your-github-actions-pool"
+github_oidc_provider_id = "your-github-actions-provider"
+
+ssh_public_keys = [
+  "ssh-ed25519 AAAA... your-personal-key",
+]
+
+ssh_source_ranges                = ["203.0.113.10/32", "35.235.240.0/20"]
+allow_insecure_ssh_from_anywhere = false
+vm_service_account_scopes        = ["https://www.googleapis.com/auth/devstorage.read_write"]

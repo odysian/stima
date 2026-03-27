@@ -19,6 +19,21 @@
         margin-bottom: 20px;
       }
 
+      .header-grid {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .header-grid td {
+        vertical-align: top;
+      }
+
+      .header-logo-cell {
+        width: 1%;
+        text-align: right;
+        white-space: nowrap;
+      }
+
       .company-name {
         margin: 0;
         font-size: 28px;
@@ -29,6 +44,14 @@
         margin: 6px 0 0;
         font-size: 14px;
         color: #4b5563;
+      }
+
+      .company-logo {
+        display: block;
+        max-height: 48px;
+        width: auto;
+        max-width: 180px;
+        margin-left: auto;
       }
 
       .meta-grid {
@@ -119,8 +142,21 @@
   <body>
     <main>
       <header class="header">
-        <h1 class="company-name">{{ business_name or "Stima Quote" }}</h1>
-        <p class="owner-name">{{ first_name or "" }} {{ last_name or "" }}</p>
+        <table class="header-grid">
+          <tbody>
+            <tr>
+              <td>
+                <h1 class="company-name">{{ business_name or "Stima Quote" }}</h1>
+                <p class="owner-name">{{ first_name or "" }} {{ last_name or "" }}</p>
+              </td>
+              {% if logo_data_uri %}
+              <td class="header-logo-cell">
+                <img class="company-logo" src="{{ logo_data_uri }}" alt="Company logo" />
+              </td>
+              {% endif %}
+            </tr>
+          </tbody>
+        </table>
       </header>
 
       <table class="meta-grid">

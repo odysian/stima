@@ -5,6 +5,7 @@ locals {
   vm_service_account_id = replace("${var.vm_name}-sa", "_", "-")
   ssh_keys_metadata     = join("\n", [for key in var.ssh_public_keys : "${var.ssh_user}:${key}"])
   vm_required_scopes = [
+    "https://www.googleapis.com/auth/devstorage.read_write",
     "https://www.googleapis.com/auth/logging.write",
     "https://www.googleapis.com/auth/monitoring.write",
   ]
@@ -21,6 +22,24 @@ resource "google_service_account" "backend_vm" {
   display_name = "Stima Backend VM Service Account"
 }
 
+resource "google_storage_bucket" "private_assets" {
+  name                        = var.private_asset_bucket_name
+  project                     = var.project_id
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+}
+
+resource "google_storage_bucket" "dev_private_assets" {
+  count = var.dev_private_asset_bucket_name == "" ? 0 : 1
+
+  name                        = var.dev_private_asset_bucket_name
+  project                     = var.project_id
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+}
+
 resource "google_project_iam_member" "backend_vm_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
@@ -31,6 +50,12 @@ resource "google_project_iam_member" "backend_vm_metric_writer" {
   project = var.project_id
   role    = "roles/monitoring.metricWriter"
   member  = "serviceAccount:${google_service_account.backend_vm.email}"
+}
+
+resource "google_storage_bucket_iam_member" "backend_vm_object_admin" {
+  bucket = google_storage_bucket.private_assets.name
+  role   = "roles/storage.objectUser"
+  member = "serviceAccount:${google_service_account.backend_vm.email}"
 }
 
 resource "google_compute_firewall" "allow_http" {
