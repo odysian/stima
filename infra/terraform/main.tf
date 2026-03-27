@@ -5,6 +5,7 @@ locals {
   vm_service_account_id = replace("${var.vm_name}-sa", "_", "-")
   ssh_keys_metadata     = join("\n", [for key in var.ssh_public_keys : "${var.ssh_user}:${key}"])
   vm_required_scopes = [
+    "https://www.googleapis.com/auth/devstorage.read_write",
     "https://www.googleapis.com/auth/logging.write",
     "https://www.googleapis.com/auth/monitoring.write",
   ]

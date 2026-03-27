@@ -72,6 +72,7 @@ include /opt/stima/nginx/upstream.conf;
 server {
     listen 80;
     server_name ${API_DOMAIN};
+    client_max_body_size 2m;
 
     location ^~ /.well-known/acme-challenge/ {
         alias ${ACME_WEBROOT}/.well-known/acme-challenge/;
@@ -96,6 +97,7 @@ include /opt/stima/nginx/upstream.conf;
 server {
     listen 80;
     server_name ${API_DOMAIN};
+    client_max_body_size 2m;
 
     # Allow ACME HTTP-01 challenges through for cert renewal.
     location ^~ /.well-known/acme-challenge/ {
@@ -110,6 +112,7 @@ server {
 server {
     listen 443 ssl;
     server_name ${API_DOMAIN};
+    client_max_body_size 2m;
     ssl_certificate     ${LE_LIVE_DIR}/fullchain.pem;
     ssl_certificate_key ${LE_LIVE_DIR}/privkey.pem;
 
