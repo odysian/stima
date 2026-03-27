@@ -147,8 +147,11 @@ These underscore names are the canonical quote-flow vocabulary for pilot instrum
 
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
-| `/profile` | GET | no | cookie | — | `200 { id, email, first_name, last_name, business_name, trade_type, timezone, is_active, is_onboarded }` |
+| `/profile` | GET | no | cookie | — | `200 { id, email, first_name, last_name, business_name, trade_type, timezone, has_logo, is_active, is_onboarded }` |
 | `/profile` | PATCH | yes | cookie | `{ business_name, first_name, last_name, trade_type, timezone? }` | `200` with updated profile payload |
+| `/profile/logo` | POST | yes | cookie | multipart form-data `file` | `200` with updated profile payload (`has_logo: true`) |
+| `/profile/logo` | GET | no | cookie | — | `200` raw image bytes with correct `Content-Type` + `Cache-Control: no-store`, or `404 { detail: "Logo not found" }` |
+| `/profile/logo` | DELETE | yes | cookie | — | `204`, or `404 { detail: "Logo not found" }` |
 
 ### Customer endpoints (`/api/customers`)
 

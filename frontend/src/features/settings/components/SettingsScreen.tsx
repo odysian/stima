@@ -19,6 +19,7 @@ import { TradeTypeSelector } from "@/shared/components/TradeTypeSelector";
 export function SettingsScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { logout, refreshUser } = useAuth();
+  const logoPreviewSrc = `${import.meta.env.VITE_API_URL ?? ""}/api/profile/logo`;
 
   const [businessName, setBusinessName] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -197,7 +198,7 @@ export function SettingsScreen(): React.ReactElement {
                     {hasLogo ? (
                       <img
                         key={logoPreviewVersion}
-                        src="/api/profile/logo"
+                        src={logoPreviewSrc}
                         alt="Business logo preview"
                         className="h-12 w-auto max-w-[180px] object-contain"
                       />
@@ -224,7 +225,7 @@ export function SettingsScreen(): React.ReactElement {
                     {hasLogo ? (
                       <button
                         type="button"
-                        className="inline-flex min-h-12 items-center justify-center rounded-lg bg-secondary px-4 py-3 text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex min-h-12 items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                         disabled={isLogoSubmitting}
                         onClick={() => setIsRemoveLogoOpen(true)}
                       >
