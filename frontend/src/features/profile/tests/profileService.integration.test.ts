@@ -32,6 +32,7 @@ describe("profileService integration (MSW)", () => {
       last_name: "Stone",
       trade_type: "Landscaper",
       timezone: null,
+      has_logo: false,
     });
   });
 
@@ -50,6 +51,7 @@ describe("profileService integration (MSW)", () => {
           email: "test@example.com",
           is_active: true,
           is_onboarded: true,
+          has_logo: false,
           ...body,
         });
       }),
@@ -63,6 +65,7 @@ describe("profileService integration (MSW)", () => {
       email: "test@example.com",
       is_active: true,
       is_onboarded: true,
+      has_logo: false,
       ...updatePayload,
     });
   });
@@ -71,5 +74,53 @@ describe("profileService integration (MSW)", () => {
     clearCsrfToken();
 
     await expect(profileService.updateProfile(updatePayload)).rejects.toThrow("CSRF token missing");
+  });
+
+  it("uploadLogo sends multipart file payload and returns updated profile", async () => {
+    setCsrfToken("integration-csrf-token");
+
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.post("/api/profile/logo", async ({ request }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+
+        return HttpResponse.json({
+          id: "user-1",
+          email: "test@example.com",
+          is_active: true,
+          is_onboarded: true,
+          business_name: "Summit Exterior Care",
+          first_name: "Alex",
+          last_name: "Stone",
+          trade_type: "Landscaper",
+          timezone: null,
+          has_logo: true,
+        });
+      }),
+    );
+
+    const updatedProfile = await profileService.uploadLogo(
+      new File(["fake-logo"], "logo.png", { type: "image/png" }),
+    );
+
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(updatedProfile.has_logo).toBe(true);
+  });
+
+  it("deleteLogo sends CSRF header and resolves void on 204", async () => {
+    setCsrfToken("integration-csrf-token");
+
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.delete("/api/profile/logo", ({ request }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await expect(profileService.deleteLogo()).resolves.toBeUndefined();
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
   });
 });

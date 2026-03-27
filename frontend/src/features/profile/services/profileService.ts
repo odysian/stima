@@ -15,7 +15,25 @@ function updateProfile(data: ProfileUpdateRequest): Promise<ProfileResponse> {
   });
 }
 
+function uploadLogo(file: File): Promise<ProfileResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return request<ProfileResponse>("/api/profile/logo", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+function deleteLogo(): Promise<void> {
+  return request<null>("/api/profile/logo", {
+    method: "DELETE",
+  }).then(() => undefined);
+}
+
 export const profileService = {
   getProfile,
   updateProfile,
+  uploadLogo,
+  deleteLogo,
 };

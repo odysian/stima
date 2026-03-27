@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache, lru_cache
 from hmac import compare_digest
 from typing import Annotated
 
@@ -29,6 +29,7 @@ from app.features.quotes.service import QuoteService
 from app.integrations.audio import AudioIntegration
 from app.integrations.extraction import ExtractionIntegration
 from app.integrations.pdf import PdfIntegration
+from app.integrations.storage import StorageService
 from app.integrations.transcription import TranscriptionIntegration
 
 
@@ -36,6 +37,18 @@ from app.integrations.transcription import TranscriptionIntegration
 def get_pdf_integration() -> PdfIntegration:
     """Return shared PDF integration instance for request-scoped quote services."""
     return PdfIntegration()
+
+
+@cache
+def _build_storage_service(bucket_name: str) -> StorageService:
+    """Return one shared storage service per configured bucket."""
+    return StorageService(bucket_name=bucket_name)
+
+
+def get_storage_service() -> StorageService:
+    """Return the configured private storage service."""
+    settings = get_settings()
+    return _build_storage_service(settings.gcs_bucket_name)
 
 
 def get_auth_service(
@@ -47,9 +60,13 @@ def get_auth_service(
 
 def get_profile_service(
     db: Annotated[AsyncSession, Depends(get_db)],
+    storage_service: Annotated[StorageService, Depends(get_storage_service)],
 ) -> ProfileService:
     """Build a request-scoped profile service wired to the DB session."""
-    return ProfileService(repository=ProfileRepository(db))
+    return ProfileService(
+        repository=ProfileRepository(db),
+        storage_service=storage_service,
+    )
 
 
 def get_customer_service(
@@ -61,11 +78,13 @@ def get_customer_service(
 
 def get_quote_service(
     db: Annotated[AsyncSession, Depends(get_db)],
+    storage_service: Annotated[StorageService, Depends(get_storage_service)],
 ) -> QuoteService:
     """Build a request-scoped quote service wired to DB and PDF integration."""
     return QuoteService(
         repository=QuoteRepository(db),
         pdf_integration=get_pdf_integration(),
+        storage_service=storage_service,
     )
 
 

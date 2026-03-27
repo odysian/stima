@@ -17,24 +17,68 @@ from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.service import QuoteService
 from app.integrations.pdf import PdfRenderError
+from app.integrations.storage import StorageNotFoundError
 from app.main import app
-from app.shared.dependencies import get_quote_service
+from app.shared.dependencies import get_quote_service, get_storage_service
 
 pytestmark = pytest.mark.asyncio
+
+_PNG_BYTES = b"\x89PNG\r\n\x1a\nfake-png"
 
 
 class _ConfigurablePdfIntegration:
     def __init__(self) -> None:
         self.should_fail = False
+        self.last_context: QuoteRenderContext | None = None
 
     def render(self, context: QuoteRenderContext) -> bytes:
+        self.last_context = context
         if self.should_fail:
             raise PdfRenderError("Unable to render quote PDF")
         return f"PDF for {context.doc_number}".encode()
 
 
+class _FakeStorageService:
+    def __init__(self) -> None:
+        self.fail_fetch = False
+        self.objects: dict[str, bytes] = {}
+
+    def upload(
+        self,
+        *,
+        prefix: str,
+        filename: str,
+        data: bytes,
+        content_type: str,
+    ) -> str:
+        del content_type
+        object_path = f"{prefix.strip('/')}/{filename.lstrip('/')}"
+        self.objects[object_path] = data
+        return object_path
+
+    def delete(self, object_path: str) -> None:
+        self.objects.pop(object_path, None)
+
+    def fetch_bytes(self, object_path: str) -> bytes:
+        if self.fail_fetch:
+            raise RuntimeError("storage unavailable")
+        if object_path not in self.objects:
+            raise StorageNotFoundError(object_path)
+        return self.objects[object_path]
+
+
+@pytest.fixture()
+def _storage_service_dependency() -> Iterator[_FakeStorageService]:
+    storage_service = _FakeStorageService()
+    app.dependency_overrides[get_storage_service] = lambda: storage_service
+    yield storage_service
+    app.dependency_overrides.pop(get_storage_service, None)
+
+
 @pytest.fixture(autouse=True)
-def _override_quote_service_dependency() -> Iterator[_ConfigurablePdfIntegration]:
+def _override_quote_service_dependency(
+    _storage_service_dependency: _FakeStorageService,
+) -> Iterator[_ConfigurablePdfIntegration]:
     pdf_integration = _ConfigurablePdfIntegration()
 
     async def _override_get_quote_service(
@@ -43,6 +87,7 @@ def _override_quote_service_dependency() -> Iterator[_ConfigurablePdfIntegration
         return QuoteService(
             repository=QuoteRepository(db),
             pdf_integration=pdf_integration,
+            storage_service=_storage_service_dependency,
         )
 
     app.dependency_overrides[get_quote_service] = _override_get_quote_service
@@ -68,6 +113,28 @@ async def test_generate_pdf_returns_pdf_and_sets_ready(client: AsyncClient) -> N
     detail = await client.get(f"/api/quotes/{quote['id']}")
     assert detail.status_code == 200
     assert detail.json()["status"] == "ready"
+
+
+async def test_generate_pdf_includes_logo_data_uri_when_logo_exists(
+    client: AsyncClient,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _upload_logo(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert _override_quote_service_dependency.last_context is not None
+    assert _override_quote_service_dependency.last_context.logo_data_uri is not None
+    assert _override_quote_service_dependency.last_context.logo_data_uri.startswith(
+        "data:image/png;base64,"
+    )
 
 
 async def test_generate_pdf_does_not_downgrade_shared_quote(client: AsyncClient) -> None:
@@ -220,6 +287,30 @@ async def test_public_share_endpoint_streams_pdf_without_auth(client: AsyncClien
     assert response.headers["x-robots-tag"] == "noindex"
 
 
+async def test_public_share_endpoint_includes_logo_data_uri_when_logo_exists(
+    client: AsyncClient,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _upload_logo(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    client.cookies.clear()
+    response = await client.get(f"/share/{share_token}")
+
+    assert response.status_code == 200
+    assert _override_quote_service_dependency.last_context is not None
+    assert _override_quote_service_dependency.last_context.logo_data_uri is not None
+
+
 async def test_public_share_endpoint_returns_404_for_unknown_token(client: AsyncClient) -> None:
     client.cookies.clear()
     response = await client.get("/share/not-a-real-token")
@@ -248,6 +339,30 @@ async def test_public_share_endpoint_returns_422_when_render_fails(
 
     assert response.status_code == 422
     assert response.json() == {"detail": "Unable to render quote PDF"}
+
+
+async def test_generate_pdf_logs_and_omits_logo_when_storage_fetch_fails(
+    client: AsyncClient,
+    caplog: pytest.LogCaptureFixture,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _upload_logo(client, csrf_token)
+    _storage_service_dependency.fail_fetch = True
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    with caplog.at_level("WARNING", logger="app.features.quotes.service"):
+        response = await client.post(
+            f"/api/quotes/{quote['id']}/pdf",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+
+    assert response.status_code == 200
+    assert _override_quote_service_dependency.last_context is not None
+    assert _override_quote_service_dependency.last_context.logo_data_uri is None
+    assert any("omitting logo" in record.message for record in caplog.records)
 
 
 async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) -> str:
@@ -291,6 +406,15 @@ async def _create_quote(client: AsyncClient, csrf_token: str, customer_id: str) 
     )
     assert response.status_code == 201
     return response.json()
+
+
+async def _upload_logo(client: AsyncClient, csrf_token: str) -> None:
+    response = await client.post(
+        "/api/profile/logo",
+        files={"file": ("logo.png", _PNG_BYTES, "image/png")},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert response.status_code == 200
 
 
 def _credentials() -> dict[str, str]:

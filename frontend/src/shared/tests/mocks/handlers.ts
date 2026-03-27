@@ -78,6 +78,7 @@ export const handlers = [
         last_name: "Stone",
         trade_type: "Landscaper",
         timezone: null,
+        has_logo: false,
       },
       { status: 200 },
     );
@@ -94,10 +95,39 @@ export const handlers = [
         email: "test@example.com",
         is_active: true,
         is_onboarded: true,
+        has_logo: false,
         ...body,
       },
       { status: 200 },
     );
+  }),
+
+  http.post("/api/profile/logo", async ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    return HttpResponse.json(
+      {
+        id: "user-1",
+        email: "test@example.com",
+        is_active: true,
+        is_onboarded: true,
+        business_name: "Summit Exterior Care",
+        first_name: "Alex",
+        last_name: "Stone",
+        trade_type: "Landscaper",
+        timezone: null,
+        has_logo: true,
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.delete("/api/profile/logo", ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    return new HttpResponse(null, { status: 204 });
   }),
 
   http.get("/api/customers", () => {

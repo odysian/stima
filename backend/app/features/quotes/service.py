@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import logging
 from datetime import UTC, datetime
 from typing import Protocol, cast
 from uuid import UUID, uuid4
@@ -23,7 +25,11 @@ from app.features.quotes.schemas import (
     QuoteUpdateRequest,
 )
 from app.integrations.pdf import PdfRenderError
+from app.integrations.storage import StorageNotFoundError
 from app.shared.event_logger import log_event
+from app.shared.image_signatures import detect_image_content_type
+
+LOGGER = logging.getLogger(__name__)
 
 
 class QuoteServiceError(Exception):
@@ -102,6 +108,12 @@ class PdfIntegrationProtocol(Protocol):
     def render(self, context: QuoteRenderContext) -> bytes: ...
 
 
+class StorageServiceProtocol(Protocol):
+    """Structural protocol for storage reads needed during PDF rendering."""
+
+    def fetch_bytes(self, object_path: str) -> bytes: ...
+
+
 class QuoteService:
     """Coordinate quote domain rules with persistence and PDF rendering."""
 
@@ -110,9 +122,11 @@ class QuoteService:
         *,
         repository: QuoteRepositoryProtocol,
         pdf_integration: PdfIntegrationProtocol,
+        storage_service: StorageServiceProtocol,
     ) -> None:
         self._repository = repository
         self._pdf = pdf_integration
+        self._storage_service = storage_service
 
     async def create_quote(self, user: User, data: QuoteCreateRequest) -> Document:
         """Create a user-owned quote and retry once on sequence collisions."""
@@ -243,6 +257,7 @@ class QuoteService:
         context = await self._repository.get_render_context(quote_id, user_id)
         if context is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        await self._attach_logo_data_uri(context)
 
         try:
             pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
@@ -259,6 +274,7 @@ class QuoteService:
         context = await self._repository.get_render_context_by_share_token(share_token)
         if context is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        await self._attach_logo_data_uri(context)
 
         try:
             pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
@@ -288,6 +304,34 @@ class QuoteService:
             customer_id=refreshed_quote.customer_id,
         )
         return refreshed_quote
+
+    async def _attach_logo_data_uri(self, context: QuoteRenderContext) -> None:
+        if context.logo_path is None:
+            context.logo_data_uri = None
+            return
+
+        try:
+            logo_bytes = await asyncio.to_thread(
+                self._storage_service.fetch_bytes,
+                context.logo_path,
+            )
+        except StorageNotFoundError:
+            LOGGER.warning("Quote logo missing in storage; omitting from PDF render")
+            context.logo_data_uri = None
+            return
+        except Exception:  # noqa: BLE001
+            LOGGER.warning("Failed to load quote logo for PDF render; omitting logo", exc_info=True)
+            context.logo_data_uri = None
+            return
+
+        content_type = detect_image_content_type(logo_bytes)
+        if content_type is None:
+            LOGGER.warning("Quote logo bytes were invalid; omitting from PDF render")
+            context.logo_data_uri = None
+            return
+
+        encoded_logo = base64.b64encode(logo_bytes).decode("ascii")
+        context.logo_data_uri = f"data:{content_type};base64,{encoded_logo}"
 
 
 def _resolve_user_id(user: User) -> UUID:

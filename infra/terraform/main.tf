@@ -21,6 +21,14 @@ resource "google_service_account" "backend_vm" {
   display_name = "Stima Backend VM Service Account"
 }
 
+resource "google_storage_bucket" "private_assets" {
+  name                        = var.private_asset_bucket_name
+  project                     = var.project_id
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+}
+
 resource "google_project_iam_member" "backend_vm_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
@@ -31,6 +39,12 @@ resource "google_project_iam_member" "backend_vm_metric_writer" {
   project = var.project_id
   role    = "roles/monitoring.metricWriter"
   member  = "serviceAccount:${google_service_account.backend_vm.email}"
+}
+
+resource "google_storage_bucket_iam_member" "backend_vm_object_admin" {
+  bucket = google_storage_bucket.private_assets.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.backend_vm.email}"
 }
 
 resource "google_compute_firewall" "allow_http" {

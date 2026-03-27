@@ -17,6 +17,7 @@ export interface ProfileResponse {
   business_name: string | null;
   trade_type: TradeType | null;
   timezone: string | null;
+  has_logo: boolean;
   is_active: boolean;
   is_onboarded: boolean;
 }

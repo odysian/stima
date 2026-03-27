@@ -7,6 +7,7 @@ subnetwork     = "default"
 vm_name        = "stima-backend"
 machine_type   = "e2-micro"
 static_ip_name = "stima-backend-ip"
+private_asset_bucket_name = "stima-private-assets-portfolio-488721"
 
 ssh_user             = "odys"
 api_domain           = "api.stima.odysian.dev"
@@ -27,3 +28,4 @@ ssh_public_keys = [
 # IAP tunnel range must stay. First IP is desktop — update if it changes (curl -s ifconfig.me).
 ssh_source_ranges                = ["184.189.209.6/32", "35.235.240.0/20"]
 allow_insecure_ssh_from_anywhere = false
+vm_service_account_scopes        = ["https://www.googleapis.com/auth/devstorage.read_write"]

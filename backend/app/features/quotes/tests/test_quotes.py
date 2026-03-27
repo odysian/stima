@@ -23,10 +23,11 @@ from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
 from app.features.quotes.service import QuoteService
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
+from app.integrations.storage import StorageNotFoundError
 from app.integrations.transcription import TranscriptionError
 from app.main import app
 from app.shared import event_logger
-from app.shared.dependencies import get_extraction_service, get_quote_service
+from app.shared.dependencies import get_extraction_service, get_quote_service, get_storage_service
 
 pytestmark = pytest.mark.asyncio
 
@@ -98,6 +99,33 @@ class _MockTranscriptionIntegration:
         return f"transcript from {audio_wav.decode()}"
 
 
+class _MockStorageService:
+    def fetch_bytes(self, object_path: str) -> bytes:
+        raise StorageNotFoundError(object_path)
+
+    def upload(
+        self,
+        *,
+        prefix: str,
+        filename: str,
+        data: bytes,
+        content_type: str,
+    ) -> str:
+        del data
+        del content_type
+        return f"{prefix.strip('/')}/{filename.lstrip('/')}"
+
+    def delete(self, object_path: str) -> None:
+        del object_path
+
+
+@pytest.fixture(autouse=True)
+def _override_storage_service_dependency() -> Iterator[None]:
+    app.dependency_overrides[get_storage_service] = lambda: _MockStorageService()
+    yield
+    app.dependency_overrides.pop(get_storage_service, None)
+
+
 @pytest.fixture(autouse=True)
 def _override_quote_service_dependency() -> Iterator[None]:
     async def _override_get_quote_service(
@@ -106,6 +134,7 @@ def _override_quote_service_dependency() -> Iterator[None]:
         return QuoteService(
             repository=QuoteRepository(db),
             pdf_integration=_MockPdfIntegration(),
+            storage_service=_MockStorageService(),
         )
 
     app.dependency_overrides[get_quote_service] = _override_get_quote_service

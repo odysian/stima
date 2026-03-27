@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes")
+os.environ.setdefault("GCS_BUCKET_NAME", "stima-test-logos")
 
 from app.core.database import Base, get_db
 from app.features import registry as feature_registry  # noqa: F401

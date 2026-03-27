@@ -26,6 +26,7 @@ async def test_get_profile_returns_authenticated_user_profile(client: AsyncClien
     assert payload["business_name"] is None
     assert payload["trade_type"] is None
     assert payload["timezone"] is None
+    assert payload["has_logo"] is False
     assert payload["is_onboarded"] is False
 
 
@@ -64,6 +65,7 @@ async def test_patch_profile_updates_onboarding_fields(client: AsyncClient) -> N
     assert body["last_name"] == payload["last_name"]
     assert body["trade_type"] == payload["trade_type"]
     assert body["timezone"] == payload["timezone"]
+    assert body["has_logo"] is False
     assert body["is_onboarded"] is True
 
     get_response = await client.get("/api/profile")

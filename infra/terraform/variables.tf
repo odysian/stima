@@ -124,6 +124,11 @@ variable "vm_service_account_scopes" {
   default     = []
 }
 
+variable "private_asset_bucket_name" {
+  description = "Private GCS bucket name used for authenticated app-managed assets."
+  type        = string
+}
+
 variable "enable_secure_boot" {
   description = "Whether to enable Shielded VM secure boot."
   type        = bool

@@ -239,6 +239,7 @@ Stima is deployed in production with same-site subdomains:
 - Frontend: Vercel at `stima.odysian.dev`
 - Backend: GCP VM + NGINX at `api.stima.odysian.dev`
 - Database: Cloud SQL PostgreSQL
+- Private assets: GCS bucket for contractor logos, served back through authenticated backend proxy routes
 - Container registry: GHCR
 
 Cookie auth is configured for the shared parent domain `.stima.odysian.dev`.

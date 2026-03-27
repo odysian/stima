@@ -29,6 +29,7 @@ anthropic==0.76.0
 # PDF generation — WeasyPrint + Jinja2 template rendering
 weasyprint==65.0
 jinja2==3.1.4
+google-cloud-storage==3.4.1
 
 # Audio processing — pydub requires ffmpeg binary (see Docker section)
 pydub==0.25.1

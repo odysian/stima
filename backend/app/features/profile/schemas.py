@@ -32,6 +32,7 @@ class ProfileResponse(BaseModel):
     business_name: str | None
     trade_type: TradeType | None
     timezone: str | None
+    has_logo: bool
     is_active: bool
     is_onboarded: bool
 

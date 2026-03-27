@@ -6,9 +6,11 @@ import { getTimezoneOptions } from "@/features/profile/lib/timezones";
 import { profileService } from "@/features/profile/services/profileService";
 import {
   TRADE_TYPES,
+  type ProfileResponse,
   type TradeType,
 } from "@/features/profile/types/profile.types";
 import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
@@ -24,11 +26,26 @@ export function SettingsScreen(): React.ReactElement {
   const [tradeType, setTradeType] = useState<TradeType>(TRADE_TYPES[0]);
   const [timezone, setTimezone] = useState("UTC");
   const [email, setEmail] = useState("");
+  const [hasLogo, setHasLogo] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLogoSubmitting, setIsLogoSubmitting] = useState(false);
+  const [isRemoveLogoOpen, setIsRemoveLogoOpen] = useState(false);
+  const [logoPreviewVersion, setLogoPreviewVersion] = useState(0);
+
+  function applyProfile(profile: ProfileResponse): void {
+    setBusinessName(profile.business_name ?? "");
+    setFirstName(profile.first_name ?? "");
+    setLastName(profile.last_name ?? "");
+    setTradeType(profile.trade_type ?? TRADE_TYPES[0]);
+    setTimezone(profile.timezone ?? "UTC");
+    setEmail(profile.email);
+    setHasLogo(profile.has_logo);
+  }
 
   useEffect(() => {
     let isActive = true;
@@ -40,12 +57,7 @@ export function SettingsScreen(): React.ReactElement {
       try {
         const profile = await profileService.getProfile();
         if (isActive) {
-          setBusinessName(profile.business_name ?? "");
-          setFirstName(profile.first_name ?? "");
-          setLastName(profile.last_name ?? "");
-          setTradeType(profile.trade_type ?? TRADE_TYPES[0]);
-          setTimezone(profile.timezone ?? "UTC");
-          setEmail(profile.email);
+          applyProfile(profile);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load settings";
@@ -65,6 +77,49 @@ export function SettingsScreen(): React.ReactElement {
       isActive = false;
     };
   }, []);
+
+  const onLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setLogoError(null);
+    setIsLogoSubmitting(true);
+
+    try {
+      const profile = await profileService.uploadLogo(file);
+      applyProfile(profile);
+      setLogoPreviewVersion((currentVersion) => currentVersion + 1);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to upload logo";
+      setLogoError(message);
+    } finally {
+      setIsLogoSubmitting(false);
+    }
+  };
+
+  const onConfirmRemoveLogo = async () => {
+    if (isLogoSubmitting) {
+      return;
+    }
+
+    setLogoError(null);
+    setIsLogoSubmitting(true);
+
+    try {
+      await profileService.deleteLogo();
+      setHasLogo(false);
+      setIsRemoveLogoOpen(false);
+      setLogoPreviewVersion((currentVersion) => currentVersion + 1);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to remove logo";
+      setLogoError(message);
+    } finally {
+      setIsLogoSubmitting(false);
+    }
+  };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -125,7 +180,66 @@ export function SettingsScreen(): React.ReactElement {
               <h2 className="mb-4 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                 Business Profile
               </h2>
+
               <div className="mt-4 flex flex-col gap-4">
+                <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-2">
+                      <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                        Logo
+                      </p>
+                      <p className="text-sm text-on-surface-variant">
+                        Shows up on all future quote PDFs.
+                      </p>
+                      <p className="text-xs text-on-surface-variant">JPEG or PNG, up to 2 MB.</p>
+                    </div>
+
+                    {hasLogo ? (
+                      <img
+                        key={logoPreviewVersion}
+                        src="/api/profile/logo"
+                        alt="Business logo preview"
+                        className="h-12 w-auto max-w-[180px] object-contain"
+                      />
+                    ) : (
+                      <p className="text-sm text-on-surface-variant">No logo uploaded yet.</p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <label
+                      htmlFor="settings-logo-upload"
+                      className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+                    >
+                      {hasLogo ? "Upload New" : "Upload Logo"}
+                    </label>
+                    <input
+                      id="settings-logo-upload"
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="sr-only"
+                      disabled={isLogoSubmitting}
+                      onChange={onLogoUpload}
+                    />
+                    {hasLogo ? (
+                      <button
+                        type="button"
+                        className="inline-flex min-h-12 items-center justify-center rounded-lg bg-secondary px-4 py-3 text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isLogoSubmitting}
+                        onClick={() => setIsRemoveLogoOpen(true)}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {logoError ? (
+                    <div className="mt-4">
+                      <FeedbackMessage variant="error">{logoError}</FeedbackMessage>
+                    </div>
+                  ) : null}
+                </div>
+
                 <Input
                   id="settings-business-name"
                   label="Business name"
@@ -153,10 +267,7 @@ export function SettingsScreen(): React.ReactElement {
                   />
                 </fieldset>
                 <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="settings-timezone"
-                    className="text-sm font-medium text-on-surface"
-                  >
+                  <label htmlFor="settings-timezone" className="text-sm font-medium text-on-surface">
                     Timezone
                   </label>
                   <select
@@ -176,15 +287,21 @@ export function SettingsScreen(): React.ReactElement {
             </section>
 
             <section className="ghost-shadow rounded-xl bg-surface-container-lowest p-6">
-              <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Account</h2>
+              <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                Account
+              </h2>
               <div className="mt-4 space-y-4">
                 <div className="flex flex-col gap-1">
-                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Email</p>
+                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                    Email
+                  </p>
                   <p className="text-sm text-on-surface">{email}</p>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Session</span>
+                  <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                    Session
+                  </span>
                   {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
                   <button
                     type="button"
@@ -205,6 +322,18 @@ export function SettingsScreen(): React.ReactElement {
           </form>
         ) : null}
       </section>
+
+      {isRemoveLogoOpen ? (
+        <ConfirmModal
+          title="Remove logo?"
+          body="This will remove your logo from all future PDFs."
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          onConfirm={() => void onConfirmRemoveLogo()}
+          onCancel={() => setIsRemoveLogoOpen(false)}
+          variant="destructive"
+        />
+      ) : null}
     </main>
   );
 }

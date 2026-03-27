@@ -88,6 +88,11 @@ class Settings(BaseSettings):
         default_factory=list,
         validation_alias="TRUSTED_PROXY_IPS",
     )
+    gcs_bucket_name: str = Field(
+        default="",
+        validation_alias="GCS_BUCKET_NAME",
+        validate_default=True,
+    )
 
     @field_validator("cookie_domain", mode="before")
     @classmethod
@@ -110,6 +115,15 @@ class Settings(BaseSettings):
             raise ValueError(f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters")
         if normalized_value.lower() in FORBIDDEN_SECRET_KEY_VALUES:
             raise ValueError("SECRET_KEY cannot use placeholder/dev values")
+        return normalized_value
+
+    @field_validator("gcs_bucket_name")
+    @classmethod
+    def validate_gcs_bucket_name(cls, value: str) -> str:
+        """Require a non-empty GCS bucket name for private asset storage."""
+        normalized_value = value.strip()
+        if not normalized_value:
+            raise ValueError("GCS_BUCKET_NAME must be set and non-empty")
         return normalized_value
 
     @field_validator("allowed_origins", mode="before")
