@@ -22,6 +22,7 @@ _JPEG_BYTES = b"\xff\xd8\xff\xe0fake-jpeg"
 class _FakeStorageService:
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
+        self.should_fail_upload = False
 
     def upload(
         self,
@@ -32,6 +33,8 @@ class _FakeStorageService:
         content_type: str,
     ) -> str:
         del content_type
+        if self.should_fail_upload:
+            raise RuntimeError("upload failed")
         object_path = f"{prefix.strip('/')}/{filename.lstrip('/')}"
         self.objects[object_path] = data
         return object_path
@@ -130,6 +133,43 @@ async def test_get_logo_returns_bytes_content_type_and_no_store_header(
     assert response.content == _PNG_BYTES
     assert response.headers["content-type"] == "image/png"
     assert response.headers["cache-control"] == "no-store"
+
+
+async def test_get_logo_returns_404_when_logo_path_exists_but_object_is_missing(
+    client: AsyncClient,
+    _override_storage_service_dependency: _FakeStorageService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    upload_response = await client.post(
+        "/api/profile/logo",
+        files={"file": ("logo.png", _PNG_BYTES, "image/png")},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert upload_response.status_code == 200
+
+    _override_storage_service_dependency.objects.clear()
+
+    response = await client.get("/api/profile/logo")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Logo not found"}
+
+
+async def test_upload_logo_returns_500_when_storage_write_fails(
+    client: AsyncClient,
+    _override_storage_service_dependency: _FakeStorageService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    _override_storage_service_dependency.should_fail_upload = True
+
+    response = await client.post(
+        "/api/profile/logo",
+        files={"file": ("logo.png", _PNG_BYTES, "image/png")},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Unable to upload logo"}
 
 
 async def test_delete_logo_clears_profile_and_future_reads_return_404(client: AsyncClient) -> None:

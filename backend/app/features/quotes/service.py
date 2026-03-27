@@ -25,7 +25,7 @@ from app.features.quotes.schemas import (
     QuoteUpdateRequest,
 )
 from app.integrations.pdf import PdfRenderError
-from app.integrations.storage import StorageNotFoundError
+from app.integrations.storage import StorageNotFoundError, StorageReaderProtocol
 from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
 
@@ -108,12 +108,6 @@ class PdfIntegrationProtocol(Protocol):
     def render(self, context: QuoteRenderContext) -> bytes: ...
 
 
-class StorageServiceProtocol(Protocol):
-    """Structural protocol for storage reads needed during PDF rendering."""
-
-    def fetch_bytes(self, object_path: str) -> bytes: ...
-
-
 class QuoteService:
     """Coordinate quote domain rules with persistence and PDF rendering."""
 
@@ -122,7 +116,7 @@ class QuoteService:
         *,
         repository: QuoteRepositoryProtocol,
         pdf_integration: PdfIntegrationProtocol,
-        storage_service: StorageServiceProtocol,
+        storage_service: StorageReaderProtocol,
     ) -> None:
         self._repository = repository
         self._pdf = pdf_integration

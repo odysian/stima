@@ -8,7 +8,7 @@ from typing import Protocol
 from uuid import UUID
 
 from app.features.auth.models import User
-from app.integrations.storage import StorageNotFoundError
+from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.image_signatures import detect_image_content_type
 
 MAX_LOGO_BYTES = 2 * 1024 * 1024
@@ -54,23 +54,6 @@ class ProfileRepositoryProtocol(Protocol):
     async def clear_logo_path(self, *, user_id: UUID) -> User | None: ...
 
     async def commit(self) -> None: ...
-
-
-class StorageServiceProtocol(Protocol):
-    """Structural protocol for storage dependencies used by profile flows."""
-
-    def upload(
-        self,
-        *,
-        prefix: str,
-        filename: str,
-        data: bytes,
-        content_type: str,
-    ) -> str: ...
-
-    def delete(self, object_path: str) -> None: ...
-
-    def fetch_bytes(self, object_path: str) -> bytes: ...
 
 
 class ProfileService:
@@ -125,13 +108,16 @@ class ProfileService:
         if content_type is None:
             raise ProfileServiceError(detail="Logo must be a JPEG or PNG image", status_code=422)
 
-        object_path = await asyncio.to_thread(
-            self._storage_service.upload,
-            prefix=f"logos/{user.id}",
-            filename=_LOGO_FILENAME,
-            data=content,
-            content_type=content_type,
-        )
+        try:
+            object_path = await asyncio.to_thread(
+                self._storage_service.upload,
+                prefix=f"logos/{user.id}",
+                filename=_LOGO_FILENAME,
+                data=content,
+                content_type=content_type,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise ProfileServiceError(detail="Unable to upload logo", status_code=500) from exc
         updated_profile = await self._repository.update_logo_path(user_id=user.id, path=object_path)
         if updated_profile is None:
             raise ProfileServiceError(detail="Profile not found", status_code=404)
