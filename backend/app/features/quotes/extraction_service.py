@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
+import sentry_sdk
+
 from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
@@ -62,6 +64,7 @@ class ExtractionService:
         try:
             return await self._extraction.extract(notes)
         except ExtractionError as exc:
+            sentry_sdk.capture_exception(exc)
             raise QuoteServiceError(
                 detail=f"Extraction failed: {exc}",
                 status_code=422,
@@ -126,11 +129,13 @@ class ExtractionService:
                 ],
             )
         except AudioError as exc:
+            sentry_sdk.capture_exception(exc)
             raise QuoteServiceError(detail=str(exc), status_code=400) from exc
 
         try:
             return await self._transcription.transcribe(stitched_wav)
         except TranscriptionError as exc:
+            sentry_sdk.capture_exception(exc)
             raise QuoteServiceError(
                 detail=f"Transcription failed: {exc}",
                 status_code=502,

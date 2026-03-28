@@ -8,8 +8,10 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.admin.router import router as admin_router
 from app.core.config import get_settings
 from app.core.database import get_session_maker
+from app.core.sentry import init_sentry
 from app.features.auth.api import router as auth_router
 from app.features.customers.api import router as customer_router
 from app.features.profile.api import router as profile_router
@@ -22,6 +24,7 @@ from app.shared.rate_limit import limiter
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
+    init_sentry(dsn=settings.sentry_dsn, environment=settings.environment)
     configure_event_logging(session_factory=get_session_maker())
 
     app = FastAPI(title="Stima API")
@@ -39,6 +42,8 @@ def create_app() -> FastAPI:
     app.include_router(customer_router, prefix="/api")
     app.include_router(quote_router, prefix="/api")
     app.include_router(quote_public_router)
+    if settings.admin_api_key is not None:
+        app.include_router(admin_router, prefix="/api")
 
     @app.get("/health", include_in_schema=False)
     async def health() -> JSONResponse:

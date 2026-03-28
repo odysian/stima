@@ -1,4 +1,5 @@
 import type { AuthResponse } from "@/features/auth/types/auth.types";
+import { captureException } from "@/sentry";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
@@ -182,13 +183,19 @@ async function requestWithParser<T>(
       ? window.fetch.bind(window)
       : fetch;
 
-  const response = await fetchImpl(`${API_BASE}${url}`, {
-    ...options,
-    method,
-    credentials: "include",
-    headers: buildHeaders(method, options.headers, bodyIsJson),
-    body: requestBody,
-  });
+  let response: Response;
+  try {
+    response = await fetchImpl(`${API_BASE}${url}`, {
+      ...options,
+      method,
+      credentials: "include",
+      headers: buildHeaders(method, options.headers, bodyIsJson),
+      body: requestBody,
+    });
+  } catch (error) {
+    captureException(error);
+    throw error;
+  }
 
   if (response.status === 401 && !options.skipRefresh && url !== "/api/auth/refresh") {
     await requestRefresh();
@@ -203,7 +210,11 @@ async function requestWithParser<T>(
 
   if (!response.ok) {
     const fallbackMessage = response.statusText || "Request failed";
-    throw new Error(getErrorMessage(payload, fallbackMessage));
+    const error = new Error(getErrorMessage(payload, fallbackMessage));
+    if (response.status >= 500) {
+      captureException(error);
+    }
+    throw error;
   }
 
   return parseResponse(response, payload);

@@ -204,3 +204,20 @@ async def test_log_event_persists_new_quote_outcome_events(
         "quote_id": str(quote_id),
         "customer_id": str(customer_id),
     }
+
+
+def test_pilot_event_whitelist_matches_v1_analytics_contract() -> None:
+    assert event_logger._PILOT_EVENT_NAMES == {  # noqa: SLF001
+        "quote_started",
+        "audio_uploaded",
+        "draft_generated",
+        "draft_generation_failed",
+        "quote_pdf_generated",
+        "quote_shared",
+        "quote_approved",
+        "quote_marked_lost",
+        "quote_viewed",
+        "email_sent",
+        "invoice_created",
+        "invoice_viewed",
+    }
