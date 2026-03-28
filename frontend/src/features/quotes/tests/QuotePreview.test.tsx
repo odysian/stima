@@ -229,7 +229,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText("Q-001")).toBeInTheDocument();
   });
 
-  it("shows a disabled open-pdf primary action for shared quotes without a local blob", async () => {
+  it("falls back to the shared PDF link for shared quotes without a local blob", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({ status: "shared", share_token: "share-token-1" }),
     );
@@ -237,10 +237,12 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    const openPdfButton = screen.getByRole("button", { name: /open pdf/i });
-    expect(openPdfButton).toBeDisabled();
+    const openPdfLink = screen.getByRole("link", { name: /open pdf/i });
+    expect(openPdfLink).toHaveAttribute(
+      "href",
+      "http://localhost:3000/share/share-token-1",
+    );
     expect(screen.getByText("Copy Share Link")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /open pdf/i })).not.toBeInTheDocument();
   });
 
   it("marks a shared quote as won and refetches the closed state", async () => {
