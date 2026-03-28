@@ -354,7 +354,12 @@ class QuoteService:
         if transition is not None:
             await self._repository.commit()
             self._log_public_quote_viewed(transition)
-        context.status = QuoteStatus.VIEWED.value
+            context.status = QuoteStatus.VIEWED.value
+            return
+
+        refreshed_context = await self._repository.get_render_context_by_share_token(share_token)
+        if refreshed_context is not None:
+            context.status = refreshed_context.status
 
     def _log_public_quote_viewed(self, transition: QuoteViewTransition) -> None:
         """Emit the first public quote view event."""

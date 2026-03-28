@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import Depends
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -497,6 +497,56 @@ async def test_public_quote_endpoint_returns_json_and_marks_first_view_once(
     assert [event["event"] for event in emitted_events] == ["quote_viewed"]
     assert emitted_events[0]["quote_id"] == quote["id"]
     assert emitted_events[0]["customer_id"] == customer_id
+
+
+async def test_public_quote_endpoint_prefers_terminal_status_when_view_transition_races(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    async def _simulate_terminal_race(self: QuoteRepository, share_token: str) -> None:
+        await self._session.execute(
+            update(Document)
+            .where(Document.share_token == share_token)
+            .values(status=QuoteStatus.APPROVED)
+        )
+        await self._session.commit()
+        return None
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+    monkeypatch.setattr(
+        QuoteRepository,
+        "transition_to_viewed_by_share_token",
+        _simulate_terminal_race,
+    )
+
+    client.cookies.clear()
+    response = await client.get(f"/api/public/doc/{share_token}")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "approved"
+
+    await event_logger.flush_event_tasks()
+    quote_row = await db_session.scalar(select(Document).where(Document.id == UUID(quote["id"])))
+    assert quote_row is not None
+    assert quote_row.status == QuoteStatus.APPROVED
+    assert emitted_events == []
 
 
 @pytest.mark.parametrize("status", [QuoteStatus.DRAFT, QuoteStatus.READY])
