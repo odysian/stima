@@ -13,6 +13,7 @@ import { CustomerDetailScreen } from "@/features/customers/components/CustomerDe
 import { CustomerListScreen } from "@/features/customers/components/CustomerListScreen";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerSelectScreen } from "@/features/customers/components/CustomerSelectScreen";
+import { PublicQuotePage } from "@/features/public/components/PublicQuotePage";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { EditLineItemForEditScreen } from "@/features/quotes/components/EditLineItemForEditScreen";
@@ -79,6 +80,7 @@ export default function App(): React.ReactElement {
           </PublicRoute>
         }
       />
+      <Route path="/doc/:token" element={<PublicQuotePage />} />
       <Route element={<OnboardingRoute />}>
         <Route path="/onboarding" element={<OnboardingForm />} />
       </Route>

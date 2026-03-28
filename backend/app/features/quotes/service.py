@@ -18,6 +18,7 @@ from app.features.quotes.repository import (
     QuoteDetailRow,
     QuoteListItemSummary,
     QuoteRenderContext,
+    QuoteViewTransition,
 )
 from app.features.quotes.schemas import (
     LineItemDraft,
@@ -79,6 +80,10 @@ class QuoteRepositoryProtocol(Protocol):
     async def get_render_context_by_share_token(
         self, share_token: str
     ) -> QuoteRenderContext | None: ...
+
+    async def transition_to_viewed_by_share_token(
+        self, share_token: str
+    ) -> QuoteViewTransition | None: ...
 
     async def mark_ready_if_not_shared(self, *, quote_id: UUID, user_id: UUID) -> None: ...
 
@@ -301,6 +306,50 @@ class QuoteService:
             raise QuoteServiceError(detail=str(exc), status_code=422) from exc
 
         return context.doc_number, pdf_bytes
+
+    async def get_public_quote(self, share_token: str) -> QuoteRenderContext:
+        """Return public quote data and apply the first shared->viewed transition once."""
+        context = await self._repository.get_render_context_by_share_token(share_token)
+        if context is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        if context.status == QuoteStatus.SHARED.value:
+            transition = await self._repository.transition_to_viewed_by_share_token(share_token)
+            if transition is not None:
+                await self._repository.commit()
+                log_event(
+                    "quote_viewed",
+                    user_id=transition.user_id,
+                    quote_id=transition.quote_id,
+                    customer_id=transition.customer_id,
+                )
+            context.status = QuoteStatus.VIEWED.value
+
+        return context
+
+    async def get_public_logo(self, share_token: str) -> tuple[bytes, str]:
+        """Return public logo bytes/content type for one shared quote token."""
+        context = await self._repository.get_render_context_by_share_token(share_token)
+        if context is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if context.logo_path is None:
+            raise QuoteServiceError(detail="Logo not found", status_code=404)
+
+        try:
+            logo_bytes = await asyncio.to_thread(
+                self._storage_service.fetch_bytes,
+                context.logo_path,
+            )
+        except StorageNotFoundError as exc:
+            raise QuoteServiceError(detail="Logo not found", status_code=404) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise QuoteServiceError(detail="Unable to load logo", status_code=500) from exc
+
+        content_type = detect_image_content_type(logo_bytes)
+        if content_type is None:
+            raise QuoteServiceError(detail="Unable to load logo", status_code=500)
+
+        return logo_bytes, content_type
 
     async def share_quote(self, user: User, quote_id: UUID) -> Document:
         """Set share token/timestamp and transition quote status to shared."""

@@ -96,7 +96,7 @@ export function QuotePreview(): React.ReactElement {
 
   const canShare = !!quote && !!pdfUrl;
   const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
-  const shareUrl = quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null;
+  const shareUrl = quote?.share_token ? `${window.location.origin}/doc/${quote.share_token}` : null;
   const hasLocalPdf = Boolean(pdfUrl);
   const isShareableStatus = quote ? SHAREABLE_QUOTE_STATUSES.has(quote.status) : false;
   const isClosedStatus = quote ? CLOSED_QUOTE_STATUSES.has(quote.status) : false;
@@ -118,7 +118,7 @@ export function QuotePreview(): React.ReactElement {
       : "draft";
   // Card messaging follows persisted quote status, while actions depend on whether
   // this device has a locally generated PDF blob available right now.
-  const openPdfUrl = pdfUrl;
+  const openPdfUrl = pdfUrl ?? (quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null);
   const quoteTitle = readOptionalQuoteText(quote, "title");
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
@@ -189,7 +189,7 @@ export function QuotePreview(): React.ReactElement {
       if (!updatedQuote.share_token) {
         throw new Error("Share link unavailable");
       }
-      const nextSharedUrl = `${apiBase}/share/${updatedQuote.share_token}`;
+      const nextSharedUrl = `${window.location.origin}/doc/${updatedQuote.share_token}`;
       const maybeNavigator = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
 
       if (typeof maybeNavigator.share === "function") {
