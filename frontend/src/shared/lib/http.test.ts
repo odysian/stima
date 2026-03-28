@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { User } from "@/features/auth/types/auth.types";
+import { captureException } from "@/sentry";
 import { clearCsrfToken, request, requestBlob } from "@/shared/lib/http";
+
+vi.mock("@/sentry", () => ({
+  captureException: vi.fn(),
+}));
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -21,6 +26,7 @@ describe("http request helper", () => {
     clearCsrfToken();
     clearCsrfCookie();
     vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(captureException).mockReset();
   });
 
   afterEach(() => {
@@ -175,5 +181,34 @@ describe("http request helper", () => {
     );
 
     await expect(request<null>("/api/quotes/quote-1", { method: "DELETE" })).resolves.toBeNull();
+  });
+
+  it("captures 5xx responses before surfacing the error", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(jsonResponse({ detail: "Server error" }, 500));
+
+    await expect(request("/api/admin/events")).rejects.toThrow("Server error");
+
+    expect(vi.mocked(captureException)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(captureException).mock.calls[0]?.[0]).toBeInstanceOf(Error);
+  });
+
+  it("does not capture expected 4xx responses", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(jsonResponse({ detail: "Bad request" }, 400));
+
+    await expect(request("/api/admin/events")).rejects.toThrow("Bad request");
+
+    expect(vi.mocked(captureException)).not.toHaveBeenCalled();
+  });
+
+  it("captures network failures", async () => {
+    const fetchMock = vi.mocked(fetch);
+    const networkError = new TypeError("Failed to fetch");
+    fetchMock.mockRejectedValueOnce(networkError);
+
+    await expect(request("/api/admin/events")).rejects.toThrow("Failed to fetch");
+
+    expect(vi.mocked(captureException)).toHaveBeenCalledWith(networkError);
   });
 });

@@ -3,7 +3,7 @@
 from collections.abc import Iterator
 
 import pytest
-from app.core.config import get_database_url, get_settings
+from app.core.config import Settings, get_database_url, get_settings
 from pydantic import ValidationError
 
 
@@ -22,6 +22,16 @@ def test_cookie_domain_blank_is_normalized(monkeypatch) -> None:
     settings = get_settings()
 
     assert settings.cookie_domain is None
+
+
+def test_optional_sentry_and_admin_config_blank_values_are_normalized(monkeypatch) -> None:
+    monkeypatch.setenv("SENTRY_DSN", "   ")
+    monkeypatch.setenv("ADMIN_API_KEY", "")
+
+    settings = get_settings()
+
+    assert settings.sentry_dsn is None
+    assert settings.admin_api_key is None
 
 
 def test_allowed_origins_csv_parses_to_list(monkeypatch) -> None:
@@ -85,4 +95,4 @@ def test_gcs_bucket_name_is_required(monkeypatch) -> None:
     monkeypatch.delenv("GCS_BUCKET_NAME", raising=False)
 
     with pytest.raises(ValidationError):
-        get_settings()
+        Settings(_env_file=None)  # type: ignore[call-arg]

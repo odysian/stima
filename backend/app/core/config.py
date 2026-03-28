@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     cookie_domain: str | None = Field(default=None, validation_alias="COOKIE_DOMAIN")
 
     environment: str = Field(default="development", validation_alias="ENVIRONMENT")
+    sentry_dsn: str | None = Field(default=None, validation_alias="SENTRY_DSN")
+    admin_api_key: str | None = Field(default=None, validation_alias="ADMIN_API_KEY")
     frontend_url: str = Field(
         default="http://localhost:5173",
         validation_alias="FRONTEND_URL",
@@ -102,6 +104,19 @@ class Settings(BaseSettings):
             return None
         if isinstance(value, str) and not value.strip():
             return None
+        return str(value)
+
+    @field_validator("sentry_dsn", "admin_api_key", mode="before")
+    @classmethod
+    def normalize_optional_strings(cls, value: Any) -> str | None:
+        """Treat empty optional config values as unset."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized_value = value.strip()
+            if not normalized_value:
+                return None
+            return normalized_value
         return str(value)
 
     @field_validator("secret_key")

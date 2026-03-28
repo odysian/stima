@@ -9,6 +9,7 @@
 ### Backend layout
 ```
 backend/app/
+  admin/         — internal-only API-key routes excluded from public schema
   core/          — config, database, security primitives
   features/      — feature modules (auth, quotes, customers, profile)
     registry.py  — central model import for Alembic discovery
@@ -131,8 +132,19 @@ Pilot event set:
 - `quote_shared`
 - `quote_approved`
 - `quote_marked_lost`
+- `quote_viewed`
+- `email_sent`
+- `invoice_created`
+- `invoice_viewed`
 
 These underscore names are the canonical quote-flow vocabulary for pilot instrumentation; dot-notation events such as `quote.created`, `quote.updated`, `quote.deleted`, and `customer.created` remain separate operational logs outside the pilot analytics scope.
+
+Internal analytics access:
+- `GET /api/admin/events?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&event_name?=...`
+- Route is registered only when `ADMIN_API_KEY` is set.
+- Requests require `X-Admin-Key`; absent or invalid keys both return `401`.
+- Results are aggregated by `event_name` and UTC calendar day.
+- Route is excluded from OpenAPI (`include_in_schema=False`).
 
 ## API Contracts
 
@@ -233,6 +245,13 @@ Rules:
 { "detail": "Human-readable error message" }
 ```
 FastAPI validation errors use `422` with array-style `detail`.
+
+## Error Monitoring
+
+- Backend Sentry initialization lives in `backend/app/core/sentry.py` and is enabled only when `SENTRY_DSN` is set.
+- Frontend Sentry initialization lives in `frontend/src/sentry.ts` and is enabled only when `VITE_SENTRY_DSN` is set.
+- Both SDKs disable default PII capture.
+- Frontend transport capture is intentionally narrow: only unhandled render errors, network failures, and `5xx` responses are reported; expected `4xx` responses are not.
 
 ## Frontend Auth Architecture
 
