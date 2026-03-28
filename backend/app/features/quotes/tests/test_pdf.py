@@ -357,6 +357,46 @@ async def test_public_share_endpoint_streams_pdf_without_auth(client: AsyncClien
     assert response.headers["x-robots-tag"] == "noindex"
 
 
+async def test_public_share_endpoint_marks_first_view_once(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    client.cookies.clear()
+    first_response = await client.get(f"/share/{share_token}")
+    second_response = await client.get(f"/share/{share_token}")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+
+    await event_logger.flush_event_tasks()
+    quote_row = await db_session.scalar(select(Document).where(Document.id == UUID(quote["id"])))
+    assert quote_row is not None
+    assert quote_row.status == QuoteStatus.VIEWED
+
+    assert [event["event"] for event in emitted_events] == ["quote_viewed"]
+    assert emitted_events[0]["quote_id"] == quote["id"]
+    assert emitted_events[0]["customer_id"] == customer_id
+
+
 async def test_public_share_endpoint_includes_logo_data_uri_when_logo_exists(
     client: AsyncClient,
     _override_quote_service_dependency: _ConfigurablePdfIntegration,
@@ -440,6 +480,7 @@ async def test_public_quote_endpoint_returns_json_and_marks_first_view_once(
 
     assert first_response.status_code == 200
     assert second_response.status_code == 200
+    assert first_response.headers["cache-control"] == "no-store"
     assert first_response.headers["x-robots-tag"] == "noindex"
     first_payload = first_response.json()
     assert first_payload["doc_number"] == "Q-001"
@@ -479,6 +520,7 @@ async def test_public_quote_endpoint_returns_404_for_non_public_statuses(
     response = await client.get(f"/api/public/doc/{token}")
 
     assert response.status_code == 404
+    assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-robots-tag"] == "noindex"
     assert response.json() == {"detail": "Not found"}
 

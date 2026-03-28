@@ -45,6 +45,10 @@ router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
 MAX_AUDIO_CLIP_BYTES = 10 * 1024 * 1024
 _NOINDEX_HEADERS = {"X-Robots-Tag": "noindex"}
+_PRIVATE_RESPONSE_HEADERS = {
+    "Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex",
+}
 
 
 class _BusinessNameContext(Protocol):
@@ -342,14 +346,14 @@ async def get_public_quote(
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
 ) -> PublicQuoteResponse:
     """Return unauthenticated public quote data for the landing page."""
-    response.headers.update(_NOINDEX_HEADERS)
+    response.headers.update(_PRIVATE_RESPONSE_HEADERS)
     try:
         quote = await quote_service.get_public_quote(share_token)
     except QuoteServiceError as exc:
         raise HTTPException(
             status_code=exc.status_code,
             detail=exc.detail,
-            headers=_NOINDEX_HEADERS,
+            headers=_PRIVATE_RESPONSE_HEADERS,
         ) from exc
 
     logo_url = str(request.url_for("get_public_quote_logo", share_token=share_token))
