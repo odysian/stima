@@ -1,11 +1,13 @@
+import type { ReactElement } from "react";
+
 import { Button } from "@/shared/components/Button";
 
-export function ErrorFallback(): React.ReactElement {
+export function ErrorFallback(): ReactElement {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 text-on-background">
       <div
         role="alert"
-        className="ghost-shadow w-full max-w-md rounded-xl border border-outline-variant bg-surface-container-lowest p-8 text-center"
+        className="ghost-shadow w-full max-w-md rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-8 text-center"
       >
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-error">
           Something went wrong

@@ -6,15 +6,13 @@ from datetime import date
 from hmac import compare_digest
 from typing import Annotated
 
-import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin.service import AdminService, AdminServiceError, get_admin_service
 from app.core.config import get_settings
-from app.core.database import get_db
-from app.features.event_logs.models import EventLog
+from app.shared.rate_limit import get_ip_key, limiter
 
 router = APIRouter(prefix="/admin")
 _ADMIN_API_KEY_HEADER = APIKeyHeader(name="X-Admin-Key", auto_error=False)
@@ -62,41 +60,31 @@ def require_admin_api_key(
     include_in_schema=False,
     dependencies=[Depends(require_admin_api_key)],
 )
+@limiter.limit("10/minute", key_func=get_ip_key)
 async def get_event_counts(
+    request: Request,
     query: Annotated[AdminEventsQuery, Depends()],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    admin_service: Annotated[AdminService, Depends(get_admin_service)],
 ) -> AdminEventsResponse:
     """Return pilot event counts grouped by event name and UTC day."""
-    if query.start_date > query.end_date:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="start_date must be on or before end_date",
+    del request
+    try:
+        result = await admin_service.get_event_counts(
+            start_date=query.start_date,
+            end_date=query.end_date,
+            event_name=query.event_name,
         )
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    utc_day = sa.cast(sa.func.timezone("UTC", EventLog.created_at), sa.Date)
-    statement = (
-        sa.select(
-            EventLog.event_name,
-            utc_day.label("date"),
-            sa.func.count(EventLog.id).label("event_count"),
-        )
-        .where(utc_day >= query.start_date, utc_day <= query.end_date)
-        .group_by(EventLog.event_name, utc_day)
-        .order_by(utc_day.asc(), EventLog.event_name.asc())
-    )
-    if query.event_name is not None:
-        statement = statement.where(EventLog.event_name == query.event_name)
-
-    rows = (await db.execute(statement)).all()
-    events = [
-        AdminEventCount(
-            event_name=row.event_name,
-            date=row.date,
-            count=row.event_count,
-        )
-        for row in rows
-    ]
     return AdminEventsResponse(
-        events=events,
-        total=sum(event.count for event in events),
+        events=[
+            AdminEventCount(
+                event_name=event.event_name,
+                date=event.date,
+                count=event.count,
+            )
+            for event in result.events
+        ],
+        total=result.total,
     )

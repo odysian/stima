@@ -28,6 +28,7 @@ _PILOT_EVENT_NAMES = frozenset(
         "quote_shared",
         "quote_approved",
         "quote_marked_lost",
+        # Reserved for upcoming callsites in later milestone work.
         "quote_viewed",
         "email_sent",
         "invoice_created",
