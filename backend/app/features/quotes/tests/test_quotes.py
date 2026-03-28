@@ -17,7 +17,7 @@ from app.core.database import get_db
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes import api as quote_api
 from app.features.quotes.extraction_service import ExtractionService
-from app.features.quotes.models import LineItem
+from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
 from app.features.quotes.service import QuoteService
@@ -1001,6 +1001,8 @@ async def test_extract_combined_rate_limit_returns_429(
         ("delete", "/api/quotes/00000000-0000-0000-0000-000000000000", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/pdf", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/share", None),
+        ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/mark-won", None),
+        ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/mark-lost", None),
     ],
 )
 async def test_all_quote_endpoints_require_authentication(
@@ -1152,6 +1154,40 @@ async def test_delete_quote_requires_csrf(client: AsyncClient) -> None:
     quote_id = create_response.json()["id"]
 
     response = await client.delete(f"/api/quotes/{quote_id}")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
+async def test_mark_won_quote_requires_csrf(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    response = await client.post(f"/api/quotes/{quote['id']}/mark-won")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
+async def test_mark_lost_quote_requires_csrf(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    response = await client.post(f"/api/quotes/{quote['id']}/mark-lost")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "CSRF token missing"}
@@ -1456,6 +1492,193 @@ async def test_delete_shared_quote_returns_409(client: AsyncClient) -> None:
     assert delete_response.json() == {"detail": "Shared quotes cannot be deleted"}
 
 
+@pytest.mark.parametrize(
+    ("starting_status", "endpoint", "expected_status", "expected_event"),
+    [
+        (QuoteStatus.SHARED, "mark-won", "approved", "quote_approved"),
+        (QuoteStatus.VIEWED, "mark-won", "approved", "quote_approved"),
+        (QuoteStatus.SHARED, "mark-lost", "declined", "quote_marked_lost"),
+        (QuoteStatus.VIEWED, "mark-lost", "declined", "quote_marked_lost"),
+    ],
+)
+async def test_mark_quote_outcome_updates_status_and_persists_event_log(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    starting_status: QuoteStatus,
+    endpoint: str,
+    expected_status: str,
+    expected_event: str,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    if starting_status is not QuoteStatus.SHARED:
+        await _set_quote_status(db_session, quote_id, starting_status)
+
+    response = await client.post(
+        f"/api/quotes/{quote_id}/{endpoint}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == expected_status
+    assert set(payload) == {
+        "id",
+        "customer_id",
+        "doc_number",
+        "title",
+        "status",
+        "source_type",
+        "transcript",
+        "total_amount",
+        "notes",
+        "shared_at",
+        "share_token",
+        "line_items",
+        "created_at",
+        "updated_at",
+    }
+    assert expected_event in event_logger._PILOT_EVENT_NAMES  # noqa: SLF001
+    assert [event["event"] for event in emitted_events][-1] == expected_event
+
+
+@pytest.mark.parametrize("endpoint", ["mark-won", "mark-lost"])
+@pytest.mark.parametrize("starting_status", [QuoteStatus.DRAFT, QuoteStatus.READY])
+async def test_mark_quote_outcome_returns_409_when_quote_not_shared_yet(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    starting_status: QuoteStatus,
+    endpoint: str,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    if starting_status is QuoteStatus.READY:
+        pdf_response = await client.post(
+            f"/api/quotes/{quote_id}/pdf",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert pdf_response.status_code == 200
+    else:
+        await _set_quote_status(db_session, quote_id, starting_status)
+
+    response = await client.post(
+        f"/api/quotes/{quote_id}/{endpoint}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Quote has not been shared yet"}
+
+
+@pytest.mark.parametrize("endpoint", ["mark-won", "mark-lost"])
+@pytest.mark.parametrize("starting_status", [QuoteStatus.APPROVED, QuoteStatus.DECLINED])
+async def test_mark_quote_outcome_returns_409_when_already_recorded(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    starting_status: QuoteStatus,
+    endpoint: str,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    await _set_quote_status(db_session, quote_id, starting_status)
+
+    response = await client.post(
+        f"/api/quotes/{quote_id}/{endpoint}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Quote outcome has already been recorded"}
+
+
+@pytest.mark.parametrize(
+    "status",
+    [QuoteStatus.VIEWED, QuoteStatus.APPROVED, QuoteStatus.DECLINED],
+)
+async def test_patch_non_editable_quote_statuses_return_409(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    status: QuoteStatus,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    await _set_quote_status(db_session, quote_id, status)
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"notes": "Updated note"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert patch_response.status_code == 409
+    assert patch_response.json() == {"detail": "Shared quotes cannot be edited"}
+
+
+@pytest.mark.parametrize(
+    "status",
+    [QuoteStatus.VIEWED, QuoteStatus.APPROVED, QuoteStatus.DECLINED],
+)
+async def test_delete_non_editable_quote_statuses_return_409(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    status: QuoteStatus,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    await _set_quote_status(db_session, quote_id, status)
+
+    delete_response = await client.delete(
+        f"/api/quotes/{quote_id}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert delete_response.status_code == 409
+    assert delete_response.json() == {"detail": "Shared quotes cannot be deleted"}
+
+
 async def test_create_quote_persists_voice_source_type(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -1508,6 +1731,34 @@ async def _create_customer(
     )
     assert response.status_code == 201
     return response.json()["id"]
+
+
+async def _create_quote(client: AsyncClient, csrf_token: str, customer_id: str) -> dict[str, str]:
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+async def _set_quote_status(
+    db_session: AsyncSession,
+    quote_id: str,
+    status: QuoteStatus,
+) -> None:
+    quote = await db_session.scalar(select(Document).where(Document.id == UUID(quote_id)))
+    assert quote is not None
+    quote.status = status
+    await db_session.commit()
 
 
 def _credentials() -> dict[str, str]:

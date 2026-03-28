@@ -5,15 +5,17 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterator
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import Depends
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.features.auth.service import CSRF_COOKIE_NAME
+from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.service import QuoteService
 from app.integrations.pdf import PdfRenderError
@@ -160,6 +162,37 @@ async def test_generate_pdf_does_not_downgrade_shared_quote(client: AsyncClient)
     assert detail.json()["status"] == "shared"
 
 
+@pytest.mark.parametrize(
+    "status",
+    [QuoteStatus.VIEWED, QuoteStatus.APPROVED, QuoteStatus.DECLINED],
+)
+async def test_generate_pdf_does_not_downgrade_post_share_quote_statuses(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    status: QuoteStatus,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    await _set_quote_status(db_session, quote["id"], status)
+
+    pdf_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert pdf_response.status_code == 200
+
+    detail = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["status"] == status.value
+
+
 async def test_share_sets_status_token_and_timestamp(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -199,6 +232,41 @@ async def test_share_reuses_existing_token_and_updates_timestamp(client: AsyncCl
     second_payload = second_response.json()
     assert second_payload["share_token"] == first_payload["share_token"]
     assert second_payload["shared_at"] != first_payload["shared_at"]
+
+
+@pytest.mark.parametrize(
+    "status",
+    [QuoteStatus.VIEWED, QuoteStatus.APPROVED, QuoteStatus.DECLINED],
+)
+async def test_share_does_not_regress_viewed_or_finalized_quotes(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    status: QuoteStatus,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    await _set_quote_status(db_session, quote["id"], status)
+
+    detail_before = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_before.status_code == 200
+
+    second_share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert second_share_response.status_code == 200
+    payload = second_share_response.json()
+    assert payload["status"] == status.value
+    assert payload["share_token"] == detail_before.json()["share_token"]
+    assert payload["shared_at"] == detail_before.json()["shared_at"]
 
 
 async def test_generate_pdf_returns_422_when_render_fails(
@@ -406,6 +474,17 @@ async def _create_quote(client: AsyncClient, csrf_token: str, customer_id: str) 
     )
     assert response.status_code == 201
     return response.json()
+
+
+async def _set_quote_status(
+    db_session: AsyncSession,
+    quote_id: str,
+    status: QuoteStatus,
+) -> None:
+    quote = await db_session.scalar(select(Document).where(Document.id == UUID(quote_id)))
+    assert quote is not None
+    quote.status = status
+    await db_session.commit()
 
 
 async def _upload_logo(client: AsyncClient, csrf_token: str) -> None:

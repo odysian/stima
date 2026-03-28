@@ -26,6 +26,8 @@ _PILOT_EVENT_NAMES = frozenset(
         "draft_generation_failed",
         "quote_pdf_generated",
         "quote_shared",
+        "quote_approved",
+        "quote_marked_lost",
     }
 )
 _PENDING_EVENT_TASKS: set[asyncio.Task[None]] = set()

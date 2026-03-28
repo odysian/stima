@@ -145,3 +145,62 @@ async def test_log_event_persists_pilot_events_with_metadata(
         "customer_id": str(customer_id),
         "detail": "audio+notes",
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("event_name", ["quote_approved", "quote_marked_lost"])
+async def test_log_event_persists_new_quote_outcome_events(
+    event_name: str,
+) -> None:
+    class _FakeSession:
+        def __init__(self) -> None:
+            self.added: list[EventLog] = []
+            self.committed = False
+
+        def add(self, instance: EventLog) -> None:
+            self.added.append(instance)
+
+        async def commit(self) -> None:
+            self.committed = True
+
+    class _FakeSessionContext:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        async def __aenter__(self) -> _FakeSession:
+            return self._session
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            del exc_type, exc, tb
+
+    class _FakeSessionFactory:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        def __call__(self) -> _FakeSessionContext:
+            return _FakeSessionContext(self._session)
+
+    fake_session = _FakeSession()
+    quote_id = uuid4()
+    customer_id = uuid4()
+    user_id = uuid4()
+    event_logger.configure_event_logging(
+        session_factory=_FakeSessionFactory(fake_session),  # type: ignore[arg-type]
+    )
+
+    event_logger.log_event(
+        event_name,
+        user_id=user_id,
+        quote_id=quote_id,
+        customer_id=customer_id,
+    )
+    await event_logger.flush_event_tasks()
+
+    assert fake_session.committed is True
+    assert len(fake_session.added) == 1
+    assert fake_session.added[0].event_name == event_name
+    assert fake_session.added[0].user_id == user_id
+    assert fake_session.added[0].metadata_json == {
+        "quote_id": str(quote_id),
+        "customer_id": str(customer_id),
+    }

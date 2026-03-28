@@ -112,6 +112,18 @@ function shareQuote(id: string): Promise<Quote> {
   });
 }
 
+function markQuoteWon(id: string): Promise<Quote> {
+  return request<Quote>(`/api/quotes/${id}/mark-won`, {
+    method: "POST",
+  });
+}
+
+function markQuoteLost(id: string): Promise<Quote> {
+  return request<Quote>(`/api/quotes/${id}/mark-lost`, {
+    method: "POST",
+  });
+}
+
 export const quoteService = {
   extract,
   convertNotes,
@@ -123,4 +135,6 @@ export const quoteService = {
   deleteQuote,
   generatePdf,
   shareQuote,
+  markQuoteWon,
+  markQuoteLost,
 };

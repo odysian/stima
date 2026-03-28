@@ -6,7 +6,7 @@ import asyncio
 import base64
 import logging
 from datetime import UTC, datetime
-from typing import Protocol, cast
+from typing import Literal, Protocol, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import inspect as sa_inspect
@@ -30,6 +30,22 @@ from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
 
 LOGGER = logging.getLogger(__name__)
+_NON_EDITABLE_STATUSES = frozenset(
+    {
+        QuoteStatus.SHARED,
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    }
+)
+_TERMINAL_QUOTE_STATUSES = frozenset({QuoteStatus.APPROVED, QuoteStatus.DECLINED})
+_POST_SHARE_NON_REGRESSION_STATUSES = frozenset(
+    {
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    }
+)
 
 
 class QuoteServiceError(Exception):
@@ -65,6 +81,14 @@ class QuoteRepositoryProtocol(Protocol):
     ) -> QuoteRenderContext | None: ...
 
     async def mark_ready_if_not_shared(self, *, quote_id: UUID, user_id: UUID) -> None: ...
+
+    async def set_quote_outcome(
+        self,
+        *,
+        quote_id: UUID,
+        user_id: UUID,
+        status: QuoteStatus,
+    ) -> Document | None: ...
 
     async def create(
         self,
@@ -196,7 +220,7 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status == QuoteStatus.SHARED:
+        if quote.status in _NON_EDITABLE_STATUSES:
             raise QuoteServiceError(
                 detail="Shared quotes cannot be edited",
                 status_code=409,
@@ -230,7 +254,7 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status == QuoteStatus.SHARED:
+        if quote.status in _NON_EDITABLE_STATUSES:
             raise QuoteServiceError(
                 detail="Shared quotes cannot be deleted",
                 status_code=409,
@@ -283,6 +307,8 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        if quote.status in _POST_SHARE_NON_REGRESSION_STATUSES:
+            return quote
 
         if quote.share_token is None:
             quote.share_token = str(uuid4())
@@ -293,6 +319,48 @@ class QuoteService:
         refreshed_quote = await self._repository.refresh(quote)
         log_event(
             "quote_shared",
+            user_id=user_id,
+            quote_id=refreshed_quote.id,
+            customer_id=refreshed_quote.customer_id,
+        )
+        return refreshed_quote
+
+    async def mark_quote_outcome(
+        self,
+        user: User,
+        quote_id: UUID,
+        outcome: Literal["approved", "declined"],
+    ) -> Document:
+        """Record a contractor-confirmed quote outcome for a shared/viewed quote."""
+        user_id = _resolve_user_id(user)
+        quote = await self._repository.get_by_id(quote_id, user_id)
+        if quote is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if quote.status in _TERMINAL_QUOTE_STATUSES:
+            raise QuoteServiceError(
+                detail="Quote outcome has already been recorded",
+                status_code=409,
+            )
+        if quote.status in {QuoteStatus.DRAFT, QuoteStatus.READY}:
+            raise QuoteServiceError(
+                detail="Quote has not been shared yet",
+                status_code=409,
+            )
+
+        next_status = QuoteStatus.APPROVED if outcome == "approved" else QuoteStatus.DECLINED
+        event_name = "quote_approved" if outcome == "approved" else "quote_marked_lost"
+        updated_quote = await self._repository.set_quote_outcome(
+            quote_id=quote_id,
+            user_id=user_id,
+            status=next_status,
+        )
+        if updated_quote is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        await self._repository.commit()
+        refreshed_quote = await self._repository.refresh(updated_quote)
+        log_event(
+            event_name,
             user_id=user_id,
             quote_id=refreshed_quote.id,
             customer_id=refreshed_quote.customer_id,

@@ -256,10 +256,26 @@ class QuoteRepository:
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
-                Document.status != QuoteStatus.SHARED,
+                Document.status == QuoteStatus.DRAFT,
             )
             .values(status=QuoteStatus.READY)
         )
+
+    async def set_quote_outcome(
+        self,
+        *,
+        quote_id: UUID,
+        user_id: UUID,
+        status: QuoteStatus,
+    ) -> Document | None:
+        """Persist an approved/declined outcome for a user-owned quote."""
+        document = await self.get_by_id(quote_id, user_id)
+        if document is None:
+            return None
+
+        document.status = status
+        await self._session.flush()
+        return document
 
     async def create(
         self,
