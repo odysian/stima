@@ -28,3 +28,4 @@ venv/
 *.tfstate
 *.tfstate.backup
 infra/terraform/envs/*.tfvars
+plans/archived/
