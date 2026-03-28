@@ -246,6 +246,21 @@ describe("QuotePreview", () => {
     expect(screen.getByText("http://localhost:3000/doc/share-token-1")).toBeInTheDocument();
   });
 
+  it("keeps the raw PDF open link for viewed quotes without a local blob", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "viewed", share_token: "share-token-1" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
+      "href",
+      "http://localhost:3000/share/share-token-1",
+    );
+    expect(screen.getByText("http://localhost:3000/doc/share-token-1")).toBeInTheDocument();
+  });
+
   it("marks a shared quote as won and refetches the closed state", async () => {
     mockedQuoteService.getQuote
       .mockResolvedValueOnce(makeQuoteDetail({ status: "shared", share_token: "share-token-1" }))

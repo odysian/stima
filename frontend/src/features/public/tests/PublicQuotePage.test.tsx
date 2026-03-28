@@ -105,6 +105,15 @@ describe("PublicQuotePage", () => {
     expect(screen.queryByRole("link", { name: /download pdf/i })).not.toBeInTheDocument();
   });
 
+  it("shows the generic error state when the request fails for another reason", async () => {
+    mockedPublicService.getQuote.mockRejectedValueOnce(new Error("Server exploded"));
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: /we couldn't load this quote/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /download pdf/i })).not.toBeInTheDocument();
+  });
+
   it("falls back cleanly when the public logo request fails", async () => {
     renderScreen();
 

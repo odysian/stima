@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Protocol
 from uuid import UUID
 
 from fastapi import (
@@ -45,6 +45,12 @@ router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
 MAX_AUDIO_CLIP_BYTES = 10 * 1024 * 1024
 _NOINDEX_HEADERS = {"X-Robots-Tag": "noindex"}
+
+
+class _BusinessNameContext(Protocol):
+    business_name: str | None
+    first_name: str | None
+    last_name: str | None
 
 
 async def _parse_upload_clips(clips: list[UploadFile]) -> list[CaptureAudioClip]:
@@ -391,15 +397,12 @@ async def get_public_quote_logo(
     )
 
 
-def _resolve_public_business_name(quote: object) -> str | None:
+def _resolve_public_business_name(quote: _BusinessNameContext) -> str | None:
     """Return the display name shown on the public landing page."""
-    business_name = getattr(quote, "business_name", None)
-    if isinstance(business_name, str) and business_name.strip():
-        return business_name.strip()
+    if quote.business_name and quote.business_name.strip():
+        return quote.business_name.strip()
 
     fallback_name = " ".join(
-        value.strip()
-        for value in (getattr(quote, "first_name", None), getattr(quote, "last_name", None))
-        if isinstance(value, str) and value.strip()
+        value.strip() for value in (quote.first_name, quote.last_name) if value and value.strip()
     )
     return fallback_name or None

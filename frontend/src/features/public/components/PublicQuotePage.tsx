@@ -6,13 +6,9 @@ import {
   publicService,
 } from "@/features/public/services/publicService";
 import type { PublicQuote } from "@/features/public/types/public.types";
+import { formatCurrency } from "@/shared/lib/formatters";
 
 type LoadState = "loading" | "ready" | "invalid" | "error";
-
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
 
 const statusCopy = {
   approved: {
@@ -24,13 +20,6 @@ const statusCopy = {
     className: "border border-warning/20 bg-warning-container text-warning",
   },
 } as const;
-
-function formatCurrency(value: number | null): string {
-  if (value === null) {
-    return "TBD";
-  }
-  return currencyFormatter.format(value);
-}
 
 function getDisplayTitle(quote: PublicQuote | null): string {
   if (!quote) {
@@ -225,7 +214,9 @@ export function PublicQuotePage(): React.ReactElement {
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
                   Total
                 </p>
-                <p className="mt-2 text-lg font-semibold">{formatCurrency(quote.total_amount)}</p>
+                <p className="mt-2 text-lg font-semibold">
+                  {quote.total_amount !== null ? formatCurrency(quote.total_amount) : "TBD"}
+                </p>
               </div>
             </section>
 
@@ -252,7 +243,7 @@ export function PublicQuotePage(): React.ReactElement {
                         ) : null}
                       </div>
                       <p className="shrink-0 text-sm font-semibold">
-                        {formatCurrency(item.price)}
+                        {item.price !== null ? formatCurrency(item.price) : "TBD"}
                       </p>
                     </div>
                   </li>
