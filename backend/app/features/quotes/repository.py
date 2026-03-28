@@ -17,6 +17,13 @@ from app.features.customers.models import Customer
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.schemas import LineItemDraft
 
+_PUBLIC_QUOTE_STATUSES = (
+    QuoteStatus.SHARED,
+    QuoteStatus.VIEWED,
+    QuoteStatus.APPROVED,
+    QuoteStatus.DECLINED,
+)
+
 
 @dataclass(slots=True)
 class QuoteRenderLineItem:
@@ -31,6 +38,9 @@ class QuoteRenderLineItem:
 class QuoteRenderContext:
     """Template context loaded in one repository call for PDF rendering."""
 
+    quote_id: UUID
+    user_id: UUID
+    customer_id: UUID
     business_name: str | None
     first_name: str | None
     last_name: str | None
@@ -93,6 +103,15 @@ class QuoteDetailRow:
     line_items: list[LineItem]
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(slots=True)
+class QuoteViewTransition:
+    """Identifiers needed when the first public view updates quote status."""
+
+    quote_id: UUID
+    user_id: UUID
+    customer_id: UUID
 
 
 class QuoteRepository:
@@ -239,7 +258,10 @@ class QuoteRepository:
             select(Document, Customer, User)
             .join(Customer, Customer.id == Document.customer_id)
             .join(User, User.id == Document.user_id)
-            .where(Document.share_token == share_token)
+            .where(
+                Document.share_token == share_token,
+                Document.status.in_(_PUBLIC_QUOTE_STATUSES),
+            )
             .options(selectinload(Document.line_items))
         )
         row = result.one_or_none()
@@ -248,6 +270,29 @@ class QuoteRepository:
 
         document, customer, user = row
         return _build_render_context(document=document, customer=customer, user=user)
+
+    async def transition_to_viewed_by_share_token(
+        self, share_token: str
+    ) -> QuoteViewTransition | None:
+        """Mark a shared quote as viewed once and return ids when the write occurred."""
+        row = await self._session.execute(
+            update(Document)
+            .where(
+                Document.share_token == share_token,
+                Document.status == QuoteStatus.SHARED,
+            )
+            .values(status=QuoteStatus.VIEWED)
+            .returning(Document.id, Document.user_id, Document.customer_id)
+        )
+        updated_row = row.one_or_none()
+        if updated_row is None:
+            return None
+
+        return QuoteViewTransition(
+            quote_id=updated_row.id,
+            user_id=updated_row.user_id,
+            customer_id=updated_row.customer_id,
+        )
 
     async def mark_ready_if_not_shared(self, *, quote_id: UUID, user_id: UUID) -> None:
         """Transition quote status to ready unless the quote is already shared."""
@@ -410,6 +455,9 @@ def _build_render_context(
     user: User,
 ) -> QuoteRenderContext:
     return QuoteRenderContext(
+        quote_id=document.id,
+        user_id=document.user_id,
+        customer_id=document.customer_id,
         business_name=user.business_name,
         first_name=user.first_name,
         last_name=user.last_name,

@@ -91,6 +91,16 @@ class LineItemResponse(BaseModel):
     sort_order: int
 
 
+class PublicLineItemResponse(BaseModel):
+    """Serializable public line-item payload used by quote landing pages."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    description: str
+    details: str | None
+    price: float | None
+
+
 class QuoteListItemResponse(BaseModel):
     """Serializable quote summary payload returned by the quote list endpoint."""
 
@@ -134,3 +144,19 @@ class QuoteDetailResponse(QuoteResponse):
     customer_name: str
     customer_email: str | None
     customer_phone: str | None
+
+
+class PublicQuoteResponse(BaseModel):
+    """Serializable unauthenticated quote payload for the public landing page."""
+
+    business_name: str | None
+    customer_name: str
+    doc_number: str
+    title: str | None
+    status: str
+    total_amount: float | None
+    notes: str | None
+    issued_date: str
+    logo_url: str
+    download_url: str
+    line_items: list[PublicLineItemResponse]

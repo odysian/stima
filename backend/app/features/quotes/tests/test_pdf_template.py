@@ -31,6 +31,9 @@ def _make_context(
 ) -> QuoteRenderContext:
     created_at = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
     return QuoteRenderContext(
+        quote_id=uuid4(),
+        user_id=uuid4(),
+        customer_id=uuid4(),
         business_name="Acme Landscaping",
         first_name="Taylor",
         last_name="Owner",

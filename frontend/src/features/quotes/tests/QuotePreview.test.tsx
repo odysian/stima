@@ -243,6 +243,22 @@ describe("QuotePreview", () => {
       "http://localhost:3000/share/share-token-1",
     );
     expect(screen.getByText("Copy Share Link")).toBeInTheDocument();
+    expect(screen.getByText("http://localhost:3000/doc/share-token-1")).toBeInTheDocument();
+  });
+
+  it("keeps the raw PDF open link for viewed quotes without a local blob", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "viewed", share_token: "share-token-1" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
+      "href",
+      "http://localhost:3000/share/share-token-1",
+    );
+    expect(screen.getByText("http://localhost:3000/doc/share-token-1")).toBeInTheDocument();
   });
 
   it("marks a shared quote as won and refetches the closed state", async () => {
@@ -464,7 +480,7 @@ describe("QuotePreview", () => {
       expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
       expect(shareMock).toHaveBeenCalledWith({
         title: "Quote Q-001",
-        url: "http://localhost:3000/share/share-token-1",
+        url: "http://localhost:3000/doc/share-token-1",
       });
     });
   });
@@ -521,7 +537,7 @@ describe("QuotePreview", () => {
 
     await waitFor(() => {
       expect(writeTextMock).toHaveBeenCalledWith(
-        "http://localhost:3000/share/share-token-1",
+        "http://localhost:3000/doc/share-token-1",
       );
     });
     expect(await screen.findByText(/copied to clipboard/i)).toBeInTheDocument();
@@ -577,7 +593,7 @@ describe("QuotePreview", () => {
     });
     expect(screen.queryByText("Share canceled")).not.toBeInTheDocument();
     expect(screen.getByText("Quote shared")).toBeInTheDocument();
-    expect(await screen.findByText(/share\/share-token-1/i)).toBeInTheDocument();
+    expect(await screen.findByText(/doc\/share-token-1/i)).toBeInTheDocument();
   });
 
   it("copies existing share URL from the client card row", async () => {
@@ -593,13 +609,13 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    const shareLinkRow = (await screen.findByText(/share\/already-shared-token/i)).closest("section");
+    const shareLinkRow = (await screen.findByText(/doc\/already-shared-token/i)).closest("section");
     expect(shareLinkRow).not.toBeNull();
     fireEvent.click(within(shareLinkRow as HTMLElement).getByRole("button", { name: /copy share link/i }));
 
     await waitFor(() => {
       expect(writeTextMock).toHaveBeenCalledWith(
-        "http://localhost:3000/share/already-shared-token",
+        "http://localhost:3000/doc/already-shared-token",
       );
     });
     expect(await screen.findByText("Share link copied to clipboard.")).toBeInTheDocument();
@@ -612,7 +628,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    const shareLinkRow = (await screen.findByText(/share\/already-shared-token/i)).closest("section");
+    const shareLinkRow = (await screen.findByText(/doc\/already-shared-token/i)).closest("section");
     expect(shareLinkRow).not.toBeNull();
     fireEvent.click(within(shareLinkRow as HTMLElement).getByRole("button", { name: /copy share link/i }));
 
@@ -633,7 +649,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    const shareLinkRow = (await screen.findByText(/share\/already-shared-token/i)).closest("section");
+    const shareLinkRow = (await screen.findByText(/doc\/already-shared-token/i)).closest("section");
     expect(shareLinkRow).not.toBeNull();
     fireEvent.click(within(shareLinkRow as HTMLElement).getByRole("button", { name: /copy share link/i }));
 

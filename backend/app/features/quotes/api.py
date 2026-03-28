@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Protocol
 from uuid import UUID
 
 from fastapi import (
@@ -13,6 +13,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
     status,
 )
@@ -23,6 +24,8 @@ from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionS
 from app.features.quotes.schemas import (
     ConvertNotesRequest,
     ExtractionResult,
+    PublicLineItemResponse,
+    PublicQuoteResponse,
     QuoteCreateRequest,
     QuoteDetailResponse,
     QuoteListItemResponse,
@@ -41,6 +44,17 @@ from app.shared.rate_limit import get_ip_key, limiter
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
 MAX_AUDIO_CLIP_BYTES = 10 * 1024 * 1024
+_NOINDEX_HEADERS = {"X-Robots-Tag": "noindex"}
+_PRIVATE_RESPONSE_HEADERS = {
+    "Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex",
+}
+
+
+class _BusinessNameContext(Protocol):
+    business_name: str | None
+    first_name: str | None
+    last_name: str | None
 
 
 async def _parse_upload_clips(clips: list[UploadFile]) -> list[CaptureAudioClip]:
@@ -307,7 +321,11 @@ async def get_shared_quote_pdf(
     try:
         doc_number, pdf_bytes = await quote_service.generate_shared_pdf(share_token)
     except QuoteServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+            headers=_NOINDEX_HEADERS,
+        ) from exc
 
     return StreamingResponse(
         iter((pdf_bytes,)),
@@ -318,3 +336,77 @@ async def get_shared_quote_pdf(
             "X-Robots-Tag": "noindex",
         },
     )
+
+
+@public_router.get("/api/public/doc/{share_token}", response_model=PublicQuoteResponse)
+async def get_public_quote(
+    share_token: str,
+    request: Request,
+    response: Response,
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> PublicQuoteResponse:
+    """Return unauthenticated public quote data for the landing page."""
+    response.headers.update(_PRIVATE_RESPONSE_HEADERS)
+    try:
+        quote = await quote_service.get_public_quote(share_token)
+    except QuoteServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+            headers=_PRIVATE_RESPONSE_HEADERS,
+        ) from exc
+
+    logo_url = str(request.url_for("get_public_quote_logo", share_token=share_token))
+    download_url = str(request.url_for("get_shared_quote_pdf", share_token=share_token))
+    return PublicQuoteResponse(
+        business_name=_resolve_public_business_name(quote),
+        customer_name=quote.customer_name,
+        doc_number=quote.doc_number,
+        title=quote.title,
+        status=quote.status,
+        total_amount=float(quote.total_amount) if quote.total_amount is not None else None,
+        notes=quote.notes,
+        issued_date=quote.issued_date,
+        logo_url=logo_url,
+        download_url=download_url,
+        line_items=[
+            PublicLineItemResponse.model_validate(item, from_attributes=True)
+            for item in quote.line_items
+        ],
+    )
+
+
+@public_router.get("/api/public/doc/{share_token}/logo")
+async def get_public_quote_logo(
+    share_token: str,
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> Response:
+    """Proxy public quote logo bytes without exposing storage paths."""
+    try:
+        logo_bytes, content_type = await quote_service.get_public_logo(share_token)
+    except QuoteServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+            headers=_NOINDEX_HEADERS,
+        ) from exc
+
+    return Response(
+        content=logo_bytes,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "public, max-age=300",
+            "X-Robots-Tag": "noindex",
+        },
+    )
+
+
+def _resolve_public_business_name(quote: _BusinessNameContext) -> str | None:
+    """Return the display name shown on the public landing page."""
+    if quote.business_name and quote.business_name.strip():
+        return quote.business_name.strip()
+
+    fallback_name = " ".join(
+        value.strip() for value in (quote.first_name, quote.last_name) if value and value.strip()
+    )
+    return fallback_name or None

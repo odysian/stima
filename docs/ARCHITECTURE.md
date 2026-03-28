@@ -218,6 +218,20 @@ Rules:
 | `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
 | `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
 
+### Public quote landing endpoints
+
+| Endpoint | Method | Auth | Response |
+|---|---|---|---|
+| `/api/public/doc/{share_token}` | GET | no | `200 PublicQuoteResponse` with `logo_url` and `download_url`, `404 { detail: "Not found" }` for unknown or non-public tokens |
+| `/api/public/doc/{share_token}/logo` | GET | no | raw image bytes with correct `Content-Type`, `Cache-Control: public, max-age=300`, `404 { detail: "Logo not found" }`, or `500 { detail: "Unable to load logo" }` |
+| `/share/{share_token}` | GET | no | raw PDF bytes with `Content-Type: application/pdf`, `Cache-Control: no-store`, and `X-Robots-Tag: noindex` |
+
+Public landing-page rules:
+- contractor share/copy actions hand out the frontend route `/doc/{share_token}` instead of the raw PDF URL
+- first public load of a `shared` quote transitions it to `viewed` and logs exactly one `quote_viewed` event
+- repeat public loads of `viewed`, `approved`, and `declined` quotes are read-only and do not create duplicate `quote_viewed` events
+- public JSON, logo, and PDF responses send `X-Robots-Tag: noindex`
+
 `PATCH /quotes/{id}` behavior:
 - If `title` is present, blank or whitespace-only values are normalized to `null`.
 - If `title` is omitted, the existing title is preserved.
