@@ -71,6 +71,22 @@ describe("QuotePreviewActions", () => {
     },
   );
 
+  it("falls back to the shared PDF link when a closed quote has no local blob URL", () => {
+    render(
+      <QuotePreviewActions
+        {...makeProps({
+          actionState: "approved",
+          openPdfUrl: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
+      "href",
+      "http://localhost:3000/share/share-token-1",
+    );
+  });
+
   it("shows in-flight won state and disables outcome actions", () => {
     render(
       <QuotePreviewActions

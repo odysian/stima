@@ -1618,6 +1618,42 @@ async def test_mark_quote_outcome_returns_409_when_already_recorded(
     assert response.json() == {"detail": "Quote outcome has already been recorded"}
 
 
+async def test_mark_quote_outcome_returns_409_when_atomic_write_loses_race(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _lose_race(
+        self: QuoteRepository,
+        *,
+        quote_id: UUID,
+        user_id: UUID,
+        status: QuoteStatus,
+        allowed_current_statuses: tuple[QuoteStatus, ...],
+    ) -> Document | None:
+        del self, quote_id, user_id, status, allowed_current_statuses
+        return None
+
+    monkeypatch.setattr(QuoteRepository, "set_quote_outcome", _lose_race)
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    response = await client.post(
+        f"/api/quotes/{quote_id}/mark-won",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Quote outcome has already been recorded"}
+
+
 @pytest.mark.parametrize(
     "status",
     [QuoteStatus.VIEWED, QuoteStatus.APPROVED, QuoteStatus.DECLINED],

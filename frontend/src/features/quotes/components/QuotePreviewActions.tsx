@@ -62,14 +62,15 @@ export function QuotePreviewActions({
   const secondaryLinkClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-4 text-center font-semibold text-on-surface transition-all active:scale-[0.98]";
   const secondaryButtonClasses = "w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest py-4 font-semibold text-on-surface-variant transition-all disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]";
   const isOutcomeInFlight = isMarkingWon || isMarkingLost;
+  const openPdfHref = openPdfUrl ?? shareUrl;
 
   function renderOpenPdfAction(asPrimary: boolean): React.ReactElement {
     const className = asPrimary ? primaryLinkClasses : secondaryLinkClasses;
 
-    if (openPdfUrl) {
+    if (openPdfHref) {
       return (
         <a
-          href={openPdfUrl}
+          href={openPdfHref}
           target="_blank"
           rel="noopener noreferrer"
           className={className}

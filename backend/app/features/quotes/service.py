@@ -88,6 +88,7 @@ class QuoteRepositoryProtocol(Protocol):
         quote_id: UUID,
         user_id: UUID,
         status: QuoteStatus,
+        allowed_current_statuses: tuple[QuoteStatus, ...],
     ) -> Document | None: ...
 
     async def create(
@@ -353,9 +354,13 @@ class QuoteService:
             quote_id=quote_id,
             user_id=user_id,
             status=next_status,
+            allowed_current_statuses=(QuoteStatus.SHARED, QuoteStatus.VIEWED),
         )
         if updated_quote is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
+            raise QuoteServiceError(
+                detail="Quote outcome has already been recorded",
+                status_code=409,
+            )
 
         await self._repository.commit()
         refreshed_quote = await self._repository.refresh(updated_quote)
