@@ -17,6 +17,8 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     deleteQuote: vi.fn(),
     generatePdf: vi.fn(),
     shareQuote: vi.fn(),
+    markQuoteWon: vi.fn(),
+    markQuoteLost: vi.fn(),
   },
 }));
 
@@ -112,6 +114,12 @@ beforeEach(() => {
   );
   mockedQuoteService.deleteQuote.mockResolvedValue(undefined);
   mockedQuoteService.shareQuote.mockResolvedValue(makeQuoteResponse());
+  mockedQuoteService.markQuoteWon.mockResolvedValue(
+    makeQuoteResponse({ status: "approved" }),
+  );
+  mockedQuoteService.markQuoteLost.mockResolvedValue(
+    makeQuoteResponse({ status: "declined" }),
+  );
   createObjectUrlMock.mockReturnValue("blob:quote-preview");
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
@@ -136,7 +144,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 });
 
 describe("QuotePreview", () => {
@@ -168,6 +176,21 @@ describe("QuotePreview", () => {
     expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /delete quote/i })).not.toBeInTheDocument();
   });
+
+  it.each(["viewed", "approved", "declined"] as const)(
+    "hides edit and delete actions when the quote is %s",
+    async (status) => {
+      mockedQuoteService.getQuote.mockResolvedValueOnce(
+        makeQuoteDetail({ status, share_token: "share-token-1" }),
+      );
+
+      renderScreen();
+
+      await screen.findByRole("heading", { name: "Test Customer" });
+      expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /delete quote/i })).not.toBeInTheDocument();
+    },
+  );
 
   it("shows the delete button when the quote is ready", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
@@ -206,7 +229,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText("Q-001")).toBeInTheDocument();
   });
 
-  it("shows a disabled open-pdf primary action for shared quotes without a local blob", async () => {
+  it("falls back to the shared PDF link for shared quotes without a local blob", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({ status: "shared", share_token: "share-token-1" }),
     );
@@ -214,10 +237,71 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    const openPdfButton = screen.getByRole("button", { name: /open pdf/i });
-    expect(openPdfButton).toBeDisabled();
+    const openPdfLink = screen.getByRole("link", { name: /open pdf/i });
+    expect(openPdfLink).toHaveAttribute(
+      "href",
+      "http://localhost:3000/share/share-token-1",
+    );
     expect(screen.getByText("Copy Share Link")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /open pdf/i })).not.toBeInTheDocument();
+  });
+
+  it("marks a shared quote as won and refetches the closed state", async () => {
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(makeQuoteDetail({ status: "shared", share_token: "share-token-1" }))
+      .mockResolvedValueOnce(
+        makeQuoteDetail({ status: "approved", share_token: "share-token-1" }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    fireEvent.click(screen.getByRole("button", { name: /mark as won/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.markQuoteWon).toHaveBeenCalledWith("quote-1");
+    });
+    await waitFor(() => {
+      expect(mockedQuoteService.getQuote).toHaveBeenCalledTimes(2);
+    });
+
+    expect(await screen.findByText("Quote approved")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mark as won/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mark as lost/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/share\/share-token-1/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the lost confirmation modal and refetches the declined state after confirmation", async () => {
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(makeQuoteDetail({ status: "shared", share_token: "share-token-1" }))
+      .mockResolvedValueOnce(
+        makeQuoteDetail({ status: "declined", share_token: "share-token-1" }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    fireEvent.click(screen.getByRole("button", { name: /mark as lost/i }));
+
+    const dialog = screen.getByRole("dialog", { name: /mark quote as lost\?/i });
+    expect(
+      within(dialog).getByText(
+        "This records the quote as lost. You can still view the quote and its PDF.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /mark as lost/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.markQuoteLost).toHaveBeenCalledWith("quote-1");
+    });
+    await waitFor(() => {
+      expect(mockedQuoteService.getQuote).toHaveBeenCalledTimes(2);
+    });
+
+    expect(await screen.findByText("Quote declined")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mark as won/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mark as lost/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/share\/share-token-1/i)).not.toBeInTheDocument();
   });
 
   it("navigates to the edit route from the preview action area", async () => {
@@ -503,8 +587,8 @@ describe("QuotePreview", () => {
       writable: true,
       value: { writeText: writeTextMock },
     });
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ share_token: "already-shared-token" }),
+    mockedQuoteService.getQuote.mockResolvedValue(
+      makeQuoteDetail({ status: "shared", share_token: "already-shared-token" }),
     );
 
     renderScreen();
@@ -522,8 +606,8 @@ describe("QuotePreview", () => {
   });
 
   it("shows manual-copy guidance when clipboard API is unavailable", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ share_token: "already-shared-token" }),
+    mockedQuoteService.getQuote.mockResolvedValue(
+      makeQuoteDetail({ status: "shared", share_token: "already-shared-token" }),
     );
 
     renderScreen();
@@ -543,8 +627,8 @@ describe("QuotePreview", () => {
         writeText: vi.fn().mockRejectedValue(new Error("Clipboard denied")),
       },
     });
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ share_token: "already-shared-token" }),
+    mockedQuoteService.getQuote.mockResolvedValue(
+      makeQuoteDetail({ status: "shared", share_token: "already-shared-token" }),
     );
 
     renderScreen();

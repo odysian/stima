@@ -36,11 +36,13 @@ Stima without leaving the app or copy-pasting links.
 - Quote status that reflects real outcomes
 - Lightweight invoice generation from an approved quote
 - Logo and branding on PDFs
+- Sales tax, discounts, and deposits on quotes and invoices (display-only)
 - Operational visibility (error monitoring, basic analytics)
 
 **V1 is not:**
 - Payment collection or processing
 - Full invoice management or accounts receivable
+- Per-line-item tax rates or automatic tax jurisdiction lookup
 - Line item templates or service catalogs (V2)
 - Photo documentation or customer notes (V2)
 - Subscription billing (V3)
@@ -375,6 +377,46 @@ been removed from V1 scope.
 
 ---
 
+### Milestone 7: Taxes, Discounts, and Deposits
+
+**Goal:** Quotes and invoices support the pricing controls contractors need before
+Stima can justify a paid tier — sales tax, a discount line, and a deposit line.
+
+**Pulled forward from V2:** This was originally scoped as V2 Track 1. Moved into V1
+Phase 3 because a contractor cannot be charged for a tool that does not handle sales
+tax on invoices.
+
+**Scope:**
+- Sales tax: percentage-based, optional, per-quote/invoice toggle. User sets a default
+  tax rate in Settings; individual quotes can override or disable.
+- Discount: fixed dollar or percentage, optional per quote/invoice.
+- Deposit required: fixed dollar amount, displayed as a line in the total section.
+- All three are display-only — Stima does not process payments. The deposit line tells
+  the customer what is due upfront; collection happens outside the app.
+- Total section on PDF and landing page renders conditionally based on which fields are
+  populated.
+
+**Out of scope:**
+- Per-line-item tax rates
+- Tax jurisdiction lookup or automatic tax calculation
+- Deposit payment tracking
+- Discount codes or promotional pricing
+
+**Depends on:** Milestone 5 (invoices must exist before taxes apply to them).
+
+**Acceptance criteria:**
+- Contractor can set a default tax rate in Settings
+- Individual quotes/invoices can override or disable tax
+- Discount (fixed or percentage) can be added per quote/invoice
+- Deposit amount can be specified per quote/invoice
+- PDF total section renders subtotal, discount, tax, deposit, and grand total
+  conditionally (only populated fields appear)
+- Landing page total section matches PDF rendering
+- Existing quotes/invoices without tax/discount/deposit are unaffected
+- All three fields are optional — no gate on existing workflows
+
+---
+
 ## Pre-V1 Polish
 
 Small, focused improvements to existing screens that should land before the V1 milestones
@@ -421,7 +463,16 @@ required — blank is fine.
 
 ---
 
-## Suggested Build Order
+## Build Order
+
+V1 is organized into three shipping phases. Each phase has a ship gate — deploy, get
+real user feedback, and validate assumptions before starting the next phase.
+
+### Phase 1: Professional Delivery
+
+Ship → get real user feedback. This is the first point where real landscapers can use the
+product end-to-end with professional output and outcome tracking. Feedback from this phase
+informs whether Phase 2 priorities are correct.
 
 1. Pre-V1 Polish — Customer detail layout + quote title field (cleans up the base before
    building on top of it)
@@ -430,9 +481,25 @@ required — blank is fine.
 4. Milestone 6 — Operational visibility (Sentry setup must ship before any public URL
    exists — the first public-facing endpoint is M2, so monitoring comes first)
 5. Milestone 2 — Public landing page (the core V1 experience)
+
+### Phase 2: Delivery Loop
+
+Ship → the product is useful for daily quoting work. Completes the zero-friction quoting
+loop: create, send, track, follow up.
+
 6. Milestone 3 — Email delivery (makes the landing page reachable without copy-paste)
 7. Milestone 4 — Reminder workflow (builds on delivery + status)
-8. Milestone 5 — Invoice conversion (completes the quoting-to-invoice loop)
+
+### Phase 3: Revenue Path
+
+Ship → the product is complete enough to charge for. This is the minimum feature set
+required before introducing a paid tier. A contractor cannot be charged for a tool that
+does not let them invoice won quotes or add sales tax.
+
+8. Milestone 5 — Invoice conversion (core conversion + PDF + copy-link; landing page and
+   email delivery for invoices follow as a fast follow)
+9. Milestone 7 — Taxes, discounts, and deposits (pulled forward from V2 — required before
+   paid tier)
 
 ---
 
@@ -460,6 +527,7 @@ Once V1 is complete, the following should be treated as stable:
 - Contractor outcome endpoints: `POST /api/quotes/:id/mark-won` and `POST /api/quotes/:id/mark-lost`
 - Invoice doc type and `I-001` numbering format
 - `source_document_id` on `documents` as the quote→invoice link
+- Tax, discount, and deposit fields on `documents` and their conditional PDF/landing page rendering
 - Canonical event log names for all V1 user actions
 
 ---

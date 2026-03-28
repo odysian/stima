@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
+import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
 import { ShareLinkRow } from "@/features/quotes/components/ShareLinkRow";
+import { QuoteStatusSummaryCard } from "@/features/quotes/components/QuoteStatusSummaryCard";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail, QuoteStatus } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -11,10 +13,18 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-import { formatCurrency } from "@/shared/lib/formatters";
 
 type QuotePreviewCardState = QuoteStatus;
-type QuotePreviewActionState = "draft" | "ready" | "shared";
+type QuotePreviewActionState = QuoteStatus;
+
+const CLOSED_QUOTE_STATUSES = new Set<QuoteStatus>([
+  "shared",
+  "viewed",
+  "approved",
+  "declined",
+]);
+
+const SHAREABLE_QUOTE_STATUSES = new Set<QuoteStatus>(["shared", "viewed"]);
 
 function isShareAbortError(error: unknown): boolean {
   return (
@@ -35,47 +45,6 @@ function readOptionalQuoteText(
   return trimmedValue.length > 0 ? trimmedValue : null;
 }
 
-function getStatusCardCopy(
-  cardState: QuotePreviewCardState,
-  hasLocalPdf: boolean,
-): {
-  label: string;
-  title: string;
-  description: string;
-  icon: string;
-  iconClasses: string;
-} {
-  if (cardState === "shared") {
-    return {
-      label: "SHARE STATUS",
-      title: "Quote shared",
-      description: "Use the link below to copy or resend the quote.",
-      icon: "ios_share",
-      iconClasses: "bg-info-container text-info",
-    };
-  }
-
-  if (cardState === "ready") {
-    return {
-      label: "PDF STATUS",
-      title: "PDF ready",
-      description: hasLocalPdf
-        ? "Open the PDF or share the quote link with your customer."
-        : "Generate the PDF on this device to open it or share it with your customer.",
-      icon: "description",
-      iconClasses: "bg-success-container text-success",
-    };
-  }
-
-  return {
-    label: "PDF STATUS",
-    title: "PDF not generated",
-    description: "Generate the quote PDF to open it or share it with your customer.",
-    icon: "description",
-    iconClasses: "bg-surface-container-high text-on-surface-variant",
-  };
-}
-
 export function QuotePreview(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -88,9 +57,13 @@ export function QuotePreview(): React.ReactElement {
   const [isSharing, setIsSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [isMarkingWon, setIsMarkingWon] = useState(false);
+  const [isMarkingLost, setIsMarkingLost] = useState(false);
+  const [outcomeError, setOutcomeError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showMarkLostConfirm, setShowMarkLostConfirm] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -125,20 +98,27 @@ export function QuotePreview(): React.ReactElement {
   const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
   const shareUrl = quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null;
   const hasLocalPdf = Boolean(pdfUrl);
+  const isShareableStatus = quote ? SHAREABLE_QUOTE_STATUSES.has(quote.status) : false;
+  const isClosedStatus = quote ? CLOSED_QUOTE_STATUSES.has(quote.status) : false;
   const cardState: QuotePreviewCardState = quote?.status === "shared"
-    ? "shared"
+    || quote?.status === "viewed"
+    || quote?.status === "approved"
+    || quote?.status === "declined"
+    ? quote.status
     : quote?.status === "ready" || hasLocalPdf
       ? "ready"
       : "draft";
   const actionState: QuotePreviewActionState = quote?.status === "shared"
-    ? "shared"
+    || quote?.status === "viewed"
+    || quote?.status === "approved"
+    || quote?.status === "declined"
+    ? quote.status
     : canShare
       ? "ready"
       : "draft";
   // Card messaging follows persisted quote status, while actions depend on whether
   // this device has a locally generated PDF blob available right now.
   const openPdfUrl = pdfUrl;
-  const statusCardCopy = getStatusCardCopy(cardState, hasLocalPdf);
   const quoteTitle = readOptionalQuoteText(quote, "title");
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
@@ -165,7 +145,15 @@ export function QuotePreview(): React.ReactElement {
         return nextPdfUrl;
       });
       setQuote((currentQuote) => {
-        if (!currentQuote || currentQuote.status === "shared") return currentQuote;
+        if (
+          !currentQuote
+          || currentQuote.status === "shared"
+          || currentQuote.status === "viewed"
+          || currentQuote.status === "approved"
+          || currentQuote.status === "declined"
+        ) {
+          return currentQuote;
+        }
         return { ...currentQuote, status: "ready" };
       });
     } catch (error) {
@@ -227,6 +215,11 @@ export function QuotePreview(): React.ReactElement {
     }
   }
 
+  async function refetchQuote(quoteId: string): Promise<void> {
+    const refreshedQuote = await quoteService.getQuote(quoteId);
+    setQuote(refreshedQuote);
+  }
+
   async function copyToClipboard(): Promise<void> {
     if (!shareUrl) {
       return;
@@ -244,6 +237,47 @@ export function QuotePreview(): React.ReactElement {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to copy share link";
       setShareError(message);
+    }
+  }
+
+  async function onMarkWon(): Promise<void> {
+    if (!id || !quote) {
+      return;
+    }
+
+    setOutcomeError(null);
+    setShareError(null);
+    setShareMessage(null);
+    setIsMarkingWon(true);
+    try {
+      await quoteService.markQuoteWon(id);
+      await refetchQuote(id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to mark quote as won";
+      setOutcomeError(message);
+    } finally {
+      setIsMarkingWon(false);
+    }
+  }
+
+  async function onConfirmMarkLost(): Promise<void> {
+    if (!id || !quote) {
+      return;
+    }
+
+    setOutcomeError(null);
+    setShareError(null);
+    setShareMessage(null);
+    setShowMarkLostConfirm(false);
+    setIsMarkingLost(true);
+    try {
+      await quoteService.markQuoteLost(id);
+      await refetchQuote(id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to mark quote as lost";
+      setOutcomeError(message);
+    } finally {
+      setIsMarkingLost(false);
     }
   }
 
@@ -287,29 +321,11 @@ export function QuotePreview(): React.ReactElement {
         {!isLoadingQuote && !loadError ? (
           <>
             {quote && cardState !== "draft" ? (
-              <section className="mx-4 mt-4 rounded-xl bg-surface-container-low p-3">
-                <div className="ghost-shadow rounded-xl bg-surface-container-lowest p-5">
-                  <div className="flex items-start gap-4">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${statusCardCopy.iconClasses}`}>
-                      <span className="material-symbols-outlined text-2xl">{statusCardCopy.icon}</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                          {statusCardCopy.label}
-                        </p>
-                        <StatusBadge variant={quote.status} />
-                      </div>
-                      <h2 className="mt-3 font-headline text-2xl font-bold tracking-tight text-on-surface">
-                        {statusCardCopy.title}
-                      </h2>
-                      <p className="mt-2 text-sm text-on-surface-variant">
-                        {statusCardCopy.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </section>
+              <QuoteStatusSummaryCard
+                cardState={cardState}
+                hasLocalPdf={hasLocalPdf}
+                statusVariant={quote.status}
+              />
             ) : null}
 
             <QuotePreviewActions
@@ -317,50 +333,28 @@ export function QuotePreview(): React.ReactElement {
               onGeneratePdf={onGeneratePdf}
               onShare={onShare}
               onCopyShareLink={copyToClipboard}
+              onMarkWon={onMarkWon}
+              onRequestMarkLost={() => setShowMarkLostConfirm(true)}
               openPdfUrl={openPdfUrl}
               shareUrl={shareUrl}
               isGeneratingPdf={isGeneratingPdf}
               isSharing={isSharing}
+              isMarkingWon={isMarkingWon}
+              isMarkingLost={isMarkingLost}
               disabled={isLoadingQuote || !!loadError}
               pdfError={pdfError}
               shareError={shareError}
+              outcomeError={outcomeError}
               shareMessage={shareMessage}
             />
 
-            {shareUrl ? <ShareLinkRow shareUrl={shareUrl} onCopy={copyToClipboard} /> : null}
-            {quote ? <QuoteDetailsCard totalAmount={quote.total_amount} clientName={clientName} clientContact={clientContact} /> : null}
-            {quote ? (
-              <section className="mx-4 mt-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                    LINE ITEMS
-                  </h2>
-                  <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                    {quote.line_items.length} ITEMS
-                  </span>
-                </div>
-                <ul className="space-y-2">
-                  {quote.line_items.map((item) => (
-                    <li
-                      key={item.id}
-                      className="ghost-shadow flex items-start justify-between rounded-lg bg-surface-container-lowest p-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-on-surface">{item.description}</p>
-                        {item.details ? (
-                          <p className="mt-1 text-sm text-on-surface-variant">{item.details}</p>
-                        ) : null}
-                      </div>
-                      <p className="ml-4 shrink-0 font-bold text-on-surface">
-                        {item.price !== null ? formatCurrency(item.price) : "TBD"}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+            {shareUrl && isShareableStatus ? (
+              <ShareLinkRow shareUrl={shareUrl} onCopy={copyToClipboard} />
             ) : null}
+            {quote ? <QuoteDetailsCard totalAmount={quote.total_amount} clientName={clientName} clientContact={clientContact} /> : null}
+            {quote ? <QuoteLineItemsSection lineItems={quote.line_items} /> : null}
 
-            {quote && id && quote.status !== "shared" ? (
+            {quote && id && !isClosedStatus ? (
               <div className="mt-3 px-4">
                 <button
                   type="button"
@@ -372,7 +366,7 @@ export function QuotePreview(): React.ReactElement {
               </div>
             ) : null}
 
-            {quote && quote.status !== "shared" ? (
+            {quote && !isClosedStatus ? (
               <div className="mt-3 px-4">
                 <button
                   type="button"
@@ -402,6 +396,18 @@ export function QuotePreview(): React.ReactElement {
           variant="destructive"
           onConfirm={() => void onDelete()}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      ) : null}
+
+      {showMarkLostConfirm ? (
+        <ConfirmModal
+          title="Mark quote as lost?"
+          body="This records the quote as lost. You can still view the quote and its PDF."
+          confirmLabel="Mark as Lost"
+          cancelLabel="Cancel"
+          variant="destructive"
+          onConfirm={() => void onConfirmMarkLost()}
+          onCancel={() => setShowMarkLostConfirm(false)}
         />
       ) : null}
 

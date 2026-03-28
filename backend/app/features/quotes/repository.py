@@ -256,10 +256,34 @@ class QuoteRepository:
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
-                Document.status != QuoteStatus.SHARED,
+                Document.status == QuoteStatus.DRAFT,
             )
             .values(status=QuoteStatus.READY)
         )
+
+    async def set_quote_outcome(
+        self,
+        *,
+        quote_id: UUID,
+        user_id: UUID,
+        status: QuoteStatus,
+        allowed_current_statuses: tuple[QuoteStatus, ...],
+    ) -> Document | None:
+        """Persist an approved/declined outcome if the quote is still eligible."""
+        updated_document_id = await self._session.scalar(
+            update(Document)
+            .where(
+                Document.id == quote_id,
+                Document.user_id == user_id,
+                Document.status.in_(allowed_current_statuses),
+            )
+            .values(status=status)
+            .returning(Document.id)
+        )
+        if updated_document_id is None:
+            return None
+
+        return await self.get_by_id(quote_id, user_id)
 
     async def create(
         self,

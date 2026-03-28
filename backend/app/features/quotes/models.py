@@ -19,6 +19,9 @@ class QuoteStatus(StrEnum):
     DRAFT = "draft"
     READY = "ready"
     SHARED = "shared"
+    VIEWED = "viewed"
+    APPROVED = "approved"
+    DECLINED = "declined"
 
 
 class Document(Base):
@@ -48,6 +51,10 @@ class Document(Base):
     doc_sequence: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     doc_number: Mapped[str] = mapped_column(sa.String(20), nullable=False)
     title: Mapped[str | None] = mapped_column(sa.String(120), nullable=True)
+    source_document_id: Mapped[UUID | None] = mapped_column(
+        sa.ForeignKey("documents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     status: Mapped[QuoteStatus] = mapped_column(
         sa.Enum(
             QuoteStatus,

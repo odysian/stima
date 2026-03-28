@@ -89,7 +89,8 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | doc_sequence | Integer | per-user sequence counter |
 | doc_number | String(20) | stored display ID, format `Q-001` |
 | title | String(120) | nullable optional quote label shown in lists, previews, and PDFs |
-| status | String(20) | `draft \| ready \| shared` with DB check constraint |
+| source_document_id | UUID (self-FK → documents.id) | nullable, `ON DELETE SET NULL`; reserved for future quote→invoice lineage |
+| status | String(20) | `draft \| ready \| shared \| viewed \| approved \| declined` with DB check constraint |
 | source_type | String(20) | `"text"` or `"voice"` based on capture mode |
 | transcript | Text | stored source transcript/notes for the quote draft |
 | total_amount | Numeric(10,2) | nullable, user-editable |
@@ -128,6 +129,8 @@ Pilot event set:
 - `draft_generation_failed`
 - `quote_pdf_generated`
 - `quote_shared`
+- `quote_approved`
+- `quote_marked_lost`
 
 These underscore names are the canonical quote-flow vocabulary for pilot instrumentation; dot-notation events such as `quote.created`, `quote.updated`, `quote.deleted`, and `customer.created` remain separate operational logs outside the pilot analytics scope.
 
@@ -198,13 +201,17 @@ Rules:
 | `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
 | `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`) or `404 { detail: "Not found" }` |
-| `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes? }` | `200 Quote` or `404 { detail: "Not found" }` |
+| `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes? }` | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Shared quotes cannot be edited" }` once the quote is shared/viewed/finalized |
+| `/quotes/{id}/share` | POST | yes | cookie | — | `200 Quote`; returns existing quote unchanged when status is already `viewed`, `approved`, or `declined` |
+| `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
+| `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
 
 `PATCH /quotes/{id}` behavior:
 - If `title` is present, blank or whitespace-only values are normalized to `null`.
 - If `title` is omitted, the existing title is preserved.
 - If `line_items` is present, existing rows are fully replaced.
 - If `line_items` is omitted, existing rows are preserved.
+- Shared, viewed, approved, and declined quotes are read-only.
 
 `QuoteListItem` fields:
 - `id`

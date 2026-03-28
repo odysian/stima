@@ -29,7 +29,13 @@ export interface LineItem {
   sort_order: number;
 }
 
-export type QuoteStatus = "draft" | "ready" | "shared";
+export type QuoteStatus =
+  | "draft"
+  | "ready"
+  | "shared"
+  | "viewed"
+  | "approved"
+  | "declined";
 export type QuoteSourceType = "text" | "voice";
 
 export interface Quote {

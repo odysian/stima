@@ -3,13 +3,23 @@
 **Date:** 2026-03-27
 **Roadmap ref:** `docs/V1_ROADMAP.md` — Milestone 5
 **Mode:** This is likely a `gated` candidate (multiple tasks) given scope. Flag for human decision.
-**Depends on:** M1 (status expansion, `source_document_id`), M2 (landing page), M3 (email delivery)
+**Depends on:** M1 (status expansion, `source_document_id`). M2 and M3 are dependencies for the fast follow, not for the initial ship.
+
+---
+
+## Scope Split
+
+M5 ships in two cuts:
+
+**First cut (this PR):** Core conversion + invoice PDF + copy-link sharing + document list integration. A contractor can convert an approved quote to an invoice, generate the PDF, copy the link, and share it manually — the same flow V0 quotes used before M2 and M3 existed.
+
+**Fast follow (second PR):** Extend M2 and M3 infrastructure to invoices — invoice-specific public landing page rendering at `/doc/:token`, invoice email delivery with invoice-specific subject/template, and `invoice_viewed` event. This is not a separate milestone — it extends existing infrastructure to a new doc type.
 
 ---
 
 ## Goal
 
-A contractor converts an approved quote to an invoice in one action — line items, total, and customer carry over automatically. The invoice has its own PDF, landing page, and email delivery.
+A contractor converts an approved quote to an invoice in one action — line items, total, and customer carry over automatically. The invoice has its own PDF and can be shared via copy-link.
 
 ---
 
@@ -22,6 +32,9 @@ A contractor converts an approved quote to an invoice in one action — line ite
 - Invoice status beyond `draft → ready → sent` (no approve/decline lifecycle for invoices)
 - Customer-facing action buttons on invoice landing page (read-only, same as quotes)
 - Tax calculations or tax line items
+- Invoice public landing page at `/doc/:token` (fast follow)
+- Invoice email delivery (fast follow)
+- `invoice_viewed` event (ships with the fast follow landing page extension)
 
 ---
 
@@ -173,13 +186,19 @@ Based on `quote.html` but with:
 
 **Decision for human review:** Should there be one PDF template with conditional sections, or two separate templates? **Recommendation:** Two templates. They're simple HTML files, and conditional branching in Jinja2 makes templates harder to read. The shared layout elements (logo, line items table, notes) can be Jinja2 includes/macros if duplication is a concern.
 
-### 7. Service: invoice share + email
+### 7. Service: invoice share (copy-link only in first cut)
 
-Invoice sharing and email delivery follow the same pattern as quotes. Options:
-- (a) Generalize `share_quote()` to `share_document()` that works for both types
-- (b) Create parallel `share_invoice()` / `send_invoice_email()` methods
+The first cut supports sharing invoices via the existing copy-link flow — generating a
+`share_token` and transitioning the invoice to `sent` status. This is the same mechanism
+V0 quotes used before M2/M3 existed.
 
-**Recommendation:** Option (a) — generalize. The logic is identical: create token, transition status (`ready → sent` for invoices instead of `ready → shared`), log event. Rename or add a `share_document()` that dispatches on `doc_type`.
+Options for implementation:
+- (a) Generalize `share_quote()` to `share_document()` that dispatches on `doc_type`
+- (b) Create a parallel `share_invoice()` method
+
+**Recommendation:** Option (a) — generalize now. The logic is identical: create token,
+transition status (`ready → sent` for invoices instead of `ready → shared`), log event.
+This also prepares for the fast follow which adds email delivery for invoices.
 
 ### 8. API routes
 
@@ -192,27 +211,31 @@ Invoice sharing and email delivery follow the same pattern as quotes. Options:
 | `PATCH /api/invoices/{id}` | PATCH | yes | `{ line_items?, total_amount?, notes?, due_date?, title? }` | `200 Invoice` |
 | `POST /api/invoices/{id}/pdf` | POST | yes | — | `200 PDF stream` |
 | `POST /api/invoices/{id}/share` | POST | yes | — | `200 Invoice` |
-| `POST /api/invoices/{id}/send-email` | POST | yes | — | `200 Invoice` |
+| `POST /api/invoices/{id}/send-email` | POST | yes | — | `200 Invoice` (fast follow) |
 
 **Decision for human review:** Should invoice routes live under `/api/invoices/` or `/api/quotes/`? The `documents` table stores both, but the API semantics are different. **Recommendation:** `/api/invoices/` for invoice-specific CRUD. The conversion trigger (`/api/quotes/{id}/convert`) stays under quotes because it's a quote action.
 
 **Decision for human review:** Should invoices have their own `api.py` router file, or share the quotes router? **Recommendation:** New file `backend/app/features/quotes/invoice_api.py` (or a new `invoices` feature directory). The quotes router is already at 277 LOC. Adding 6+ routes would exceed budget. A separate router keeps things clean.
 
-### 9. Public landing page — invoice support
+### 9. Public landing page — invoice support (FAST FOLLOW)
 
-M2's `GET /api/public/doc/{share_token}` currently only handles quotes. M5 extends it:
+Deferred to fast follow PR. M2's `GET /api/public/doc/{share_token}` currently only
+handles quotes. The fast follow extends it:
 
 - After fetching the document by share_token, check `doc_type`
 - If `"quote"` → existing quote rendering logic
 - If `"invoice"` → return `PublicInvoiceResponse` (same as quote response + `due_date`)
-- Status transition for invoices: `sent → viewed` doesn't apply (invoice lifecycle is `draft → ready → sent`, no `viewed` state)
+- No `viewed` status transition for invoices — log `invoice_viewed` event only
 
-**Decision for human review:** Should invoices track a `viewed` status when the customer opens the page? The roadmap says invoice lifecycle is `draft → ready → sent` with no approve/decline. Adding `viewed` to invoices means the customer opening the page transitions `sent → viewed`. **Recommendation:** No `viewed` for invoices in V1. The invoice page is purely informational. Log an `invoice_viewed` event on page load for analytics, but don't transition the status.
+In the first cut, shared invoices use the existing `/share/{share_token}` raw PDF endpoint
+(the same flow V0 quotes used before M2 landed).
 
 ### 10. Event logging
 
-Events added in M5:
+Events added in M5 first cut:
 - `invoice_created` — logged on conversion
+
+Events added in fast follow:
 - `invoice_viewed` — logged on public page load (already pre-registered by M6)
 
 ---
@@ -264,22 +287,21 @@ The existing `QuoteList.tsx` shows all documents. M5 adds:
 
 **Decision for human review:** Tabs/filter vs. mixed list? **Recommendation:** Mixed list with a doc type badge on each card. Filter tabs are V2 when the list gets long. For pilot with <50 documents, a mixed list is fine.
 
-### 5. Invoice email template
+### 5. Invoice email template (FAST FOLLOW)
 
-New email template for invoices with:
+Deferred to fast follow. New email template for invoices with:
 - "Invoice" in subject line: `"Invoice for {title}"` or `"Invoice {doc_number} from {business_name}"`
 - Due date prominently displayed in email body
 - CTA linking to `/doc/:token`
 
-### 6. Public landing page — invoice variant
+### 6. Public landing page — invoice variant (FAST FOLLOW)
 
-`PublicQuotePage.tsx` needs to handle both quotes and invoices. Options:
-- (a) Branch within `PublicQuotePage` based on `doc_type` in the response
-- (b) Create `PublicInvoicePage.tsx` separately
+Deferred to fast follow. `PublicQuotePage.tsx` handles both quotes and invoices by
+branching on `doc_type` in the response. The layout is 90% identical — the differences
+are header text ("Quote" vs "Invoice"), due date field, and status banner text.
 
-**Recommendation:** Option (a) — branch within the same component. The layout is 90% identical (logo, business name, line items, total, notes, PDF download). The differences are: header text ("Quote" vs "Invoice"), due date field, and status banner text. A few conditionals are cleaner than duplicating the entire component.
-
-The route stays `/doc/:token` — the backend response includes `doc_type` and the frontend renders accordingly.
+The route stays `/doc/:token` — the backend response includes `doc_type` and the
+frontend renders accordingly.
 
 ---
 
@@ -300,28 +322,39 @@ The route stays `/doc/:token` — the backend response includes `doc_type` and t
 
 ## Implementation Order
 
+### First cut (core conversion + PDF + copy-link)
+
 1. Migration: `due_date` column, `sent` status, unique constraint change
 2. Backend model: add `due_date`, `SENT` status, invoice `doc_number` formatting
 3. Backend repository: `create_invoice_from_quote`, `get_invoice_by_source`, doc_type filter on list
 4. Backend service: `convert_to_invoice()` with guards
 5. Backend: invoice PDF template (`invoice.html`)
-6. Backend: generalize share/email to support invoices (or add invoice-specific methods)
-7. Backend API: conversion route + invoice CRUD routes
-8. Backend: extend public endpoint to handle `doc_type="invoice"`
-9. Backend tests: conversion flow, duplicate guard, invoice PDF, invoice share/email, public page
-10. Frontend: "Convert to Invoice" modal with date picker on approved quotes
-11. Frontend: invoice detail screen (`InvoicePreview.tsx`)
-12. Frontend: invoice actions (generate PDF, share, send email)
-13. Frontend: doc type badge on list items
-14. Frontend: linked invoice display on quote detail
-15. Frontend: extend public landing page for invoice doc_type
-16. Frontend: invoice email template
-17. Frontend tests: conversion modal, invoice detail, list badges, public page invoice variant
-18. Update `docs/ARCHITECTURE.md`: invoice schema, endpoints, status lifecycle, events
+6. Backend: generalize share to support invoices (copy-link flow)
+7. Backend API: conversion route + invoice CRUD routes (excluding `send-email`)
+8. Backend tests: conversion flow, duplicate guard, invoice PDF, invoice share
+9. Frontend: "Convert to Invoice" modal with date picker on approved quotes
+10. Frontend: invoice detail screen (`InvoicePreview.tsx`)
+11. Frontend: invoice actions (generate PDF, share/copy-link)
+12. Frontend: doc type badge on list items
+13. Frontend: linked invoice display on quote detail
+14. Frontend tests: conversion modal, invoice detail, list badges
+15. Update `docs/ARCHITECTURE.md`: invoice schema, endpoints, status lifecycle, events
+
+### Fast follow (landing page + email delivery for invoices)
+
+16. Backend: extend public endpoint to handle `doc_type="invoice"`
+17. Backend: add `POST /api/invoices/{id}/send-email` route
+18. Backend tests: public page invoice variant, invoice email
+19. Frontend: extend public landing page for invoice doc_type
+20. Frontend: invoice email template
+21. Frontend tests: public page invoice variant, send email button
+22. Update `docs/ARCHITECTURE.md`: public endpoint invoice support, invoice email endpoint
 
 ---
 
 ## Acceptance Criteria
+
+### First cut
 
 - [ ] "Convert to Invoice" action available on `approved` quotes only
 - [ ] Conversion creates a new document with `doc_type="invoice"` and `source_document_id` set
@@ -331,14 +364,18 @@ The route stays `/doc/:token` — the backend response includes `doc_type` and t
 - [ ] Duplicate conversion from same quote returns 409
 - [ ] Converting a quote does not change the quote's status or data
 - [ ] Invoice PDF renders with "Invoice" header and due date
-- [ ] Invoice can be shared and emailed using the same flow as quotes
-- [ ] Invoice landing page renders at `/doc/:token` with invoice-specific content
+- [ ] Invoice can be shared via copy-link (same flow as V0 quote sharing)
 - [ ] `invoice_created` event logged on conversion
-- [ ] `invoice_viewed` event logged on public page load
 - [ ] Quote detail screen shows linked invoice when one exists
 - [ ] Document list shows both quotes and invoices with type differentiation
 - [ ] Invoice status lifecycle: `draft → ready → sent` (no approve/decline)
 - [ ] `docs/ARCHITECTURE.md` updated with invoice schema, endpoints, and status lifecycle
+
+### Fast follow
+
+- [ ] Invoice landing page renders at `/doc/:token` with invoice-specific content
+- [ ] Invoice can be emailed using the same flow as quotes (invoice-specific subject/template)
+- [ ] `invoice_viewed` event logged on public page load
 
 ---
 
@@ -349,13 +386,17 @@ make backend-verify
 make frontend-verify
 ```
 
-Manual:
+Manual (first cut):
 1. Approve a quote → press "Convert to Invoice" → set due date → confirm invoice created
 2. Check invoice detail → confirm line items, total, customer, title match source quote
 3. Check source quote detail → confirm linked invoice reference with "View" link
 4. Generate invoice PDF → confirm "Invoice" header and due date present
-5. Send invoice by email → confirm email arrives with invoice subject
-6. Open invoice landing page → confirm renders with "Invoice" header and due date
-7. Try converting the same quote again → confirm 409 error
-8. Check document list → confirm both quote and invoice appear with type badges
-9. Check `event_logs` → confirm `invoice_created` and `invoice_viewed` events
+5. Share invoice via copy-link → confirm share token generated, link works for PDF download
+6. Try converting the same quote again → confirm 409 error
+7. Check document list → confirm both quote and invoice appear with type badges
+8. Check `event_logs` → confirm `invoice_created` event
+
+Manual (fast follow):
+9. Open invoice landing page via `/doc/:token` → confirm renders with "Invoice" header and due date
+10. Send invoice by email → confirm email arrives with invoice subject
+11. Check `event_logs` → confirm `invoice_viewed` event on page load

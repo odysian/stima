@@ -21,4 +21,25 @@ describe("StatusBadge", () => {
 
     expect(screen.getByText("Shared")).toHaveClass("bg-info-container", "text-info");
   });
+
+  it("renders viewed variant styles", () => {
+    render(<StatusBadge variant="viewed" />);
+
+    expect(screen.getByText("Viewed")).toHaveClass("bg-warning-container", "text-warning");
+  });
+
+  it("renders approved variant styles with an inline icon", () => {
+    const { container } = render(<StatusBadge variant="approved" />);
+
+    expect(screen.getByText("Approved")).toHaveClass("bg-success-container", "text-success");
+    expect(container.querySelector(".material-symbols-outlined")).toHaveTextContent(
+      "check_circle",
+    );
+  });
+
+  it("renders declined variant styles", () => {
+    render(<StatusBadge variant="declined" />);
+
+    expect(screen.getByText("Declined")).toHaveClass("bg-error-container", "text-error");
+  });
 });

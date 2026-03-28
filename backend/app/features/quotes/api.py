@@ -254,6 +254,50 @@ async def share_quote(
     return QuoteResponse.model_validate(quote)
 
 
+@router.post(
+    "/{quote_id}/mark-won",
+    response_model=QuoteResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def mark_quote_won(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> QuoteResponse:
+    """Record a contractor-confirmed won quote outcome."""
+    try:
+        quote = await quote_service.mark_quote_outcome(
+            user,
+            quote_id,
+            outcome="approved",
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return QuoteResponse.model_validate(quote)
+
+
+@router.post(
+    "/{quote_id}/mark-lost",
+    response_model=QuoteResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def mark_quote_lost(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> QuoteResponse:
+    """Record a contractor-confirmed lost quote outcome."""
+    try:
+        quote = await quote_service.mark_quote_outcome(
+            user,
+            quote_id,
+            outcome="declined",
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return QuoteResponse.model_validate(quote)
+
+
 @public_router.get("/share/{share_token}")
 async def get_shared_quote_pdf(
     share_token: str,

@@ -1,7 +1,7 @@
 # Stima V2 Roadmap
 
 **Version:** 0.1 — March 2026
-**Status:** Directional — scope subject to revision based on V1 pilot data
+**Status:** Parked — features prioritized by pilot data, not pre-planned. This document captures ideas validated during V1 planning but is not an active build queue.
 **Assumes:** V1 is complete and live with real users
 **Reference:** `docs/PRODUCT.md` for strategic context
 
@@ -77,35 +77,12 @@ same scope, next season).
 - Duplicate opens in draft state with all line items copied
 - Doc number is a new sequential number, not a copy of the source
 
-**Taxes, discounts, and deposits**
-The quote and invoice total section gains structured support for:
+**Taxes, discounts, and deposits** — *Pulled into V1 Phase 3 (Milestone 7).* See
+`docs/V1_ROADMAP.md` for scope. No longer part of V2.
 
-- Sales tax (percentage, optional, per-quote toggle)
-- Discount (fixed dollar or percentage, optional)
-- Deposit required (fixed dollar amount, shown as a line in the total section)
-
-These are display-only in V2 — Stima does not process payments. The deposit line tells
-the customer what is due upfront; collection happens outside the app.
-
-**PDF template note:** When V1 builds the PDF template, the total section must be
-implemented as a conditional block, not a hardcoded single-line total. This feature
-depends on that structure being in place:
-
-```jinja2
-{% if quote.deposit %}
-<tr class="deposit-line">...</tr>
-{% endif %}
-{% if quote.discount %}
-<tr class="discount-line">...</tr>
-{% endif %}
-{% if quote.tax_rate %}
-<tr class="tax-line">...</tr>
-{% endif %}
-<tr class="total-line">...</tr>
-```
-
-If V1 hardcodes the total block, V2 must restructure the template rather than just
-populating new variables. The V1 agent should be aware of this when building the PDF.
+**PDF template note:** The V1 PDF template total section should be implemented as a
+conditional block, not a hardcoded single-line total. M7 depends on that structure
+being in place.
 
 **Revision history**
 A quote keeps a lightweight record of when it was edited and what the total was at each
