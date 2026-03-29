@@ -149,6 +149,25 @@ describe("CaptureScreen", () => {
     expect(screen.getByRole("button", { name: /extract line items/i })).toBeEnabled();
   });
 
+  it("shows extraction helper copy only while extraction is active", async () => {
+    const extractDeferred = new Promise<ExtractionResult>(() => {});
+    mockedQuoteService.extract.mockReturnValueOnce(extractDeferred);
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+
+    expect(
+      screen.queryByText(/we will turn your notes into draft line items/i),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(await screen.findByText("Analyzing notes...")).toBeInTheDocument();
+    expect(screen.getByText(/we will turn your notes into draft line items/i)).toBeInTheDocument();
+  });
+
   it("shows recording state with stop button and elapsed time", () => {
     mockVoiceCapture({ isRecording: true, elapsedSeconds: 3 });
     renderScreen();
