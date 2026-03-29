@@ -580,6 +580,53 @@ describe("QuotePreview", () => {
     }
   });
 
+  it("suppresses feedback when Web Share is aborted by the user", async () => {
+    const abortError = new Error("Share aborted");
+    abortError.name = "AbortError";
+    const shareMock = vi.fn().mockRejectedValue(abortError);
+    const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, "share");
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      writable: true,
+      value: shareMock,
+    });
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: { writeText: writeTextMock },
+    });
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
+    );
+
+    try {
+      renderScreen();
+
+      await screen.findByRole("heading", { name: "Test Customer" });
+      fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
+
+      await waitFor(() => {
+        expect(shareMock).toHaveBeenCalledWith({
+          title: "Quote Q-001",
+          url: "http://localhost:3000/doc/share-token-1",
+        });
+      });
+
+      expect(writeTextMock).not.toHaveBeenCalled();
+      expect(screen.queryByText("Quote link shared.")).not.toBeInTheDocument();
+      expect(screen.queryByText("Share link copied to clipboard.")).not.toBeInTheDocument();
+      expect(screen.queryByText("Share aborted")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /copy link/i })).toBeEnabled();
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(navigator, "share", originalDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, "share");
+      }
+    }
+  });
+
   it("shows loading feedback while copying the share link and clears it after the request resolves", async () => {
     let resolveShareQuote: ((value: Quote) => void) | undefined;
     mockedQuoteService.getQuote.mockResolvedValueOnce(

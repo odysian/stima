@@ -941,6 +941,7 @@ async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
     )
     quote = await _create_quote(client, csrf_token, customer_id)
     await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+    rollback_calls = 0
 
     async def _raise_persist_failure(
         self: QuoteRepository,
@@ -953,7 +954,13 @@ async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
         del self, user_id, quote_id, customer_id, event_name
         raise RuntimeError("event log unavailable")
 
+    async def _record_rollback(self: QuoteRepository) -> None:
+        nonlocal rollback_calls
+        del self
+        rollback_calls += 1
+
     monkeypatch.setattr(QuoteRepository, "persist_quote_event", _raise_persist_failure)
+    monkeypatch.setattr(QuoteRepository, "rollback", _record_rollback)
 
     first_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
@@ -970,6 +977,62 @@ async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
         "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
     }
     assert len(mock_email_service.messages) == 1
+    assert rollback_calls == 1
+
+
+async def test_send_quote_email_returns_200_when_event_commit_fails_after_send(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    rollback_calls = 0
+
+    async def _raise_commit_failure(self: QuoteRepository) -> None:
+        del self
+        raise RuntimeError("commit failed")
+
+    async def _record_rollback(self: QuoteRepository) -> None:
+        nonlocal rollback_calls
+        del self
+        rollback_calls += 1
+
+    monkeypatch.setattr(QuoteRepository, "commit", _raise_commit_failure)
+    monkeypatch.setattr(QuoteRepository, "rollback", _record_rollback)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.json() == {
+        "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
+    }
+    assert len(mock_email_service.messages) == 1
+    assert rollback_calls == 1
 
 
 async def test_send_quote_email_allows_immediate_retry_after_provider_failure(

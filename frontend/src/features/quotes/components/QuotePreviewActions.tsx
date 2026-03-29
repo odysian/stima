@@ -141,7 +141,15 @@ export function QuotePreviewActions({
           <button
             type="button"
             className={secondaryButtonClasses}
-            disabled={disabled || !canCopyLink || isSendingEmail || isCopyingLink}
+            disabled={
+              disabled
+              || !canCopyLink
+              || isGeneratingPdf
+              || isSendingEmail
+              || isCopyingLink
+              || isMarkingWon
+              || isMarkingLost
+            }
             onClick={() => {
               void onCopyLink();
             }}

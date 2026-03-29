@@ -58,6 +58,8 @@ class QuoteEmailRepositoryProtocol(Protocol):
 
     async def commit(self) -> None: ...
 
+    async def rollback(self) -> None: ...
+
 
 @dataclass(slots=True)
 class QuoteEmailTemplateContext:
@@ -169,6 +171,7 @@ class QuoteEmailDeliveryService:
             )
             await self._repository.commit()
         except Exception:  # noqa: BLE001
+            await self._repository.rollback()
             _remember_fallback_email_sent_at(context)
             LOGGER.warning(
                 "quote email sent without persisted throttle state",

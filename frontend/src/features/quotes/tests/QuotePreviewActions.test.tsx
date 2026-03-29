@@ -115,6 +115,20 @@ describe("QuotePreviewActions", () => {
     expect(screen.getByRole("button", { name: /resend email/i })).toBeDisabled();
   });
 
+  it("disables copy link while other quote mutations are pending", () => {
+    render(
+      <QuotePreviewActions
+        {...makeProps({
+          actionState: "shared",
+          emailActionLabel: "Resend Email",
+          isMarkingLost: true,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /copy link/i })).toBeDisabled();
+  });
+
   it("shows in-flight resend state copy", () => {
     render(
       <QuotePreviewActions
