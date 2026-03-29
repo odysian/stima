@@ -15,7 +15,6 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { TradeTypeSelector } from "@/shared/components/TradeTypeSelector";
 
 export function SettingsScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -37,6 +36,7 @@ export function SettingsScreen(): React.ReactElement {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLogoSubmitting, setIsLogoSubmitting] = useState(false);
   const [isRemoveLogoOpen, setIsRemoveLogoOpen] = useState(false);
+  const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
   const [logoPreviewVersion, setLogoPreviewVersion] = useState(0);
 
   function applyProfile(profile: ProfileResponse): void {
@@ -121,6 +121,11 @@ export function SettingsScreen(): React.ReactElement {
     } finally {
       setIsLogoSubmitting(false);
     }
+  };
+
+  const onConfirmSignOut = async () => {
+    setIsSignOutConfirmOpen(false);
+    await logout();
   };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -259,14 +264,23 @@ export function SettingsScreen(): React.ReactElement {
                   value={lastName}
                   onChange={(event) => setLastName(event.target.value)}
                 />
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-1 text-sm font-medium text-on-surface">Trade type</legend>
-                  <TradeTypeSelector
-                    options={TRADE_TYPES}
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="settings-trade-type" className="text-sm font-medium text-on-surface">
+                    Trade type
+                  </label>
+                  <select
+                    id="settings-trade-type"
                     value={tradeType}
-                    onChange={(value) => setTradeType(value as TradeType)}
-                  />
-                </fieldset>
+                    onChange={(event) => setTradeType(event.target.value as TradeType)}
+                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {TRADE_TYPES.map((tradeTypeOption) => (
+                      <option key={tradeTypeOption} value={tradeTypeOption}>
+                        {tradeTypeOption}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="settings-timezone" className="text-sm font-medium text-on-surface">
                     Timezone
@@ -287,31 +301,26 @@ export function SettingsScreen(): React.ReactElement {
               </div>
             </section>
 
-            <section className="rounded-xl bg-surface-container-low p-5">
+            <section className="rounded-xl bg-surface-container-low p-4">
               <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                 Account
               </h2>
-              <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col gap-1">
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                     Email
                   </p>
-                  <p className="text-sm text-on-surface">{email}</p>
+                  <p className="truncate text-sm text-on-surface">{email}</p>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 sm:justify-end">
-                  <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                    Session
-                  </span>
-                  {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
-                  <button
-                    type="button"
-                    className="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white transition-all active:scale-[0.98]"
-                    onClick={() => void logout()}
-                  >
-                    Sign Out
-                  </button>
-                </div>
+                {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
+                <button
+                  type="button"
+                  className="shrink-0 rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white transition-all active:scale-[0.98]"
+                  onClick={() => setIsSignOutConfirmOpen(true)}
+                >
+                  Sign Out
+                </button>
               </div>
             </section>
 
@@ -335,6 +344,18 @@ export function SettingsScreen(): React.ReactElement {
           cancelLabel="Cancel"
           onConfirm={() => void onConfirmRemoveLogo()}
           onCancel={() => setIsRemoveLogoOpen(false)}
+          variant="destructive"
+        />
+      ) : null}
+
+      {isSignOutConfirmOpen ? (
+        <ConfirmModal
+          title="Sign out?"
+          body="You'll need to sign back in to access your account."
+          confirmLabel="Sign Out"
+          cancelLabel="Cancel"
+          onConfirm={() => void onConfirmSignOut()}
+          onCancel={() => setIsSignOutConfirmOpen(false)}
           variant="destructive"
         />
       ) : null}
