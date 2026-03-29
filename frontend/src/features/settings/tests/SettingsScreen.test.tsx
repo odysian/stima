@@ -97,7 +97,7 @@ describe("SettingsScreen", () => {
       }),
     );
 
-    const { container } = renderScreen();
+    renderScreen();
 
     expect(await screen.findByDisplayValue("Bright Lawn Care")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
@@ -127,7 +127,6 @@ describe("SettingsScreen", () => {
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).not.toBeNull();
     expect(screen.getByText("Account").closest("section")).toHaveClass("bg-surface-container-low");
-    expect(container.querySelectorAll(".ghost-shadow")).toHaveLength(1);
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });

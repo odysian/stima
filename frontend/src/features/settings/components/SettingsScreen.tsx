@@ -184,57 +184,59 @@ export function SettingsScreen(): React.ReactElement {
               </h2>
 
               <div className="mt-4 flex flex-col gap-4">
-                <div className="flex flex-col gap-4 border-b border-outline-variant/20 pb-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1">
-                      <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                        Logo
-                      </p>
-                      <p className="text-sm text-on-surface-variant">
-                        JPEG or PNG, up to 2 MB. Appears on quote PDFs.
-                      </p>
+                <div className="rounded-xl bg-surface-container-low p-4">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1">
+                        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                          Logo
+                        </p>
+                        <p className="text-sm text-on-surface-variant">
+                          JPEG or PNG, up to 2 MB. Appears on quote PDFs.
+                        </p>
+                      </div>
+
+                      {hasLogo ? (
+                        <img
+                          key={logoPreviewVersion}
+                          src={logoPreviewSrc}
+                          alt="Business logo preview"
+                          className="h-12 w-auto max-w-[180px] object-contain sm:mt-1"
+                        />
+                      ) : (
+                        <p className="text-sm text-on-surface-variant">No logo uploaded yet.</p>
+                      )}
                     </div>
 
-                    {hasLogo ? (
-                      <img
-                        key={logoPreviewVersion}
-                        src={logoPreviewSrc}
-                        alt="Business logo preview"
-                        className="h-12 w-auto max-w-[180px] object-contain sm:mt-1"
-                      />
-                    ) : (
-                      <p className="text-sm text-on-surface-variant">No logo uploaded yet.</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <label
-                      htmlFor="settings-logo-upload"
-                      className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
-                    >
-                      {hasLogo ? "Upload New" : "Upload Logo"}
-                    </label>
-                    <input
-                      id="settings-logo-upload"
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      className="sr-only"
-                      disabled={isLogoSubmitting}
-                      onChange={onLogoUpload}
-                    />
-                    {hasLogo ? (
-                      <button
-                        type="button"
-                        className="inline-flex min-h-12 items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={isLogoSubmitting}
-                        onClick={() => setIsRemoveLogoOpen(true)}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <label
+                        htmlFor="settings-logo-upload"
+                        className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
                       >
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
+                        {hasLogo ? "Upload New" : "Upload Logo"}
+                      </label>
+                      <input
+                        id="settings-logo-upload"
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        className="sr-only"
+                        disabled={isLogoSubmitting}
+                        onChange={onLogoUpload}
+                      />
+                      {hasLogo ? (
+                        <button
+                          type="button"
+                          className="inline-flex min-h-12 items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={isLogoSubmitting}
+                          onClick={() => setIsRemoveLogoOpen(true)}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
 
-                  {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
+                    {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
+                  </div>
                 </div>
 
                 <Input
@@ -311,6 +313,7 @@ export function SettingsScreen(): React.ReactElement {
               </div>
             </section>
 
+            {/* Keep the footer inside the form so the fixed primary action submits natively. */}
             <ScreenFooter>
               <div className="mx-auto w-full max-w-2xl">
                 <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
