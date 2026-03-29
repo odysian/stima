@@ -125,7 +125,13 @@ export function QuotePreviewActions({
               void onSendEmail();
             }}
             isLoading={isSendingEmail}
-            disabled={disabled || !hasCustomerEmail || isCopyingLink}
+            disabled={
+              disabled
+              || !hasCustomerEmail
+              || isCopyingLink
+              || isMarkingWon
+              || isMarkingLost
+            }
           >
             {emailActionLabel}
           </Button>

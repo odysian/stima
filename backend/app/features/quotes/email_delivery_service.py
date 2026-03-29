@@ -136,6 +136,7 @@ class QuoteEmailDeliveryService:
                     subject=subject,
                     html_content=self._render_html(rendered_context),
                     text_content=_render_text(rendered_context),
+                    reply_to_email=rendered_context.contractor_email,
                 )
             )
         except EmailConfigurationError as exc:

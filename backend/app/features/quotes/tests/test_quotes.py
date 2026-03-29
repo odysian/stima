@@ -661,6 +661,7 @@ async def test_send_quote_email_shares_quote_delivers_email_and_logs_success(
     assert f"/share/{payload['share_token']}" in message.html_content
     assert "Questions? Call or text +1-555-111-2222." in message.html_content
     assert credentials["email"] in message.html_content
+    assert message.reply_to_email == credentials["email"]
 
     quote_event_names = [
         payload["event"] for payload in emitted_events if payload.get("quote_id") == quote["id"]

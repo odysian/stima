@@ -101,6 +101,20 @@ describe("QuotePreviewActions", () => {
     expect(screen.getByText(/add a customer email/i)).toBeInTheDocument();
   });
 
+  it("disables the email action while quote outcome mutation is pending", () => {
+    render(
+      <QuotePreviewActions
+        {...makeProps({
+          actionState: "shared",
+          emailActionLabel: "Resend Email",
+          isMarkingWon: true,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /resend email/i })).toBeDisabled();
+  });
+
   it("shows in-flight resend state copy", () => {
     render(
       <QuotePreviewActions
