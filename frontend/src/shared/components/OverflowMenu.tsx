@@ -37,10 +37,11 @@ export function OverflowMenu({
       return undefined;
     }
 
-    const container = containerRef.current;
-    if (!container) {
+    const containerNode = containerRef.current;
+    if (!containerNode) {
       return undefined;
     }
+    const container: HTMLDivElement = containerNode;
 
     function handlePointerDown(event: PointerEvent): void {
       if (!container.contains(event.target as Node)) {
