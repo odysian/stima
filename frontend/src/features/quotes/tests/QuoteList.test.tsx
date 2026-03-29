@@ -103,8 +103,11 @@ describe("QuoteList", () => {
 
     renderScreen();
 
-    expect(await screen.findByText("Stima Quotes")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Quotes" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Sorted by: Most Recent")).not.toBeInTheDocument();
     expect(await screen.findByText("Q-001")).toBeInTheDocument();
+    expect(screen.getByText("1 active · 1 pending")).toBeInTheDocument();
     expect(screen.getByText("Spring Cleanup")).toBeInTheDocument();
     expect(screen.getByText(/Bob Brown\s*·\s*Q-002\s*·\s*Mar 20, 2026\s*·\s*3 items/)).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
@@ -203,7 +206,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText("Q-001");
 
-    expect(screen.getByText(/1 active\s*·\s*1 pending review/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 active\s*·\s*1 pending/i)).toBeInTheDocument();
     expect(screen.queryByText("ACTIVE QUOTES")).not.toBeInTheDocument();
     expect(screen.queryByText("PENDING REVIEW")).not.toBeInTheDocument();
   });
@@ -237,12 +240,14 @@ describe("QuoteList", () => {
 
     renderScreen();
 
+    expect(screen.queryByText(/active\s*·\s*\d+\s*pending/i)).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Loading quotes...");
 
     resolveQuotes?.([makeQuoteListItem()]);
     await waitFor(() => {
       expect(screen.queryByText("Loading quotes...")).not.toBeInTheDocument();
     });
+    expect(screen.getByText("0 active · 1 pending")).toBeInTheDocument();
   });
 
   it("renders created_at using the saved business timezone", async () => {

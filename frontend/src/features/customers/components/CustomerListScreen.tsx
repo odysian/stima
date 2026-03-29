@@ -6,6 +6,7 @@ import type { Customer } from "@/features/customers/types/customer.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
 function contactLine(customer: Customer): string {
   return [customer.phone, customer.email].filter(Boolean).join(" · ");
@@ -61,19 +62,22 @@ export function CustomerListScreen(): React.ReactElement {
   const showNoCustomersState = !isLoading && !loadError && customers.length === 0;
   const showNoSearchMatches =
     !isLoading && !loadError && customers.length > 0 && filteredCustomers.length === 0;
+  const customerSubtitle =
+    !isLoading && !loadError
+      ? `${customers.length} ${customers.length === 1 ? "customer" : "customers"}`
+      : undefined;
 
   return (
     <main className="min-h-screen bg-background pb-24">
-      <section className="mx-auto w-full max-w-3xl py-2">
-        <div className="px-4 pt-6 pb-4">
-          <h1 className="font-headline text-2xl font-bold tracking-tight text-primary">Customers</h1>
-        </div>
+      <ScreenHeader title="Customers" subtitle={customerSubtitle} />
+      <section className="mx-auto w-full max-w-3xl pb-2 pt-20">
 
         <div className="mb-4 px-4">
           <Input
             id="customers-search"
             label="Search customers"
             placeholder="Search customers..."
+            hideLabel
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
