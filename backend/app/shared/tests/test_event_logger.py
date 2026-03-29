@@ -67,6 +67,23 @@ def test_log_event_emits_json_payload_without_none_fields(monkeypatch) -> None:
     datetime.fromisoformat(payload["timestamp"])
 
 
+def test_log_event_can_skip_async_persistence(monkeypatch) -> None:
+    calls: list[str] = []
+    user_id = uuid4()
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", calls.append)  # noqa: SLF001
+    event_logger.configure_event_logging(session_factory=object())  # type: ignore[arg-type]
+
+    event_logger.log_event(
+        "email_sent",
+        user_id=user_id,
+        persist_async=False,
+    )
+
+    assert len(calls) == 1
+    assert not event_logger._PENDING_EVENT_TASKS  # noqa: SLF001
+
+
 @pytest.mark.asyncio
 async def test_flush_event_tasks_waits_for_pending_persistence(monkeypatch) -> None:
     gate = asyncio.Event()

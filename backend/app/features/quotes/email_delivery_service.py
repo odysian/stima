@@ -44,6 +44,15 @@ class QuoteEmailRepositoryProtocol(Protocol):
         event_name: str,
     ) -> datetime | None: ...
 
+    async def persist_quote_event(
+        self,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+        customer_id: UUID,
+        event_name: str,
+    ) -> None: ...
+
 
 @dataclass(slots=True)
 class QuoteEmailTemplateContext:
@@ -137,11 +146,18 @@ class QuoteEmailDeliveryService:
                 status_code=502,
             ) from exc
 
+        await self._repository.persist_quote_event(
+            user_id=context.user_id,
+            quote_id=context.quote_id,
+            customer_id=context.customer_id,
+            event_name="email_sent",
+        )
         log_event(
             "email_sent",
             user_id=context.user_id,
             quote_id=context.quote_id,
             customer_id=context.customer_id,
+            persist_async=False,
         )
         return shared_quote
 

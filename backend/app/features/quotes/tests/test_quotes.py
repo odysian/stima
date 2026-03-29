@@ -753,6 +753,51 @@ async def test_send_quote_email_returns_429_when_duplicate_send_guard_triggers(
     assert mock_email_service.messages == []
 
 
+async def test_send_quote_email_returns_429_on_immediate_retry_after_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.json() == {
+        "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
+    }
+    assert len(mock_email_service.messages) == 1
+
+    user = await _get_user_by_email(db_session, credentials["email"])
+    email_sent_count = await db_session.scalar(
+        select(func.count())
+        .select_from(EventLog)
+        .where(
+            EventLog.user_id == user.id,
+            EventLog.event_name == "email_sent",
+            EventLog.metadata_json["quote_id"].as_string() == quote["id"],
+        )
+    )
+    assert email_sent_count == 1
+
+
 @pytest.mark.parametrize(
     ("raise_configuration_error", "raise_send_error", "expected_status", "expected_detail"),
     [

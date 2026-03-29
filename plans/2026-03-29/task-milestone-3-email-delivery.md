@@ -48,7 +48,7 @@ Option B (schema change): add a `last_emailed_at` field to `documents` (or creat
 
 Default recommendation: Option A, to avoid schema changes.
 
-Known gap / explicit resolution: event persistence is fire-and-forget in `log_event()` (async DB write). Two near-simultaneous taps from the same client can race the "last email" lookup before the previous write commits. We accept this for pilot scale (UI disables the button during in-flight sends), and we will revisit if duplicate emails show up in real usage; a schema-based `last_emailed_at` (Option B) is the contingency.
+Known gap / explicit resolution: `email_sent` is persisted synchronously on the request path before the response returns, so immediate retries are blocked by the 5-minute guard. Truly overlapping concurrent requests are still pilot-scale best-effort until we introduce a schema-backed `last_emailed_at` field or row-lock-based throttle (Option B).
 
 ### 2) Email provider integration style
 - Use Resend for transactional delivery and keep the integration thin.
@@ -179,6 +179,6 @@ Milestone 3 has explicit infrastructure pre-work; PR should not be opened unless
 ---
 ## Residual Risk / Known Limitations (for reviewers)
 1. Partial-success on `502`: share transition to `shared` happens before the provider call; if the provider fails, the quote is already shared but `email_sent` is not logged (no rollback; no retry queue in V1 scope).
-2. Async event persistence race: duplicate-send guard relies on pilot `event_logs` persistence which is fire-and-forget; two near-simultaneous taps can potentially both pass the guard. Pilot-scale impact is accepted; schema-based `last_emailed_at` is the contingency.
+2. Overlapping concurrent resend race: immediate retries are blocked by synchronous `email_sent` persistence, but truly overlapping concurrent requests still rely on pilot-scale assumptions; schema-based `last_emailed_at` (or an equivalent atomic throttle) is the contingency if duplicates show up in practice.
 3. `FRONTEND_BASE_URL` misconfiguration risk: incorrect base URL would cause email links to point to the wrong domain. Implementation should guard/validate in config.
 4. Email HTML client coverage is manual-only in this milestone: `make backend-verify` can’t validate Outlook/Gmail/Apple Mail quirks; we accept this in exchange for pilot speed.

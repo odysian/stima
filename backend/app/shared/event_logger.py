@@ -64,6 +64,7 @@ def log_event(
     quote_id: UUID | None = None,
     customer_id: UUID | None = None,
     detail: str | None = None,
+    persist_async: bool = True,
 ) -> None:
     """Emit a structured JSON log record for one business event."""
     payload = {
@@ -78,7 +79,12 @@ def log_event(
         json.dumps({key: value for key, value in payload.items() if value is not None})
     )
 
-    if event not in _PILOT_EVENT_NAMES or _EVENT_LOG_SESSION_FACTORY is None or user_id is None:
+    if (
+        not persist_async
+        or event not in _PILOT_EVENT_NAMES
+        or _EVENT_LOG_SESSION_FACTORY is None
+        or user_id is None
+    ):
         return
 
     try:

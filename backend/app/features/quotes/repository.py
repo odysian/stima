@@ -409,6 +409,27 @@ class QuoteRepository:
             .limit(1)
         )
 
+    async def persist_quote_event(
+        self,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+        customer_id: UUID,
+        event_name: str,
+    ) -> None:
+        """Synchronously persist one quote-scoped pilot event row."""
+        self._session.add(
+            EventLog(
+                user_id=user_id,
+                event_name=event_name,
+                metadata_json={
+                    "quote_id": str(quote_id),
+                    "customer_id": str(customer_id),
+                },
+            )
+        )
+        await self._session.commit()
+
     async def create(
         self,
         *,
