@@ -7,6 +7,7 @@ import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
@@ -76,18 +77,13 @@ export function QuoteList(): React.ReactElement {
     [quotes],
   );
   const timezone = user?.timezone ?? null;
+  const quoteSubtitle =
+    !isLoading && !loadError ? `${activeQuoteCount} active · ${pendingReviewCount} pending` : undefined;
 
   return (
     <main className="min-h-screen bg-background pb-24">
-      <section className="mx-auto w-full max-w-3xl py-2">
-        <div className="px-4 pt-6 pb-4">
-          <h1 className="font-headline text-2xl font-bold tracking-tight text-primary">
-            Stima Quotes
-          </h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            {activeQuoteCount} active {"\u00b7"} {pendingReviewCount} pending review
-          </p>
-        </div>
+      <ScreenHeader title="Quotes" subtitle={quoteSubtitle} />
+      <section className="mx-auto w-full max-w-3xl pb-2 pt-20">
 
         <div className="mb-4 px-4">
           <Input
@@ -125,12 +121,9 @@ export function QuoteList(): React.ReactElement {
 
         {!isLoading && !loadError && filteredQuotes.length > 0 ? (
           <>
-            <div className="mb-2 flex items-center justify-between px-4">
+            <div className="mb-2 px-4">
               <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                 PAST QUOTES
-              </p>
-              <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                Sorted by: Most Recent
               </p>
             </div>
             <div className="mx-4 rounded-xl bg-surface-container-low p-3">

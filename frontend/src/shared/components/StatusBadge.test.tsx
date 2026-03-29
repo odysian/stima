@@ -28,13 +28,11 @@ describe("StatusBadge", () => {
     expect(screen.getByText("Viewed")).toHaveClass("bg-warning-container", "text-warning");
   });
 
-  it("renders approved variant styles with an inline icon", () => {
+  it("renders approved variant styles without an inline icon", () => {
     const { container } = render(<StatusBadge variant="approved" />);
 
     expect(screen.getByText("Approved")).toHaveClass("bg-success-container", "text-success");
-    expect(container.querySelector(".material-symbols-outlined")).toHaveTextContent(
-      "check_circle",
-    );
+    expect(container.querySelector(".material-symbols-outlined")).toBeNull();
   });
 
   it("renders declined variant styles", () => {
