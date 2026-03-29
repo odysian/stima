@@ -1,4 +1,3 @@
-import userEvent from "@testing-library/user-event";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -105,8 +104,7 @@ function renderScreen(
 }
 
 async function openOverflowMenu(): Promise<void> {
-  const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: /more actions/i }));
+  fireEvent.click(screen.getByRole("button", { name: /more actions/i }));
 }
 
 beforeEach(() => {
@@ -168,18 +166,21 @@ describe("QuotePreview", () => {
     expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
   });
 
-  it("hides edit and overflow actions when the quote is approved or declined", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "approved", share_token: "share-token-1" }),
-    );
+  it.each(["approved", "declined"] as const)(
+    "hides edit and overflow actions when the quote is %s",
+    async (status) => {
+      mockedQuoteService.getQuote.mockResolvedValueOnce(
+        makeQuoteDetail({ status, share_token: "share-token-1" }),
+      );
 
-    renderScreen();
+      renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
-    expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /more actions/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
-  });
+      await screen.findByRole("heading", { name: "Test Customer" });
+      expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /more actions/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
+    },
+  );
 
   it("shows share as the primary action when the quote is ready", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
@@ -581,6 +582,12 @@ describe("QuotePreview", () => {
   });
 
   it("copies the existing share URL from the overflow menu", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: { writeText: writeTextMock },
+    });
     mockedQuoteService.getQuote.mockResolvedValue(
       makeQuoteDetail({ status: "shared", share_token: "already-shared-token" }),
     );
@@ -591,7 +598,52 @@ describe("QuotePreview", () => {
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /copy share link/i }));
 
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(
+        "http://localhost:3000/doc/already-shared-token",
+      );
+    });
     expect(await screen.findByText("Share link copied to clipboard.")).toBeInTheDocument();
+  });
+
+  it("shows manual-copy guidance when clipboard API is unavailable from the overflow menu", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    mockedQuoteService.getQuote.mockResolvedValue(
+      makeQuoteDetail({ status: "shared", share_token: "already-shared-token" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /copy share link/i }));
+
+    expect(await screen.findByText("Copy this share link manually.")).toBeInTheDocument();
+  });
+
+  it("shows an error when clipboard write fails from the overflow menu", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error("Clipboard denied")),
+      },
+    });
+    mockedQuoteService.getQuote.mockResolvedValue(
+      makeQuoteDetail({ status: "shared", share_token: "already-shared-token" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /copy share link/i }));
+
+    expect(await screen.findByText("Clipboard denied")).toBeInTheDocument();
   });
 
   it("shows an error when share request fails", async () => {

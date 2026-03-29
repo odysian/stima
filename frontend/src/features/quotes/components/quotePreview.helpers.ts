@@ -1,5 +1,6 @@
 import type { QuoteDetail, QuoteStatus } from "@/features/quotes/types/quote.types";
 import type { OverflowMenuItem } from "@/shared/components/OverflowMenu";
+import { formatDate } from "@/shared/lib/formatters";
 
 export type QuotePreviewActionState = QuoteStatus;
 
@@ -46,18 +47,6 @@ export function canNavigateBack(): boolean {
   return window.history.length > 1;
 }
 
-function formatStatusTimestamp(value: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
-}
-
 export function getCompactStatusRow(
   actionState: QuotePreviewActionState,
   quote: QuoteDetail | null,
@@ -82,18 +71,20 @@ export function getCompactStatusRow(
       icon: "ios_share",
       iconClasses: "bg-info-container text-info",
       text: "Quote shared",
-      timestamp: formatStatusTimestamp(timestampValue),
+      timestamp: formatDate(timestampValue),
       timestampLabel: "Shared",
       timestampValue,
     };
   }
 
+  // The quote schema does not store dedicated viewed/won/lost transition timestamps yet,
+  // so updated_at is the best available proxy for when these states were recorded.
   if (actionState === "viewed") {
     return {
       icon: "visibility",
       iconClasses: "bg-warning-container text-warning",
       text: "Customer viewed this quote",
-      timestamp: formatStatusTimestamp(quote.updated_at),
+      timestamp: formatDate(quote.updated_at),
       timestampLabel: "Viewed",
       timestampValue: quote.updated_at,
     };
@@ -104,7 +95,7 @@ export function getCompactStatusRow(
       icon: "check_circle",
       iconClasses: "bg-success-container text-success",
       text: "Quote marked as won",
-      timestamp: formatStatusTimestamp(quote.updated_at),
+      timestamp: formatDate(quote.updated_at),
       timestampLabel: "Approved",
       timestampValue: quote.updated_at,
     };
@@ -114,7 +105,7 @@ export function getCompactStatusRow(
     icon: "cancel",
     iconClasses: "bg-error-container text-error",
     text: "Quote marked as lost",
-    timestamp: formatStatusTimestamp(quote.updated_at),
+    timestamp: formatDate(quote.updated_at),
     timestampLabel: "Declined",
     timestampValue: quote.updated_at,
   };
