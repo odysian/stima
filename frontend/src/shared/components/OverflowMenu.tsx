@@ -37,10 +37,22 @@ export function OverflowMenu({
       return undefined;
     }
 
+    const container = containerRef.current;
+    if (!container) {
+      return undefined;
+    }
+
     function handlePointerDown(event: PointerEvent): void {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      if (!container.contains(event.target as Node)) {
         setIsOpen(false);
         queueFocusRestore(triggerRef.current);
+      }
+    }
+
+    function handleFocusOut(event: FocusEvent): void {
+      const nextFocusedNode = event.relatedTarget;
+      if (!nextFocusedNode || !container.contains(nextFocusedNode as Node)) {
+        setIsOpen(false);
       }
     }
 
@@ -54,9 +66,11 @@ export function OverflowMenu({
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    container.addEventListener("focusout", handleFocusOut);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      container.removeEventListener("focusout", handleFocusOut);
     };
   }, [isOpen]);
 

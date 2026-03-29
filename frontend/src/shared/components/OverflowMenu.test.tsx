@@ -67,4 +67,36 @@ describe("OverflowMenu", () => {
       expect(trigger).toHaveFocus();
     });
   });
+
+  it("closes when focus tabs outside the menu container", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <>
+        <OverflowMenu
+          items={[
+            {
+              label: "Copy Share Link",
+              icon: "content_copy",
+              onSelect: vi.fn(),
+            },
+          ]}
+        />
+        <button type="button">After</button>
+      </>,
+    );
+
+    const trigger = screen.getByRole("button", { name: /more actions/i });
+    await user.click(trigger);
+
+    await user.tab();
+    expect(screen.getByRole("menuitem", { name: /copy share link/i })).toHaveFocus();
+
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "After" })).toHaveFocus();
+    });
+  });
 });

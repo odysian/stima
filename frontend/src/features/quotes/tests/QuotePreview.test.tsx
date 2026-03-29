@@ -182,6 +182,27 @@ describe("QuotePreview", () => {
     },
   );
 
+  it.each(["shared", "viewed"] as const)(
+    "hides edit while keeping follow-up actions in the overflow menu when the quote is %s",
+    async (status) => {
+      mockedQuoteService.getQuote.mockResolvedValueOnce(
+        makeQuoteDetail({ status, share_token: "share-token-1" }),
+      );
+
+      renderScreen();
+
+      await screen.findByRole("heading", { name: "Test Customer" });
+      expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
+
+      await openOverflowMenu();
+
+      expect(screen.getByRole("menuitem", { name: /copy share link/i })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: /mark as won/i })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: /mark as lost/i })).toBeInTheDocument();
+    },
+  );
+
   it("shows share as the primary action when the quote is ready", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuoteDetail({ status: "ready" }));
 
