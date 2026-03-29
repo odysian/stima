@@ -13,8 +13,8 @@ import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { TradeTypeSelector } from "@/shared/components/TradeTypeSelector";
 
 export function SettingsScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -36,6 +36,7 @@ export function SettingsScreen(): React.ReactElement {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLogoSubmitting, setIsLogoSubmitting] = useState(false);
   const [isRemoveLogoOpen, setIsRemoveLogoOpen] = useState(false);
+  const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
   const [logoPreviewVersion, setLogoPreviewVersion] = useState(0);
 
   function applyProfile(profile: ProfileResponse): void {
@@ -122,6 +123,11 @@ export function SettingsScreen(): React.ReactElement {
     }
   };
 
+  const onConfirmSignOut = async () => {
+    setIsSignOutConfirmOpen(false);
+    await logout();
+  };
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaveError(null);
@@ -151,7 +157,7 @@ export function SettingsScreen(): React.ReactElement {
   };
 
   return (
-    <main className="min-h-screen bg-background pb-24 pt-16">
+    <main className="min-h-screen bg-background pb-32 pt-16">
       <ScreenHeader title="Settings" onBack={() => navigate(-1)} />
 
       <section className="mx-auto w-full max-w-2xl space-y-4 px-4 pt-4">
@@ -166,7 +172,7 @@ export function SettingsScreen(): React.ReactElement {
         ) : null}
 
         {!isLoadingProfile && !loadError ? (
-          <form className="space-y-4" onSubmit={onSubmit}>
+          <form className="space-y-4 pb-28" onSubmit={onSubmit}>
             {saveSuccess ? (
               <p role="status" className="rounded-lg bg-success-container p-3 text-sm text-success">
                 {saveSuccess}
@@ -183,62 +189,61 @@ export function SettingsScreen(): React.ReactElement {
               </h2>
 
               <div className="mt-4 flex flex-col gap-4">
-                <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-2">
-                      <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                        Logo
-                      </p>
-                      <p className="text-sm text-on-surface-variant">
-                        Shows up on all future quote PDFs.
-                      </p>
-                      <p className="text-xs text-on-surface-variant">JPEG or PNG, up to 2 MB.</p>
+                <div className="rounded-xl bg-surface-container-low px-4 py-3">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1 pr-2">
+                        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                          Logo
+                        </p>
+                        <p className="text-xs text-on-surface-variant">
+                          JPEG or PNG, up to 2 MB. Appears on quote PDFs.
+                        </p>
+                      </div>
+
+                      {hasLogo ? (
+                        <img
+                          key={logoPreviewVersion}
+                          src={logoPreviewSrc}
+                          alt="Business logo preview"
+                          className="h-10 w-auto max-w-[140px] shrink-0 object-contain"
+                        />
+                      ) : (
+                        <p className="shrink-0 text-right text-xs text-on-surface-variant">
+                          No logo uploaded yet.
+                        </p>
+                      )}
                     </div>
 
-                    {hasLogo ? (
-                      <img
-                        key={logoPreviewVersion}
-                        src={logoPreviewSrc}
-                        alt="Business logo preview"
-                        className="h-12 w-auto max-w-[180px] object-contain"
-                      />
-                    ) : (
-                      <p className="text-sm text-on-surface-variant">No logo uploaded yet.</p>
-                    )}
-                  </div>
-
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <label
-                      htmlFor="settings-logo-upload"
-                      className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
-                    >
-                      {hasLogo ? "Upload New" : "Upload Logo"}
-                    </label>
-                    <input
-                      id="settings-logo-upload"
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      className="sr-only"
-                      disabled={isLogoSubmitting}
-                      onChange={onLogoUpload}
-                    />
-                    {hasLogo ? (
-                      <button
-                        type="button"
-                        className="inline-flex min-h-12 items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={isLogoSubmitting}
-                        onClick={() => setIsRemoveLogoOpen(true)}
+                    <div className="flex items-center gap-3">
+                      <label
+                        htmlFor="settings-logo-upload"
+                        className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
                       >
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-
-                  {logoError ? (
-                    <div className="mt-4">
-                      <FeedbackMessage variant="error">{logoError}</FeedbackMessage>
+                        {hasLogo ? "Upload New" : "Upload Logo"}
+                      </label>
+                      <input
+                        id="settings-logo-upload"
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        className="sr-only"
+                        disabled={isLogoSubmitting}
+                        onChange={onLogoUpload}
+                      />
+                      {hasLogo ? (
+                        <button
+                          type="button"
+                          className="inline-flex min-h-12 items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={isLogoSubmitting}
+                          onClick={() => setIsRemoveLogoOpen(true)}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
                     </div>
-                  ) : null}
+
+                    {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
+                  </div>
                 </div>
 
                 <Input
@@ -259,14 +264,23 @@ export function SettingsScreen(): React.ReactElement {
                   value={lastName}
                   onChange={(event) => setLastName(event.target.value)}
                 />
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-1 text-sm font-medium text-on-surface">Trade type</legend>
-                  <TradeTypeSelector
-                    options={TRADE_TYPES}
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="settings-trade-type" className="text-sm font-medium text-on-surface">
+                    Trade type
+                  </label>
+                  <select
+                    id="settings-trade-type"
                     value={tradeType}
-                    onChange={(value) => setTradeType(value as TradeType)}
-                  />
-                </fieldset>
+                    onChange={(event) => setTradeType(event.target.value as TradeType)}
+                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {TRADE_TYPES.map((tradeTypeOption) => (
+                      <option key={tradeTypeOption} value={tradeTypeOption}>
+                        {tradeTypeOption}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="settings-timezone" className="text-sm font-medium text-on-surface">
                     Timezone
@@ -287,39 +301,37 @@ export function SettingsScreen(): React.ReactElement {
               </div>
             </section>
 
-            <section className="ghost-shadow rounded-xl bg-surface-container-lowest p-6">
+            <section className="rounded-xl bg-surface-container-low p-4">
               <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                 Account
               </h2>
-              <div className="mt-4 space-y-4">
-                <div className="flex flex-col gap-1">
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                     Email
                   </p>
-                  <p className="text-sm text-on-surface">{email}</p>
+                  <p className="truncate text-sm text-on-surface">{email}</p>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                    Session
-                  </span>
-                  {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
-                  <button
-                    type="button"
-                    className="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white transition-all active:scale-[0.98]"
-                    onClick={() => void logout()}
-                  >
-                    Sign Out
-                  </button>
-                </div>
+                {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
+                <button
+                  type="button"
+                  className="shrink-0 rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white transition-all active:scale-[0.98]"
+                  onClick={() => setIsSignOutConfirmOpen(true)}
+                >
+                  Sign Out
+                </button>
               </div>
             </section>
 
-            <div>
-              <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
-                Save Changes
-              </Button>
-            </div>
+            {/* Keep the footer inside the form so the fixed primary action submits natively. */}
+            <ScreenFooter>
+              <div className="mx-auto w-full max-w-2xl">
+                <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
+                  Save Changes
+                </Button>
+              </div>
+            </ScreenFooter>
           </form>
         ) : null}
       </section>
@@ -332,6 +344,18 @@ export function SettingsScreen(): React.ReactElement {
           cancelLabel="Cancel"
           onConfirm={() => void onConfirmRemoveLogo()}
           onCancel={() => setIsRemoveLogoOpen(false)}
+          variant="destructive"
+        />
+      ) : null}
+
+      {isSignOutConfirmOpen ? (
+        <ConfirmModal
+          title="Sign out?"
+          body="You'll need to sign back in to access your account."
+          confirmLabel="Sign Out"
+          cancelLabel="Cancel"
+          onConfirm={() => void onConfirmSignOut()}
+          onCancel={() => setIsSignOutConfirmOpen(false)}
           variant="destructive"
         />
       ) : null}

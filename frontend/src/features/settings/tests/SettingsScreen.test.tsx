@@ -48,8 +48,8 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
   };
 }
 
-function renderScreen(): void {
-  render(
+function renderScreen() {
+  return render(
     <MemoryRouter>
       <SettingsScreen />
     </MemoryRouter>,
@@ -86,7 +86,7 @@ afterEach(() => {
 });
 
 describe("SettingsScreen", () => {
-  it("renders pre-filled form fields, trade selector, read-only account email, and logo upload control", async () => {
+  it("renders pre-filled form fields in the tightened layout with compact selects", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({
         email: "owner@example.com",
@@ -102,11 +102,7 @@ describe("SettingsScreen", () => {
     expect(await screen.findByDisplayValue("Bright Lawn Care")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Hill")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(1);
-    expect(
-      screen.getAllByRole("button", { name: new RegExp(TRADE_TYPES.join("|"), "i") }),
-    ).toHaveLength(TRADE_TYPES.length);
-    expect(screen.getByRole("button", { name: "Plumber" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText(/trade type/i)).toHaveValue("Plumber");
     expect(screen.getByLabelText(/timezone/i)).toHaveValue("America/New_York");
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.getByText("Email")).toHaveClass(
@@ -116,14 +112,11 @@ describe("SettingsScreen", () => {
       "tracking-widest",
       "text-outline",
     );
-    expect(screen.getByText("Session")).toHaveClass(
-      "text-[0.6875rem]",
-      "font-bold",
-      "uppercase",
-      "tracking-widest",
-      "text-outline",
-    );
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).not.toBeNull();
+    expect(screen.getByText("Account").closest("section")).toHaveClass("bg-surface-container-low");
+    expect(screen.queryByText("Session")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
@@ -147,7 +140,7 @@ describe("SettingsScreen", () => {
     expect((screen.getByLabelText(/business name/i) as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText(/first name/i) as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText(/last name/i) as HTMLInputElement).value).toBe("");
-    expect(screen.getByRole("button", { name: TRADE_TYPES[0] })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText(/trade type/i)).toHaveValue(TRADE_TYPES[0]);
     expect(screen.getByLabelText(/timezone/i)).toHaveValue("UTC");
 
     const errorOutput = consoleErrorSpy.mock.calls.flat().join(" ");
@@ -192,7 +185,9 @@ describe("SettingsScreen", () => {
     fireEvent.change(screen.getByLabelText(/last name/i), {
       target: { value: "Reed" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Builder" }));
+    fireEvent.change(screen.getByLabelText(/trade type/i), {
+      target: { value: "Builder" },
+    });
     fireEvent.change(screen.getByLabelText(/timezone/i), {
       target: { value: "UTC" },
     });
@@ -278,7 +273,7 @@ describe("SettingsScreen", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /save changes/i })).toBeEnabled());
   });
 
-  it("calls logout when sign out is clicked", async () => {
+  it("requires confirmation before signing out", async () => {
     const logout = vi.fn(async () => undefined);
     mockedUseAuth.mockReturnValue({
       user: {
@@ -304,6 +299,18 @@ describe("SettingsScreen", () => {
     expect(signOutButton).not.toHaveClass("border");
 
     fireEvent.click(signOutButton);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Sign out?")).toBeInTheDocument();
+    expect(logout).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
+    await waitFor(() => expect(screen.queryByText("Sign out?")).not.toBeInTheDocument());
+    expect(logout).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
+    const confirmDialog = await screen.findByRole("dialog");
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: /^sign out$/i }));
 
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
   });
