@@ -239,7 +239,7 @@ export function CustomerDetailScreen(): React.ReactElement {
                       className="flex-1"
                       onClick={() => navigate(`/quotes/capture/${customer.id}`)}
                     >
-                      Create Quote {"->"}
+                      Create Quote
                     </Button>
                     <button
                       type="button"

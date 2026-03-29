@@ -330,14 +330,14 @@ export function ReviewScreen(): React.ReactElement | null {
           />
         </section>
 
-        <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
+        <div className="flex items-end justify-between">
           <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>
           <span className="text-[0.6875rem] uppercase tracking-widest text-outline">
             {currentDraft.lineItems.length} ITEMS EXTRACTED
           </span>
         </div>
 
-        <div className="space-y-3">
+        <div className="mt-3 space-y-3">
           {currentDraft.lineItems.length > 0 ? (
             currentDraft.lineItems.map((lineItem, index) => (
               <LineItemCard
@@ -364,7 +364,7 @@ export function ReviewScreen(): React.ReactElement | null {
           onClick={onLineItemAdd}
         >
           <span className="material-symbols-outlined text-base">add</span>
-          + Add Manual Line Item
+          Add Line Item
         </button>
 
         <TotalAmountSection
@@ -416,7 +416,7 @@ export function ReviewScreen(): React.ReactElement | null {
             disabled={!canSubmit || isInteractionLocked}
             isLoading={isSaving}
           >
-            Generate Quote {">"}
+            Generate Quote
           </Button>
         </div>
       </ScreenFooter>

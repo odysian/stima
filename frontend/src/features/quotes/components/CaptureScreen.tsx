@@ -290,7 +290,7 @@ export function CaptureScreen(): React.ReactElement {
           {extractionStage ? (
             <p className="mb-2 text-center text-sm text-on-surface-variant">{extractionStage}</p>
           ) : null}
-          {extractionHelperCopy ? (
+          {extractionStage && extractionHelperCopy ? (
             <p className="mb-3 text-center text-xs text-on-surface-variant">{extractionHelperCopy}</p>
           ) : null}
           <Button
@@ -300,7 +300,7 @@ export function CaptureScreen(): React.ReactElement {
             isLoading={isExtracting}
             onClick={() => void onExtract()}
           >
-            Extract Line Items ✦
+            Extract Line Items
           </Button>
         </div>
       </ScreenFooter>

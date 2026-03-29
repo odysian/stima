@@ -233,7 +233,7 @@ describe("ReviewScreen", () => {
     renderScreen(makeDraft());
 
     expect(screen.getByText(/review missing prices before sharing/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate quote >/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^generate quote$/i })).toBeEnabled();
   });
 
   it("lets users edit transcript notes locally", async () => {
@@ -300,10 +300,10 @@ describe("ReviewScreen", () => {
     await user.click(screen.getByRole("button", { name: /replace draft/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /generate quote >/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /^generate quote$/i })).toBeDisabled();
     });
 
-    await user.click(screen.getByRole("button", { name: /generate quote >/i }));
+    await user.click(screen.getByRole("button", { name: /^generate quote$/i }));
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
 
     regeneration.resolve({
@@ -314,7 +314,7 @@ describe("ReviewScreen", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /generate quote >/i })).toBeEnabled();
+      expect(screen.getByRole("button", { name: /^generate quote$/i })).toBeEnabled();
     });
   });
 
@@ -406,7 +406,7 @@ describe("ReviewScreen", () => {
   it("adds a blank manual line item", () => {
     renderScreen(makeDraft());
 
-    fireEvent.click(screen.getByRole("button", { name: /\+ add manual line item/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add line item/i }));
 
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",
@@ -426,7 +426,7 @@ describe("ReviewScreen", () => {
   it("creates quote, clears draft, and navigates to preview", async () => {
     renderScreen(makeDraft({ title: "  Front Yard Refresh  ", notes: "Thanks for your business" }));
 
-    fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^generate quote$/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.createQuote).toHaveBeenCalledWith({
@@ -447,7 +447,7 @@ describe("ReviewScreen", () => {
     mockedQuoteService.createQuote.mockRejectedValueOnce(new Error("Unable to create quote"));
     renderScreen(makeDraft());
 
-    fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^generate quote$/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to create quote");
   });
@@ -462,7 +462,7 @@ describe("ReviewScreen", () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^generate quote$/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.createQuote).toHaveBeenCalledWith(
@@ -488,7 +488,7 @@ describe("ReviewScreen", () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /generate quote >/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^generate quote$/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.createQuote).toHaveBeenCalledWith(
@@ -506,7 +506,7 @@ describe("ReviewScreen", () => {
       }),
     );
 
-    const submitButton = screen.getByRole("button", { name: /generate quote >/i });
+    const submitButton = screen.getByRole("button", { name: /^generate quote$/i });
     expect(submitButton).toBeDisabled();
     fireEvent.click(submitButton);
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
@@ -519,7 +519,7 @@ describe("ReviewScreen", () => {
       }),
     );
 
-    expect(screen.getByRole("button", { name: /generate quote >/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^generate quote$/i })).toBeDisabled();
   });
 
   it("disables submit when there are no line items", () => {
@@ -530,7 +530,7 @@ describe("ReviewScreen", () => {
     );
 
     expect(screen.getByText("No line items extracted yet.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate quote >/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^generate quote$/i })).toBeDisabled();
   });
 
   it("redirects to home when no draft is available", async () => {
