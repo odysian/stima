@@ -14,16 +14,18 @@ can produce a professional quote fast. V1 makes that quote mean something — th
 sees it on a branded page, responds to it, and the contractor knows the outcome and can
 act on it.
 
-By the end of V1, a contractor can run their full quoting-to-invoice workflow inside
-Stima without leaving the app or copy-pasting links.
+By the end of V1, a contractor has a complete quoting-to-invoice workflow inside Stima:
+professional email delivery or fast manual link sharing, status tracking, and lightweight
+invoice conversion from a won quote.
 
 ---
 
 ## V1 Goal
 
-> A contractor sends a quote from Stima. The customer receives it by email, views a
-> branded landing page, and approves or declines. The contractor sees the response,
-> follows up if needed, and converts the approved quote to an invoice in one action.
+> A contractor sends a quote from Stima — by email or by sharing a link directly. The
+> customer views a branded landing page. The contractor records the outcome (Won or Lost)
+> after the customer responds, follows up if needed, and converts a won quote (`approved`
+> status) to an invoice in one action.
 
 ---
 
@@ -34,9 +36,10 @@ Stima without leaving the app or copy-pasting links.
 - Email delivery from Stima to the customer
 - A customer-facing branded quote page
 - Quote status that reflects real outcomes
-- Lightweight invoice generation from an approved quote
+- Lightweight invoice generation from a won quote (`approved` status)
 - Logo and branding on PDFs
-- Sales tax, discounts, and deposits on quotes and invoices (display-only)
+- Optional pricing controls on quotes and invoices (discounts, deposits, and simple tax where
+  needed — all display-only and optional)
 - Operational visibility (error monitoring, basic analytics)
 
 **V1 is not:**
@@ -75,7 +78,8 @@ This model is secure when:
 ### GET /doc/:token (view landing page)
 
 - No authentication required
-- No write side effects beyond status transition (`shared → viewed`) and event log
+- No write side effects beyond event logging. Quote pages may transition status
+  (`shared → viewed`); invoice pages do not transition status on view.
 - Returns 404 for unknown tokens — do not distinguish "wrong token" from "not found"
   (enumeration resistance)
 
@@ -243,29 +247,48 @@ Invoice pages also render read-only.
 
 ---
 
-### Milestone 3: Email Delivery
+### Milestone 3: Email Delivery and Copy Link Visibility
 
-**Goal:** The contractor can send the quote link to the customer by email directly from
-Stima — no copy-pasting.
+**Goal:** The contractor can send the quote by email directly from Stima. Copy Link is
+always immediately accessible as a secondary action — not hidden in a menu or restricted
+to a narrow state transition. Both email and manual link-sharing are first-class delivery
+paths in V1.
 
 **Scope:**
-- "Send by Email" action on the quote preview/share screen
+- "Send by Email" primary action on the quote preview/share screen
+- "Copy Link" always-visible secondary action — accessible whenever a share link exists,
+  not gated on a specific status transition
 - Sends a transactional email to the customer's email address with:
   - contractor name and business name in the from/subject line
-  - quote number and total in the email body
+  - quote number, optional title, and total in the email body
   - a clear link to the public landing page
   - the PDF attached or linked as a secondary option
+  - a contact line: "Questions? Call or text [contractor phone number]."
+  - contractor email address if present (optional footer field)
 - Email is only available if the customer record has an email address
-- If no customer email exists, prompt to add one or fall back to copy-link
+- If no customer email exists, Copy Link / manual sharing remains fully functional;
+  the "Send by Email" action is disabled with a help prompt to add customer email
 - Sent email transitions quote status to `shared` (if not already)
 - Re-sharing a quote already at `viewed` or later does not regress the status
 - Delivery provider: SendGrid (or equivalent transactional email service)
 
+**Action hierarchy on the quote preview screen:**
+1. Primary: Send by Email (when customer email is available)
+2. Always-visible secondary: Copy Link (whenever a share link exists)
+3. Utility: Open PDF
+
+Both delivery paths are first-class. Email provides a professional, branded, permanent
+delivery record. Copy Link supports the text-forward workflow that remains the most
+common sharing behavior for many contractors in the field.
+
 **Acceptance criteria:**
 - Contractor can send email to customer from the quote preview screen
+- Copy Link is always visible as a secondary action when a share link exists
 - Email renders correctly on mobile email clients
-- Email includes quote number, total, contractor name, and the landing page link
-- Missing customer email is handled gracefully with a prompt, not a broken state
+- Email includes: quote number, total, contractor name, business name, the landing page
+  link, a contact line with contractor phone number, and contractor email if present
+- Missing customer email is handled gracefully: Copy Link remains available, "Send by
+  Email" is disabled with a help prompt
 - A `quote_shared` event is recorded on send
 - Rate limiting or send guards prevent accidental duplicate sends
 
@@ -283,66 +306,129 @@ the build sequence, not on the day Milestone 3 begins.
 
 ---
 
-### Milestone 4: Reminder Workflow
 
-**Goal:** Contractors do not lose jobs because they forgot to follow up on an unanswered
-quote.
+### Milestone 4: Quote PDF Presentation Refinement
+
+**Goal:** Make the quote PDF professional and trustworthy enough to send to a new customer
+without apology. Tighten visual hierarchy, typography, and layout so the document reflects the
+quality the contractor intended.
+
+**Why this milestone exists:** The landing page (M2) and email delivery (M3) put the PDF
+directly in front of customers. If the document looks like a generic printout, it undercuts
+the contractor's professionalism regardless of how fast they produced it. PDF quality is also
+a one-way street — once a contractor has sent real quotes to real customers, the baseline is
+set. Reminder automation (the original M4) is a V2 candidate; this improvement is not.
 
 **Scope:**
-- Quotes in `shared` or `viewed` status for more than 3 days surface a reminder prompt
-  in the quote detail view
-- "Resend" action: re-sends the quote email with a short "just following up" wrapper
-- Reminder prompt is informational, not a push notification (V2 can add push)
+- Typography: upgrade font stack (embed Inter or prefer Noto Sans / Ubuntu over bare Arial)
+- Header: increase logo size; add contractor phone (and email if present) to the identity block
+- Title: render as a standalone document headline above the meta grid, not a labeled meta field
+- Line items: collapse to 2-column layout (Description+Details | Price); items without details
+  use the full cell width; null prices render as `—`
+- Total section: visually separated from the line-items table, stronger typographic weight
+- Notes: accent-bar left border treatment (no bordered box)
+- Page setup: explicit `@page` margin and A4 size
+- Empty field safety: guard owner name when both first and last name are null
+- `QuoteRenderContext` extension: add contractor phone and email from the users table
 
-Note: The base "Mark as Lost" action (setting status to `declined`, emitting
-`quote_marked_lost`) ships in Milestone 1. Milestone 4 adds the idle-detection
-reminder banner that surfaces it contextually after 3 days of no activity.
+**Out of scope:** invoice template (M5's responsibility), M7 fields (tax/discount/deposit),
+per-user color themes, custom font uploads, Letter vs. A4 preference, email template styling.
+
+**Implementation note:** All changes are in `backend/app/templates/quote.html` and the
+`QuoteRenderContext` dataclass / repository query. No frontend changes required. No new API
+contracts. No schema migration.
 
 **Acceptance criteria:**
-- Quotes idle in `shared` or `viewed` for 3+ days show a reminder banner on detail view
-- Resend sends the same email flow as Milestone 3 with a follow-up subject line
-- Resend is rate-limited (maximum once per 24 hours per quote)
-- Reminder banner disappears once the quote receives an outcome or is manually closed
+- PDF renders correctly for quotes with and without a logo
+- Sparse-quote case renders cleanly: no title, no logo, no customer contact, one item with no
+  details, null total, null owner name — no blank gaps or phantom labels
+- Line items with details show a two-line stack in one cell; items without details show
+  description only
+- Title (when present) appears as a headline above the meta grid; absent title leaves no gap
+- Contractor phone appears in the header identity block when present on the user profile
+- Total section is visually separated from line items
+- Notes section renders with accent-bar treatment
+- All existing PDF template tests pass; sparse-quote test case added
+- `make backend-verify` passes
 
 ---
 
-### Milestone 5: Quote to Invoice Conversion
+### Milestone 5: Won Quote -> Linked Invoice
 
-**Goal:** A contractor who wins a job can convert the approved quote to an invoice in one
-action, without re-entering any line items.
+**Goal:** Let a contractor convert a won quote (`approved` status) into a linked invoice
+with minimal extra input, using the same delivery and public-document patterns already
+introduced for quotes.
+
+**Rationale:** Stima stays quote-first. Invoices are critical downstream artifacts, but V1
+should not create a second mini-app for invoice management. The quote remains the parent
+job record; the invoice is a child document derived from that quote.
 
 **Scope:**
-- "Convert to Invoice" action on approved quotes
-- Creates a new document record with `doc_type: "invoice"` seeded from the quote's
-  line items, total, and customer
-- Invoice inherits the source quote title when present
-- Invoice document gets its own sequential number in `I-001` format
-- Invoice adds one new field: **Due Date** (required, date picker, defaults to 30 days
-  out)
-- Invoice PDF uses the same template as the quote PDF with "Invoice" in the header and
-  the due date in the document metadata block
-- Invoice can be sent by email using the same delivery flow as Milestone 3; the
-  customer-facing page is served at `/doc/:token` and renders read-only (no action
-  buttons — invoices are not two-way)
-- Invoice status lifecycle: `draft → ready → sent` (no approve/decline)
-- Invoices appear in the quote list alongside quotes, differentiated by doc type badge
+- Add a clear "Convert to Invoice" action on quote detail for won quotes (`approved`)
+- Create an invoice (`doc_type = "invoice"`) seeded from source quote data:
+  customer, title/context, line items, totals
+- Generate invoice number (`I-001` format) and set `source_document_id` to preserve
+  quote -> invoice linkage
+- Capture **Due Date** as the primary invoice-specific field: prefilled sensibly
+  (for example +30 days), editable, and lightweight
+- Keep quote detail as the primary invoice entry/access point:
+  - no linked invoice yet -> show compact invoice section/card with CTA
+    "Convert to Invoice"
+  - linked invoice exists -> show compact linked invoice summary card (invoice number,
+    status, due date, total, created date)
+  - do not render full invoice body inline under quote detail
+- Provide a dedicated invoice detail page that reuses quote-detail structure and mental
+  model where practical, while showing invoice-specific metadata (invoice number, due date)
+- Make relationship visible in both directions:
+  - quote detail shows invoice created from this quote
+  - invoice detail shows source quote and links back
+- Reuse existing delivery/public infrastructure:
+  - invoice send/share follows Milestone 3 delivery patterns
+  - public invoice page reuses the Milestone 2 `/doc/:token` document-view model
+  - customer page remains read-only
+- Invoice lifecycle remains lightweight: `draft -> ready -> sent`
+- Keep main list quote-first/quote-only by default; invoices are surfaced from quote detail,
+  not as peer records that pollute the primary list
 
-**Schema note:** `source_document_id` should already exist from the Milestone 1 schema
-expansion. Milestone 5 populates it at conversion time and never updates it after.
-The quote detail screen queries `SELECT * FROM documents WHERE source_document_id =
-:quote_id` to find and surface the resulting invoice.
+**Out of scope:**
+- Invoice dashboards or standalone invoice management layer
+- Overdue/collections workflows or reminder cadences for AR
+- Payment tracking, payment processing, or bookkeeping/accounting features
+- Expanded invoice status systems beyond what V1 needs
+- Full AR/back-office workflows
+- Showing invoices as duplicate peer entries in the main quote list
 
-**Acceptance criteria:**
-- "Convert to Invoice" is available on quotes with `approved` status
-- Invoice is pre-populated with all line items and total from the source quote
-- Invoice number is sequential per user in `I-001` format
-- Due date is required before the invoice can be sent
-- Invoice PDF renders correctly with "Invoice" header and due date
-- Invoice inherits the source quote title when present
-- Invoice can be emailed directly to the customer via `/doc/:token` landing page
-- The source quote and the invoice are linked via `source_document_id`; quote detail
-  shows the resulting invoice
-- Converting a quote to an invoice does not change the quote's status or data
+**Schema note:** `source_document_id` is introduced in Milestone 1. Milestone 5 populates
+it at conversion time and treats the link as immutable application history.
+
+**Depends on:** Milestone 1 (`approved` status, `source_document_id`). Milestone 2
+(`/doc/:token` public document pattern) and Milestone 3 (delivery model) are required
+for fast follow only.
+
+**Acceptance criteria (first cut):**
+- Contractor can create an invoice directly from a won quote (`approved`) without
+  re-entering core quote data
+- Invoice inherits customer, title/context, line items, and totals from the source quote
+- Invoice number is generated in sequential per-user `I-001` format
+- Due date is lightweight and professional: prefilled + editable without adding workflow
+  friction
+- Quote detail is the primary place for invoice creation and access
+- When invoice exists, quote detail shows a compact linked summary card (invoice number,
+  status, due date, total, created date), not a full inline invoice document
+- Invoice has its own dedicated detail page and reuses existing document UI mental model
+- Quote and invoice link to each other clearly (parent/child relationship)
+- Main quote list remains clean and quote-focused by default (no quote+invoice duplicate
+  rows for the same job)
+- Invoice can be shared by copy-link using the existing raw PDF endpoint (`/share/:token`)
+  in first cut
+- Converting to invoice does not mutate the source quote's status or core data
+- No invoice-management sprawl is implied by milestone scope
+
+**Acceptance criteria (fast follow):**
+- Invoice email delivery reuses Milestone 3 delivery infrastructure (invoice-specific
+  content, same delivery model)
+- Public invoice page reuses Milestone 2 `/doc/:token` document-view model with read-only
+  behavior
 
 ---
 
@@ -377,43 +463,66 @@ been removed from V1 scope.
 
 ---
 
-### Milestone 7: Taxes, Discounts, and Deposits
+### Milestone 7: Optional Pricing Controls
 
-**Goal:** Quotes and invoices support the pricing controls contractors need before
-Stima can justify a paid tier — sales tax, a discount line, and a deposit line.
+**Goal:** Add lightweight, optional pricing controls so contractors can reflect real‑world
+discounts, deposits, and simple tax on quotes and invoices without turning Stima into an
+accounting system or cluttering straightforward jobs.
 
-**Pulled forward from V2:** This was originally scoped as V2 Track 1. Moved into V1
-Phase 3 because a contractor cannot be charged for a tool that does not handle sales
-tax on invoices.
+**Why this milestone exists:** Many contractors already adjust pricing in the field — repeat‑customer
+discounts, bundled‑job deals, and occasional goodwill adjustments. A small subset also needs to
+show a deposit or simple sales tax on paperwork. Stima should support these patterns in a way
+that feels natural to solo operators who mostly think in terms of "what should I charge for this
+job," not in terms of accounting workflows or tax engines.
+
+**Pulled forward from V2:** This was originally scoped as V2 Track 1. It moved into V1 Phase 3
+because basic pricing controls (especially discounts, with optional deposits and tax where needed)
+help the product feel complete enough for some contractors to pay for it, without expanding into
+full bookkeeping.
 
 **Scope:**
-- Sales tax: percentage-based, optional, per-quote/invoice toggle. User sets a default
-  tax rate in Settings; individual quotes can override or disable.
-- Discount: fixed dollar or percentage, optional per quote/invoice.
-- Deposit required: fixed dollar amount, displayed as a line in the total section.
-- All three are display-only — Stima does not process payments. The deposit line tells
-  the customer what is due upfront; collection happens outside the app.
-- Total section on PDF and landing page renders conditionally based on which fields are
-  populated.
+- **Discounts first-class:** Optional per quote/invoice discount, fixed dollar or percentage.
+  - Obvious fit for real behavior: repeat‑customer pricing, bundled work, negotiated adjustments,
+    and goodwill discounts.
+  - When unused, there is no discount field, label, or empty row on the UI, PDF, or public page.
+- **Optional deposit:** Optional per quote/invoice deposit amount.
+  - Display/communication only — shows what is due upfront; collection happens outside the app.
+  - When unset, deposit does not appear at all (no placeholder line or label).
+- **Simple tax (optional, low‑friction):**
+  - Percentage‑based tax field that can be enabled per quote/invoice.
+  - Reasonable default can live in Settings for contractors who need it; any given document can
+    override or disable tax entirely.
+  - Tax is treated as an advanced, optional control — never required for creating or sending
+    a quote or invoice.
+- **Conditional breakdown:** Total section on quote/invoice detail views, PDFs, and public landing
+  pages renders a clean subtotal/discount/tax/deposit/total/balance‑due breakdown **only** for
+  values that are present; the default case (no optional pricing controls) remains a single,
+  simple total line.
 
 **Out of scope:**
-- Per-line-item tax rates
+- Per‑line‑item tax rates
 - Tax jurisdiction lookup or automatic tax calculation
-- Deposit payment tracking
+- Deposit payment tracking or payment status
 - Discount codes or promotional pricing
+- Any payment processing or accounting‑style workflow
 
-**Depends on:** Milestone 5 (invoices must exist before taxes apply to them).
+**Depends on:** Milestone 5 (invoices must exist before these pricing controls can apply to them).
 
 **Acceptance criteria:**
-- Contractor can set a default tax rate in Settings
-- Individual quotes/invoices can override or disable tax
-- Discount (fixed or percentage) can be added per quote/invoice
-- Deposit amount can be specified per quote/invoice
-- PDF total section renders subtotal, discount, tax, deposit, and grand total
-  conditionally (only populated fields appear)
-- Landing page total section matches PDF rendering
-- Existing quotes/invoices without tax/discount/deposit are unaffected
-- All three fields are optional — no gate on existing workflows
+- Discount (fixed or percentage) works as an optional pricing adjustment per quote/invoice and
+  feels natural for repeat‑customer, bundled‑job, and goodwill scenarios.
+- Deposit works as an optional amount/line that clearly communicates "due upfront" when set and
+  is completely absent when not used.
+- Tax, if configured, is a simple percentage field that can be enabled, edited, or disabled on
+  any individual quote/invoice and is never required to send documents.
+- Optional pricing fields (discount, deposit, tax) and any related labels/notes:
+  - do not appear in the app UI, PDF, or public quote/invoice views when blank
+  - do not introduce placeholder rows or "N/A" text
+  - preserve the existing clean, single‑total layout when no pricing controls are used
+- PDF and landing page total sections match the same conditional breakdown behavior and layout.
+- Existing quotes/invoices without pricing controls are unaffected and render exactly as they did
+  before this milestone.
+- All pricing controls are optional — no gate on existing quoting or invoicing workflows.
 
 ---
 
@@ -482,24 +591,27 @@ informs whether Phase 2 priorities are correct.
    exists — the first public-facing endpoint is M2, so monitoring comes first)
 5. Milestone 2 — Public landing page (the core V1 experience)
 
-### Phase 2: Delivery Loop
+### Phase 2: Delivery
 
-Ship → the product is useful for daily quoting work. Completes the zero-friction quoting
-loop: create, send, track, follow up.
+Ship → the product is useful for daily quoting work. Completes the quoting loop:
+create, send, track — with a polished document at the center of it.
 
-6. Milestone 3 — Email delivery (makes the landing page reachable without copy-paste)
-7. Milestone 4 — Reminder workflow (builds on delivery + status)
+6. Milestone 3 — Email delivery and Copy Link visibility (adds professional in-app delivery
+   and ensures manual link-sharing is always accessible)
+7. Milestone 4 — Quote PDF presentation refinement (upgrades document quality before invoice
+   conversion inherits the template; no schema dependencies, ships standalone)
 
 ### Phase 3: Revenue Path
 
 Ship → the product is complete enough to charge for. This is the minimum feature set
 required before introducing a paid tier. A contractor cannot be charged for a tool that
-does not let them invoice won quotes or add sales tax.
+does not let them invoice won quotes or reflect basic, real-world pricing controls like
+discounts (with optional deposits and simple tax where needed).
 
-8. Milestone 5 — Invoice conversion (core conversion + PDF + copy-link; landing page and
-   email delivery for invoices follow as a fast follow)
-9. Milestone 7 — Taxes, discounts, and deposits (pulled forward from V2 — required before
-   paid tier)
+8. Milestone 5 — Invoice conversion from won quote (quote-detail entry point, linked
+   child invoice detail, and reused delivery/public document patterns)
+9. Milestone 7 — Optional Pricing Controls (discounts first, with optional deposits and
+   simple tax; pulled forward from V2 — required before paid tier)
 
 ---
 
@@ -527,7 +639,8 @@ Once V1 is complete, the following should be treated as stable:
 - Contractor outcome endpoints: `POST /api/quotes/:id/mark-won` and `POST /api/quotes/:id/mark-lost`
 - Invoice doc type and `I-001` numbering format
 - `source_document_id` on `documents` as the quote→invoice link
-- Tax, discount, and deposit fields on `documents` and their conditional PDF/landing page rendering
+- Optional tax, discount, and deposit fields on `documents` and their conditional
+  PDF/landing page rendering (omitted entirely when unused)
 - Canonical event log names for all V1 user actions
 
 ---
@@ -536,8 +649,8 @@ Once V1 is complete, the following should be treated as stable:
 
 V1 is considered successful if, after a pilot period:
 
-- At least 50% of shared quotes are sent via email (not just copy-link)
+- At least 30% of shared quotes are sent via the in-app email flow
 - At least 30% of shared quotes are marked Won or Lost by the contractor
-- At least one invoice is generated from an approved quote per active pilot user
+- At least one invoice is generated from a won quote (`approved` status) per active pilot user
 - Error monitoring captures actionable errors before users report them
 - No quote or invoice data is lost or corrupted through status transitions

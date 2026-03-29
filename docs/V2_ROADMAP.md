@@ -40,7 +40,8 @@ not a locked spec.
 - A persistent customer relationship layer
 - Photo and job documentation
 - Smarter extraction using the contractor's own history
-- Pricing controls that match how real jobs are structured (taxes, discounts, deposits)
+- Optional pricing controls that match how real jobs are structured (discounts, deposits,
+  simple tax where needed)
 
 **V2 is not:**
 - Subscription billing (V3)
@@ -77,8 +78,9 @@ same scope, next season).
 - Duplicate opens in draft state with all line items copied
 - Doc number is a new sequential number, not a copy of the source
 
-**Taxes, discounts, and deposits** — *Pulled into V1 Phase 3 (Milestone 7).* See
-`docs/V1_ROADMAP.md` for scope. No longer part of V2.
+**Optional pricing controls (discounts, deposits, tax where needed)** — *Pulled into V1
+Phase 3 (Milestone 7: Optional Pricing Controls).* See `docs/V1_ROADMAP.md` for scope.
+No longer part of V2.
 
 **PDF template note:** The V1 PDF template total section should be implemented as a
 conditional block, not a hardcoded single-line total. M7 depends on that structure

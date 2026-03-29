@@ -88,19 +88,21 @@ screen, PDF generation, public share link, quote history, pilot event logging.
 ### V1 — Close the Loop
 
 **Goal:** A complete quoting workflow. Contractor sends a quote → customer sees it on a
-branded landing page → responds → contractor knows the outcome → converts to an invoice.
+branded landing page → contractor knows the outcome → converts to an invoice.
 
 V0 ends at "quote shared via native share." V1 makes that moment mean something.
 
 **Core scope:**
 
 - Logo upload and branding on PDF (part of the core professional pitch, not a billing add-on)
-- Public branded quote landing page (replaces direct PDF stream for customer-facing delivery)
-- Customer actions on that page: approve / decline / request changes
-- Quote status expansion: `viewed`, `approved`, `declined`, `expired`
-- Email delivery from Stima (send quote link directly to customer — not copy-paste)
-- Reminder workflow for unresponded quotes
+- Public branded quote landing page — read-only customer view (replaces direct PDF stream)
+- Quote status expansion: `viewed`, `approved`, `declined` — contractor-set outcomes after
+  the customer communicates their decision; `expired` is deferred
+- Email delivery from Stima — a professional direct-send channel alongside always-available
+  copy-link sharing; both delivery paths are first-class in V1
 - Quote → Invoice conversion (same line items, add due date — not full AR)
+- Optional pricing controls on quotes and invoices (discounts first, with optional deposits
+  and simple tax where needed; all optional and display-focused)
 - Basic pilot analytics view (surface existing event_logs data in an admin route)
 - Error monitoring (Sentry or equivalent — operational visibility before real users)
 
@@ -125,7 +127,6 @@ layer — not just a generator for one-off quotes.
 - Photo documentation per customer and job
 - Persistent customer notes (gate codes, access instructions, preferences)
 - Context-aware extraction: "last time you quoted this customer, you used these items"
-- Taxes, discounts, and deposits on quotes and invoices
 - Quote revision history
 - Stronger search across quotes and customers
 
@@ -166,7 +167,7 @@ revenue they would have generated.
 ### Invoice as a natural extension of quoting
 
 Stima is not an accounting tool. But a contractor who wins a quote needs to invoice.
-The path from approved quote to sent invoice should be one action, not a separate product.
+The path from won quote (`approved` status) to sent invoice should be one action, not a separate product.
 
 ### AI drafts, user approves
 
