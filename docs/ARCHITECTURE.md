@@ -241,6 +241,10 @@ Public landing-page rules:
 - If `line_items` is omitted, existing rows are preserved.
 - Shared, viewed, approved, and declined quotes are read-only.
 
+`POST /quotes/{id}/send-email` behavior:
+- The quote is shared before the provider call, so a `502` or `503` can still leave the quote in `shared` state on a subsequent `GET`.
+- The duplicate-send guard allows an immediate retry after provider failure because no `email_sent` throttle event is recorded on failed sends.
+
 `QuoteListItem` fields:
 - `id`
 - `customer_id`

@@ -725,6 +725,47 @@ async def test_send_quote_email_returns_409_when_quote_is_still_draft(
     assert mock_email_service.messages == []
 
 
+async def test_send_quote_email_returns_404_for_missing_quote(
+    client: AsyncClient,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        f"/api/quotes/{uuid4()}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+    assert mock_email_service.messages == []
+
+
+async def test_send_quote_email_returns_404_for_different_users_quote(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token_user_a = await _register_and_login(client, _credentials())
+    customer_id_user_a = await _create_customer(
+        client,
+        csrf_token_user_a,
+        email="customer@example.com",
+    )
+    quote = await _create_quote(client, csrf_token_user_a, customer_id_user_a)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    csrf_token_user_b = await _register_and_login(client, _credentials())
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token_user_b},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+    assert mock_email_service.messages == []
+
+
 async def test_send_quote_email_returns_429_when_duplicate_send_guard_triggers(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -806,6 +847,43 @@ async def test_send_quote_email_returns_429_on_immediate_retry_after_success(
     assert email_sent_count == 1
 
 
+@pytest.mark.parametrize("starting_status", [QuoteStatus.SHARED, QuoteStatus.VIEWED])
+async def test_send_quote_email_resends_without_changing_existing_shared_status(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    starting_status: QuoteStatus,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    if starting_status == QuoteStatus.VIEWED:
+        await _set_quote_status(db_session, quote["id"], QuoteStatus.VIEWED)
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == starting_status.value
+    assert len(mock_email_service.messages) == 1
+    assert mock_email_service.messages[0].to_email == "customer@example.com"
+
+
 async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -850,6 +928,38 @@ async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
     assert second_response.json() == {
         "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
     }
+    assert len(mock_email_service.messages) == 1
+
+
+async def test_send_quote_email_allows_immediate_retry_after_provider_failure(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+    mock_email_service.raise_send_error = True
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    mock_email_service.raise_send_error = False
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 502
+    assert second_response.status_code == 200
     assert len(mock_email_service.messages) == 1
 
 
