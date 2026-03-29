@@ -184,14 +184,14 @@ export function SettingsScreen(): React.ReactElement {
               </h2>
 
               <div className="mt-4 flex flex-col gap-4">
-                <div className="rounded-xl bg-surface-container-low p-4">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="rounded-xl bg-surface-container-low px-4 py-3">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="space-y-1">
                         <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                           Logo
                         </p>
-                        <p className="text-sm text-on-surface-variant">
+                        <p className="text-xs text-on-surface-variant">
                           JPEG or PNG, up to 2 MB. Appears on quote PDFs.
                         </p>
                       </div>
@@ -201,10 +201,10 @@ export function SettingsScreen(): React.ReactElement {
                           key={logoPreviewVersion}
                           src={logoPreviewSrc}
                           alt="Business logo preview"
-                          className="h-12 w-auto max-w-[180px] object-contain sm:mt-1"
+                          className="h-10 w-auto max-w-[160px] object-contain"
                         />
                       ) : (
-                        <p className="text-sm text-on-surface-variant">No logo uploaded yet.</p>
+                        <p className="text-xs text-on-surface-variant">No logo uploaded yet.</p>
                       )}
                     </div>
 

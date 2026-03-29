@@ -6,7 +6,7 @@ interface ScreenFooterProps {
 
 export function ScreenFooter({ children }: ScreenFooterProps): React.ReactElement {
   return (
-    <footer className="fixed bottom-0 z-40 w-full bg-white/80 backdrop-blur-md p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)]">
+    <footer className="fixed inset-x-0 bottom-0 z-40 bg-white/80 p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] backdrop-blur-md">
       {children}
     </footer>
   );
