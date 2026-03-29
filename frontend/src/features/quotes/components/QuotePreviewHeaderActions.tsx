@@ -1,0 +1,36 @@
+import type { OverflowMenuItem } from "@/shared/components/OverflowMenu";
+import { OverflowMenu } from "@/shared/components/OverflowMenu";
+import { StatusBadge } from "@/shared/components/StatusBadge";
+
+import type { QuoteStatus } from "@/features/quotes/types/quote.types";
+
+interface QuotePreviewHeaderActionsProps {
+  status: QuoteStatus;
+  canEdit: boolean;
+  onEdit: () => void;
+  overflowItems: OverflowMenuItem[];
+}
+
+export function QuotePreviewHeaderActions({
+  status,
+  canEdit,
+  onEdit,
+  overflowItems,
+}: QuotePreviewHeaderActionsProps): React.ReactElement {
+  return (
+    <div className="flex items-center gap-2">
+      <StatusBadge variant={status} />
+      {canEdit ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label="Edit quote"
+          className="rounded-full border border-outline-variant/30 bg-surface-container-lowest p-2 text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
+        >
+          <span className="material-symbols-outlined text-[1.125rem]">edit</span>
+        </button>
+      ) : null}
+      <OverflowMenu items={overflowItems} />
+    </div>
+  );
+}

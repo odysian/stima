@@ -13,9 +13,6 @@ interface QuotePreviewActionsProps {
   actionState: QuotePreviewActionState;
   onGeneratePdf: () => Promise<void>;
   onShare: () => Promise<void>;
-  onCopyShareLink: () => Promise<void>;
-  onMarkWon: () => Promise<void>;
-  onRequestMarkLost: () => void;
   openPdfUrl: string | null;
   shareUrl: string | null;
   isGeneratingPdf: boolean;
@@ -33,9 +30,6 @@ export function QuotePreviewActions({
   actionState,
   onGeneratePdf,
   onShare,
-  onCopyShareLink,
-  onMarkWon,
-  onRequestMarkLost,
   openPdfUrl,
   shareUrl,
   isGeneratingPdf,
@@ -58,22 +52,17 @@ export function QuotePreviewActions({
   } else if (isMarkingLost) {
     statusCopy = "Recording quote as lost...";
   }
-  const primaryLinkClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-white transition-all active:scale-[0.98] forest-gradient";
-  const secondaryLinkClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-4 text-center font-semibold text-on-surface transition-all active:scale-[0.98]";
-  const secondaryButtonClasses = "w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest py-4 font-semibold text-on-surface-variant transition-all disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]";
-  const isOutcomeInFlight = isMarkingWon || isMarkingLost;
+  const primaryLinkClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-white transition-all active:scale-[0.98] forest-gradient disabled:cursor-not-allowed disabled:opacity-40";
   const openPdfHref = openPdfUrl ?? shareUrl;
 
-  function renderOpenPdfAction(asPrimary: boolean): React.ReactElement {
-    const className = asPrimary ? primaryLinkClasses : secondaryLinkClasses;
-
+  function renderOpenPdfAction(): React.ReactElement {
     if (openPdfHref) {
       return (
         <a
           href={openPdfHref}
           target="_blank"
           rel="noopener noreferrer"
-          className={className}
+          className={primaryLinkClasses}
         >
           <span className="material-symbols-outlined text-base">open_in_new</span>
           Open PDF
@@ -84,7 +73,7 @@ export function QuotePreviewActions({
     return (
       <button
         type="button"
-        className={`${className} disabled:cursor-not-allowed disabled:opacity-40`}
+        className={primaryLinkClasses}
         disabled
       >
         <span className="material-symbols-outlined text-base">open_in_new</span>
@@ -111,62 +100,25 @@ export function QuotePreviewActions({
         ) : null}
 
         {actionState === "ready" ? (
-          <>
-            <Button
-              type="button"
-              className="w-full"
-              onClick={() => {
-                void onShare();
-              }}
-              isLoading={isSharing}
-              disabled={disabled}
-            >
-              Share Quote
-            </Button>
-            {renderOpenPdfAction(false)}
-          </>
+          <Button
+            type="button"
+            className="w-full"
+            onClick={() => {
+              void onShare();
+            }}
+            isLoading={isSharing}
+            disabled={disabled}
+          >
+            Share Quote
+          </Button>
         ) : null}
 
         {actionState === "shared" || actionState === "viewed" ? (
-          <>
-            {renderOpenPdfAction(true)}
-            <button
-              type="button"
-              onClick={() => {
-                void onCopyShareLink();
-              }}
-              className={secondaryButtonClasses}
-              disabled={!shareUrl || disabled || isOutcomeInFlight}
-            >
-              Copy Share Link
-            </button>
-            <Button
-              type="button"
-              className="w-full"
-              onClick={() => {
-                void onMarkWon();
-              }}
-              isLoading={isMarkingWon}
-              disabled={disabled || isMarkingLost}
-            >
-              Mark as Won
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              className="w-full"
-              onClick={onRequestMarkLost}
-              disabled={disabled || isOutcomeInFlight}
-            >
-              Mark as Lost
-            </Button>
-          </>
+          <>{renderOpenPdfAction()}</>
         ) : null}
 
         {actionState === "approved" || actionState === "declined" ? (
-          <>
-            {renderOpenPdfAction(true)}
-          </>
+          <>{renderOpenPdfAction()}</>
         ) : null}
       </div>
 

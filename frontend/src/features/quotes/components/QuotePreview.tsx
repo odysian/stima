@@ -2,48 +2,25 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
+import { QuotePreviewHeaderActions } from "@/features/quotes/components/QuotePreviewHeaderActions";
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
-import { ShareLinkRow } from "@/features/quotes/components/ShareLinkRow";
-import { QuoteStatusSummaryCard } from "@/features/quotes/components/QuoteStatusSummaryCard";
+import { QuotePreviewStatusRow } from "@/features/quotes/components/QuotePreviewStatusRow";
+import {
+  CLOSED_QUOTE_STATUSES,
+  buildOverflowItems,
+  canNavigateBack,
+  getCompactStatusRow,
+  isShareAbortError,
+  readOptionalQuoteText,
+  type QuotePreviewActionState,
+} from "@/features/quotes/components/quotePreview.helpers";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { QuoteDetail, QuoteStatus } from "@/features/quotes/types/quote.types";
+import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { StatusBadge } from "@/shared/components/StatusBadge";
-
-type QuotePreviewCardState = QuoteStatus;
-type QuotePreviewActionState = QuoteStatus;
-
-const CLOSED_QUOTE_STATUSES = new Set<QuoteStatus>([
-  "shared",
-  "viewed",
-  "approved",
-  "declined",
-]);
-
-const SHAREABLE_QUOTE_STATUSES = new Set<QuoteStatus>(["shared", "viewed"]);
-
-function isShareAbortError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "name" in error &&
-    (error as { name?: unknown }).name === "AbortError"
-  );
-}
-
-function readOptionalQuoteText(
-  quote: QuoteDetail | null,
-  key: "customer_name" | "customer_email" | "customer_phone" | "title",
-): string | null {
-  const value = quote?.[key];
-  if (typeof value !== "string") return null;
-  const trimmedValue = value.trim();
-  return trimmedValue.length > 0 ? trimmedValue : null;
-}
 
 export function QuotePreview(): React.ReactElement {
   const navigate = useNavigate();
@@ -63,6 +40,7 @@ export function QuotePreview(): React.ReactElement {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showMarkWonConfirm, setShowMarkWonConfirm] = useState(false);
   const [showMarkLostConfirm, setShowMarkLostConfirm] = useState(false);
 
   useEffect(() => {
@@ -71,6 +49,7 @@ export function QuotePreview(): React.ReactElement {
       setIsLoadingQuote(false);
       return;
     }
+
     const quoteId = id;
     let isActive = true;
 
@@ -79,28 +58,37 @@ export function QuotePreview(): React.ReactElement {
       setLoadError(null);
       try {
         const fetchedQuote = await quoteService.getQuote(quoteId);
-        if (isActive) setQuote(fetchedQuote);
+        if (isActive) {
+          setQuote(fetchedQuote);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load quote";
-        if (isActive) setLoadError(message);
+        if (isActive) {
+          setLoadError(message);
+        }
       } finally {
-        if (isActive) setIsLoadingQuote(false);
+        if (isActive) {
+          setIsLoadingQuote(false);
+        }
       }
     }
 
     void fetchQuote();
-    return () => { isActive = false; };
+    return () => {
+      isActive = false;
+    };
   }, [id]);
 
-  useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
+  useEffect(() => () => {
+    if (pdfUrl) {
+      URL.revokeObjectURL(pdfUrl);
+    }
+  }, [pdfUrl]);
 
-  const canShare = !!quote && !!pdfUrl;
   const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
   const shareUrl = quote?.share_token ? `${window.location.origin}/doc/${quote.share_token}` : null;
   const hasLocalPdf = Boolean(pdfUrl);
-  const isShareableStatus = quote ? SHAREABLE_QUOTE_STATUSES.has(quote.status) : false;
-  const isClosedStatus = quote ? CLOSED_QUOTE_STATUSES.has(quote.status) : false;
-  const cardState: QuotePreviewCardState = quote?.status === "shared"
+  const actionState: QuotePreviewActionState = quote?.status === "shared"
     || quote?.status === "viewed"
     || quote?.status === "approved"
     || quote?.status === "declined"
@@ -108,16 +96,6 @@ export function QuotePreview(): React.ReactElement {
     : quote?.status === "ready" || hasLocalPdf
       ? "ready"
       : "draft";
-  const actionState: QuotePreviewActionState = quote?.status === "shared"
-    || quote?.status === "viewed"
-    || quote?.status === "approved"
-    || quote?.status === "declined"
-    ? quote.status
-    : canShare
-      ? "ready"
-      : "draft";
-  // Card messaging follows persisted quote status, while actions depend on whether
-  // this device has a locally generated PDF blob available right now.
   const openPdfUrl = pdfUrl ?? (quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null);
   const quoteTitle = readOptionalQuoteText(quote, "title");
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
@@ -127,6 +105,18 @@ export function QuotePreview(): React.ReactElement {
       .map((value) => value?.trim())
       .filter((value): value is string => Boolean(value))
       .join(" \u00b7 ") || "No contact details";
+  const compactStatusRow = getCompactStatusRow(actionState, quote, hasLocalPdf);
+  const canEdit = Boolean(quote && id && !CLOSED_QUOTE_STATUSES.has(actionState));
+  const isBusy = isGeneratingPdf || isSharing || isMarkingWon || isMarkingLost || isDeleting;
+
+  function handleBack(): void {
+    if (canNavigateBack()) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/", { replace: true });
+  }
 
   async function onGeneratePdf(): Promise<void> {
     if (!id) {
@@ -141,7 +131,9 @@ export function QuotePreview(): React.ReactElement {
       const blob = await quoteService.generatePdf(id);
       const nextPdfUrl = URL.createObjectURL(blob);
       setPdfUrl((currentPdfUrl) => {
-        if (currentPdfUrl) URL.revokeObjectURL(currentPdfUrl);
+        if (currentPdfUrl) {
+          URL.revokeObjectURL(currentPdfUrl);
+        }
         return nextPdfUrl;
       });
       setQuote((currentQuote) => {
@@ -154,6 +146,7 @@ export function QuotePreview(): React.ReactElement {
         ) {
           return currentQuote;
         }
+
         return { ...currentQuote, status: "ready" };
       });
     } catch (error) {
@@ -168,6 +161,7 @@ export function QuotePreview(): React.ReactElement {
     if (!id || !quote) {
       return;
     }
+
     setShareError(null);
     setShareMessage(null);
     setIsSharing(true);
@@ -175,7 +169,10 @@ export function QuotePreview(): React.ReactElement {
     try {
       const updatedQuote = await quoteService.shareQuote(id);
       setQuote((currentQuote) => {
-        if (!currentQuote) return currentQuote;
+        if (!currentQuote) {
+          return currentQuote;
+        }
+
         return {
           ...currentQuote,
           title: updatedQuote.title,
@@ -189,6 +186,7 @@ export function QuotePreview(): React.ReactElement {
       if (!updatedQuote.share_token) {
         throw new Error("Share link unavailable");
       }
+
       const nextSharedUrl = `${window.location.origin}/doc/${updatedQuote.share_token}`;
       const maybeNavigator = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
 
@@ -200,14 +198,19 @@ export function QuotePreview(): React.ReactElement {
         setShareMessage("Quote link shared.");
         return;
       }
+
       if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
         await navigator.clipboard.writeText(nextSharedUrl);
         setShareMessage("Share link copied to clipboard.");
         return;
       }
+
       setShareMessage("Share this link with your customer.");
     } catch (error) {
-      if (isShareAbortError(error)) return;
+      if (isShareAbortError(error)) {
+        return;
+      }
+
       const message = error instanceof Error ? error.message : "Unable to share quote";
       setShareError(message);
     } finally {
@@ -224,6 +227,7 @@ export function QuotePreview(): React.ReactElement {
     if (!shareUrl) {
       return;
     }
+
     setShareError(null);
     setShareMessage(null);
     if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
@@ -240,7 +244,7 @@ export function QuotePreview(): React.ReactElement {
     }
   }
 
-  async function onMarkWon(): Promise<void> {
+  async function onConfirmMarkWon(): Promise<void> {
     if (!id || !quote) {
       return;
     }
@@ -248,6 +252,7 @@ export function QuotePreview(): React.ReactElement {
     setOutcomeError(null);
     setShareError(null);
     setShareMessage(null);
+    setShowMarkWonConfirm(false);
     setIsMarkingWon(true);
     try {
       await quoteService.markQuoteWon(id);
@@ -300,16 +305,37 @@ export function QuotePreview(): React.ReactElement {
     }
   }
 
+  const overflowItems = buildOverflowItems({
+    hasQuote: Boolean(quote),
+    actionState,
+    openPdfUrl,
+    shareUrl,
+    isBusy,
+    onDeleteRequest: () => setShowDeleteConfirm(true),
+    onCopyShareLink: () => {
+      void copyToClipboard();
+    },
+    onMarkWonRequest: () => setShowMarkWonConfirm(true),
+    onMarkLostRequest: () => setShowMarkLostConfirm(true),
+  });
+
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader
         title={quoteTitle ?? customerNameForHeader ?? quote?.doc_number ?? "Quote Preview"}
         subtitle={quoteTitle || customerNameForHeader ? quote?.doc_number : undefined}
-        onBack={() => navigate(-1)}
-        trailing={quote ? <StatusBadge variant={quote.status} /> : null}
+        onBack={handleBack}
+        trailing={quote ? (
+          <QuotePreviewHeaderActions
+            status={quote.status}
+            canEdit={canEdit}
+            onEdit={() => navigate(`/quotes/${id}/edit`)}
+            overflowItems={overflowItems}
+          />
+        ) : null}
       />
 
-      <section className="mx-auto w-full max-w-6xl">
+      <section className="mx-auto w-full max-w-3xl">
         {isLoadingQuote ? <p role="status" className="mt-4 px-4 text-sm text-on-surface-variant">Loading quote...</p> : null}
 
         {loadError ? (
@@ -320,21 +346,21 @@ export function QuotePreview(): React.ReactElement {
 
         {!isLoadingQuote && !loadError ? (
           <>
-            {quote && cardState !== "draft" ? (
-              <QuoteStatusSummaryCard
-                cardState={cardState}
-                hasLocalPdf={hasLocalPdf}
-                statusVariant={quote.status}
+            {compactStatusRow ? <QuotePreviewStatusRow row={compactStatusRow} /> : null}
+
+            {quote ? (
+              <QuoteDetailsCard
+                totalAmount={quote.total_amount}
+                clientName={clientName}
+                clientContact={clientContact}
               />
             ) : null}
+            {quote ? <QuoteLineItemsSection lineItems={quote.line_items} /> : null}
 
             <QuotePreviewActions
               actionState={actionState}
               onGeneratePdf={onGeneratePdf}
               onShare={onShare}
-              onCopyShareLink={copyToClipboard}
-              onMarkWon={onMarkWon}
-              onRequestMarkLost={() => setShowMarkLostConfirm(true)}
               openPdfUrl={openPdfUrl}
               shareUrl={shareUrl}
               isGeneratingPdf={isGeneratingPdf}
@@ -348,39 +374,9 @@ export function QuotePreview(): React.ReactElement {
               shareMessage={shareMessage}
             />
 
-            {shareUrl && isShareableStatus ? (
-              <ShareLinkRow shareUrl={shareUrl} onCopy={copyToClipboard} />
-            ) : null}
-            {quote ? <QuoteDetailsCard totalAmount={quote.total_amount} clientName={clientName} clientContact={clientContact} /> : null}
-            {quote ? <QuoteLineItemsSection lineItems={quote.line_items} /> : null}
-
-            {quote && id && !isClosedStatus ? (
-              <div className="mt-3 px-4">
-                <button
-                  type="button"
-                  onClick={() => navigate(`/quotes/${id}/edit`)}
-                  className="w-full rounded-lg border border-outline-variant py-4 font-semibold text-on-surface-variant transition-all active:scale-[0.98]"
-                >
-                  Edit Quote
-                </button>
-              </div>
-            ) : null}
-
-            {quote && !isClosedStatus ? (
-              <div className="mt-3 px-4">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="w-full rounded-lg py-3 text-sm text-error transition-all active:scale-[0.98]"
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? "Deleting..." : "Delete Quote"}
-                </button>
-                {deleteError ? (
-                  <div className="mt-3">
-                    <FeedbackMessage variant="error">{deleteError}</FeedbackMessage>
-                  </div>
-                ) : null}
+            {deleteError ? (
+              <div className="mx-4 mt-3">
+                <FeedbackMessage variant="error">{deleteError}</FeedbackMessage>
               </div>
             ) : null}
           </>
@@ -396,6 +392,17 @@ export function QuotePreview(): React.ReactElement {
           variant="destructive"
           onConfirm={() => void onDelete()}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      ) : null}
+
+      {showMarkWonConfirm ? (
+        <ConfirmModal
+          title="Mark quote as won?"
+          body="This records the quote as won. You can still view the quote and its PDF."
+          confirmLabel="Mark as Won"
+          cancelLabel="Cancel"
+          onConfirm={() => void onConfirmMarkWon()}
+          onCancel={() => setShowMarkWonConfirm(false)}
         />
       ) : null}
 

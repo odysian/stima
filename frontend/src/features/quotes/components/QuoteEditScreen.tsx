@@ -6,6 +6,7 @@ import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSect
 import { useQuoteEdit, type QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft, LineItemDraftWithFlags, QuoteDetail } from "@/features/quotes/types/quote.types";
+import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -80,6 +81,12 @@ export function QuoteEditScreen(): React.ReactElement {
       try {
         const fetchedQuote = await quoteService.getQuote(quoteId);
         if (isActive) {
+          if (!isQuoteEditableStatus(fetchedQuote.status)) {
+            setShouldSkipSeeding(true);
+            clearDraft();
+            navigate(`/quotes/${quoteId}/preview`, { replace: true });
+            return;
+          }
           setQuote(fetchedQuote);
         }
       } catch (error) {
@@ -96,7 +103,7 @@ export function QuoteEditScreen(): React.ReactElement {
 
     void fetchQuote();
     return () => { isActive = false; };
-  }, [id]);
+  }, [clearDraft, id, navigate]);
 
   useEffect(() => {
     if (!quote || shouldSkipSeeding) {
