@@ -13,6 +13,7 @@ import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { TradeTypeSelector } from "@/shared/components/TradeTypeSelector";
 
@@ -151,7 +152,7 @@ export function SettingsScreen(): React.ReactElement {
   };
 
   return (
-    <main className="min-h-screen bg-background pb-24 pt-16">
+    <main className="min-h-screen bg-background pb-32 pt-16">
       <ScreenHeader title="Settings" onBack={() => navigate(-1)} />
 
       <section className="mx-auto w-full max-w-2xl space-y-4 px-4 pt-4">
@@ -166,7 +167,7 @@ export function SettingsScreen(): React.ReactElement {
         ) : null}
 
         {!isLoadingProfile && !loadError ? (
-          <form className="space-y-4" onSubmit={onSubmit}>
+          <form className="space-y-4 pb-28" onSubmit={onSubmit}>
             {saveSuccess ? (
               <p role="status" className="rounded-lg bg-success-container p-3 text-sm text-success">
                 {saveSuccess}
@@ -183,16 +184,15 @@ export function SettingsScreen(): React.ReactElement {
               </h2>
 
               <div className="mt-4 flex flex-col gap-4">
-                <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-2">
+                <div className="flex flex-col gap-4 border-b border-outline-variant/20 pb-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
                       <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                         Logo
                       </p>
                       <p className="text-sm text-on-surface-variant">
-                        Shows up on all future quote PDFs.
+                        JPEG or PNG, up to 2 MB. Appears on quote PDFs.
                       </p>
-                      <p className="text-xs text-on-surface-variant">JPEG or PNG, up to 2 MB.</p>
                     </div>
 
                     {hasLogo ? (
@@ -200,17 +200,17 @@ export function SettingsScreen(): React.ReactElement {
                         key={logoPreviewVersion}
                         src={logoPreviewSrc}
                         alt="Business logo preview"
-                        className="h-12 w-auto max-w-[180px] object-contain"
+                        className="h-12 w-auto max-w-[180px] object-contain sm:mt-1"
                       />
                     ) : (
                       <p className="text-sm text-on-surface-variant">No logo uploaded yet.</p>
                     )}
                   </div>
 
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <label
                       htmlFor="settings-logo-upload"
-                      className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+                      className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
                     >
                       {hasLogo ? "Upload New" : "Upload Logo"}
                     </label>
@@ -234,11 +234,7 @@ export function SettingsScreen(): React.ReactElement {
                     ) : null}
                   </div>
 
-                  {logoError ? (
-                    <div className="mt-4">
-                      <FeedbackMessage variant="error">{logoError}</FeedbackMessage>
-                    </div>
-                  ) : null}
+                  {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
                 </div>
 
                 <Input
@@ -287,11 +283,11 @@ export function SettingsScreen(): React.ReactElement {
               </div>
             </section>
 
-            <section className="ghost-shadow rounded-xl bg-surface-container-lowest p-6">
+            <section className="rounded-xl bg-surface-container-low p-5">
               <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                 Account
               </h2>
-              <div className="mt-4 space-y-4">
+              <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-col gap-1">
                   <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                     Email
@@ -299,7 +295,7 @@ export function SettingsScreen(): React.ReactElement {
                   <p className="text-sm text-on-surface">{email}</p>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4 sm:justify-end">
                   <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                     Session
                   </span>
@@ -315,11 +311,13 @@ export function SettingsScreen(): React.ReactElement {
               </div>
             </section>
 
-            <div>
-              <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
-                Save Changes
-              </Button>
-            </div>
+            <ScreenFooter>
+              <div className="mx-auto w-full max-w-2xl">
+                <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
+                  Save Changes
+                </Button>
+              </div>
+            </ScreenFooter>
           </form>
         ) : null}
       </section>

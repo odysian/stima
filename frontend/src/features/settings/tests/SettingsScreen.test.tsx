@@ -48,8 +48,8 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
   };
 }
 
-function renderScreen(): void {
-  render(
+function renderScreen() {
+  return render(
     <MemoryRouter>
       <SettingsScreen />
     </MemoryRouter>,
@@ -86,7 +86,7 @@ afterEach(() => {
 });
 
 describe("SettingsScreen", () => {
-  it("renders pre-filled form fields, trade selector, read-only account email, and logo upload control", async () => {
+  it("renders pre-filled form fields in the tightened layout with footer save action", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({
         email: "owner@example.com",
@@ -97,7 +97,7 @@ describe("SettingsScreen", () => {
       }),
     );
 
-    renderScreen();
+    const { container } = renderScreen();
 
     expect(await screen.findByDisplayValue("Bright Lawn Care")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
@@ -123,7 +123,11 @@ describe("SettingsScreen", () => {
       "tracking-widest",
       "text-outline",
     );
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).not.toBeNull();
+    expect(screen.getByText("Account").closest("section")).toHaveClass("bg-surface-container-low");
+    expect(container.querySelectorAll(".ghost-shadow")).toHaveLength(1);
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
