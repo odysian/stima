@@ -45,6 +45,33 @@ def test_allowed_origins_csv_parses_to_list(monkeypatch) -> None:
     ]
 
 
+def test_frontend_url_is_normalized_without_trailing_slash(monkeypatch) -> None:
+    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev/")
+
+    settings = get_settings()
+
+    assert settings.frontend_url == "https://app.stima.dev"
+
+
+def test_frontend_url_must_be_absolute_http_url(monkeypatch) -> None:
+    monkeypatch.setenv("FRONTEND_URL", "app.stima.dev")
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+
+def test_email_delivery_config_blank_values_are_normalized(monkeypatch) -> None:
+    monkeypatch.setenv("RESEND_API_KEY", " ")
+    monkeypatch.setenv("EMAIL_FROM_ADDRESS", "")
+    monkeypatch.setenv("EMAIL_FROM_NAME", "   ")
+
+    settings = get_settings()
+
+    assert settings.resend_api_key is None
+    assert settings.email_from_address is None
+    assert settings.email_from_name is None
+
+
 def test_secret_key_must_be_non_empty(monkeypatch) -> None:
     monkeypatch.setenv("SECRET_KEY", "")
 

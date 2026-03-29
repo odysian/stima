@@ -1,10 +1,11 @@
-"""Application settings for database, auth, and cookie behavior."""
+"""Application settings for database, auth, cookie, and delivery behavior."""
 
 from __future__ import annotations
 
 import os
 from functools import lru_cache
 from typing import Annotated, Any, Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -66,6 +67,12 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         validation_alias="FRONTEND_URL",
     )
+    resend_api_key: str | None = Field(default=None, validation_alias="RESEND_API_KEY")
+    email_from_address: str | None = Field(
+        default=None,
+        validation_alias="EMAIL_FROM_ADDRESS",
+    )
+    email_from_name: str | None = Field(default=None, validation_alias="EMAIL_FROM_NAME")
     anthropic_api_key: str = Field(
         default="",
         validation_alias="ANTHROPIC_API_KEY",
@@ -106,7 +113,14 @@ class Settings(BaseSettings):
             return None
         return str(value)
 
-    @field_validator("sentry_dsn", "admin_api_key", mode="before")
+    @field_validator(
+        "sentry_dsn",
+        "admin_api_key",
+        "resend_api_key",
+        "email_from_address",
+        "email_from_name",
+        mode="before",
+    )
     @classmethod
     def normalize_optional_strings(cls, value: Any) -> str | None:
         """Treat empty optional config values as unset."""
@@ -160,6 +174,16 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return [str(ip).strip() for ip in value if str(ip).strip()]
         return []
+
+    @field_validator("frontend_url")
+    @classmethod
+    def validate_frontend_url(cls, value: str) -> str:
+        """Require FRONTEND_URL to be an absolute HTTP(S) origin."""
+        normalized_value = value.strip().rstrip("/")
+        parsed = urlparse(normalized_value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("FRONTEND_URL must be an absolute http(s) URL")
+        return normalized_value
 
     @model_validator(mode="after")
     def validate_cookie_samesite_secure_combination(self) -> Settings:

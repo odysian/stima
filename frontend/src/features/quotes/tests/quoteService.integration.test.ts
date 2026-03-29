@@ -166,6 +166,50 @@ describe("quoteService integration (MSW)", () => {
     expect(quote.customer_phone).toBe("+1-555-0100");
   });
 
+  it("sendQuoteEmail posts to the email delivery endpoint and returns the updated quote", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.post("/api/quotes/:id/send-email", ({ request, params }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        return HttpResponse.json(
+          {
+            id: String(params.id),
+            customer_id: "cust-1",
+            doc_number: "Q-001",
+            title: null,
+            status: "shared",
+            source_type: "text",
+            transcript: "Mulch and edging",
+            total_amount: 120,
+            notes: "Thank you",
+            shared_at: "2026-03-20T00:05:00.000Z",
+            share_token: "share-token-1",
+            line_items: [
+              {
+                id: "line-1",
+                description: "Mulch",
+                details: "5 yards",
+                price: 120,
+                sort_order: 0,
+              },
+            ],
+            created_at: "2026-03-20T00:00:00.000Z",
+            updated_at: "2026-03-20T00:05:00.000Z",
+          },
+          { status: 200 },
+        );
+      }),
+    );
+
+    const quote = await quoteService.sendQuoteEmail("quote-1");
+
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(quote.status).toBe("shared");
+    expect(quote.share_token).toBe("share-token-1");
+  });
+
   it("listQuotes returns quote summary contract including customer_name", async () => {
     const response: QuoteListItem[] = [
       {

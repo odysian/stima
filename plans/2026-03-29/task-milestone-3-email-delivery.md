@@ -51,9 +51,9 @@ Default recommendation: Option A, to avoid schema changes.
 Known gap / explicit resolution: event persistence is fire-and-forget in `log_event()` (async DB write). Two near-simultaneous taps from the same client can race the "last email" lookup before the previous write commits. We accept this for pilot scale (UI disables the button during in-flight sends), and we will revisit if duplicate emails show up in real usage; a schema-based `last_emailed_at` (Option B) is the contingency.
 
 ### 2) Email provider integration style
-- Use the official SendGrid SDK vs raw HTTP requests.
+- Use Resend for transactional delivery and keep the integration thin.
 
-Default recommendation: official SendGrid SDK if available/clean for error parsing; keep integration thin.
+Default recommendation: use a thin Resend adapter over HTTP so provider-specific behavior stays isolated.
 
 ### 3) Resend semantics
 Decide whether resend:
@@ -88,7 +88,7 @@ On resend, `share_quote()` is a no-op for already-shared statuses, so `quote_sha
   - Include secondary link to `/share/:token`
   - Include contact line with contractor phone number and optional contractor email footer
 - Add runtime configuration for provider:
-  - SendGrid API key and From address/name
+  - Resend API key and From address/name
   - Frontend base URL used to build absolute links
 
 ### Frontend
@@ -130,7 +130,7 @@ On resend, `share_quote()` is a no-op for already-shared statuses, so `quote_sha
 - [ ] If customer email is invalid, send returns 422 with a user-friendly message (no provider call).
 - [ ] If quote is `draft`, send returns 409.
 - [ ] If email was sent < 5 minutes ago, send returns 429.
-- [ ] If SendGrid/provider fails, send returns 502 with a user-friendly message.
+- [ ] If the email provider fails, send returns 502 with a user-friendly message.
 - [ ] If quote is missing or not owned, send returns 404 with a user-friendly message.
 - [ ] If email delivery is not configured (missing provider config), send returns 503 with a user-friendly message.
 - [ ] UI shows user-friendly messages for 404/409/422/429/502/503 responses.
@@ -168,7 +168,7 @@ Manual sanity checks:
 
 ## DoR Preconditions (blocking before PR)
 Milestone 3 has explicit infrastructure pre-work; PR should not be opened unless all are confirmed:
-1. `SENDGRID_API_KEY` is set (non-empty) in the backend runtime environment.
+1. `RESEND_API_KEY` is set (non-empty) in the backend runtime environment.
 2. Sending domain has completed DNS verification in the provider dashboard:
    - SPF record added
    - DKIM record added

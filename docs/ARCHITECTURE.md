@@ -215,6 +215,7 @@ Rules:
 | `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`) or `404 { detail: "Not found" }` |
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes? }` | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Shared quotes cannot be edited" }` once the quote is shared/viewed/finalized |
 | `/quotes/{id}/share` | POST | yes | cookie | — | `200 Quote`; returns existing quote unchanged when status is already `viewed`, `approved`, or `declined` |
+| `/quotes/{id}/send-email` | POST | yes | cookie | — | `200 Quote` after ensuring the quote is shared and emailing the customer link, `404` when quote is missing/not owned, `409` when still `draft`, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
 | `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
 | `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
 
@@ -228,6 +229,7 @@ Rules:
 
 Public landing-page rules:
 - contractor share/copy actions hand out the frontend route `/doc/{share_token}` instead of the raw PDF URL
+- transactional quote emails reuse that same `/doc/{share_token}` landing page as the primary CTA and include `/share/{share_token}` as the secondary "Download PDF" link
 - first public load of a `shared` quote transitions it to `viewed` and logs exactly one `quote_viewed` event
 - repeat public loads of `viewed`, `approved`, and `declined` quotes are read-only and do not create duplicate `quote_viewed` events
 - public JSON, logo, and PDF responses send `X-Robots-Tag: noindex`

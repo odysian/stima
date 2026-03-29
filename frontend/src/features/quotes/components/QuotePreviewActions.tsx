@@ -11,12 +11,16 @@ type QuotePreviewActionState =
 
 interface QuotePreviewActionsProps {
   actionState: QuotePreviewActionState;
+  emailActionLabel: string | null;
+  hasCustomerEmail: boolean;
   onGeneratePdf: () => Promise<void>;
-  onShare: () => Promise<void>;
+  onSendEmail: () => Promise<void>;
+  onCopyLink: () => Promise<void>;
   openPdfUrl: string | null;
   shareUrl: string | null;
   isGeneratingPdf: boolean;
-  isSharing: boolean;
+  isSendingEmail: boolean;
+  isCopyingLink: boolean;
   isMarkingWon: boolean;
   isMarkingLost: boolean;
   disabled: boolean;
@@ -26,14 +30,21 @@ interface QuotePreviewActionsProps {
   shareMessage: string | null;
 }
 
+const secondaryButtonClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+const utilityButtonClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface-container px-4 py-4 text-center font-medium text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+
 export function QuotePreviewActions({
   actionState,
+  emailActionLabel,
+  hasCustomerEmail,
   onGeneratePdf,
-  onShare,
+  onSendEmail,
+  onCopyLink,
   openPdfUrl,
   shareUrl,
   isGeneratingPdf,
-  isSharing,
+  isSendingEmail,
+  isCopyingLink,
   isMarkingWon,
   isMarkingLost,
   disabled,
@@ -45,15 +56,19 @@ export function QuotePreviewActions({
   let statusCopy: string | null = null;
   if (isGeneratingPdf) {
     statusCopy = "Generating PDF preview. This can take a few moments.";
-  } else if (isSharing) {
-    statusCopy = "Preparing share link...";
+  } else if (isSendingEmail) {
+    statusCopy = "Sending quote email...";
+  } else if (isCopyingLink) {
+    statusCopy = "Copying share link...";
   } else if (isMarkingWon) {
     statusCopy = "Recording quote as won...";
   } else if (isMarkingLost) {
     statusCopy = "Recording quote as lost...";
   }
-  const primaryLinkClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-white transition-all active:scale-[0.98] forest-gradient disabled:cursor-not-allowed disabled:opacity-40";
+
   const openPdfHref = openPdfUrl ?? shareUrl;
+  const showEmailAction = emailActionLabel !== null;
+  const canCopyLink = actionState === "ready" || Boolean(shareUrl);
 
   function renderOpenPdfAction(): React.ReactElement {
     if (openPdfHref) {
@@ -62,7 +77,7 @@ export function QuotePreviewActions({
           href={openPdfHref}
           target="_blank"
           rel="noopener noreferrer"
-          className={primaryLinkClasses}
+          className={utilityButtonClasses}
         >
           <span className="material-symbols-outlined text-base">open_in_new</span>
           Open PDF
@@ -73,8 +88,11 @@ export function QuotePreviewActions({
     return (
       <button
         type="button"
-        className={primaryLinkClasses}
-        disabled
+        className={utilityButtonClasses}
+        disabled={disabled || actionState !== "ready"}
+        onClick={() => {
+          void onGeneratePdf();
+        }}
       >
         <span className="material-symbols-outlined text-base">open_in_new</span>
         Open PDF
@@ -99,28 +117,42 @@ export function QuotePreviewActions({
           </Button>
         ) : null}
 
-        {actionState === "ready" ? (
+        {showEmailAction ? (
           <Button
             type="button"
             className="w-full"
             onClick={() => {
-              void onShare();
+              void onSendEmail();
             }}
-            isLoading={isSharing}
-            disabled={disabled}
+            isLoading={isSendingEmail}
+            disabled={disabled || !hasCustomerEmail || isCopyingLink}
           >
-            Share Quote
+            {emailActionLabel}
           </Button>
         ) : null}
 
-        {actionState === "shared" || actionState === "viewed" ? (
-          <>{renderOpenPdfAction()}</>
+        {actionState !== "draft" ? (
+          <button
+            type="button"
+            className={secondaryButtonClasses}
+            disabled={disabled || !canCopyLink || isSendingEmail || isCopyingLink}
+            onClick={() => {
+              void onCopyLink();
+            }}
+          >
+            <span className="material-symbols-outlined text-base">content_copy</span>
+            Copy Link
+          </button>
         ) : null}
 
-        {actionState === "approved" || actionState === "declined" ? (
-          <>{renderOpenPdfAction()}</>
-        ) : null}
+        {actionState !== "draft" ? <>{renderOpenPdfAction()}</> : null}
       </div>
+
+      {!hasCustomerEmail && showEmailAction ? (
+        <p className="mx-4 mt-3 text-sm text-on-surface-variant">
+          Add a customer email to send this quote by email. Copy Link still works.
+        </p>
+      ) : null}
 
       {statusCopy ? (
         <p role="status" className="mx-4 mt-3 text-sm text-on-surface-variant">

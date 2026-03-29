@@ -112,6 +112,12 @@ function shareQuote(id: string): Promise<Quote> {
   });
 }
 
+function sendQuoteEmail(id: string): Promise<Quote> {
+  return request<Quote>(`/api/quotes/${id}/send-email`, {
+    method: "POST",
+  });
+}
+
 function markQuoteWon(id: string): Promise<Quote> {
   return request<Quote>(`/api/quotes/${id}/mark-won`, {
     method: "POST",
@@ -135,6 +141,7 @@ export const quoteService = {
   deleteQuote,
   generatePdf,
   shareQuote,
+  sendQuoteEmail,
   markQuoteWon,
   markQuoteLost,
 };

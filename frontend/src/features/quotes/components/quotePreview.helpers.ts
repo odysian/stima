@@ -1,5 +1,6 @@
 import type { QuoteDetail, QuoteStatus } from "@/features/quotes/types/quote.types";
 import type { OverflowMenuItem } from "@/shared/components/OverflowMenu";
+import { isHttpRequestError } from "@/shared/lib/http";
 import { formatDate } from "@/shared/lib/formatters";
 
 export type QuotePreviewActionState = QuoteStatus;
@@ -48,6 +49,61 @@ export function canNavigateBack(): boolean {
   // prior history but React Router did not set idx. We accept that tradeoff here to
   // preserve a sensible back behavior for older/non-router history state entries.
   return window.history.length > 1;
+}
+
+export function resolveActionState(
+  quote: QuoteDetail | null,
+  hasLocalPdf: boolean,
+): QuotePreviewActionState {
+  if (
+    quote?.status === "shared"
+    || quote?.status === "viewed"
+    || quote?.status === "approved"
+    || quote?.status === "declined"
+  ) {
+    return quote.status;
+  }
+
+  if (quote?.status === "ready" || hasLocalPdf) {
+    return "ready";
+  }
+
+  return "draft";
+}
+
+
+export function getEmailActionLabel(actionState: QuotePreviewActionState): string | null {
+  if (actionState === "ready") {
+    return "Send by Email";
+  }
+  if (actionState === "shared" || actionState === "viewed") {
+    return "Resend Email";
+  }
+  return null;
+}
+
+
+export function getSendEmailErrorMessage(error: unknown): string {
+  if (isHttpRequestError(error)) {
+    switch (error.status) {
+      case 404:
+        return "This quote could not be found. Refresh and try again.";
+      case 409:
+        return "Generate the PDF before sending this quote by email.";
+      case 422:
+        return "Add a valid customer email before sending this quote.";
+      case 429:
+        return "This quote was emailed recently. Please wait a few minutes before resending.";
+      case 502:
+        return "Email delivery failed. Please try again.";
+      case 503:
+        return "Email delivery is not configured right now.";
+      default:
+        break;
+    }
+  }
+
+  return error instanceof Error ? error.message : "Unable to send quote email";
 }
 
 export function getCompactStatusRow(
@@ -117,11 +173,8 @@ export function getCompactStatusRow(
 interface BuildOverflowItemsArgs {
   hasQuote: boolean;
   actionState: QuotePreviewActionState;
-  openPdfUrl: string | null;
-  shareUrl: string | null;
   isBusy: boolean;
   onDeleteRequest: () => void;
-  onCopyShareLink: () => void;
   onMarkWonRequest: () => void;
   onMarkLostRequest: () => void;
 }
@@ -129,11 +182,8 @@ interface BuildOverflowItemsArgs {
 export function buildOverflowItems({
   hasQuote,
   actionState,
-  openPdfUrl,
-  shareUrl,
   isBusy,
   onDeleteRequest,
-  onCopyShareLink,
   onMarkWonRequest,
   onMarkLostRequest,
 }: BuildOverflowItemsArgs): OverflowMenuItem[] {
@@ -156,13 +206,6 @@ export function buildOverflowItems({
   if (actionState === "ready") {
     return [
       {
-        label: "Open PDF",
-        icon: "open_in_new",
-        href: openPdfUrl ?? undefined,
-        openInNewTab: true,
-        disabled: !openPdfUrl,
-      },
-      {
         label: "Delete Quote",
         icon: "delete",
         tone: "destructive",
@@ -174,12 +217,6 @@ export function buildOverflowItems({
 
   if (actionState === "shared" || actionState === "viewed") {
     return [
-      {
-        label: "Copy Share Link",
-        icon: "content_copy",
-        disabled: !shareUrl || isBusy,
-        onSelect: onCopyShareLink,
-      },
       {
         label: "Mark as Won",
         icon: "check_circle",

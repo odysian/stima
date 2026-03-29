@@ -49,6 +49,22 @@ interface RequestOptions extends Omit<RequestInit, "body"> {
   skipRefresh?: boolean;
 }
 
+export class HttpRequestError extends Error {
+  status: number;
+  payload: unknown;
+
+  constructor(message: string, status: number, payload: unknown) {
+    super(message);
+    this.name = "HttpRequestError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
+export function isHttpRequestError(error: unknown): error is HttpRequestError {
+  return error instanceof HttpRequestError;
+}
+
 function isMutatingMethod(method: string): boolean {
   return MUTATING_METHODS.has(method.toUpperCase());
 }
@@ -210,7 +226,11 @@ async function requestWithParser<T>(
 
   if (!response.ok) {
     const fallbackMessage = response.statusText || "Request failed";
-    const error = new Error(getErrorMessage(payload, fallbackMessage));
+    const error = new HttpRequestError(
+      getErrorMessage(payload, fallbackMessage),
+      response.status,
+      payload,
+    );
     if (response.status >= 500) {
       captureException(error);
     }

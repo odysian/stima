@@ -20,6 +20,7 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
+from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
 from app.features.quotes.schemas import (
     ConvertNotesRequest,
@@ -36,6 +37,7 @@ from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.shared.dependencies import (
     get_current_user,
     get_extraction_service,
+    get_quote_email_delivery_service,
     get_quote_service,
     require_csrf,
 )
@@ -263,6 +265,27 @@ async def share_quote(
     """Create/reuse a share token and mark quote as shared."""
     try:
         quote = await quote_service.share_quote(user, quote_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return QuoteResponse.model_validate(quote)
+
+
+@router.post(
+    "/{quote_id}/send-email",
+    response_model=QuoteResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def send_quote_email(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    email_delivery_service: Annotated[
+        QuoteEmailDeliveryService,
+        Depends(get_quote_email_delivery_service),
+    ],
+) -> QuoteResponse:
+    """Send a quote email to the customer contact on file."""
+    try:
+        quote = await email_delivery_service.send_quote_email(user, quote_id)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return QuoteResponse.model_validate(quote)
