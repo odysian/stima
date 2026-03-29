@@ -124,7 +124,10 @@ On resend, `share_quote()` is a no-op for already-shared statuses, so `quote_sha
   - business name and contractor name
   - quote number and total
   - optional quote title (if present)
-  - contact line "Questions? Call or text [contractor phone number]."
+  - conditional contact copy:
+    - `Questions? Call or text [contractor phone number].` when phone exists
+    - `Questions? Reply to this email.` when phone is missing and contractor email exists
+    - neutral fallback copy when both phone and contractor email are missing
   - contractor email footer if present
 - [ ] If customer has no email, "Send by Email" is disabled with a help prompt; Copy Link remains functional.
 - [ ] If customer email is invalid, send returns 422 with a user-friendly message (no provider call).

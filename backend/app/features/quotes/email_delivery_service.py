@@ -67,8 +67,8 @@ class QuoteEmailTemplateContext:
 
     business_name: str
     contractor_name: str
-    contractor_phone: str
     contractor_email: str | None
+    contact_line: str
     customer_name: str
     doc_number: str
     title: str | None
@@ -283,15 +283,16 @@ def _build_template_context(
 ) -> QuoteEmailTemplateContext:
     business_name = _resolve_business_name(context)
     contractor_name = _resolve_contractor_name(context, business_name)
-    contractor_phone = _resolve_contractor_phone(context)
-    contractor_email = (
-        context.contractor_email.strip() if context.contractor_email.strip() else None
-    )
+    contractor_phone = _normalize_optional_text(context.contractor_phone)
+    contractor_email = _normalize_optional_text(context.contractor_email)
     return QuoteEmailTemplateContext(
         business_name=business_name,
         contractor_name=contractor_name,
-        contractor_phone=contractor_phone,
         contractor_email=contractor_email,
+        contact_line=_build_contact_line(
+            contractor_phone=contractor_phone,
+            contractor_email=contractor_email,
+        ),
         customer_name=context.customer_name,
         doc_number=context.doc_number,
         title=_normalize_optional_text(context.title),
@@ -322,11 +323,16 @@ def _resolve_contractor_name(context: QuoteEmailContext, fallback: str) -> str:
     return fallback
 
 
-def _resolve_contractor_phone(context: QuoteEmailContext) -> str:
-    phone_number = _normalize_optional_text(context.contractor_phone)
-    if phone_number is not None:
-        return phone_number
-    return "your contractor"
+def _build_contact_line(
+    *,
+    contractor_phone: str | None,
+    contractor_email: str | None,
+) -> str:
+    if contractor_phone is not None:
+        return f"Questions? Call or text {contractor_phone}."
+    if contractor_email is not None:
+        return "Questions? Reply to this email."
+    return "Questions? Contact your contractor for help."
 
 
 def _normalize_optional_text(value: str | None) -> str | None:
@@ -361,7 +367,7 @@ def _render_text(context: QuoteEmailTemplateContext) -> str:
             f"View quote: {context.landing_page_url}",
             f"Download PDF: {context.pdf_download_url}",
             "",
-            f"Questions? Call or text {context.contractor_phone}.",
+            context.contact_line,
         ]
     )
     if context.contractor_email:

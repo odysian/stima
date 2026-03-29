@@ -661,12 +661,90 @@ async def test_send_quote_email_shares_quote_delivers_email_and_logs_success(
     assert f"/share/{payload['share_token']}" in message.html_content
     assert "Questions? Call or text +1-555-111-2222." in message.html_content
     assert credentials["email"] in message.html_content
+    assert "Questions? Call or text +1-555-111-2222." in message.text_content
+    assert f"Reply to: {credentials['email']}" in message.text_content
     assert message.reply_to_email == credentials["email"]
 
     quote_event_names = [
         payload["event"] for payload in emitted_events if payload.get("quote_id") == quote["id"]
     ]
     assert quote_event_names[-2:] == ["quote_shared", "email_sent"]
+
+
+async def test_send_quote_email_uses_reply_copy_when_phone_is_missing(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        name="Alice Johnson",
+        email="alice@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert len(mock_email_service.messages) == 1
+    message = mock_email_service.messages[0]
+    assert "Questions? Reply to this email." in message.html_content
+    assert "Questions? Reply to this email." in message.text_content
+    assert "Questions? Call or text" not in message.html_content
+    assert "Questions? Call or text" not in message.text_content
+    assert credentials["email"] in message.html_content
+    assert f"Reply to: {credentials['email']}" in message.text_content
+    assert message.reply_to_email == credentials["email"]
+
+
+async def test_send_quote_email_uses_neutral_contact_copy_when_phone_and_email_are_missing(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    await _set_user_email_and_phone_number(
+        db_session,
+        email=credentials["email"],
+        updated_email="",
+        phone_number=None,
+    )
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        name="Alice Johnson",
+        email="alice@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert len(mock_email_service.messages) == 1
+    message = mock_email_service.messages[0]
+    assert "Questions? Contact your contractor for help." in message.html_content
+    assert "Questions? Contact your contractor for help." in message.text_content
+    assert "Questions? Call or text" not in message.html_content
+    assert "Questions? Call or text" not in message.text_content
+    assert "Reply to this email." not in message.html_content
+    assert "Reply to this email." not in message.text_content
+    assert "Reply to " not in message.html_content
+    assert "Reply to:" not in message.text_content
+    assert message.reply_to_email is None
 
 
 @pytest.mark.parametrize(
@@ -2360,6 +2438,19 @@ async def _set_user_phone_number(
     phone_number: str,
 ) -> None:
     user = await _get_user_by_email(db_session, email)
+    user.phone_number = phone_number
+    await db_session.commit()
+
+
+async def _set_user_email_and_phone_number(
+    db_session: AsyncSession,
+    *,
+    email: str,
+    updated_email: str,
+    phone_number: str | None,
+) -> None:
+    user = await _get_user_by_email(db_session, email)
+    user.email = updated_email
     user.phone_number = phone_number
     await db_session.commit()
 
