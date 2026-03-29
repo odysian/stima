@@ -23,14 +23,6 @@ const labels = {
 export function StatusBadge({ variant }: StatusBadgeProps): React.ReactElement {
   return (
     <span className={`text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg ${styles[variant]}`}>
-      {variant === "approved" ? (
-        <span
-          aria-hidden="true"
-          className="material-symbols-outlined mr-1 align-[-0.15rem] text-sm"
-        >
-          check_circle
-        </span>
-      ) : null}
       {labels[variant]}
     </span>
   );

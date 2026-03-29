@@ -68,7 +68,6 @@ describe("CustomerListScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Customers" })).toBeInTheDocument();
     expect(await screen.findByText("2 customers")).toBeInTheDocument();
-    expect(screen.getByText("2 customers")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /alice johnson/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /bob brown/i })).toBeInTheDocument();

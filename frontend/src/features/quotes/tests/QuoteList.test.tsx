@@ -297,5 +297,6 @@ describe("QuoteList", () => {
     renderScreen();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load quotes");
+    expect(screen.queryByText(/active\s*·\s*\d+\s*pending/i)).not.toBeInTheDocument();
   });
 });
