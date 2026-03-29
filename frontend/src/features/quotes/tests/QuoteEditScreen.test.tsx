@@ -140,6 +140,24 @@ describe("QuoteEditScreen", () => {
     expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
   });
 
+  it.each(["shared", "viewed", "approved", "declined"] as const)(
+    "redirects back to preview when the quote is no longer editable (%s)",
+    async (status) => {
+      window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
+      mockedQuoteService.getQuote.mockResolvedValueOnce(
+        makeQuoteDetail({ status, share_token: "share-token-1" }),
+      );
+
+      renderScreen();
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview", { replace: true });
+      });
+      expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Q-001" })).not.toBeInTheDocument();
+    },
+  );
+
   it("saves changes, clears the edit draft, and navigates back to preview", async () => {
     window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
 
