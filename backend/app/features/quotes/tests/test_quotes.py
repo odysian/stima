@@ -17,6 +17,7 @@ from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.event_logs.models import EventLog
+from app.features.quotes import email_delivery_service
 from app.features.quotes import api as quote_api
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, LineItem, QuoteStatus
@@ -42,6 +43,13 @@ from app.shared.dependencies import (
 )
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.fixture(autouse=True)
+def _reset_email_delivery_fallback_cache() -> Iterator[None]:
+    email_delivery_service._EMAIL_SENT_FALLBACK_TIMESTAMPS.clear()  # noqa: SLF001
+    yield
+    email_delivery_service._EMAIL_SENT_FALLBACK_TIMESTAMPS.clear()  # noqa: SLF001
 
 
 class _MockExtractionIntegration:
@@ -796,6 +804,53 @@ async def test_send_quote_email_returns_429_on_immediate_retry_after_success(
         )
     )
     assert email_sent_count == 1
+
+
+async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    async def _raise_persist_failure(
+        self: QuoteRepository,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+        customer_id: UUID,
+        event_name: str,
+    ) -> None:
+        del self, user_id, quote_id, customer_id, event_name
+        raise RuntimeError("event log unavailable")
+
+    monkeypatch.setattr(QuoteRepository, "persist_quote_event", _raise_persist_failure)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.json() == {
+        "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
+    }
+    assert len(mock_email_service.messages) == 1
 
 
 @pytest.mark.parametrize(

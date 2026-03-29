@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -25,6 +26,8 @@ from app.integrations.email import (
 from app.shared.event_logger import log_event
 
 _DUPLICATE_SEND_WINDOW = timedelta(minutes=5)
+_EMAIL_SENT_FALLBACK_TIMESTAMPS: dict[tuple[UUID, UUID], datetime] = {}
+LOGGER = logging.getLogger(__name__)
 
 
 class QuoteEmailRepositoryProtocol(Protocol):
@@ -146,12 +149,22 @@ class QuoteEmailDeliveryService:
                 status_code=502,
             ) from exc
 
-        await self._repository.persist_quote_event(
-            user_id=context.user_id,
-            quote_id=context.quote_id,
-            customer_id=context.customer_id,
-            event_name="email_sent",
-        )
+        try:
+            await self._repository.persist_quote_event(
+                user_id=context.user_id,
+                quote_id=context.quote_id,
+                customer_id=context.customer_id,
+                event_name="email_sent",
+            )
+        except Exception:  # noqa: BLE001
+            _remember_fallback_email_sent_at(context)
+            LOGGER.warning(
+                "quote email sent without persisted throttle state",
+                extra={
+                    "quote_id": str(context.quote_id),
+                    "user_id": str(context.user_id),
+                },
+            )
         log_event(
             "email_sent",
             user_id=context.user_id,
@@ -167,11 +180,16 @@ class QuoteEmailDeliveryService:
             quote_id=context.quote_id,
             event_name="email_sent",
         )
-        if latest_email_sent_at is None:
+        fallback_email_sent_at = _get_fallback_email_sent_at(context)
+        effective_latest_email_sent_at = _pick_latest_timestamp(
+            latest_email_sent_at,
+            fallback_email_sent_at,
+        )
+        if effective_latest_email_sent_at is None:
             return
 
         cutoff = datetime.now(UTC) - _DUPLICATE_SEND_WINDOW
-        if latest_email_sent_at >= cutoff:
+        if effective_latest_email_sent_at >= cutoff:
             raise QuoteServiceError(
                 detail=(
                     "This quote was emailed recently. Please wait a few minutes before resending."
@@ -211,6 +229,35 @@ def _validate_customer_email(customer_email: str | None) -> str:
         ) from exc
 
     return validated_email.normalized
+
+
+def _remember_fallback_email_sent_at(context: QuoteEmailContext) -> None:
+    _EMAIL_SENT_FALLBACK_TIMESTAMPS[(context.user_id, context.quote_id)] = datetime.now(UTC)
+
+
+def _get_fallback_email_sent_at(context: QuoteEmailContext) -> datetime | None:
+    cache_key = (context.user_id, context.quote_id)
+    fallback_email_sent_at = _EMAIL_SENT_FALLBACK_TIMESTAMPS.get(cache_key)
+    if fallback_email_sent_at is None:
+        return None
+
+    cutoff = datetime.now(UTC) - _DUPLICATE_SEND_WINDOW
+    if fallback_email_sent_at < cutoff:
+        _EMAIL_SENT_FALLBACK_TIMESTAMPS.pop(cache_key, None)
+        return None
+
+    return fallback_email_sent_at
+
+
+def _pick_latest_timestamp(
+    left: datetime | None,
+    right: datetime | None,
+) -> datetime | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return max(left, right)
 
 
 def _build_template_context(
