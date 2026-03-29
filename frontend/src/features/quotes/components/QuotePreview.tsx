@@ -10,13 +10,15 @@ import {
   CLOSED_QUOTE_STATUSES,
   buildOverflowItems,
   canNavigateBack,
+  getEmailActionLabel,
   getCompactStatusRow,
+  getSendEmailErrorMessage,
   isShareAbortError,
   readOptionalQuoteText,
-  type QuotePreviewActionState,
+  resolveActionState,
 } from "@/features/quotes/components/quotePreview.helpers";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { QuoteDetail } from "@/features/quotes/types/quote.types";
+import type { Quote, QuoteDetail } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -32,6 +34,7 @@ export function QuotePreview(): React.ReactElement {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [isMarkingWon, setIsMarkingWon] = useState(false);
@@ -88,14 +91,9 @@ export function QuotePreview(): React.ReactElement {
   const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
   const shareUrl = quote?.share_token ? `${window.location.origin}/doc/${quote.share_token}` : null;
   const hasLocalPdf = Boolean(pdfUrl);
-  const actionState: QuotePreviewActionState = quote?.status === "shared"
-    || quote?.status === "viewed"
-    || quote?.status === "approved"
-    || quote?.status === "declined"
-    ? quote.status
-    : quote?.status === "ready" || hasLocalPdf
-      ? "ready"
-      : "draft";
+  const actionState = resolveActionState(quote, hasLocalPdf);
+  const emailActionLabel = getEmailActionLabel(actionState);
+  const hasCustomerEmail = Boolean(readOptionalQuoteText(quote, "customer_email"));
   const openPdfUrl = pdfUrl ?? (quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null);
   const quoteTitle = readOptionalQuoteText(quote, "title");
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
@@ -107,7 +105,8 @@ export function QuotePreview(): React.ReactElement {
       .join(" \u00b7 ") || "No contact details";
   const compactStatusRow = getCompactStatusRow(actionState, quote, hasLocalPdf);
   const canEdit = Boolean(quote && id && !CLOSED_QUOTE_STATUSES.has(actionState));
-  const isBusy = isGeneratingPdf || isSharing || isMarkingWon || isMarkingLost || isDeleting;
+  const isBusy =
+    isGeneratingPdf || isSharing || isSendingEmail || isMarkingWon || isMarkingLost || isDeleting;
 
   function handleBack(): void {
     if (canNavigateBack()) {
@@ -157,91 +156,109 @@ export function QuotePreview(): React.ReactElement {
     }
   }
 
-  async function onShare(): Promise<void> {
+  function applyQuoteUpdate(updatedQuote: Quote): void {
+    setQuote((currentQuote) => {
+      if (!currentQuote) {
+        return currentQuote;
+      }
+
+      return {
+        ...currentQuote,
+        title: updatedQuote.title,
+        status: updatedQuote.status,
+        shared_at: updatedQuote.shared_at,
+        share_token: updatedQuote.share_token,
+        updated_at: updatedQuote.updated_at,
+      };
+    });
+  }
+
+  async function ensureShareUrl(): Promise<{ url: string; shareTitle: string }> {
     if (!id || !quote) {
-      return;
+      throw new Error("Share link unavailable");
     }
 
+    if (quote.share_token) {
+      return {
+        url: `${window.location.origin}/doc/${quote.share_token}`,
+        shareTitle: quote.title ?? `Quote ${quote.doc_number}`,
+      };
+    }
+
+    const updatedQuote = await quoteService.shareQuote(id);
+    applyQuoteUpdate(updatedQuote);
+    if (!updatedQuote.share_token) {
+      throw new Error("Share link unavailable");
+    }
+    return {
+      url: `${window.location.origin}/doc/${updatedQuote.share_token}`,
+      shareTitle: updatedQuote.title ?? `Quote ${updatedQuote.doc_number}`,
+    };
+  }
+
+  async function onCopyLink(): Promise<void> {
     setShareError(null);
     setShareMessage(null);
     setIsSharing(true);
 
     try {
-      const updatedQuote = await quoteService.shareQuote(id);
-      setQuote((currentQuote) => {
-        if (!currentQuote) {
-          return currentQuote;
-        }
-
-        return {
-          ...currentQuote,
-          title: updatedQuote.title,
-          status: updatedQuote.status,
-          shared_at: updatedQuote.shared_at,
-          share_token: updatedQuote.share_token,
-          updated_at: updatedQuote.updated_at,
-        };
-      });
-
-      if (!updatedQuote.share_token) {
-        throw new Error("Share link unavailable");
-      }
-
-      const nextSharedUrl = `${window.location.origin}/doc/${updatedQuote.share_token}`;
+      const { url: nextSharedUrl, shareTitle } = await ensureShareUrl();
       const maybeNavigator = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
 
       if (typeof maybeNavigator.share === "function") {
-        await maybeNavigator.share({
-          title: updatedQuote.title ?? `Quote ${updatedQuote.doc_number}`,
-          url: nextSharedUrl,
-        });
-        setShareMessage("Quote link shared.");
+        try {
+          await maybeNavigator.share({
+            title: shareTitle,
+            url: nextSharedUrl,
+          });
+          setShareMessage("Quote link shared.");
+          return;
+        } catch (error) {
+          if (isShareAbortError(error)) {
+            return;
+          }
+          throw error;
+        }
+      }
+
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        setShareMessage("Copy this share link manually.");
         return;
       }
 
-      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-        await navigator.clipboard.writeText(nextSharedUrl);
-        setShareMessage("Share link copied to clipboard.");
-        return;
-      }
-
-      setShareMessage("Share this link with your customer.");
+      await navigator.clipboard.writeText(nextSharedUrl);
+      setShareMessage("Share link copied to clipboard.");
     } catch (error) {
-      if (isShareAbortError(error)) {
-        return;
-      }
-
-      const message = error instanceof Error ? error.message : "Unable to share quote";
+      const message = error instanceof Error ? error.message : "Unable to copy share link";
       setShareError(message);
     } finally {
       setIsSharing(false);
     }
   }
 
-  async function refetchQuote(quoteId: string): Promise<void> {
-    const refreshedQuote = await quoteService.getQuote(quoteId);
-    setQuote(refreshedQuote);
-  }
-
-  async function copyToClipboard(): Promise<void> {
-    if (!shareUrl) {
+  async function onSendEmail(): Promise<void> {
+    if (!id || !quote) {
       return;
     }
 
     setShareError(null);
     setShareMessage(null);
-    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
-      setShareMessage("Copy this share link manually.");
-      return;
-    }
+    setIsSendingEmail(true);
 
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      setShareMessage("Share link copied to clipboard.");
+      const updatedQuote = await quoteService.sendQuoteEmail(id);
+      applyQuoteUpdate(updatedQuote);
+      setShareMessage("Quote email sent.");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to copy share link";
-      setShareError(message);
+      setShareError(getSendEmailErrorMessage(error));
+    } finally {
+      setIsSendingEmail(false);
     }
+  }
+
+  async function refetchQuote(quoteId: string): Promise<void> {
+    const refreshedQuote = await quoteService.getQuote(quoteId);
+    setQuote(refreshedQuote);
   }
 
   async function onConfirmMarkWon(): Promise<void> {
@@ -308,13 +325,8 @@ export function QuotePreview(): React.ReactElement {
   const overflowItems = buildOverflowItems({
     hasQuote: Boolean(quote),
     actionState,
-    openPdfUrl,
-    shareUrl,
     isBusy,
     onDeleteRequest: () => setShowDeleteConfirm(true),
-    onCopyShareLink: () => {
-      void copyToClipboard();
-    },
     onMarkWonRequest: () => setShowMarkWonConfirm(true),
     onMarkLostRequest: () => setShowMarkLostConfirm(true),
   });
@@ -359,12 +371,16 @@ export function QuotePreview(): React.ReactElement {
 
             <QuotePreviewActions
               actionState={actionState}
+              emailActionLabel={emailActionLabel}
+              hasCustomerEmail={hasCustomerEmail}
               onGeneratePdf={onGeneratePdf}
-              onShare={onShare}
+              onSendEmail={onSendEmail}
+              onCopyLink={onCopyLink}
               openPdfUrl={openPdfUrl}
               shareUrl={shareUrl}
               isGeneratingPdf={isGeneratingPdf}
-              isSharing={isSharing}
+              isSendingEmail={isSendingEmail}
+              isCopyingLink={isSharing}
               isMarkingWon={isMarkingWon}
               isMarkingLost={isMarkingLost}
               disabled={isLoadingQuote || !!loadError}

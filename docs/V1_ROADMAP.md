@@ -202,7 +202,7 @@ landing page (Milestone 2) which needs the same logo asset.
 **Status:** Shipped
 
 **Goal:** Replace the direct PDF stream with a branded customer-facing page where the
-customer can view the quote and take action.
+customer can view the quote.
 
 **Schema notes:**
 - `share_token` column already exists on `documents` from V0 (migration
@@ -276,7 +276,7 @@ paths in V1.
   the "Send by Email" action is disabled with a help prompt to add customer email
 - Sent email transitions quote status to `shared` (if not already)
 - Re-sharing a quote already at `viewed` or later does not regress the status
-- Delivery provider: SendGrid (or equivalent transactional email service)
+- Delivery provider: Resend
 
 **Action hierarchy on the quote preview screen:**
 1. Primary: Send by Email (when customer email is available)
@@ -300,11 +300,11 @@ common sharing behavior for many contractors in the field.
 
 **Pre-work required before Milestone 3 build begins:**
 - [ ] Sending domain confirmed (e.g., `noreply@stima.dev` or `mail.stima.dev`)
-- [ ] SendGrid account created and API key generated
+- [ ] Resend account created and API key generated
 - [ ] SPF record added to domain DNS
 - [ ] DKIM record added to domain DNS
 - [ ] DMARC record added (prevents spoofing of the sending domain)
-- [ ] Domain verification confirmed in SendGrid dashboard
+- [ ] Domain verification confirmed in the Resend dashboard
 - [ ] Test email sent and received successfully before writing any application code
 
 Note: DNS propagation can take 24–48 hours. Start this before reaching Milestone 3 in
@@ -609,7 +609,7 @@ Ship in this order from current state:
 | Dependency | Milestone | Notes |
 |---|---|---|
 | Cloud file storage (S3/GCS) | 0 | Logo upload requires persistent file storage |
-| Transactional email provider (SendGrid) | 3 | New service, requires API key + domain setup |
+| Transactional email provider (Resend) | 3 | New service, requires API key + domain setup |
 | Error monitoring (Sentry) | 6 | New service, requires project setup on both frontend and backend |
 
 These three infrastructure items should be provisioned before or during their respective

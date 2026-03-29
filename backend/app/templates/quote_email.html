@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0; padding:0; background-color:#f5f5f0; font-family:Arial, Helvetica, sans-serif; color:#1f2933;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f5f5f0; padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px; background-color:#ffffff; border-collapse:collapse; border-radius:16px; overflow:hidden;">
+            <tr>
+              <td style="padding:32px 32px 16px; background-color:#1f4d3a; color:#ffffff;">
+                <p style="margin:0; font-size:12px; letter-spacing:0.08em; text-transform:uppercase;">{{ business_name }}</p>
+                <h1 style="margin:12px 0 0; font-size:28px; line-height:1.2;">Your quote is ready</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <p style="margin:0 0 16px; font-size:16px; line-height:1.6;">
+                  Hi {{ customer_name }},
+                </p>
+                <p style="margin:0 0 24px; font-size:16px; line-height:1.6;">
+                  {{ contractor_name }} sent over quote <strong>{{ doc_number }}</strong> from {{ business_name }}.
+                </p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 24px; border:1px solid #d8dfd8; border-radius:12px;">
+                  <tr>
+                    <td style="padding:16px 20px; border-bottom:1px solid #d8dfd8;">
+                      <p style="margin:0; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#52606d;">Quote number</p>
+                      <p style="margin:8px 0 0; font-size:18px; font-weight:700;">{{ doc_number }}</p>
+                    </td>
+                  </tr>
+                  {% if title %}
+                  <tr>
+                    <td style="padding:16px 20px; border-bottom:1px solid #d8dfd8;">
+                      <p style="margin:0; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#52606d;">Title</p>
+                      <p style="margin:8px 0 0; font-size:16px;">{{ title }}</p>
+                    </td>
+                  </tr>
+                  {% endif %}
+                  <tr>
+                    <td style="padding:16px 20px;">
+                      <p style="margin:0; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#52606d;">Total</p>
+                      <p style="margin:8px 0 0; font-size:16px; font-weight:700;">{{ total_amount }}</p>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 16px;">
+                  <tr>
+                    <td align="center" bgcolor="#1f4d3a" style="border-radius:999px;">
+                      <a href="{{ landing_page_url }}" style="display:inline-block; padding:14px 24px; color:#ffffff; font-size:16px; font-weight:700; text-decoration:none;">View Quote</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 24px; font-size:14px; line-height:1.6;">
+                  Need the PDF instead? <a href="{{ pdf_download_url }}" style="color:#1f4d3a; font-weight:700;">Download PDF</a>
+                </p>
+                <p style="margin:0 0 8px; font-size:16px; line-height:1.6;">
+                  Questions? Call or text {{ contractor_phone }}.
+                </p>
+                {% if contractor_email %}
+                <p style="margin:0; font-size:14px; line-height:1.6; color:#52606d;">
+                  Reply to {{ contractor_email }}
+                </p>
+                {% endif %}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

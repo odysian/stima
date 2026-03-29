@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.features.auth.models import User
 from app.features.customers.models import Customer
+from app.features.event_logs.models import EventLog
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.schemas import LineItemDraft
 
@@ -103,6 +104,27 @@ class QuoteDetailRow:
     line_items: list[LineItem]
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(slots=True)
+class QuoteEmailContext:
+    """Quote and contact fields required for transactional email delivery."""
+
+    quote_id: UUID
+    user_id: UUID
+    customer_id: UUID
+    business_name: str | None
+    first_name: str | None
+    last_name: str | None
+    contractor_email: str
+    contractor_phone: str | None
+    customer_name: str
+    customer_email: str | None
+    doc_number: str
+    title: str | None
+    status: str
+    total_amount: Decimal | None
+    share_token: str | None
 
 
 @dataclass(slots=True)
@@ -231,6 +253,44 @@ class QuoteRepository:
             updated_at=document.updated_at,
         )
 
+    async def get_email_context(self, quote_id: UUID, user_id: UUID) -> QuoteEmailContext | None:
+        """Return the quote and contact fields needed to send a quote email."""
+        result = await self._session.execute(
+            select(Document, Customer, User)
+            .join(Customer, Customer.id == Document.customer_id)
+            .join(User, User.id == Document.user_id)
+            .where(
+                Document.id == quote_id,
+                Document.user_id == user_id,
+            )
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+
+        document, customer, user = row
+        return QuoteEmailContext(
+            quote_id=document.id,
+            user_id=document.user_id,
+            customer_id=document.customer_id,
+            business_name=user.business_name,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            contractor_email=user.email,
+            contractor_phone=user.phone_number,
+            customer_name=customer.name,
+            customer_email=customer.email,
+            doc_number=document.doc_number,
+            title=document.title,
+            status=(
+                document.status.value
+                if isinstance(document.status, QuoteStatus)
+                else str(document.status)
+            ),
+            total_amount=document.total_amount,
+            share_token=document.share_token,
+        )
+
     async def get_render_context(self, quote_id: UUID, user_id: UUID) -> QuoteRenderContext | None:
         """Return PDF render context for a user-owned quote."""
         result = await self._session.execute(
@@ -329,6 +389,46 @@ class QuoteRepository:
             return None
 
         return await self.get_by_id(quote_id, user_id)
+
+    async def get_latest_quote_event_at(
+        self,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+        event_name: str,
+    ) -> datetime | None:
+        """Return the latest pilot event timestamp for one quote/event combination."""
+        return await self._session.scalar(
+            select(EventLog.created_at)
+            .where(
+                EventLog.user_id == user_id,
+                EventLog.event_name == event_name,
+                EventLog.metadata_json["quote_id"].as_string() == str(quote_id),
+            )
+            .order_by(EventLog.created_at.desc())
+            .limit(1)
+        )
+
+    async def persist_quote_event(
+        self,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+        customer_id: UUID,
+        event_name: str,
+    ) -> None:
+        """Stage one quote-scoped pilot event row; caller should commit the session."""
+        self._session.add(
+            EventLog(
+                user_id=user_id,
+                event_name=event_name,
+                metadata_json={
+                    "quote_id": str(quote_id),
+                    "customer_id": str(customer_id),
+                },
+            )
+        )
+        await self._session.flush()
 
     async def create(
         self,

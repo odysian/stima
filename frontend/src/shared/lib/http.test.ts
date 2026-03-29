@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { User } from "@/features/auth/types/auth.types";
 import { captureException } from "@/sentry";
-import { clearCsrfToken, request, requestBlob } from "@/shared/lib/http";
+import {
+  clearCsrfToken,
+  request,
+  requestBlob,
+} from "@/shared/lib/http";
 
 vi.mock("@/sentry", () => ({
   captureException: vi.fn(),
@@ -200,6 +204,17 @@ describe("http request helper", () => {
     await expect(request("/api/admin/events")).rejects.toThrow("Bad request");
 
     expect(vi.mocked(captureException)).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the response status on request failures", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(jsonResponse({ detail: "Too many requests" }, 429));
+
+    await expect(request("/api/quotes")).rejects.toMatchObject({
+      message: "Too many requests",
+      status: 429,
+      name: "HttpRequestError",
+    });
   });
 
   it("captures network failures", async () => {

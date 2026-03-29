@@ -48,12 +48,12 @@ Option B (schema change): add a `last_emailed_at` field to `documents` (or creat
 
 Default recommendation: Option A, to avoid schema changes.
 
-Known gap / explicit resolution: event persistence is fire-and-forget in `log_event()` (async DB write). Two near-simultaneous taps from the same client can race the "last email" lookup before the previous write commits. We accept this for pilot scale (UI disables the button during in-flight sends), and we will revisit if duplicate emails show up in real usage; a schema-based `last_emailed_at` (Option B) is the contingency.
+Known gap / explicit resolution: `email_sent` is persisted synchronously on the request path before the response returns, so immediate retries are blocked by the 5-minute guard. If that post-send DB write fails, the app falls back to a process-local throttle timestamp so the same worker still blocks immediate retries. Truly overlapping concurrent requests across workers are still pilot-scale best-effort until we introduce a schema-backed `last_emailed_at` field or row-lock-based throttle (Option B).
 
 ### 2) Email provider integration style
-- Use the official SendGrid SDK vs raw HTTP requests.
+- Use Resend for transactional delivery and keep the integration thin.
 
-Default recommendation: official SendGrid SDK if available/clean for error parsing; keep integration thin.
+Default recommendation: use a thin Resend adapter over HTTP so provider-specific behavior stays isolated.
 
 ### 3) Resend semantics
 Decide whether resend:
@@ -88,7 +88,7 @@ On resend, `share_quote()` is a no-op for already-shared statuses, so `quote_sha
   - Include secondary link to `/share/:token`
   - Include contact line with contractor phone number and optional contractor email footer
 - Add runtime configuration for provider:
-  - SendGrid API key and From address/name
+  - Resend API key and From address/name
   - Frontend base URL used to build absolute links
 
 ### Frontend
@@ -130,7 +130,7 @@ On resend, `share_quote()` is a no-op for already-shared statuses, so `quote_sha
 - [ ] If customer email is invalid, send returns 422 with a user-friendly message (no provider call).
 - [ ] If quote is `draft`, send returns 409.
 - [ ] If email was sent < 5 minutes ago, send returns 429.
-- [ ] If SendGrid/provider fails, send returns 502 with a user-friendly message.
+- [ ] If the email provider fails, send returns 502 with a user-friendly message.
 - [ ] If quote is missing or not owned, send returns 404 with a user-friendly message.
 - [ ] If email delivery is not configured (missing provider config), send returns 503 with a user-friendly message.
 - [ ] UI shows user-friendly messages for 404/409/422/429/502/503 responses.
@@ -168,7 +168,7 @@ Manual sanity checks:
 
 ## DoR Preconditions (blocking before PR)
 Milestone 3 has explicit infrastructure pre-work; PR should not be opened unless all are confirmed:
-1. `SENDGRID_API_KEY` is set (non-empty) in the backend runtime environment.
+1. `RESEND_API_KEY` is set (non-empty) in the backend runtime environment.
 2. Sending domain has completed DNS verification in the provider dashboard:
    - SPF record added
    - DKIM record added
@@ -179,6 +179,6 @@ Milestone 3 has explicit infrastructure pre-work; PR should not be opened unless
 ---
 ## Residual Risk / Known Limitations (for reviewers)
 1. Partial-success on `502`: share transition to `shared` happens before the provider call; if the provider fails, the quote is already shared but `email_sent` is not logged (no rollback; no retry queue in V1 scope).
-2. Async event persistence race: duplicate-send guard relies on pilot `event_logs` persistence which is fire-and-forget; two near-simultaneous taps can potentially both pass the guard. Pilot-scale impact is accepted; schema-based `last_emailed_at` is the contingency.
+2. Overlapping concurrent resend race: immediate retries are blocked by synchronous `email_sent` persistence, with a process-local fallback if that write fails after send, but truly overlapping concurrent requests across workers still rely on pilot-scale assumptions; schema-based `last_emailed_at` (or an equivalent atomic throttle) is the contingency if duplicates show up in practice.
 3. `FRONTEND_BASE_URL` misconfiguration risk: incorrect base URL would cause email links to point to the wrong domain. Implementation should guard/validate in config.
 4. Email HTML client coverage is manual-only in this milestone: `make backend-verify` can’t validate Outlook/Gmail/Apple Mail quirks; we accept this in exchange for pilot speed.

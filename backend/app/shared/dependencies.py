@@ -23,10 +23,12 @@ from app.features.customers.repository import CustomerRepository
 from app.features.customers.service import CustomerService
 from app.features.profile.repository import ProfileRepository
 from app.features.profile.service import ProfileService
+from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.service import QuoteService
 from app.integrations.audio import AudioIntegration
+from app.integrations.email import EmailService
 from app.integrations.extraction import ExtractionIntegration
 from app.integrations.pdf import PdfIntegration
 from app.integrations.storage import StorageService
@@ -49,6 +51,17 @@ def get_storage_service() -> StorageService:
     """Return the configured private storage service."""
     settings = get_settings()
     return _build_storage_service(settings.gcs_bucket_name)
+
+
+@lru_cache(maxsize=1)
+def get_email_service() -> EmailService:
+    """Return the configured transactional email integration."""
+    settings = get_settings()
+    return EmailService(
+        api_key=settings.resend_api_key,
+        from_address=settings.email_from_address,
+        from_name=settings.email_from_name,
+    )
 
 
 def get_auth_service(
@@ -85,6 +98,27 @@ def get_quote_service(
         repository=QuoteRepository(db),
         pdf_integration=get_pdf_integration(),
         storage_service=storage_service,
+    )
+
+
+def get_quote_email_delivery_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    storage_service: Annotated[StorageService, Depends(get_storage_service)],
+    email_service: Annotated[EmailService, Depends(get_email_service)],
+) -> QuoteEmailDeliveryService:
+    """Build a request-scoped quote email delivery service."""
+    settings = get_settings()
+    repository = QuoteRepository(db)
+    quote_service = QuoteService(
+        repository=repository,
+        pdf_integration=get_pdf_integration(),
+        storage_service=storage_service,
+    )
+    return QuoteEmailDeliveryService(
+        repository=repository,
+        quote_service=quote_service,
+        email_service=email_service,
+        frontend_url=settings.frontend_url,
     )
 
 
