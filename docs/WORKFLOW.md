@@ -74,6 +74,26 @@ Use `docs/template/KICKOFF.md` for copy-paste kickoff prompts.
 - Planning kickoff (feature -> issue planning only): no code changes, no PR.
 - Execution kickoff (existing Task -> implement/verify/PR): run only when Task issue already exists.
 
+## Stateful Cross-Layer Hardening Gate
+
+For Tasks that touch any of the following:
+- state transitions or lifecycle/status machines
+- frontend action visibility/enabled-state logic
+- external provider side effects
+- transport/error semantics or contract-sensitive behavior
+
+run one explicit hardening pass before reviewer handoff.
+
+Hardening pass checklist:
+- Behavior matrix matches implementation across all affected states
+- UI action matrix matches intended enabled/disabled/hidden behavior
+- Success, error, and retry semantics are aligned across backend, frontend, and docs
+- Failure paths are checked explicitly (for example provider failure, persistence failure, rollback/fallback behavior)
+- Canonical verification target(s) for the touched scope pass before push
+
+If canonical verification is blocked locally, stop and report that clearly before pushing follow-up fixes.
+Do not rely on confidence or partial checks when the Task changes contract-sensitive or stateful behavior.
+
 ## Boundary And Dependency Rules
 
 - Allowed: `api -> services -> repositories -> integrations/libs`.
@@ -108,6 +128,14 @@ Default reviewer constraints:
 - do not create worktrees by default
 - do not rerun full verification already reported green
 - report findings first; no command-by-command transcript unless a command failed
+
+Reviewer note for stateful/cross-layer Tasks:
+- default to matrix/parity review first:
+  - status/action parity
+  - error/detail parity
+  - side-effect parity
+  - failure/retry parity
+- separate correctness defects from product decisions that should become follow-up tasks
 
 ## Canonical Reviewer Follow-Up Prompt
 

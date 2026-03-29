@@ -19,6 +19,17 @@ Then execute the full Task flow end-to-end:
 7. After review verdict is relayed back:
    - if verdict is `ACTIONABLE`: patch required fixes and rerun targeted verification only.
    - if verdict is `APPROVED`: write `docs/learning/YYYY-MM-DD-feature-slug-learning.md` using section 4 below, then return the file path and final completion summary.
+8. If the Task touches state transitions, frontend action availability, external provider side effects, or contract/error semantics, include a short Behavior Matrix before implementation.
+
+Behavior Matrix (required for stateful/cross-layer tasks):
+- States/statuses involved and allowed actions per state
+- Endpoint success/error codes and exact externally visible error semantics
+- Side effects per path (DB writes, event logs, provider calls, token/state changes)
+- Failure-path outcomes (what still changes if downstream provider or persistence fails)
+
+Open Product Decisions (required when applicable):
+- List any unresolved UX/content decisions that should not be silently locked in by implementation or tests
+- If unresolved, explicitly mark them as follow-up candidates rather than encoding them as "correct" behavior
 
 Constraints:
 - Keep mode `single` unless explicitly requested otherwise.
@@ -116,6 +127,12 @@ Constraints:
 - Do not rerun broad verification already reported green unless prior results are suspect.
 - Keep output concise and findings-first.
 - No command transcript unless a command failed and that failure matters to a finding.
+- For stateful/cross-layer Tasks, verify status/action/error/side-effect parity across all affected states, not just the changed happy path.
+- Classify findings as one of:
+  - merge-blocking bug/contract issue
+  - quick hardening fix
+  - follow-up product/UX decision
+- Avoid escalating unresolved wording/copy/product decisions as correctness bugs unless they violate a documented contract.
 
 Required Output:
 1. Verdict: APPROVED or ACTIONABLE
