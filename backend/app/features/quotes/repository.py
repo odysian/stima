@@ -45,6 +45,8 @@ class QuoteRenderContext:
     business_name: str | None
     first_name: str | None
     last_name: str | None
+    phone_number: str | None
+    contractor_email: str | None
     logo_path: str | None
     logo_data_uri: str | None
     customer_name: str
@@ -561,6 +563,8 @@ def _build_render_context(
         business_name=user.business_name,
         first_name=user.first_name,
         last_name=user.last_name,
+        phone_number=user.phone_number,
+        contractor_email=user.email,
         logo_path=user.logo_path,
         logo_data_uri=None,
         customer_name=customer.name,

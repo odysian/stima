@@ -5,18 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stima Quote</title>
     <style>
+      @page {
+        size: A4;
+        margin: 18mm;
+      }
+
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 400;
+        src: url("Inter-Regular.woff2") format("woff2");
+      }
+
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 700;
+        src: url("Inter-Bold.woff2") format("woff2");
+      }
+
       body {
         margin: 0;
-        padding: 32px;
-        font-family: Arial, Helvetica, sans-serif;
+        padding: 0;
+        font-family: "Inter", sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
         color: #111827;
         background: #ffffff;
       }
 
       .header {
-        border-bottom: 2px solid #e5e7eb;
-        padding-bottom: 16px;
-        margin-bottom: 20px;
+        border-bottom: 1px solid #d1d5db;
+        padding-bottom: 20px;
+        margin-bottom: 24px;
       }
 
       .header-grid {
@@ -36,34 +57,48 @@
 
       .company-name {
         margin: 0;
-        font-size: 28px;
+        font-size: 30px;
         font-weight: 700;
       }
 
       .owner-name {
-        margin: 6px 0 0;
+        margin: 8px 0 0;
         font-size: 14px;
+        font-weight: 700;
+        color: #1f2937;
+      }
+
+      .header-contact {
+        margin: 4px 0 0;
+        font-size: 13px;
         color: #4b5563;
       }
 
       .company-logo {
         display: block;
-        max-height: 48px;
+        max-height: 56px;
         width: auto;
-        max-width: 180px;
+        max-width: 200px;
         margin-left: auto;
+      }
+
+      .quote-title {
+        margin: 0 0 18px;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.25;
       }
 
       .meta-grid {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
       }
 
       .meta-grid td {
         width: 50%;
         vertical-align: top;
-        padding: 0 0 12px;
+        padding: 0 24px 12px 0;
       }
 
       .label {
@@ -80,16 +115,10 @@
         font-size: 14px;
       }
 
-      .quote-title {
-        margin: 0 0 10px;
-        font-size: 20px;
-        font-weight: 700;
-      }
-
       table.line-items {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 10px;
+        margin-top: 8px;
       }
 
       table.line-items thead th {
@@ -104,32 +133,57 @@
 
       table.line-items tbody td {
         border-bottom: 1px solid #e5e7eb;
-        padding: 10px 8px;
+        padding: 14px 8px;
         font-size: 13px;
+        vertical-align: top;
       }
 
       .price-col {
         text-align: right;
         white-space: nowrap;
+        width: 1%;
       }
 
-      .details {
-        color: #4b5563;
-      }
-
-      .total-row td {
-        border-top: 2px solid #9ca3af;
-        border-bottom: none;
-        font-weight: 700;
+      .line-item-description {
         font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+      }
+
+      .line-item-details {
+        display: block;
+        margin-top: 4px;
+        color: #4b5563;
+        font-size: 12px;
+        font-weight: 400;
+      }
+
+      .total-block {
+        width: 220px;
+        margin: 16px 0 0 auto;
+        padding-top: 12px;
+        border-top: 2px solid #111827;
+      }
+
+      .total-label {
+        margin: 0;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6b7280;
+      }
+
+      .total-amount {
+        margin: 6px 0 0;
+        font-size: 16px;
+        font-weight: 700;
+        text-align: right;
       }
 
       .notes {
         margin-top: 24px;
-        padding: 14px;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        background: #f9fafb;
+        padding-left: 16px;
+        border-left: 3px solid #d1d5db;
       }
 
       .notes p {
@@ -141,13 +195,22 @@
   </head>
   <body>
     <main>
+      {% set owner_name = ((first_name or "") ~ " " ~ (last_name or "")).strip() %}
       <header class="header">
         <table class="header-grid">
           <tbody>
             <tr>
               <td>
                 <h1 class="company-name">{{ business_name or "Stima Quote" }}</h1>
-                <p class="owner-name">{{ first_name or "" }} {{ last_name or "" }}</p>
+                {% if owner_name %}
+                <p class="owner-name">{{ owner_name }}</p>
+                {% endif %}
+                {% if phone_number %}
+                <p class="header-contact">{{ phone_number }}</p>
+                {% endif %}
+                {% if contractor_email %}
+                <p class="header-contact">{{ contractor_email }}</p>
+                {% endif %}
               </td>
               {% if logo_data_uri %}
               <td class="header-logo-cell">
@@ -158,6 +221,10 @@
           </tbody>
         </table>
       </header>
+
+      {% if title %}
+      <h2 class="quote-title">{{ title }}</h2>
+      {% endif %}
 
       <table class="meta-grid">
         <tbody>
@@ -176,10 +243,6 @@
               {% endif %}
             </td>
             <td>
-              {% if title %}
-              <p class="label">Quote Title</p>
-              <p class="quote-title">{{ title }}</p>
-              {% endif %}
               <p class="label">Quote Number</p>
               <p class="value">{{ doc_number }}</p>
               <p class="label" style="margin-top: 10px">Issued</p>
@@ -197,32 +260,40 @@
         <thead>
           <tr>
             <th>Description</th>
-            <th>Details</th>
             <th class="price-col">Price</th>
           </tr>
         </thead>
         <tbody>
           {% for line_item in line_items %}
           <tr>
-            <td>{{ line_item.description }}</td>
-            <td class="details">{{ line_item.details or "" }}</td>
+            <td>
+              <span class="line-item-description">{{ line_item.description }}</span>
+              {% if line_item.details %}
+              <span class="line-item-details">{{ line_item.details }}</span>
+              {% endif %}
+            </td>
             <td class="price-col">
               {% if line_item.price is not none %}
               ${{ "{:,.2f}".format(line_item.price) }}
+              {% else %}
+              &mdash;
               {% endif %}
             </td>
           </tr>
           {% endfor %}
-          <tr class="total-row">
-            <td colspan="2">Total</td>
-            <td class="price-col">
-              {% if total_amount is not none %}
-              ${{ "{:,.2f}".format(total_amount) }}
-              {% endif %}
-            </td>
-          </tr>
         </tbody>
       </table>
+
+      <section class="total-block">
+        <p class="total-label">Total</p>
+        <p class="total-amount">
+          {% if total_amount is not none %}
+          ${{ "{:,.2f}".format(total_amount) }}
+          {% else %}
+          &mdash;
+          {% endif %}
+        </p>
+      </section>
 
       {% if notes %}
       <section class="notes">
