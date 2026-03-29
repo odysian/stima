@@ -6,7 +6,7 @@ patterns.
 
 Plan references:
 - `docs/V1_ROADMAP.md` — Milestone 5
-- `plans/2026-03-27/milestone-5-quote-to-invoice.md`
+- This task file is the canonical active plan for Milestone 5.
 
 ---
 ## Goal

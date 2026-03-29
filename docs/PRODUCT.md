@@ -91,6 +91,10 @@ screen, PDF generation, public share link, quote history, pilot event logging.
 branded landing page → contractor knows the outcome → converts to an invoice.
 
 V0 ends at "quote shared via native share." V1 makes that moment mean something.
+V1 is partially shipped: branding, quote status expansion, the read-only public quote
+landing page, and operational visibility are already live. The remaining forward build path
+is email delivery + always-visible Copy Link (M3), PDF refinement (M4), linked invoice
+conversion (M5), and optional pricing controls (M7).
 
 **Core scope:**
 

@@ -1,7 +1,7 @@
 # Stima V1 Roadmap
 
 **Version:** 1.0 — March 2026
-**Status:** Active
+**Status:** Active (foundations shipped; forward path is M3 -> M4 -> M5 -> M7)
 **Assumes:** V0 is complete, deployed, and pilot-ready
 **Reference:** `docs/PRODUCT.md` for strategic context
 
@@ -139,6 +139,8 @@ separate authentication/authorization task rather than hidden inside Milestone 6
 
 ### Milestone 0: Branding Foundation
 
+**Status:** Shipped
+
 **Goal:** Every PDF a contractor sends looks like it came from their business.
 
 **Scope:**
@@ -168,6 +170,8 @@ landing page (Milestone 2) which needs the same logo asset.
 
 ### Milestone 1: Quote Status Expansion
 
+**Status:** Shipped
+
 **Goal:** The quote status lifecycle reflects real-world outcomes, not just document state.
 
 **Scope:**
@@ -194,6 +198,8 @@ landing page (Milestone 2) which needs the same logo asset.
 ---
 
 ### Milestone 2: Public Quote Landing Page
+
+**Status:** Shipped
 
 **Goal:** Replace the direct PDF stream with a branded customer-facing page where the
 customer can view the quote and take action.
@@ -434,6 +440,8 @@ for fast follow only.
 
 ### Milestone 6: Operational Visibility
 
+**Status:** Shipped
+
 **Goal:** Have enough instrumentation and error monitoring in place before real users
 depend on the app.
 
@@ -574,44 +582,25 @@ required — blank is fine.
 
 ## Build Order
 
-V1 is organized into three shipping phases. Each phase has a ship gate — deploy, get
-real user feedback, and validate assumptions before starting the next phase.
+V1 remains organized into shipping phases, but the foundation sequence is now complete.
+From the current state forward, execution is focused on the remaining milestones only.
 
-### Phase 1: Professional Delivery
+### Completed Foundations (already shipped)
 
-Ship → get real user feedback. This is the first point where real landscapers can use the
-product end-to-end with professional output and outcome tracking. Feedback from this phase
-informs whether Phase 2 priorities are correct.
+1. Pre-V1 Polish — Customer detail layout + quote title field
+2. Milestone 0 — Branding foundation
+3. Milestone 1 — Quote status expansion
+4. Milestone 6 — Operational visibility
+5. Milestone 2 — Public landing page (read-only customer quote page)
 
-1. Pre-V1 Polish — Customer detail layout + quote title field (cleans up the base before
-   building on top of it)
-2. Milestone 0 — Branding (low risk, high visibility, unblocks landing page)
-3. Milestone 1 — Status expansion (schema foundation everything else depends on)
-4. Milestone 6 — Operational visibility (Sentry setup must ship before any public URL
-   exists — the first public-facing endpoint is M2, so monitoring comes first)
-5. Milestone 2 — Public landing page (the core V1 experience)
+### Active Forward Path
 
-### Phase 2: Delivery
+Ship in this order from current state:
 
-Ship → the product is useful for daily quoting work. Completes the quoting loop:
-create, send, track — with a polished document at the center of it.
-
-6. Milestone 3 — Email delivery and Copy Link visibility (adds professional in-app delivery
-   and ensures manual link-sharing is always accessible)
-7. Milestone 4 — Quote PDF presentation refinement (upgrades document quality before invoice
-   conversion inherits the template; no schema dependencies, ships standalone)
-
-### Phase 3: Revenue Path
-
-Ship → the product is complete enough to charge for. This is the minimum feature set
-required before introducing a paid tier. A contractor cannot be charged for a tool that
-does not let them invoice won quotes or reflect basic, real-world pricing controls like
-discounts (with optional deposits and simple tax where needed).
-
-8. Milestone 5 — Invoice conversion from won quote (quote-detail entry point, linked
-   child invoice detail, and reused delivery/public document patterns)
-9. Milestone 7 — Optional Pricing Controls (discounts first, with optional deposits and
-   simple tax; pulled forward from V2 — required before paid tier)
+1. Milestone 3 (revised) — Email delivery and always-visible Copy Link
+2. Milestone 4 — Quote PDF presentation refinement
+3. Milestone 5 — Invoice conversion from won quote
+4. Milestone 7 — Optional pricing controls
 
 ---
 
