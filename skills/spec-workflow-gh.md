@@ -66,7 +66,7 @@ When planning shorthand is used, default to this non-interactive behavior:
 
 ### A) Draft issue body content
 
-- choose mode from criteria in `ISSUES_WORKFLOW.md`
+- choose mode from criteria in `docs/ISSUES_WORKFLOW.md`
 - for `single`: generate one end-to-end Task body
 - for `gated`: generate Spec + one default Task body
 - add optional split Tasks only when split criteria are met
@@ -87,5 +87,5 @@ Execution must create/switch to dedicated branch `task-<id>-<slug>` before imple
 
 ## Common GitHub CLI Snippets
 
-Use the canonical command examples in `ISSUES_WORKFLOW.md` under `Common GitHub CLI Commands`.
+Use the canonical command examples in `docs/ISSUES_WORKFLOW.md` under `Common GitHub CLI Commands`.
 Do not duplicate command blocks in this playbook.

@@ -15,19 +15,48 @@ This repository uses GitHub issues as the execution control plane.
 - **Spec** (`type:spec`): feature-set/spec umbrella with decision locks and child Task links.
 - **Decision** (`type:decision`): short-term decision lock with rationale.
 
+## Issue Labels
+
+All issues must include:
+
+- exactly one `type:` label: `type:task`, `type:spec`, or `type:decision`
+- `area:` labels from the approved repo taxonomy below
+
+Approved `area:` labels:
+
+- `area:auth`
+- `area:profile`
+- `area:customers`
+- `area:quotes`
+- `area:integrations`
+- `area:database`
+- `area:frontend`
+- `area:backend`
+- `area:docs`
+- `area:tooling`
+
+Label selection rules:
+
+- apply `1-3` `area:` labels per issue
+- prefer feature labels first (`area:quotes`) over surface-only labels (`area:backend`)
+- add cross-cutting labels only when they materially affect scope
+- when using issue templates, add the appropriate `area:` labels before implementation begins
+- if required labels do not yet exist in GitHub, create them before opening the issue or treat that as a planning blocker
+
 ## Control Plane Rules
 
 1. For issue-backed work (`single`/`gated`), GitHub Issues are the source of truth for execution. `TASKS.md` (if present) is scratchpad only.
-2. The default execution path is **1 feature -> 1 Task -> 1 PR**.
-3. PRs close Task issues (`Closes #...`), not Specs.
-4. Specs close only when all child Tasks are done or explicitly deferred.
-5. Tasks are PR-sized; in this workflow PR-sized usually means end-to-end feature delivery.
-6. Backend-coupled work requires Decision Locks checked before implementation begins.
-7. After major refactors, open one docs-only Task for readability hardening (comments + `docs/PATTERNS.md` updates), with no behavior changes.
-8. For `single` and `gated` modes, create a dedicated branch for the Task issue before implementation (for example: `task-123-short-name`).
-9. After Task PR creation, run a lean reviewer follow-up pass and return `APPROVED` or `ACTIONABLE`.
-10. If scope is a no-contract refactor, include a parity lock checklist in the Task acceptance criteria.
-11. For greenfield repos, align issue scope with `GREENFIELD_BLUEPRINT.md` boundaries and structure defaults.
+2. If a scratch planning file is promoted into a GitHub issue, copy any locked decisions, acceptance criteria, and verification commands into the issue body so the issue remains self-contained.
+3. The default execution path is **1 feature -> 1 Task -> 1 PR**.
+4. PRs close Task issues (`Closes #...`), not Specs.
+5. Specs close only when all child Tasks are done or explicitly deferred.
+6. Tasks are PR-sized; in this workflow PR-sized usually means end-to-end feature delivery.
+7. Backend-coupled work requires Decision Locks checked before implementation begins.
+8. After major refactors, open one docs-only Task for readability hardening (comments + `docs/PATTERNS.md` updates), with no behavior changes.
+9. For `single` and `gated` modes, create a dedicated branch for the Task issue before implementation (for example: `task-123-short-name`).
+10. After Task PR creation, run a lean reviewer follow-up pass and return `APPROVED` or `ACTIONABLE`.
+11. If scope is a no-contract refactor, include a parity lock checklist in the Task acceptance criteria.
+12. For greenfield repos, align issue scope with `docs/GREENFIELD_BLUEPRINT.md` boundaries and structure defaults.
 
 ## Execution Modes (Choose Before Opening Issues)
 
@@ -118,9 +147,11 @@ A Task is done when:
 - Default: Decision Locks live in the controlling issue (Task in `single`, Spec in `gated`).
 - Use a separate Decision issue only for non-trivial or cross-Spec discussion.
 - If a decision has lasting architecture/security/performance impact:
-  - create an ADR (`NNN-*.md`)
+  - create an ADR in `docs/adr/NNN-slug.md` using `docs/adr/000-template.md` as the format
   - link it from the Spec or Task
   - link it from the implementing PR
+- ADR numbering is sequential (`001`, `002`, ...). Use `Accepted` status for active decisions, `Superseded by ADR-NNN` when replaced.
+- Write ADRs during the hardening pass or as part of the implementing Task — not retroactively months later when context is lost.
 
 ## Verification Template
 
@@ -132,7 +163,7 @@ cd backend && ruff check . && mypy . && bandit -r app/ && pytest && cd ../fronte
 
 Prefer repo-level verify entrypoints when available (for example: `make backend-verify`, `make frontend-verify`).
 
-When a Makefile verify contract exists (see `WORKFLOW.md`), use those canonical targets in Task verification sections.
+When a Makefile verify contract exists (see `docs/WORKFLOW.md`), use those canonical targets in Task verification sections.
 
 ## Codex + GitHub CLI Playbook
 

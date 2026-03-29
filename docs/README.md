@@ -9,6 +9,13 @@ Use this index to keep template docs easy to traverse.
 - `V1_ROADMAP.md` — V1 detailed milestone spec (implementation-ready)
 - `V2_ROADMAP.md` — V2 directional roadmap (subject to V1 pilot data)
 
+## Workflow Docs
+
+- `WORKFLOW.md` — implementation loop and engineering defaults
+- `ISSUES_WORKFLOW.md` — issue modes, DoR/DoD, branching rules
+- `GREENFIELD_BLUEPRINT.md` — default repo structure baseline
+- `MIGRATION_GUIDE.md` — template adoption guide for new and existing repos
+
 ## Project Runtime Docs
 
 - `ARCHITECTURE.md` — stack, schema, API contracts, auth model
@@ -16,7 +23,6 @@ Use this index to keep template docs easy to traverse.
 - `PATTERNS.md` — code conventions and cross-cutting rules
 - `REVIEW_CHECKLIST.md` — PR review checklist
 - `CODE_COMMENTING_CONTRACT.md` — in-code comment and docstring standards
-- `ISSUES_WORKFLOW.md` — issue modes, DoR/DoD, branching rules
 - `DEFERRED.md` — intentionally deferred technical debt items
 
 ## Architecture Decision Records

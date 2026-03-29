@@ -8,13 +8,13 @@
 
 ## Source Of Truth (By Rule Type)
 
-- Execution control plane (modes, DoR/DoD, branching, issue lifecycle): `ISSUES_WORKFLOW.md` (authoritative)
+- Execution control plane (modes, DoR/DoD, branching, issue lifecycle): `docs/ISSUES_WORKFLOW.md` (authoritative)
 - Kickoff prompts and reviewer output contract: `docs/template/KICKOFF.md` (authoritative)
 - This file (`WORKFLOW.md`) summarizes the implementation loop and engineering defaults.
 
 ## Greenfield Baseline (Default)
 
-For new repositories, use `GREENFIELD_BLUEPRINT.md` as the baseline.
+For new repositories, use `docs/GREENFIELD_BLUEPRINT.md` as the baseline.
 
 Core defaults:
 
@@ -52,7 +52,7 @@ Use this as the default human-in-the-loop sequence to reduce handoff overhead:
 
 ## Issues Workflow (Control Plane)
 
-Read `ISSUES_WORKFLOW.md` before implementation.
+Read `docs/ISSUES_WORKFLOW.md` before implementation.
 
 Core rule:
 
@@ -65,7 +65,7 @@ Core rule:
 - Backend-coupled work must have Decision Locks checked before implementation.
 - After major refactors, open one docs-only Task for readability hardening (comments + `docs/PATTERNS.md` updates), with no behavior changes.
 
-Definition of Ready and Definition of Done are defined in `ISSUES_WORKFLOW.md` and are mandatory gates.
+Definition of Ready and Definition of Done are defined in `docs/ISSUES_WORKFLOW.md` and are mandatory gates.
 
 ## Canonical Kickoff Prompts
 
@@ -133,7 +133,7 @@ After reviewer verdict `APPROVED` is explicitly relayed back to the implementati
 - One issue at a time.
 - Default to one end-to-end Task per feature.
 - Keep changes surgical.
-- Split Tasks only when `ISSUES_WORKFLOW.md` split criteria apply.
+- Split Tasks only when `docs/ISSUES_WORKFLOW.md` split criteria apply.
 
 ### Default Modularity
 
@@ -237,12 +237,12 @@ Docs paths:
 
 - `GitHub Actions: .github/workflows/backend-test.yml and .github/workflows/frontend-test.yml`
 
-## Documentation Layout Recommendation
+## Documentation Layout
 
-For clean traversal, keep root docs minimal and move detailed docs under `docs/`:
+Root stays lean — only agent/Claude entrypoints:
 
-- Root: `AGENTS.md`, `WORKFLOW.md`, `ISSUES_WORKFLOW.md`, `GREENFIELD_BLUEPRINT.md`.
-- `docs/`: `ARCHITECTURE.md`, `PATTERNS.md`, `REVIEW_CHECKLIST.md`, ADRs, runbooks.
+- Root: `AGENTS.md`, `CLAUDE.md`.
+- `docs/`: `WORKFLOW.md`, `ISSUES_WORKFLOW.md`, `GREENFIELD_BLUEPRINT.md`, `MIGRATION_GUIDE.md`, `ARCHITECTURE.md`, `PATTERNS.md`, `REVIEW_CHECKLIST.md`, ADRs, runbooks.
 - `skills/`: procedural playbooks only.
 
 ## Optional Later

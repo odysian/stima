@@ -5,8 +5,8 @@ This guide explains how to use this template as the foundation for a new project
 ## What this template provides
 
 - Agent operating rules (`AGENTS.md`)
-- Core workflow (`WORKFLOW.md`)
-- Issue-driven execution control plane (`ISSUES_WORKFLOW.md`)
+- Core workflow (`docs/WORKFLOW.md`)
+- Issue-driven execution control plane (`docs/ISSUES_WORKFLOW.md`)
 - Canonical kickoff/review prompts (`docs/template/KICKOFF.md`)
 - Documentation skeletons (`docs/ARCHITECTURE.md`, `docs/PATTERNS.md`, `docs/REVIEW_CHECKLIST.md`)
 - GitHub issue templates and PR template (`.github/`)
@@ -33,9 +33,9 @@ This guide explains how to use this template as the foundation for a new project
 
 Recommended onboarding order for agents:
 1. `AGENTS.md`
-2. `ISSUES_WORKFLOW.md`
+2. `docs/ISSUES_WORKFLOW.md`
 3. `docs/template/KICKOFF.md`
-4. `WORKFLOW.md`
+4. `docs/WORKFLOW.md`
 
 Kickoff split:
 - Planning kickoff (`feature -> issue artifacts`) is planning-only: no code changes, no PR.
@@ -43,7 +43,7 @@ Kickoff split:
 
 ## Definition of Ready and Done
 
-Use `ISSUES_WORKFLOW.md` as the authoritative gate for:
+Use `docs/ISSUES_WORKFLOW.md` as the authoritative gate for:
 
 - Definition of Ready (DoR)
 - Definition of Done (DoD)

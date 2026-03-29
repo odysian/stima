@@ -3,4 +3,4 @@
 @docs/DESIGN.md
 @docs/PATTERNS.md
 @docs/REVIEW_CHECKLIST.md
-@WORKFLOW.md
+@docs/WORKFLOW.md

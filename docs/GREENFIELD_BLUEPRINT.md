@@ -14,10 +14,12 @@ This file is the default baseline for new repositories that use this template.
 ```text
 Stima/
   AGENTS.md
-  WORKFLOW.md
-  ISSUES_WORKFLOW.md
-  GREENFIELD_BLUEPRINT.md
+  CLAUDE.md
   docs/
+    WORKFLOW.md
+    ISSUES_WORKFLOW.md
+    GREENFIELD_BLUEPRINT.md
+    MIGRATION_GUIDE.md
     ARCHITECTURE.md
     PATTERNS.md
     REVIEW_CHECKLIST.md
@@ -97,11 +99,10 @@ For refactors declared as "no API/contract change", verify:
 - Frontend verify should include: type check, tests, lint, production build.
 - For no-contract refactors, parity lock validation must be reported with verification results.
 
-## Documentation Layout Recommendation
+## Documentation Layout
 
-For clean traversal, keep root docs lean and move detailed docs into `docs/`:
+Root stays lean — only agent/Claude entrypoints:
 
-- Keep at root: `AGENTS.md`, `WORKFLOW.md`, `ISSUES_WORKFLOW.md`, `GREENFIELD_BLUEPRINT.md`.
-- Keep in `docs/`: `ARCHITECTURE.md`, `PATTERNS.md`, `REVIEW_CHECKLIST.md`, ADRs, runbooks.
+- Keep at root: `AGENTS.md`, `CLAUDE.md`.
+- Keep in `docs/`: `WORKFLOW.md`, `ISSUES_WORKFLOW.md`, `GREENFIELD_BLUEPRINT.md`, `MIGRATION_GUIDE.md`, `ARCHITECTURE.md`, `PATTERNS.md`, `REVIEW_CHECKLIST.md`, ADRs, runbooks.
 - Keep automation playbooks under `skills/`.
-

@@ -6,12 +6,12 @@
 
 Must-read in this order:
 1. `AGENTS.md` (this file)
-2. `ISSUES_WORKFLOW.md`
+2. `docs/ISSUES_WORKFLOW.md`
 3. `docs/template/KICKOFF.md` (if present)
-4. `WORKFLOW.md`
+4. `docs/WORKFLOW.md`
 
 Read conditionally (only when relevant):
-- `GREENFIELD_BLUEPRINT.md` for greenfield repos or explicit restructuring tasks
+- `docs/GREENFIELD_BLUEPRINT.md` for greenfield repos or explicit restructuring tasks
 - `docs/README.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/PATTERNS.md`, `docs/REVIEW_CHECKLIST.md` for domain/contract/pattern/UI changes
 - `skills/*` playbooks only when explicitly requested or clearly required by the task
 
@@ -20,12 +20,12 @@ Read conditionally (only when relevant):
 - **Default unit of work is a GitHub Issue.**
 - Use `single` mode by default: one feature -> one Task issue -> one PR.
 - Use `gated` or `fast` only when the user explicitly requests it.
-- In `fast` mode, no issue creation is required (per `ISSUES_WORKFLOW.md` criteria).
+- In `fast` mode, no issue creation is required (per `docs/ISSUES_WORKFLOW.md` criteria).
 - Convert freeform requests into the selected issue mode before implementation.
 - For issue-backed work, work one Task issue at a time.
 - PRs close Task issues (`Closes #123`), not Specs.
 - Specs close only when all child Tasks are done or explicitly deferred.
-- Detailed control-plane rules are canonical in `ISSUES_WORKFLOW.md`.
+- Detailed control-plane rules are canonical in `docs/ISSUES_WORKFLOW.md`.
 - For one-shot issue body + `gh` command generation, use `skills/spec-workflow-gh.md`.
 - Canonical kickoff types:
   - Planning kickoff (issue planning only): `Run kickoff for feature <feature-id> from <filename> mode=<single|gated|fast>, planning-only (no code changes, no PR).`
@@ -73,7 +73,7 @@ Read conditionally (only when relevant):
 
 ## Codebase Modularity Defaults
 
-- Default for greenfield repos: follow `GREENFIELD_BLUEPRINT.md`.
+- Default for greenfield repos: follow `docs/GREENFIELD_BLUEPRINT.md`.
 - Backend layering default: `api -> services -> repositories -> integrations/libs`.
 - Frontend layering default: `src/app` route shells + `src/features/<feature>` + `src/shared`.
 - Keep feature boundaries explicit: feature internals stay private; cross-feature usage should go through public exports.
@@ -97,10 +97,10 @@ For tiny quick fixes with no contract change, decision brief is optional.
 
 ## Workflow Order
 
-1. Read `ISSUES_WORKFLOW.md`
+1. Read `docs/ISSUES_WORKFLOW.md`
 2. Read `docs/template/KICKOFF.md`
-3. Read `WORKFLOW.md`
-4. Read `GREENFIELD_BLUEPRINT.md` only for greenfield/restructure tasks
+3. Read `docs/WORKFLOW.md`
+4. Read `docs/GREENFIELD_BLUEPRINT.md` only for greenfield/restructure tasks
 5. Read project docs in `docs/README.md, docs/ARCHITECTURE.md, docs/PATTERNS.md, docs/REVIEW_CHECKLIST.md, backend/TESTPLAN.md` only when needed for touched scope
 6. Execute one ready Task issue
 
@@ -193,9 +193,9 @@ Treat doc updates like failing tests. Keep architecture, patterns, checklists, a
 Keep external skills high-signal and conflict-free:
 
 - Rule ownership:
-  - execution control plane (modes/DoR/DoD/branching): `ISSUES_WORKFLOW.md` (authoritative)
+  - execution control plane (modes/DoR/DoD/branching): `docs/ISSUES_WORKFLOW.md` (authoritative)
   - kickoff and reviewer output contract: `docs/template/KICKOFF.md` (authoritative)
-  - implementation loop and quality defaults: `WORKFLOW.md`
+  - implementation loop and quality defaults: `docs/WORKFLOW.md`
   - onboarding and operating constraints: `AGENTS.md`
 - For skills, precedence order is: repo docs above -> local `skills/*` -> external installed skills.
 - Install external skills globally in Codex home, not inside project repos.
