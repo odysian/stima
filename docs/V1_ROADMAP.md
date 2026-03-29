@@ -269,7 +269,10 @@ paths in V1.
   - quote number, optional title, and total in the email body
   - a clear link to the public landing page
   - the PDF attached or linked as a secondary option
-  - a contact line: "Questions? Call or text [contractor phone number]."
+  - conditional contact copy based on available contractor details:
+    - "Questions? Call or text [contractor phone number]." when phone exists
+    - "Questions? Reply to this email." when phone is missing and contractor email exists
+    - neutral fallback copy when both phone and contractor email are missing
   - contractor email address if present (optional footer field)
 - Email is only available if the customer record has an email address
 - If no customer email exists, Copy Link / manual sharing remains fully functional;
