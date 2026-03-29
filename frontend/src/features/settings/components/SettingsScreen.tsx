@@ -186,8 +186,8 @@ export function SettingsScreen(): React.ReactElement {
               <div className="mt-4 flex flex-col gap-4">
                 <div className="rounded-xl bg-surface-container-low px-4 py-3">
                   <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1 pr-2">
                         <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                           Logo
                         </p>
@@ -201,14 +201,16 @@ export function SettingsScreen(): React.ReactElement {
                           key={logoPreviewVersion}
                           src={logoPreviewSrc}
                           alt="Business logo preview"
-                          className="h-10 w-auto max-w-[160px] object-contain"
+                          className="h-10 w-auto max-w-[140px] shrink-0 object-contain"
                         />
                       ) : (
-                        <p className="text-xs text-on-surface-variant">No logo uploaded yet.</p>
+                        <p className="shrink-0 text-right text-xs text-on-surface-variant">
+                          No logo uploaded yet.
+                        </p>
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="flex items-center gap-3">
                       <label
                         htmlFor="settings-logo-upload"
                         className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
