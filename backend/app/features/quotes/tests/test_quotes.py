@@ -1002,6 +1002,7 @@ async def test_send_quote_email_returns_200_when_event_commit_fails_after_send(
         headers={"X-CSRF-Token": csrf_token},
     )
     assert share_response.status_code == 200
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.VIEWED)
 
     rollback_calls = 0
 
