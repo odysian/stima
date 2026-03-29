@@ -56,6 +56,8 @@ class QuoteEmailRepositoryProtocol(Protocol):
         event_name: str,
     ) -> None: ...
 
+    async def commit(self) -> None: ...
+
 
 @dataclass(slots=True)
 class QuoteEmailTemplateContext:
@@ -109,6 +111,14 @@ class QuoteEmailDeliveryService:
                 detail="Generate the PDF before sending this quote by email.",
                 status_code=409,
             )
+        if context.status in {QuoteStatus.APPROVED.value, QuoteStatus.DECLINED.value}:
+            raise QuoteServiceError(
+                detail=(
+                    "This quote is already closed. Email cannot be sent after it is marked won "
+                    "or lost."
+                ),
+                status_code=409,
+            )
 
         customer_email = _validate_customer_email(context.customer_email)
         await self._enforce_duplicate_send_guard(context)
@@ -157,6 +167,7 @@ class QuoteEmailDeliveryService:
                 customer_id=context.customer_id,
                 event_name="email_sent",
             )
+            await self._repository.commit()
         except Exception:  # noqa: BLE001
             _remember_fallback_email_sent_at(context)
             LOGGER.warning(

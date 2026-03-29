@@ -89,7 +89,7 @@ export function getSendEmailErrorMessage(error: unknown): string {
       case 404:
         return "This quote could not be found. Refresh and try again.";
       case 409:
-        return "Generate the PDF before sending this quote by email.";
+        return error.message;
       case 422:
         return "Add a valid customer email before sending this quote.";
       case 429:

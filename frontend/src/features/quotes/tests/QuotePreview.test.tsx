@@ -538,6 +538,48 @@ describe("QuotePreview", () => {
     expect(await screen.findByText(/copied to clipboard/i)).toBeInTheDocument();
   });
 
+  it("uses the Web Share API when available instead of the clipboard", async () => {
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, "share");
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      writable: true,
+      value: shareMock,
+    });
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: { writeText: writeTextMock },
+    });
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
+    );
+
+    try {
+      renderScreen();
+
+      await screen.findByRole("heading", { name: "Test Customer" });
+      fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
+
+      await waitFor(() => {
+        expect(mockedQuoteService.shareQuote).toHaveBeenCalledWith("quote-1");
+        expect(shareMock).toHaveBeenCalledWith({
+          title: "Quote Q-001",
+          url: "http://localhost:3000/doc/share-token-1",
+        });
+      });
+      expect(writeTextMock).not.toHaveBeenCalled();
+      expect(await screen.findByText("Quote link shared.")).toBeInTheDocument();
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(navigator, "share", originalDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, "share");
+      }
+    }
+  });
+
   it("shows loading feedback while copying the share link and clears it after the request resolves", async () => {
     let resolveShareQuote: ((value: Quote) => void) | undefined;
     mockedQuoteService.getQuote.mockResolvedValueOnce(

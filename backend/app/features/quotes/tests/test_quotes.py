@@ -726,6 +726,46 @@ async def test_send_quote_email_returns_409_when_quote_is_still_draft(
     assert mock_email_service.messages == []
 
 
+@pytest.mark.parametrize("terminal_status", [QuoteStatus.APPROVED, QuoteStatus.DECLINED])
+async def test_send_quote_email_returns_409_when_quote_is_closed(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    terminal_status: QuoteStatus,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    await _set_quote_status(db_session, quote["id"], terminal_status)
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": (
+            "This quote is already closed. Email cannot be sent after it is marked won or lost."
+        ),
+    }
+    assert mock_email_service.messages == []
+
+
 async def test_send_quote_email_returns_404_for_missing_quote(
     client: AsyncClient,
     mock_email_service: _MockEmailService,

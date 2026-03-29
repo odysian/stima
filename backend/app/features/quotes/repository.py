@@ -417,7 +417,7 @@ class QuoteRepository:
         customer_id: UUID,
         event_name: str,
     ) -> None:
-        """Synchronously persist one quote-scoped pilot event row."""
+        """Stage one quote-scoped pilot event row; caller should commit the session."""
         self._session.add(
             EventLog(
                 user_id=user_id,
@@ -428,7 +428,7 @@ class QuoteRepository:
                 },
             )
         )
-        await self._session.commit()
+        await self._session.flush()
 
     async def create(
         self,

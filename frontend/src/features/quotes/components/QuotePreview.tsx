@@ -13,6 +13,7 @@ import {
   getEmailActionLabel,
   getCompactStatusRow,
   getSendEmailErrorMessage,
+  isShareAbortError,
   readOptionalQuoteText,
   resolveActionState,
 } from "@/features/quotes/components/quotePreview.helpers";
@@ -172,13 +173,16 @@ export function QuotePreview(): React.ReactElement {
     });
   }
 
-  async function ensureShareUrl(): Promise<string> {
+  async function ensureShareUrl(): Promise<{ url: string; shareTitle: string }> {
     if (!id || !quote) {
       throw new Error("Share link unavailable");
     }
 
     if (quote.share_token) {
-      return `${window.location.origin}/doc/${quote.share_token}`;
+      return {
+        url: `${window.location.origin}/doc/${quote.share_token}`,
+        shareTitle: quote.title ?? `Quote ${quote.doc_number}`,
+      };
     }
 
     const updatedQuote = await quoteService.shareQuote(id);
@@ -186,7 +190,10 @@ export function QuotePreview(): React.ReactElement {
     if (!updatedQuote.share_token) {
       throw new Error("Share link unavailable");
     }
-    return `${window.location.origin}/doc/${updatedQuote.share_token}`;
+    return {
+      url: `${window.location.origin}/doc/${updatedQuote.share_token}`,
+      shareTitle: updatedQuote.title ?? `Quote ${updatedQuote.doc_number}`,
+    };
   }
 
   async function onCopyLink(): Promise<void> {
@@ -195,7 +202,25 @@ export function QuotePreview(): React.ReactElement {
     setIsSharing(true);
 
     try {
-      const nextSharedUrl = await ensureShareUrl();
+      const { url: nextSharedUrl, shareTitle } = await ensureShareUrl();
+      const maybeNavigator = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
+
+      if (typeof maybeNavigator.share === "function") {
+        try {
+          await maybeNavigator.share({
+            title: shareTitle,
+            url: nextSharedUrl,
+          });
+          setShareMessage("Quote link shared.");
+          return;
+        } catch (error) {
+          if (isShareAbortError(error)) {
+            return;
+          }
+          throw error;
+        }
+      }
+
       if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
         setShareMessage("Copy this share link manually.");
         return;
