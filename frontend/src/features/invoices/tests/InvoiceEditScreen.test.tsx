@@ -232,6 +232,33 @@ describe("InvoiceEditScreen", () => {
     });
   });
 
+  it("allows editing an invoice with a null persisted due date by omitting due_date from the patch", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        due_date: null,
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "I-001" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/invoice due date/i)).toHaveValue("");
+
+    fireEvent.change(screen.getByLabelText(/customer notes/i), {
+      target: { value: "Updated note without a due date" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.updateInvoice).toHaveBeenCalledWith("invoice-1", {
+        title: null,
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total_amount: 120,
+        notes: "Updated note without a due date",
+      });
+    });
+  });
+
   it("blocks save when a line item has details or price but no description", async () => {
     window.sessionStorage.setItem(
       EDIT_STORAGE_KEY,

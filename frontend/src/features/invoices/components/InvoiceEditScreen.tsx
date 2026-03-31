@@ -184,21 +184,17 @@ export function InvoiceEditScreen(): React.ReactElement {
       return;
     }
 
-    if (!currentDraft.dueDate) {
-      setSaveError("Invoice due date is required.");
-      return;
-    }
-
     setIsSaving(true);
 
     try {
-      await invoiceService.updateInvoice(id, {
+      const updatePayload = {
         title: normalizeOptionalTitle(currentDraft.title),
         line_items: lineItemsForSubmit,
         total_amount: currentDraft.total,
         notes: currentDraft.notes.trim().length > 0 ? currentDraft.notes.trim() : null,
-        due_date: currentDraft.dueDate,
-      });
+        ...(currentDraft.dueDate ? { due_date: currentDraft.dueDate } : {}),
+      };
+      await invoiceService.updateInvoice(id, updatePayload);
       setShouldSkipSeeding(true);
       clearDraft();
       navigate(`/invoices/${id}`);
