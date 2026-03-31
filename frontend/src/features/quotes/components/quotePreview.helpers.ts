@@ -5,13 +5,6 @@ import { formatDate } from "@/shared/lib/formatters";
 
 export type QuotePreviewActionState = QuoteStatus;
 
-export const CLOSED_QUOTE_STATUSES = new Set<QuoteStatus>([
-  "shared",
-  "viewed",
-  "approved",
-  "declined",
-]);
-
 export interface QuotePreviewStatusRowModel {
   icon: string;
   iconClasses: string;
@@ -76,7 +69,12 @@ export function getEmailActionLabel(actionState: QuotePreviewActionState): strin
   if (actionState === "ready") {
     return "Send by Email";
   }
-  if (actionState === "shared" || actionState === "viewed") {
+  if (
+    actionState === "shared"
+    || actionState === "viewed"
+    || actionState === "approved"
+    || actionState === "declined"
+  ) {
     return "Resend Email";
   }
   return null;

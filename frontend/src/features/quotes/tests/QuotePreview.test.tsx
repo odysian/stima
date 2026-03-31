@@ -192,17 +192,22 @@ describe("QuotePreview", () => {
   });
 
   it.each(["approved", "declined"] as const)(
-    "hides edit and overflow actions when the quote is %s",
+    "keeps edit available and shows resend actions when the quote is %s",
     async (status) => {
       mockedQuoteService.getQuote.mockResolvedValueOnce(
-        makeQuoteDetail({ status, share_token: "share-token-1" }),
+        makeQuoteDetail({
+          status,
+          share_token: "share-token-1",
+          customer_email: "customer@example.com",
+        }),
       );
 
       renderScreen();
 
       await screen.findByRole("heading", { name: "Test Customer" });
-      expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /more actions/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
     },
   );
@@ -297,7 +302,7 @@ describe("QuotePreview", () => {
   });
 
   it.each(["shared", "viewed"] as const)(
-    "hides edit while keeping follow-up actions available for %s quotes",
+    "keeps edit and follow-up actions available for %s quotes",
     async (status) => {
       mockedQuoteService.getQuote.mockResolvedValueOnce(
         makeQuoteDetail({
@@ -310,7 +315,7 @@ describe("QuotePreview", () => {
       renderScreen();
 
       await screen.findByRole("heading", { name: "Test Customer" });
-      expect(screen.queryByRole("button", { name: /edit quote/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
@@ -411,6 +416,7 @@ describe("QuotePreview", () => {
 
     expect(await screen.findByText("Quote marked as won")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /more actions/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
   });
 
   it("shows the lost confirmation modal and refetches the declined state after confirmation", async () => {
@@ -444,6 +450,7 @@ describe("QuotePreview", () => {
 
     expect(await screen.findByText("Quote marked as lost")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /more actions/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
   });
 
   it("navigates to the edit route from the header action", async () => {
