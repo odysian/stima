@@ -220,7 +220,7 @@ describe("InvoiceDetailScreen", () => {
   it("clears a generated local PDF after saving a due date change", async () => {
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Open PDF" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Generate PDF" }));
 
     const openPdfLink = (await screen.findByText("Open PDF")).closest("a");
     expect(openPdfLink).toHaveAttribute("href", "blob:invoice-preview");
@@ -238,7 +238,7 @@ describe("InvoiceDetailScreen", () => {
     await waitFor(() => {
       expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:invoice-preview");
     });
-    expect(screen.queryByText("Open PDF")?.closest("a")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open PDF" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open PDF" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate PDF" })).toBeInTheDocument();
   });
 });
