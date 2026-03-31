@@ -54,6 +54,23 @@ class InvoiceResponse(BaseModel):
     updated_at: datetime
 
 
+class InvoiceListItemResponse(BaseModel):
+    """Serializable invoice summary payload returned by the invoice list endpoint."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    customer_id: UUID
+    customer_name: str
+    doc_number: str
+    title: str | None
+    status: Literal["draft", "ready", "sent"]
+    total_amount: float | None
+    due_date: date | None
+    created_at: datetime
+    source_document_id: UUID | None
+
+
 class InvoiceCustomerResponse(BaseModel):
     """Customer summary embedded in invoice detail responses."""
 

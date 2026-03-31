@@ -1,4 +1,9 @@
-"""Invoice service orchestration."""
+"""Invoice service orchestration.
+
+This module applies invoice domain rules on top of repository reads/writes.
+It owns creation, quote conversion, list/detail access, and invoice PDF/share
+side effects while preserving quote-service error semantics for the API layer.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from app.features.auth.models import User
 from app.features.invoices.repository import (
     InvoiceDetailRow,
+    InvoiceListItemSummary,
     InvoiceRepository,
     build_default_due_date,
 )
@@ -38,6 +44,12 @@ class InvoiceRepositoryProtocol(Protocol):
     async def customer_exists_for_user(self, *, user_id: UUID, customer_id: UUID) -> bool: ...
 
     async def get_by_id(self, invoice_id: UUID, user_id: UUID) -> Document | None: ...
+
+    async def list_by_user(
+        self,
+        user_id: UUID,
+        customer_id: UUID | None = None,
+    ) -> list[InvoiceListItemSummary]: ...
 
     async def get_by_source_document_id(
         self,
@@ -159,6 +171,17 @@ class InvoiceService:
                 raise
 
         raise QuoteServiceError(detail="Unable to create invoice", status_code=409)
+
+    async def list_invoices(
+        self,
+        user: User,
+        customer_id: UUID | None = None,
+    ) -> list[InvoiceListItemSummary]:
+        """List invoices for the authenticated user."""
+        return await self._invoice_repository.list_by_user(
+            _resolve_user_id(user),
+            customer_id=customer_id,
+        )
 
     async def convert_quote_to_invoice(self, user: User, quote_id: UUID) -> Document:
         """Create one invoice from an approved quote."""

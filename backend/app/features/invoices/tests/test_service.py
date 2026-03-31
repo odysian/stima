@@ -37,6 +37,11 @@ class _RetryingInvoiceRepository:
         del customer_id
         return False
 
+    async def list_by_user(self, user_id, customer_id=None):  # noqa: ANN001
+        del user_id
+        del customer_id
+        return []
+
     async def get_by_source_document_id(self, *, source_document_id, user_id):  # noqa: ANN001
         if str(source_document_id) == self._quote_id and str(user_id) == self._user_id:
             return None
@@ -128,6 +133,11 @@ class _DirectInvoiceCollisionRepository:
         del user_id
         del customer_id
         return True
+
+    async def list_by_user(self, user_id, customer_id=None):  # noqa: ANN001
+        del user_id
+        del customer_id
+        return []
 
     async def get_by_id(self, invoice_id, user_id):  # noqa: ANN001
         del invoice_id

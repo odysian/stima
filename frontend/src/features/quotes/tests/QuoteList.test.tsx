@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { invoiceService } from "@/features/invoices/services/invoiceService";
+import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
@@ -30,11 +32,18 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
+vi.mock("@/features/invoices/services/invoiceService", () => ({
+  invoiceService: {
+    listInvoices: vi.fn(),
+  },
+}));
+
 vi.mock("@/features/auth/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
 const mockedQuoteService = vi.mocked(quoteService);
+const mockedInvoiceService = vi.mocked(invoiceService);
 const mockedUseAuth = vi.mocked(useAuth);
 
 function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListItem {
@@ -48,6 +57,22 @@ function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListIte
     total_amount: 120,
     item_count: 1,
     created_at: "2026-03-20T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function makeInvoiceListItem(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem {
+  return {
+    id: "invoice-1",
+    customer_id: "cust-1",
+    customer_name: "Alice Johnson",
+    doc_number: "I-001",
+    title: null,
+    status: "draft",
+    total_amount: 120,
+    due_date: "2026-04-19",
+    created_at: "2026-03-20T00:00:00.000Z",
+    source_document_id: null,
     ...overrides,
   };
 }
@@ -120,8 +145,38 @@ describe("QuoteList", () => {
     renderScreen();
 
     expect(
-      await screen.findByText("No quotes yet. Tap + to create your first."),
+      await screen.findByText("No quotes yet. Tap Create Document to create your first."),
     ).toBeInTheDocument();
+  });
+
+  it("switches to invoices mode and renders invoice cards", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+    mockedInvoiceService.listInvoices.mockResolvedValueOnce([
+      makeInvoiceListItem(),
+      makeInvoiceListItem({
+        id: "invoice-2",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "I-002",
+        title: "Front Bed Refresh",
+        status: "ready",
+        total_amount: 220,
+        created_at: "2026-03-21T00:00:00.000Z",
+        source_document_id: "quote-2",
+      }),
+    ]);
+
+    renderScreen();
+    await screen.findByText("Q-001");
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
+
+    expect(await screen.findByRole("heading", { name: "Invoices" })).toBeInTheDocument();
+    expect(screen.getByText("1 active · 1 pending")).toBeInTheDocument();
+    expect(screen.getByText("Front Bed Refresh")).toBeInTheDocument();
+    expect(screen.getByText(/Bob Brown\s*·\s*I-002\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getAllByText("$220.00")).toHaveLength(1);
   });
 
   it("filters rows by customer name", async () => {
@@ -191,6 +246,19 @@ describe("QuoteList", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
   });
 
+  it("navigates to invoice detail when an invoice row is clicked", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+    mockedInvoiceService.listInvoices.mockResolvedValueOnce([makeInvoiceListItem()]);
+
+    renderScreen();
+    await screen.findByText("Q-001");
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
+    fireEvent.click(await screen.findByRole("button", { name: /i-001/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1");
+  });
+
   it("renders compact stats text for active and pending quotes", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([
       makeQuoteListItem({ status: "ready" }),
@@ -217,7 +285,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText("Q-001");
 
-    expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
+    expect(within(screen.getByRole("navigation")).getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
   });
 
   it("navigates to new quote when FAB is clicked", async () => {
@@ -226,9 +294,23 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText("Q-001");
 
-    fireEvent.click(screen.getByRole("button", { name: "Create quote" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create document" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/new");
+  });
+
+  it("renders invoice empty state when no invoices are returned", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+    mockedInvoiceService.listInvoices.mockResolvedValueOnce([]);
+
+    renderScreen();
+    await screen.findByText("Q-001");
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
+
+    expect(
+      await screen.findByText("No invoices yet. Tap Create Document to create your first."),
+    ).toBeInTheDocument();
   });
 
   it("shows loading state while list request is in flight", async () => {
@@ -284,7 +366,7 @@ describe("QuoteList", () => {
     await screen.findByText("Q-001");
 
     const searchInput = screen.getByLabelText("Search quotes");
-    const searchLabel = document.querySelector('label[for="quote-search"]');
+    const searchLabel = document.querySelector('label[for="document-search"]');
 
     expect(searchInput).toBeInTheDocument();
     expect(searchLabel).not.toBeNull();

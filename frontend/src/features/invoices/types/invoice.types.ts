@@ -32,6 +32,19 @@ export interface Invoice {
   updated_at: string;
 }
 
+export interface InvoiceListItem {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  doc_number: string;
+  title: string | null;
+  status: InvoiceStatus;
+  total_amount: number | null;
+  due_date: string | null;
+  created_at: string;
+  source_document_id: string | null;
+}
+
 export interface InvoiceDetail extends Invoice {
   source_quote_number: string | null;
   customer: {
