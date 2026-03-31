@@ -1,7 +1,7 @@
 # Stima V1 Roadmap
 
 **Version:** 1.0 — March 2026
-**Status:** Active (foundations shipped; forward path is M3 -> M4 -> M5 -> M7)
+**Status:** Active (foundations shipped; forward path is M3 -> M4 -> M5 -> M8 -> M7)
 **Assumes:** V0 is complete, deployed, and pilot-ready
 **Reference:** `docs/PRODUCT.md` for strategic context
 
@@ -537,6 +537,108 @@ full bookkeeping.
 
 ---
 
+### Milestone 8: Contractor-First Document Flow
+
+**Goal:** Reset document behavior around a simpler contractor-first model: one shared builder,
+late quote/invoice type choice, always-editable documents, and statuses used for internal
+tracking rather than permission gates.
+
+**Why this milestone exists:** The current flow assumes too much about how contractors work.
+It uses status changes as hard locks, forces quote-first behavior even when the contractor
+already wants an invoice, and creates “you have to start over” moments when a customer asks
+for revisions. Stima should feel like a flexible document tool for the contractor, not like
+a rigid customer-workflow engine.
+
+**Contractor-first baseline:**
+- one shared document builder for quotes and invoices
+- type choice happens near the end of the builder flow
+- quotes remain editable after share and after contractor-recorded outcomes
+- invoices remain editable after `sent`
+- shared/customer-facing document views reflect the latest version
+- quote and invoice statuses remain as organizational labels, not edit locks
+- quote -> invoice remains a clone-based convenience flow, not in-place type mutation
+
+**Decision locks for M8:**
+- Persisted quote statuses remain `draft -> ready -> shared -> viewed -> approved | declined`
+  in the backend and database. M8 may use contractor-facing `Won` / `Lost` copy in the UI,
+  but it does not rename persisted statuses.
+- Persisted invoice statuses remain `draft -> ready -> sent`. `ready` remains an internal
+  pre-share state; M8 does not remove it.
+- Quote editing continues to use the existing quote patch fields: `title`, `line_items`,
+  `total_amount`, and `notes`.
+- Invoice editing expands beyond due date only. `PATCH /api/invoices/{id}` becomes the single
+  invoice edit contract for `title`, `line_items`, `total_amount`, `notes`, and `due_date`
+  in `draft`, `ready`, and `sent`.
+- Editing a shared/viewed/approved/declined/sent document does not rotate `share_token`,
+  does not clear the public link, and does not automatically reset status.
+- Editing a `ready` quote or `ready` invoice does not demote it back to `draft`.
+- Existing one-way share/view/outcome/send transitions remain intact. M8 removes edit locks;
+  it does not make outcomes reversible.
+- Hard delete remains limited to unshared draft/ready documents. Any customer-visible document
+  (`shared`, `viewed`, `approved`, `declined`, `sent`) remains non-deletable in M8.
+- Direct invoice creation is allowed without a source quote. Those invoices use
+  `source_document_id = NULL` and get a server-assigned default due date before routing to
+  invoice detail for further edits.
+- Direct invoice creation uses `POST /api/invoices`; it does not create a hidden quote first and
+  does not mutate a quote row into an invoice row.
+- Direct invoices must support null source fields cleanly in detail/list contracts:
+  `source_document_id = null`, `source_quote_number = null`.
+- Quote -> invoice convenience remains the existing quote-first path: approved quotes only,
+  one linked invoice per quote.
+- `Approved` / `Declined` quotes may still copy link and resend email in M8; resend never
+  regresses status or rotates the existing share token.
+- Invoice discoverability lands as the smallest explicit surface: the existing main list adds
+  a top-level type filter with `Quotes` as the default view and `Invoices` as the secondary
+  view. No new bottom-nav tab or standalone invoice dashboard ships in M8.
+- The existing `/` route remains the main list route. The primary CTA becomes `Create Document`
+  and routes to the shared builder. Search behavior stays parallel in both modes: customer name,
+  title, and document number.
+- Optional `customer_id` filtering remains available in both list modes, and invoice discovery
+  uses a stable `GET /api/invoices` list contract rather than overloading the quote list.
+- M8 does not add invoice public landing pages under `/doc/:token`. Public invoice access
+  remains the existing shared PDF path unless a later milestone scopes invoice landing pages
+  explicitly.
+
+**Scope:**
+- Relax quote and invoice edit restrictions across backend and frontend
+- Add shared builder handoff for `Quote` vs `Invoice`
+- Support direct invoice creation without forcing a won-quote path first
+- Keep quote -> invoice cloning as a lightweight convenience flow
+- Add the smallest possible discoverability surface for invoice-first documents on the
+  existing main list screen
+
+**Out of scope:**
+- Immutable customer-visible snapshots
+- Version history or timeline UI
+- Full invoice management / AR workflows
+- Payment collection or reconciliation
+- Invoice public landing pages on `/doc/:token`
+
+**Depends on:** Milestone 5 (invoices exist). This milestone should land before Milestone 7 so
+later document/pricing work builds on the contractor-first baseline instead of the stricter
+locked-status model.
+
+**Acceptance criteria:**
+- Contractor can build one document and choose `Quote` or `Invoice` near the end
+- Shared quotes remain editable after being shared
+- `Approved` / `Declined` quotes remain editable, with optional `Won` / `Lost` UI copy
+- Sent invoices remain editable after being sent
+- Shared/customer-facing document views reflect the latest version of the document
+- Statuses remain available for internal tracking but do not block editing
+- Editing does not rotate share links or automatically reset document status
+- Editing `ready` quotes/invoices does not demote them back to `draft`
+- Shared/sent/outcome documents remain non-deletable in M8
+- Contractor can create an invoice directly without first forcing a won-quote path
+- Direct invoice creation uses a dedicated `POST /api/invoices` contract and supports
+  `source_document_id = null`
+- Contractor can create a separate invoice from an existing quote via cloning
+- `Approved` / `Declined` quotes can still copy link and resend email without status/token
+  regression
+- Invoice-first documents are discoverable from the existing main list without a new invoice
+  dashboard
+
+---
+
 ## Pre-V1 Polish
 
 Small, focused improvements to existing screens that should land before the V1 milestones
@@ -603,7 +705,8 @@ Ship in this order from current state:
 1. Milestone 3 (revised) — Email delivery and always-visible Copy Link
 2. Milestone 4 — Quote PDF presentation refinement
 3. Milestone 5 — Invoice conversion from won quote
-4. Milestone 7 — Optional pricing controls
+4. Milestone 8 — Contractor-first document flow baseline reset
+5. Milestone 7 — Optional pricing controls
 
 ---
 
@@ -627,7 +730,9 @@ Once V1 is complete, the following should be treated as stable:
 
 - Quote status lifecycle: `draft → ready → shared → viewed → approved | declined`
 - Invoice status lifecycle: `draft → ready → sent`
-- Public document route: `/doc/:token` (handles both quotes and invoices, branches on `doc_type`; read-only for customers)
+- Public quote route: `/doc/:token` (quote landing page; read-only for customers)
+- Public invoice sharing: existing shared PDF route remains the stable contract unless a later
+  milestone explicitly adds invoice landing pages
 - Contractor outcome endpoints: `POST /api/quotes/:id/mark-won` and `POST /api/quotes/:id/mark-lost`
 - Invoice doc type and `I-001` numbering format
 - `source_document_id` on `documents` as the quote→invoice link
@@ -643,6 +748,7 @@ V1 is considered successful if, after a pilot period:
 
 - At least 30% of shared quotes are sent via the in-app email flow
 - At least 30% of shared quotes are marked Won or Lost by the contractor
-- At least one invoice is generated from a won quote (`approved` status) per active pilot user
+- At least one invoice is created in Stima per active pilot user, either directly or from an
+  approved quote
 - Error monitoring captures actionable errors before users report them
 - No quote or invoice data is lost or corrupted through status transitions
