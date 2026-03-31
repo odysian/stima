@@ -134,16 +134,12 @@ export function getCompactStatusRow(
     };
   }
 
-  // The quote schema does not store dedicated viewed/won/lost transition timestamps yet,
-  // so updated_at is the best available proxy for when these states were recorded.
   if (actionState === "viewed") {
     return {
       icon: "visibility",
       iconClasses: "bg-warning-container text-warning",
       text: "Customer viewed this quote",
-      timestamp: formatDate(quote.updated_at),
-      timestampLabel: "Viewed",
-      timestampValue: quote.updated_at,
+      timestamp: null,
     };
   }
 
@@ -152,9 +148,7 @@ export function getCompactStatusRow(
       icon: "check_circle",
       iconClasses: "bg-success-container text-success",
       text: "Quote marked as won",
-      timestamp: formatDate(quote.updated_at),
-      timestampLabel: "Approved",
-      timestampValue: quote.updated_at,
+      timestamp: null,
     };
   }
 
@@ -162,9 +156,7 @@ export function getCompactStatusRow(
     icon: "cancel",
     iconClasses: "bg-error-container text-error",
     text: "Quote marked as lost",
-    timestamp: formatDate(quote.updated_at),
-    timestampLabel: "Declined",
-    timestampValue: quote.updated_at,
+    timestamp: null,
   };
 }
 

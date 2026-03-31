@@ -327,6 +327,38 @@ describe("QuotePreview", () => {
     },
   );
 
+  it.each([
+    ["viewed", "Customer viewed this quote"],
+    ["approved", "Quote marked as won"],
+    ["declined", "Quote marked as lost"],
+  ] as const)(
+    "suppresses mutable status timestamps for %s quotes",
+    async (status, statusCopy) => {
+      mockedQuoteService.getQuote.mockResolvedValueOnce(
+        makeQuoteDetail({
+          status,
+          share_token: "share-token-1",
+          updated_at: "2026-03-22T15:45:00.000Z",
+        }),
+      );
+
+      const { container } = render(
+        <MemoryRouter initialEntries={["/quotes/quote-1/preview"]}>
+          <Routes>
+            <Route path="/quotes/:id/preview" element={<QuotePreview />} />
+            <Route path="/quotes/:id/edit" element={<div>Edit Quote Screen</div>} />
+            <Route path="/invoices/:id" element={<div>Invoice Detail Screen</div>} />
+            <Route path="/" element={<div>Quote List Screen</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      const statusSection = await screen.findByLabelText(/quote status/i);
+      expect(within(statusSection).getByText(statusCopy)).toBeInTheDocument();
+      expect(container.querySelector("section[aria-label='Quote status'] time")).toBeNull();
+    },
+  );
+
   it("shows send by email, copy link, and open pdf when the quote is ready", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({
