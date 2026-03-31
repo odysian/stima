@@ -27,7 +27,7 @@ from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
 
 LOGGER = logging.getLogger(__name__)
-_EDITABLE_INVOICE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY})
+_EDITABLE_INVOICE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY, QuoteStatus.SENT})
 
 
 class InvoiceRepositoryProtocol(Protocol):

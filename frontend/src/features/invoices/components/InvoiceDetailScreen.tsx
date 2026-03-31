@@ -82,8 +82,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
       .map((value) => value?.trim())
       .filter((value): value is string => Boolean(value))
       .join(" · ") || "No contact details";
-  const isSent = invoice?.status === "sent";
-
   function invalidateLocalPdf(): void {
     setPdfUrl(null);
   }
@@ -274,16 +272,11 @@ export function InvoiceDetailScreen(): React.ReactElement {
                       void onSaveDueDate();
                     }}
                     isLoading={isSavingDueDate}
-                    disabled={isSent || !dueDateInput || dueDateInput === invoice.due_date}
+                    disabled={!dueDateInput || dueDateInput === invoice.due_date}
                   >
                     Save Due Date
                   </Button>
                 </div>
-                {isSent ? (
-                  <p className="mt-3 text-sm text-on-surface-variant">
-                    Sent invoices are read-only.
-                  </p>
-                ) : null}
               </div>
             </section>
 

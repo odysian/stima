@@ -142,7 +142,7 @@ describe("QuoteEditScreen", () => {
   });
 
   it.each(["shared", "viewed", "approved", "declined"] as const)(
-    "redirects back to preview when the quote is no longer editable (%s)",
+    "keeps customer-visible quotes editable in the editor (%s)",
     async (status) => {
       window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
       mockedQuoteService.getQuote.mockResolvedValueOnce(
@@ -151,11 +151,9 @@ describe("QuoteEditScreen", () => {
 
       renderScreen();
 
-      await waitFor(() => {
-        expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview", { replace: true });
-      });
-      expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).toBeNull();
-      expect(screen.queryByRole("heading", { name: "Q-001" })).not.toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Q-001" })).toBeInTheDocument();
+      expect(navigateMock).not.toHaveBeenCalledWith("/quotes/quote-1/preview", { replace: true });
+      expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).not.toBeNull();
     },
   );
 

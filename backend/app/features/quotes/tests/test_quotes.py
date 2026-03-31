@@ -806,7 +806,7 @@ async def test_send_quote_email_returns_409_when_quote_is_still_draft(
 
 
 @pytest.mark.parametrize("terminal_status", [QuoteStatus.APPROVED, QuoteStatus.DECLINED])
-async def test_send_quote_email_returns_409_when_quote_is_closed(
+async def test_send_quote_email_allows_resend_for_finalized_quotes_without_rotating_share_token(
     client: AsyncClient,
     db_session: AsyncSession,
     mock_email_service: _MockEmailService,
@@ -828,6 +828,7 @@ async def test_send_quote_email_returns_409_when_quote_is_closed(
         headers={"X-CSRF-Token": csrf_token},
     )
     assert share_response.status_code == 200
+    original_share_token = share_response.json()["share_token"]
 
     await _set_quote_status(db_session, quote["id"], terminal_status)
 
@@ -836,13 +837,11 @@ async def test_send_quote_email_returns_409_when_quote_is_closed(
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert response.status_code == 409
-    assert response.json() == {
-        "detail": (
-            "This quote is already closed. Email cannot be sent after it is marked won or lost."
-        ),
-    }
-    assert mock_email_service.messages == []
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == terminal_status.value
+    assert payload["share_token"] == original_share_token
+    assert len(mock_email_service.messages) == 1
 
 
 async def test_send_quote_email_returns_404_for_missing_quote(
@@ -2074,7 +2073,7 @@ async def test_delete_quote_returns_404_for_different_users_quote(client: AsyncC
     assert response.json() == {"detail": "Not found"}
 
 
-async def test_patch_ready_quote_reverts_status_to_draft_even_when_values_do_not_change(
+async def test_patch_ready_quote_preserves_ready_status_even_when_values_do_not_change(
     client: AsyncClient,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -2112,11 +2111,13 @@ async def test_patch_ready_quote_reverts_status_to_draft_even_when_values_do_not
     )
 
     assert patch_response.status_code == 200
-    assert patch_response.json()["status"] == "draft"
+    assert patch_response.json()["status"] == "ready"
     assert patch_response.json()["notes"] == "Original note"
 
 
-async def test_patch_shared_quote_returns_409(client: AsyncClient) -> None:
+async def test_patch_shared_quote_preserves_shared_status_and_share_fields(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
 
@@ -2141,6 +2142,7 @@ async def test_patch_shared_quote_returns_409(client: AsyncClient) -> None:
     )
     assert share_response.status_code == 200
     assert share_response.json()["status"] == "shared"
+    original_payload = share_response.json()
 
     patch_response = await client.patch(
         f"/api/quotes/{quote_id}",
@@ -2148,8 +2150,11 @@ async def test_patch_shared_quote_returns_409(client: AsyncClient) -> None:
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert patch_response.status_code == 409
-    assert patch_response.json() == {"detail": "Shared quotes cannot be edited"}
+    assert patch_response.status_code == 200
+    assert patch_response.json()["status"] == "shared"
+    assert patch_response.json()["notes"] == "Updated note"
+    assert patch_response.json()["share_token"] == original_payload["share_token"]
+    assert patch_response.json()["shared_at"] == original_payload["shared_at"]
 
 
 async def test_delete_shared_quote_returns_409(client: AsyncClient) -> None:
@@ -2353,7 +2358,7 @@ async def test_mark_quote_outcome_returns_409_when_atomic_write_loses_race(
     "status",
     [QuoteStatus.VIEWED, QuoteStatus.APPROVED, QuoteStatus.DECLINED],
 )
-async def test_patch_non_editable_quote_statuses_return_409(
+async def test_patch_customer_visible_quote_statuses_preserves_status_and_share_fields(
     client: AsyncClient,
     db_session: AsyncSession,
     status: QuoteStatus,
@@ -2368,6 +2373,7 @@ async def test_patch_non_editable_quote_statuses_return_409(
         headers={"X-CSRF-Token": csrf_token},
     )
     assert share_response.status_code == 200
+    shared_quote = share_response.json()
     await _set_quote_status(db_session, quote_id, status)
 
     patch_response = await client.patch(
@@ -2376,8 +2382,11 @@ async def test_patch_non_editable_quote_statuses_return_409(
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert patch_response.status_code == 409
-    assert patch_response.json() == {"detail": "Shared quotes cannot be edited"}
+    assert patch_response.status_code == 200
+    assert patch_response.json()["status"] == status.value
+    assert patch_response.json()["notes"] == "Updated note"
+    assert patch_response.json()["share_token"] == shared_quote["share_token"]
+    assert patch_response.json()["shared_at"] == shared_quote["shared_at"]
 
 
 @pytest.mark.parametrize(
@@ -2494,7 +2503,7 @@ async def test_convert_quote_to_invoice_creates_linked_invoice_and_keeps_quote_l
     assert invoice_count == 1
 
 
-async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_blocks_sent_invoices(
+async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_preserves_sent_invoice_status(
     client: AsyncClient,
     db_session: AsyncSession,
 ) -> None:
@@ -2525,14 +2534,17 @@ async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_blocks_sent
     )
     assert share_response.status_code == 200
     assert share_response.json()["status"] == "sent"
+    original_share_token = share_response.json()["share_token"]
 
     patch_response = await client.patch(
         f"/api/invoices/{invoice_id}",
         json={"due_date": "2026-05-01"},
         headers={"X-CSRF-Token": csrf_token},
     )
-    assert patch_response.status_code == 409
-    assert patch_response.json() == {"detail": "Sent invoices cannot be edited"}
+    assert patch_response.status_code == 200
+    assert patch_response.json()["status"] == "sent"
+    assert patch_response.json()["due_date"] == "2026-05-01"
+    assert patch_response.json()["share_token"] == original_share_token
 
 
 @pytest.mark.parametrize(

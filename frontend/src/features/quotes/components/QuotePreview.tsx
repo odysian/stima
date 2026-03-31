@@ -8,7 +8,6 @@ import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineIte
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
 import { QuotePreviewStatusRow } from "@/features/quotes/components/QuotePreviewStatusRow";
 import {
-  CLOSED_QUOTE_STATUSES,
   buildOverflowItems,
   canNavigateBack,
   getEmailActionLabel,
@@ -22,6 +21,7 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import { useQuoteDetail } from "@/features/quotes/hooks/useQuoteDetail";
 import { useQuoteInvoiceConversion } from "@/features/quotes/hooks/useQuoteInvoiceConversion";
 import type { Quote } from "@/features/quotes/types/quote.types";
+import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -75,7 +75,7 @@ export function QuotePreview(): React.ReactElement {
       .filter((value): value is string => Boolean(value))
       .join(" \u00b7 ") || "No contact details";
   const compactStatusRow = getCompactStatusRow(actionState, quote, hasLocalPdf);
-  const canEdit = Boolean(quote && id && !CLOSED_QUOTE_STATUSES.has(actionState));
+  const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
   const {
     invoiceError,
     isConvertingInvoice,

@@ -75,12 +75,18 @@ describe("QuotePreviewActions", () => {
   });
 
   it.each(["approved", "declined"] as const)(
-    "renders copy link and open pdf without email for %s quotes",
+    "renders resend email, copy link, and open pdf for %s quotes",
     (actionState) => {
-      render(<QuotePreviewActions {...makeProps({ actionState })} />);
+      render(
+        <QuotePreviewActions
+          {...makeProps({
+            actionState,
+            emailActionLabel: "Resend Email",
+          })}
+        />,
+      );
 
-      expect(screen.queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /resend email/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
     },

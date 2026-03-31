@@ -154,6 +154,39 @@ describe("InvoiceDetailScreen", () => {
     expect(await screen.findByText("Due date updated.")).toBeInTheDocument();
   });
 
+  it("keeps sent invoices editable for due date updates", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "sent",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+      }),
+    );
+    mockedInvoiceService.updateInvoice.mockResolvedValueOnce(
+      makeInvoice({
+        status: "sent",
+        due_date: "2026-04-30",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+        updated_at: "2026-03-20T00:10:00.000Z",
+      }),
+    );
+
+    renderScreen();
+
+    const dueDateInput = await screen.findByLabelText(/invoice due date/i);
+    fireEvent.change(dueDateInput, { target: { value: "2026-04-30" } });
+    fireEvent.click(screen.getByRole("button", { name: /save due date/i }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.updateInvoice).toHaveBeenCalledWith("invoice-1", {
+        due_date: "2026-04-30",
+      });
+    });
+    expect(await screen.findByText("Due date updated.")).toBeInTheDocument();
+    expect(screen.queryByText(/sent invoices are read-only/i)).not.toBeInTheDocument();
+  });
+
   it("shares the invoice using the raw /share token URL", async () => {
     renderScreen();
 

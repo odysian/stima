@@ -31,7 +31,7 @@ from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
 
 LOGGER = logging.getLogger(__name__)
-_NON_EDITABLE_STATUSES = frozenset(
+_NON_DELETABLE_QUOTE_STATUSES = frozenset(
     {
         QuoteStatus.SHARED,
         QuoteStatus.VIEWED,
@@ -226,11 +226,6 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status in _NON_EDITABLE_STATUSES:
-            raise QuoteServiceError(
-                detail="Shared quotes cannot be edited",
-                status_code=409,
-            )
 
         updated_quote = await self._repository.update(
             document=quote,
@@ -243,8 +238,6 @@ class QuoteService:
             line_items=data.line_items,
             replace_line_items="line_items" in data.model_fields_set,
         )
-        if updated_quote.status == QuoteStatus.READY:
-            updated_quote.status = QuoteStatus.DRAFT
         await self._repository.commit()
         log_event(
             "quote.updated",
@@ -260,7 +253,7 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status in _NON_EDITABLE_STATUSES:
+        if quote.status in _NON_DELETABLE_QUOTE_STATUSES:
             raise QuoteServiceError(
                 detail="Shared quotes cannot be deleted",
                 status_code=409,

@@ -216,9 +216,9 @@ Rules:
 | `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
 | `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`, `linked_invoice`) or `404 { detail: "Not found" }` |
-| `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes? }` | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Shared quotes cannot be edited" }` once the quote is shared/viewed/finalized |
+| `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes, or `404 { detail: "Not found" }` |
 | `/quotes/{id}/share` | POST | yes | cookie | — | `200 Quote`; returns existing quote unchanged when status is already `viewed`, `approved`, or `declined` |
-| `/quotes/{id}/send-email` | POST | yes | cookie | — | `200 Quote` after ensuring the quote is shared and emailing the customer link, `404` when quote is missing/not owned, `409` when still `draft` or already finalized (`approved`/`declined`), `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
+| `/quotes/{id}/send-email` | POST | yes | cookie | — | `200 Quote` after ensuring the quote is shared and emailing the customer link, `404` when quote is missing/not owned, `409` when still `draft`, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
 | `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
 | `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
 | `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "Only approved quotes can be converted to invoices" \| "An invoice already exists for this quote" }` |
@@ -228,7 +228,7 @@ Rules:
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
 | `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail`, `404 { detail: "Not found" }` |
-| `/invoices/{id}` | PATCH | yes | cookie | `{ due_date }` | `200 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "Sent invoices cannot be edited" }` |
+| `/invoices/{id}` | PATCH | yes | cookie | `{ due_date }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
 | `/invoices/{id}/share` | POST | yes | cookie | — | `200 Invoice`; creates/reuses `share_token` and transitions invoice to `sent` |
 
@@ -252,10 +252,12 @@ Public landing-page rules:
 - If `title` is omitted, the existing title is preserved.
 - If `line_items` is present, existing rows are fully replaced.
 - If `line_items` is omitted, existing rows are preserved.
-- Shared, viewed, approved, and declined quotes are read-only.
+- Editing preserves the persisted quote status and any existing `share_token` / `shared_at` values.
+- Shared, viewed, approved, and declined quotes stay editable even though they remain non-deletable customer-visible documents.
 
 `POST /quotes/{id}/send-email` behavior:
 - The quote is shared before the provider call, so a `502` or `503` can still leave the quote in `shared` state on a subsequent `GET`.
+- Ready, shared, viewed, approved, and declined quotes can all send or resend email without rotating the existing share token.
 - The duplicate-send guard allows an immediate retry after provider failure because no `email_sent` throttle event is recorded on failed sends.
 
 `QuoteListItem` fields:
@@ -283,7 +285,7 @@ Invoice rules:
 - only `approved` quotes can convert to invoices
 - quote conversion is one-to-one; duplicate conversions are blocked by service guard plus the DB partial unique index
 - invoice lifecycle is `draft -> ready -> sent`
-- `PATCH /invoices/{id}` is allowed only while invoice status is `draft` or `ready`
+- `PATCH /invoices/{id}` is allowed while invoice status is `draft`, `ready`, or `sent`, and preserves the existing `share_token`
 - first-cut invoice copy/share surfaces the raw PDF route `/share/{share_token}` rather than the frontend `/doc/{share_token}` landing page
 
 ### Error format
