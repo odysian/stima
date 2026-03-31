@@ -40,4 +40,10 @@ describe("StatusBadge", () => {
 
     expect(screen.getByText("Declined")).toHaveClass("bg-error-container", "text-error");
   });
+
+  it("renders sent variant styles", () => {
+    render(<StatusBadge variant="sent" />);
+
+    expect(screen.getByText("Sent")).toHaveClass("bg-info-container", "text-info");
+  });
 });

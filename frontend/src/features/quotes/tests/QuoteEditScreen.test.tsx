@@ -52,6 +52,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     notes: "Thanks for your business",
     shared_at: null,
     share_token: null,
+    linked_invoice: null,
     line_items: [
       {
         id: "line-1",

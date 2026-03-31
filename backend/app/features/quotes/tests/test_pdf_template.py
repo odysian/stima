@@ -24,6 +24,8 @@ from app.integrations.pdf import PdfIntegration
 def _make_context(
     *,
     title: str | None = None,
+    doc_label: str = "Quote",
+    due_date: str | None = None,
     updated_at: datetime,
     line_item_price: Decimal | None,
     total: Decimal | None,
@@ -55,10 +57,12 @@ def _make_context(
         customer_email=customer_email,
         customer_address=customer_address,
         doc_number="Q-201",
+        doc_label=doc_label,
         title=title,
         status="ready",
         total_amount=total,
         notes=notes,
+        due_date=due_date,
         line_items=[
             QuoteRenderLineItem(
                 description="Leaf cleanup",
@@ -242,6 +246,40 @@ def test_render_stacks_line_item_details_in_description_column(
         re.DOTALL,
     )
     assert "<th>Details</th>" not in rendered_html
+
+
+def test_render_includes_due_date_and_doc_label_for_invoices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            doc_label="Invoice",
+            due_date="Apr 19, 2026",
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert "Invoice Number" in rendered_html
+    assert "Due Date" in rendered_html
+    assert "Apr 19, 2026" in rendered_html
 
 
 def test_render_includes_contractor_contact_details_when_present(

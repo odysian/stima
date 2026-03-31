@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, tzinfo
+from datetime import UTC, date, datetime, tzinfo
 from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -24,6 +24,19 @@ _PUBLIC_QUOTE_STATUSES = (
     QuoteStatus.APPROVED,
     QuoteStatus.DECLINED,
 )
+_QUOTE_DOC_TYPE = "quote"
+
+
+@dataclass(slots=True)
+class LinkedInvoiceSummary:
+    """Compact invoice summary shown from quote detail."""
+
+    id: UUID
+    doc_number: str
+    status: str
+    due_date: date | None
+    total_amount: Decimal | None
+    created_at: datetime
 
 
 @dataclass(slots=True)
@@ -54,10 +67,12 @@ class QuoteRenderContext:
     customer_email: str | None
     customer_address: str | None
     doc_number: str
+    doc_label: str
     title: str | None
     status: str
     total_amount: Decimal | None
     notes: str | None
+    due_date: str | None
     line_items: list[QuoteRenderLineItem]
     created_at: datetime
     updated_at: datetime
@@ -106,6 +121,7 @@ class QuoteDetailRow:
     line_items: list[LineItem]
     created_at: datetime
     updated_at: datetime
+    linked_invoice: LinkedInvoiceSummary | None
 
 
 @dataclass(slots=True)
@@ -179,7 +195,10 @@ class QuoteRepository:
                 Document.created_at,
             )
             .join(Customer, Customer.id == Document.customer_id)
-            .where(Document.user_id == user_id)
+            .where(
+                Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
+            )
             .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
         )
         if customer_id is not None:
@@ -210,6 +229,7 @@ class QuoteRepository:
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
             )
             .options(selectinload(Document.line_items))
         )
@@ -223,6 +243,7 @@ class QuoteRepository:
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
             )
             .options(selectinload(Document.line_items))
         )
@@ -231,6 +252,11 @@ class QuoteRepository:
             return None
 
         document, customer = row
+        linked_invoice = await self.get_linked_invoice_summary(
+            source_document_id=document.id,
+            user_id=user_id,
+        )
+
         return QuoteDetailRow(
             id=document.id,
             customer_id=document.customer_id,
@@ -253,6 +279,7 @@ class QuoteRepository:
             line_items=document.line_items,
             created_at=document.created_at,
             updated_at=document.updated_at,
+            linked_invoice=linked_invoice,
         )
 
     async def get_email_context(self, quote_id: UUID, user_id: UUID) -> QuoteEmailContext | None:
@@ -264,6 +291,7 @@ class QuoteRepository:
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
             )
         )
         row = result.one_or_none()
@@ -302,6 +330,7 @@ class QuoteRepository:
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
             )
             .options(selectinload(Document.line_items))
         )
@@ -322,6 +351,7 @@ class QuoteRepository:
             .join(User, User.id == Document.user_id)
             .where(
                 Document.share_token == share_token,
+                Document.doc_type == _QUOTE_DOC_TYPE,
                 Document.status.in_(_PUBLIC_QUOTE_STATUSES),
             )
             .options(selectinload(Document.line_items))
@@ -341,6 +371,7 @@ class QuoteRepository:
             update(Document)
             .where(
                 Document.share_token == share_token,
+                Document.doc_type == _QUOTE_DOC_TYPE,
                 Document.status == QuoteStatus.SHARED,
             )
             .values(status=QuoteStatus.VIEWED)
@@ -363,6 +394,7 @@ class QuoteRepository:
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
                 Document.status == QuoteStatus.DRAFT,
             )
             .values(status=QuoteStatus.READY)
@@ -382,6 +414,7 @@ class QuoteRepository:
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
                 Document.status.in_(allowed_current_statuses),
             )
             .values(status=status)
@@ -445,10 +478,14 @@ class QuoteRepository:
         source_type: str,
     ) -> Document:
         """Create a quote and optional line items for the owning user."""
-        next_sequence = await self._next_doc_sequence_for_user(user_id)
+        next_sequence = await self.get_next_doc_sequence_for_type(
+            user_id=user_id,
+            doc_type=_QUOTE_DOC_TYPE,
+        )
         document = Document(
             user_id=user_id,
             customer_id=customer_id,
+            doc_type=_QUOTE_DOC_TYPE,
             doc_sequence=next_sequence,
             doc_number=f"Q-{next_sequence:03d}",
             title=title,
@@ -515,15 +552,51 @@ class QuoteRepository:
         """Rollback pending quote writes."""
         await self._session.rollback()
 
-    async def _next_doc_sequence_for_user(self, user_id: UUID) -> int:
+    async def get_next_doc_sequence_for_type(self, *, user_id: UUID, doc_type: str) -> int:
+        """Return the next display sequence for one user/doc-type pair."""
         next_sequence = await self._session.scalar(
             select(func.coalesce(func.max(Document.doc_sequence), 0) + 1).where(
-                Document.user_id == user_id
+                Document.user_id == user_id,
+                Document.doc_type == doc_type,
             )
         )
         if next_sequence is None:
             return 1
         return int(next_sequence)
+
+    async def get_linked_invoice_summary(
+        self,
+        *,
+        source_document_id: UUID,
+        user_id: UUID,
+    ) -> LinkedInvoiceSummary | None:
+        """Return the linked invoice summary for one quote, if present."""
+        invoice = await self._session.execute(
+            select(
+                Document.id,
+                Document.doc_number,
+                Document.status,
+                Document.due_date,
+                Document.total_amount,
+                Document.created_at,
+            ).where(
+                Document.user_id == user_id,
+                Document.doc_type == "invoice",
+                Document.source_document_id == source_document_id,
+            )
+        )
+        row = invoice.one_or_none()
+        if row is None:
+            return None
+
+        return LinkedInvoiceSummary(
+            id=row.id,
+            doc_number=row.doc_number,
+            status=row.status.value if isinstance(row.status, QuoteStatus) else str(row.status),
+            due_date=row.due_date,
+            total_amount=row.total_amount,
+            created_at=row.created_at,
+        )
 
     async def _replace_line_items(
         self,
@@ -572,10 +645,14 @@ def _build_render_context(
         customer_email=customer.email,
         customer_address=customer.address,
         doc_number=document.doc_number,
+        doc_label="Quote",
         title=document.title,
         status=document.status.value,
         total_amount=document.total_amount,
         notes=document.notes,
+        due_date=(
+            document.due_date.strftime("%b %d, %Y") if document.due_date is not None else None
+        ),
         line_items=[
             QuoteRenderLineItem(
                 description=line_item.description,

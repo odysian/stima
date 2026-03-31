@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Stima Quote</title>
+    <title>Stima {{ doc_label }}</title>
     <style>
       @page {
         size: A4;
@@ -231,7 +231,7 @@
           <tbody>
             <tr>
               <td>
-                <h1 class="company-name">{{ business_name or "Stima Quote" }}</h1>
+                <h1 class="company-name">{{ business_name or ("Stima " ~ doc_label) }}</h1>
                 {% if owner_name %}
                 <p class="owner-name">{{ owner_name }}</p>
                 {% endif %}
@@ -246,7 +246,7 @@
                 {% if logo_data_uri %}
                 <img class="company-logo" src="{{ logo_data_uri }}" alt="Company logo" />
                 {% endif %}
-                <p class="header-doc-type">Quote</p>
+                <p class="header-doc-type">{{ doc_label }}</p>
               </td>
             </tr>
           </tbody>
@@ -274,10 +274,14 @@
               {% endif %}
             </td>
             <td class="meta-right">
-              <p class="label">Quote Number</p>
+              <p class="label">{{ doc_label }} Number</p>
               <p class="value">{{ doc_number }}</p>
               <p class="label" style="margin-top: 10px">Issued</p>
               <p class="value">{{ issued_date }}</p>
+              {% if due_date %}
+              <p class="label" style="margin-top: 10px">Due Date</p>
+              <p class="value">{{ due_date }}</p>
+              {% endif %}
               {% if show_updated_date %}
               <p class="label" style="margin-top: 10px">Updated</p>
               <p class="value">{{ updated_date }}</p>

@@ -87,21 +87,24 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | user_id | UUID (FK → users) | indexed, cascade delete |
 | customer_id | UUID (FK → customers) | indexed, cascade delete |
 | doc_type | String(20) | default `"quote"` |
-| doc_sequence | Integer | per-user sequence counter |
-| doc_number | String(20) | stored display ID, format `Q-001` |
-| title | String(120) | nullable optional quote label shown in lists, previews, and PDFs |
-| source_document_id | UUID (self-FK → documents.id) | nullable, `ON DELETE SET NULL`; reserved for future quote→invoice lineage |
-| status | String(20) | `draft \| ready \| shared \| viewed \| approved \| declined` with DB check constraint |
+| doc_sequence | Integer | per-user, per-`doc_type` sequence counter |
+| doc_number | String(20) | stored display ID, format `Q-001` or `I-001` |
+| title | String(120) | nullable optional document label shown in detail views and PDFs |
+| source_document_id | UUID (self-FK → documents.id) | nullable, `ON DELETE SET NULL`; invoice rows use this for immutable quote lineage |
+| status | String(20) | `draft \| ready \| shared \| viewed \| approved \| declined \| sent` with DB check constraint; `sent` is invoice-only |
 | source_type | String(20) | `"text"` or `"voice"` based on capture mode |
-| transcript | Text | stored source transcript/notes for the quote draft |
+| transcript | Text | stored source transcript/notes inherited from capture flow |
 | total_amount | Numeric(10,2) | nullable, user-editable |
 | notes | Text | nullable, customer-facing notes |
+| due_date | Date | nullable; used by invoice documents |
 | pdf_url | Text | nullable legacy field; PDFs are streamed directly in V0 and this is not populated by the current flow |
 | share_token | Text | nullable, unique, set on first share and reused for public PDF access |
-| shared_at | DateTime(tz) | nullable, set when a quote transitions to `shared` |
+| shared_at | DateTime(tz) | nullable, set when a quote transitions to `shared` or an invoice transitions to `sent` |
 | created_at, updated_at | DateTime(tz) | server defaults |
 
-Unique constraint: `(user_id, doc_sequence)`.
+Unique constraints:
+- `(user_id, doc_type, doc_sequence)`
+- partial unique invoice-source index on `source_document_id` where `doc_type = 'invoice'`
 
 ### `line_items`
 | Column | Type | Notes |
@@ -211,13 +214,23 @@ Rules:
 | `/quotes/capture-audio` | POST | yes | cookie | multipart form-data `clips` files | `200 ExtractionResult` |
 | `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `200 ExtractionResult` |
 | `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
-| `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided) |
-| `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`) or `404 { detail: "Not found" }` |
+| `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`) |
+| `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`, `linked_invoice`) or `404 { detail: "Not found" }` |
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes? }` | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Shared quotes cannot be edited" }` once the quote is shared/viewed/finalized |
 | `/quotes/{id}/share` | POST | yes | cookie | — | `200 Quote`; returns existing quote unchanged when status is already `viewed`, `approved`, or `declined` |
 | `/quotes/{id}/send-email` | POST | yes | cookie | — | `200 Quote` after ensuring the quote is shared and emailing the customer link, `404` when quote is missing/not owned, `409` when still `draft` or already finalized (`approved`/`declined`), `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
 | `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
 | `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
+| `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "Only approved quotes can be converted to invoices" \| "An invoice already exists for this quote" }` |
+
+### Invoice endpoints (`/api/invoices`)
+
+| Endpoint | Method | CSRF | Auth | Request | Response |
+|---|---|---|---|---|---|
+| `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail`, `404 { detail: "Not found" }` |
+| `/invoices/{id}` | PATCH | yes | cookie | `{ due_date }` | `200 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "Sent invoices cannot be edited" }` |
+| `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
+| `/invoices/{id}/share` | POST | yes | cookie | — | `200 Invoice`; creates/reuses `share_token` and transitions invoice to `sent` |
 
 ### Public quote landing endpoints
 
@@ -225,7 +238,7 @@ Rules:
 |---|---|---|---|
 | `/api/public/doc/{share_token}` | GET | no | `200 PublicQuoteResponse` with `logo_url` and `download_url`, `404 { detail: "Not found" }` for unknown or non-public tokens |
 | `/api/public/doc/{share_token}/logo` | GET | no | raw image bytes with correct `Content-Type`, `Cache-Control: public, max-age=300`, `404 { detail: "Logo not found" }`, or `500 { detail: "Unable to load logo" }` |
-| `/share/{share_token}` | GET | no | raw PDF bytes with `Content-Type: application/pdf`, `Cache-Control: no-store`, and `X-Robots-Tag: noindex` |
+| `/share/{share_token}` | GET | no | raw quote or sent-invoice PDF bytes with `Content-Type: application/pdf`, `Cache-Control: no-store`, and `X-Robots-Tag: noindex` |
 
 Public landing-page rules:
 - contractor share/copy actions hand out the frontend route `/doc/{share_token}` instead of the raw PDF URL
@@ -259,6 +272,19 @@ Public landing-page rules:
 `QuoteDetailResponse` fields:
 - Standard `Quote` fields, including `id`, `customer_id`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
 - Customer display fields: `customer_name`, `customer_email`, `customer_phone`
+- `linked_invoice`: `{ id, doc_number, status, due_date, total_amount, created_at } | null`
+
+`InvoiceDetail` fields:
+- Standard invoice fields: `id`, `customer_id`, `doc_number`, `title`, `status`, `total_amount`, `notes`, `due_date`, `shared_at`, `share_token`, `source_document_id`, `line_items`, `created_at`, and `updated_at`
+- `source_quote_number`
+- `customer`: `{ id, name, email, phone }`
+
+Invoice rules:
+- only `approved` quotes can convert to invoices
+- quote conversion is one-to-one; duplicate conversions are blocked by service guard plus the DB partial unique index
+- invoice lifecycle is `draft -> ready -> sent`
+- `PATCH /invoices/{id}` is allowed only while invoice status is `draft` or `ready`
+- first-cut invoice copy/share surfaces the raw PDF route `/share/{share_token}` rather than the frontend `/doc/{share_token}` landing page
 
 ### Error format
 ```json

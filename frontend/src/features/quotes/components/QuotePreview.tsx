@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
+import { LinkedInvoiceCard } from "@/features/quotes/components/LinkedInvoiceCard";
 import { QuotePreviewHeaderActions } from "@/features/quotes/components/QuotePreviewHeaderActions";
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
@@ -18,7 +19,9 @@ import {
   resolveActionState,
 } from "@/features/quotes/components/quotePreview.helpers";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { Quote, QuoteDetail } from "@/features/quotes/types/quote.types";
+import { useQuoteDetail } from "@/features/quotes/hooks/useQuoteDetail";
+import { useQuoteInvoiceConversion } from "@/features/quotes/hooks/useQuoteInvoiceConversion";
+import type { Quote } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -27,9 +30,13 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 export function QuotePreview(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [quote, setQuote] = useState<QuoteDetail | null>(null);
-  const [isLoadingQuote, setIsLoadingQuote] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const {
+    quote,
+    setQuote,
+    isLoadingQuote,
+    loadError,
+    refetchQuote,
+  } = useQuoteDetail(id);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -45,42 +52,6 @@ export function QuotePreview(): React.ReactElement {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMarkWonConfirm, setShowMarkWonConfirm] = useState(false);
   const [showMarkLostConfirm, setShowMarkLostConfirm] = useState(false);
-
-  useEffect(() => {
-    if (!id) {
-      setLoadError("Missing quote id.");
-      setIsLoadingQuote(false);
-      return;
-    }
-
-    const quoteId = id;
-    let isActive = true;
-
-    async function fetchQuote(): Promise<void> {
-      setIsLoadingQuote(true);
-      setLoadError(null);
-      try {
-        const fetchedQuote = await quoteService.getQuote(quoteId);
-        if (isActive) {
-          setQuote(fetchedQuote);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unable to load quote";
-        if (isActive) {
-          setLoadError(message);
-        }
-      } finally {
-        if (isActive) {
-          setIsLoadingQuote(false);
-        }
-      }
-    }
-
-    void fetchQuote();
-    return () => {
-      isActive = false;
-    };
-  }, [id]);
 
   useEffect(() => () => {
     if (pdfUrl) {
@@ -105,8 +76,24 @@ export function QuotePreview(): React.ReactElement {
       .join(" \u00b7 ") || "No contact details";
   const compactStatusRow = getCompactStatusRow(actionState, quote, hasLocalPdf);
   const canEdit = Boolean(quote && id && !CLOSED_QUOTE_STATUSES.has(actionState));
+  const {
+    invoiceError,
+    isConvertingInvoice,
+    onConvertToInvoice,
+    clearInvoiceError,
+  } = useQuoteInvoiceConversion({
+    quoteId: id,
+    navigate,
+    setQuote,
+  });
   const isBusy =
-    isGeneratingPdf || isSharing || isSendingEmail || isMarkingWon || isMarkingLost || isDeleting;
+    isGeneratingPdf
+    || isSharing
+    || isSendingEmail
+    || isMarkingWon
+    || isMarkingLost
+    || isDeleting
+    || isConvertingInvoice;
 
   function handleBack(): void {
     if (canNavigateBack()) {
@@ -256,11 +243,6 @@ export function QuotePreview(): React.ReactElement {
     }
   }
 
-  async function refetchQuote(quoteId: string): Promise<void> {
-    const refreshedQuote = await quoteService.getQuote(quoteId);
-    setQuote(refreshedQuote);
-  }
-
   async function onConfirmMarkWon(): Promise<void> {
     if (!id || !quote) {
       return;
@@ -269,6 +251,7 @@ export function QuotePreview(): React.ReactElement {
     setOutcomeError(null);
     setShareError(null);
     setShareMessage(null);
+    clearInvoiceError();
     setShowMarkWonConfirm(false);
     setIsMarkingWon(true);
     try {
@@ -290,6 +273,7 @@ export function QuotePreview(): React.ReactElement {
     setOutcomeError(null);
     setShareError(null);
     setShareMessage(null);
+    clearInvoiceError();
     setShowMarkLostConfirm(false);
     setIsMarkingLost(true);
     try {
@@ -367,6 +351,15 @@ export function QuotePreview(): React.ReactElement {
                 clientContact={clientContact}
               />
             ) : null}
+            {quote ? (
+              <LinkedInvoiceCard
+                quoteStatus={quote.status}
+                linkedInvoice={quote.linked_invoice}
+                isConverting={isConvertingInvoice}
+                onConvert={onConvertToInvoice}
+                onOpenInvoice={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
+              />
+            ) : null}
             {quote ? <QuoteLineItemsSection lineItems={quote.line_items} /> : null}
 
             <QuotePreviewActions
@@ -393,6 +386,12 @@ export function QuotePreview(): React.ReactElement {
             {deleteError ? (
               <div className="mx-4 mt-3">
                 <FeedbackMessage variant="error">{deleteError}</FeedbackMessage>
+              </div>
+            ) : null}
+
+            {invoiceError ? (
+              <div className="mx-4 mt-3">
+                <FeedbackMessage variant="error">{invoiceError}</FeedbackMessage>
               </div>
             ) : null}
           </>

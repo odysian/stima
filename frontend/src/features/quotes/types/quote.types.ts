@@ -37,6 +37,7 @@ export type QuoteStatus =
   | "approved"
   | "declined";
 export type QuoteSourceType = "text" | "voice";
+export type InvoiceStatus = "draft" | "ready" | "sent";
 
 export interface Quote {
   id: string;
@@ -55,10 +56,20 @@ export interface Quote {
   updated_at: string;
 }
 
+export interface LinkedInvoiceSummary {
+  id: string;
+  doc_number: string;
+  status: InvoiceStatus;
+  due_date: string | null;
+  total_amount: number | null;
+  created_at: string;
+}
+
 export interface QuoteDetail extends Quote {
   customer_name: string;
   customer_email: string | null;
   customer_phone: string | null;
+  linked_invoice: LinkedInvoiceSummary | null;
 }
 
 export interface QuoteListItem {

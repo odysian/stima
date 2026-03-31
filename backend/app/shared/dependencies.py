@@ -21,6 +21,8 @@ from app.features.auth.service import (
 )
 from app.features.customers.repository import CustomerRepository
 from app.features.customers.service import CustomerService
+from app.features.invoices.repository import InvoiceRepository
+from app.features.invoices.service import InvoiceService
 from app.features.profile.repository import ProfileRepository
 from app.features.profile.service import ProfileService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
@@ -96,6 +98,19 @@ def get_quote_service(
     """Build a request-scoped quote service wired to DB and PDF integration."""
     return QuoteService(
         repository=QuoteRepository(db),
+        pdf_integration=get_pdf_integration(),
+        storage_service=storage_service,
+    )
+
+
+def get_invoice_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    storage_service: Annotated[StorageService, Depends(get_storage_service)],
+) -> InvoiceService:
+    """Build a request-scoped invoice service wired to DB and PDF integration."""
+    return InvoiceService(
+        invoice_repository=InvoiceRepository(db),
+        quote_repository=QuoteRepository(db),
         pdf_integration=get_pdf_integration(),
         storage_service=storage_service,
     )

@@ -1,5 +1,5 @@
 interface StatusBadgeProps {
-  variant: "draft" | "ready" | "shared" | "viewed" | "approved" | "declined";
+  variant: "draft" | "ready" | "shared" | "viewed" | "approved" | "declined" | "sent";
 }
 
 const styles = {
@@ -9,6 +9,7 @@ const styles = {
   viewed: "bg-warning-container text-warning",
   approved: "bg-success-container text-success",
   declined: "bg-error-container text-error",
+  sent: "bg-info-container text-info",
 } as const;
 
 const labels = {
@@ -18,6 +19,7 @@ const labels = {
   viewed: "Viewed",
   approved: "Approved",
   declined: "Declined",
+  sent: "Sent",
 } as const;
 
 export function StatusBadge({ variant }: StatusBadgeProps): React.ReactElement {

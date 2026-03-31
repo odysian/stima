@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -138,12 +138,26 @@ class QuoteResponse(BaseModel):
     updated_at: datetime
 
 
+class LinkedInvoiceResponse(BaseModel):
+    """Compact linked invoice payload returned from quote detail."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    doc_number: str
+    status: str
+    due_date: date | None
+    total_amount: float | None
+    created_at: datetime
+
+
 class QuoteDetailResponse(QuoteResponse):
     """Quote detail payload including customer display fields."""
 
     customer_name: str
     customer_email: str | None
     customer_phone: str | None
+    linked_invoice: LinkedInvoiceResponse | None
 
 
 class PublicQuoteResponse(BaseModel):

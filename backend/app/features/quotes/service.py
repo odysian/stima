@@ -480,7 +480,7 @@ def _resolve_user_id(user: User) -> UUID:
 def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
     """Return true when IntegrityError was caused by doc-sequence uniqueness collision."""
     message = str(exc.orig)
-    return "uq_documents_user_sequence" in message
+    return "uq_documents_user_type_sequence" in message
 
 
 def _utcnow() -> datetime:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
@@ -13,8 +13,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
-class QuoteStatus(StrEnum):
-    """Lifecycle states for quote documents."""
+class DocumentStatus(StrEnum):
+    """Lifecycle states used across quote and invoice documents."""
 
     DRAFT = "draft"
     READY = "ready"
@@ -22,6 +22,10 @@ class QuoteStatus(StrEnum):
     VIEWED = "viewed"
     APPROVED = "approved"
     DECLINED = "declined"
+    SENT = "sent"
+
+
+QuoteStatus = DocumentStatus
 
 
 class Document(Base):
@@ -29,7 +33,12 @@ class Document(Base):
 
     __tablename__ = "documents"
     __table_args__ = (
-        sa.UniqueConstraint("user_id", "doc_sequence", name="uq_documents_user_sequence"),
+        sa.UniqueConstraint(
+            "user_id",
+            "doc_type",
+            "doc_sequence",
+            name="uq_documents_user_type_sequence",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(sa.Uuid, primary_key=True, default=uuid4)
@@ -55,9 +64,9 @@ class Document(Base):
         sa.ForeignKey("documents.id", ondelete="SET NULL"),
         nullable=True,
     )
-    status: Mapped[QuoteStatus] = mapped_column(
+    status: Mapped[DocumentStatus] = mapped_column(
         sa.Enum(
-            QuoteStatus,
+            DocumentStatus,
             values_callable=lambda enum_type: [member.value for member in enum_type],
             native_enum=False,
             create_constraint=True,
@@ -66,12 +75,13 @@ class Document(Base):
             length=20,
         ),
         nullable=False,
-        server_default=QuoteStatus.DRAFT.value,
+        server_default=DocumentStatus.DRAFT.value,
     )
     source_type: Mapped[str] = mapped_column(sa.String(20), nullable=False)
     transcript: Mapped[str] = mapped_column(sa.Text, nullable=False)
     total_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
     notes: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    due_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
     pdf_url: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     share_token: Mapped[str | None] = mapped_column(sa.Text, nullable=True, unique=True)
     shared_at: Mapped[datetime | None] = mapped_column(
