@@ -1647,6 +1647,18 @@ async def test_all_quote_endpoints_require_authentication(
 @pytest.mark.parametrize(
     ("method", "path", "payload"),
     [
+        (
+            "post",
+            "/api/invoices",
+            {
+                "customer_id": "00000000-0000-0000-0000-000000000000",
+                "transcript": "notes",
+                "line_items": [{"description": "x", "details": None, "price": None}],
+                "total_amount": None,
+                "notes": None,
+                "source_type": "text",
+            },
+        ),
         ("get", "/api/invoices/00000000-0000-0000-0000-000000000000", None),
         (
             "patch",
@@ -1887,6 +1899,26 @@ async def test_invoice_mutations_require_csrf(
     assert response.json() == {"detail": "CSRF token missing"}
 
 
+async def test_create_invoice_requires_csrf(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "transcript": "invoice transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": None,
+            "source_type": "text",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
 async def test_create_quote_returns_404_for_different_users_customer(
     client: AsyncClient,
 ) -> None:
@@ -1899,6 +1931,30 @@ async def test_create_quote_returns_404_for_different_users_customer(
         json={
             "customer_id": customer_id_user_a,
             "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token_user_b},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_create_invoice_returns_404_for_different_users_customer(
+    client: AsyncClient,
+) -> None:
+    csrf_token_user_a = await _register_and_login(client, _credentials())
+    customer_id_user_a = await _create_customer(client, csrf_token_user_a)
+
+    csrf_token_user_b = await _register_and_login(client, _credentials())
+    response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id_user_a,
+            "transcript": "invoice transcript",
             "line_items": [{"description": "line item", "details": None, "price": 55}],
             "total_amount": 55,
             "notes": None,
@@ -2500,6 +2556,66 @@ async def test_convert_quote_to_invoice_creates_linked_invoice_and_keeps_quote_l
     invoice_count = await db_session.scalar(
         select(func.count()).select_from(Document).where(Document.doc_type == "invoice")
     )
+    assert invoice_count == 1
+
+
+async def test_create_direct_invoice_sets_default_due_date_and_keeps_quote_list_clean(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+        phone="+1-555-123-4567",
+    )
+
+    create_response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "title": "  Front Bed Refresh  ",
+            "transcript": "invoice transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert create_response.status_code == 201
+    invoice_payload = create_response.json()
+    assert invoice_payload["doc_number"] == "I-001"
+    assert invoice_payload["status"] == "draft"
+    assert invoice_payload["title"] == "Front Bed Refresh"
+    assert invoice_payload["source_document_id"] is None
+    assert invoice_payload["due_date"] is not None
+
+    invoice_detail_response = await client.get(f"/api/invoices/{invoice_payload['id']}")
+    assert invoice_detail_response.status_code == 200
+    invoice_detail = invoice_detail_response.json()
+    assert invoice_detail["source_document_id"] is None
+    assert invoice_detail["source_quote_number"] is None
+    assert invoice_detail["customer"] == {
+        "id": customer_id,
+        "name": "Quote Test Customer",
+        "email": "customer@example.com",
+        "phone": "+1-555-123-4567",
+    }
+
+    list_response = await client.get("/api/quotes")
+    assert list_response.status_code == 200
+    assert list_response.json() == []
+
+    quote_count = await db_session.scalar(
+        select(func.count()).select_from(Document).where(Document.doc_type == "quote")
+    )
+    invoice_count = await db_session.scalar(
+        select(func.count()).select_from(Document).where(Document.doc_type == "invoice")
+    )
+    assert quote_count == 0
     assert invoice_count == 1
 
 

@@ -6,9 +6,31 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.features.quotes.schemas import LineItemResponse
+from app.features.quotes.schemas import LineItemDraft, LineItemResponse
+
+
+def _normalize_optional_title(value: object) -> object:
+    """Trim optional title values and collapse blanks to null."""
+    if value is None or not isinstance(value, str):
+        return value
+    trimmed = value.strip()
+    return trimmed or None
+
+
+class InvoiceCreateRequest(BaseModel):
+    """Request payload for creating a direct invoice from the shared builder."""
+
+    customer_id: UUID
+    title: str | None = Field(default=None, max_length=120)
+    transcript: str = Field(min_length=1)
+    line_items: list[LineItemDraft] = Field(default_factory=list)
+    total_amount: float | None = None
+    notes: str | None = None
+    source_type: Literal["text", "voice"]
+
+    _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
 
 
 class InvoiceResponse(BaseModel):
@@ -26,7 +48,7 @@ class InvoiceResponse(BaseModel):
     due_date: date | None
     shared_at: datetime | None
     share_token: str | None
-    source_document_id: UUID
+    source_document_id: UUID | None
     line_items: list[LineItemResponse]
     created_at: datetime
     updated_at: datetime
@@ -44,7 +66,7 @@ class InvoiceCustomerResponse(BaseModel):
 class InvoiceDetailResponse(InvoiceResponse):
     """Detailed invoice payload including source quote and customer fields."""
 
-    source_quote_number: str
+    source_quote_number: str | None
     customer: InvoiceCustomerResponse
 
 

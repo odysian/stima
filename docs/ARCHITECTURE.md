@@ -227,6 +227,7 @@ Rules:
 
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
+| `/invoices` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type }` | `201 Invoice` with `doc_number` (`I-001`), `status: "draft"`, server-default `due_date`, and nullable `source_document_id` |
 | `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail`, `404 { detail: "Not found" }` |
 | `/invoices/{id}` | PATCH | yes | cookie | `{ due_date }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
@@ -278,10 +279,13 @@ Public landing-page rules:
 
 `InvoiceDetail` fields:
 - Standard invoice fields: `id`, `customer_id`, `doc_number`, `title`, `status`, `total_amount`, `notes`, `due_date`, `shared_at`, `share_token`, `source_document_id`, `line_items`, `created_at`, and `updated_at`
-- `source_quote_number`
+- `source_quote_number` (`null` for direct invoices with no parent quote)
 - `customer`: `{ id, name, email, phone }`
 
 Invoice rules:
+- direct invoices can be created from the shared builder via `POST /api/invoices` without a source quote
+- direct invoices receive the server-side default due date on create
+- direct invoices use `source_document_id = null` and `source_quote_number = null`
 - only `approved` quotes can convert to invoices
 - quote conversion is one-to-one; duplicate conversions are blocked by service guard plus the DB partial unique index
 - invoice lifecycle is `draft -> ready -> sent`

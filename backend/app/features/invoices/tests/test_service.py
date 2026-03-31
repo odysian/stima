@@ -31,6 +31,11 @@ class _RetryingInvoiceRepository:
         del user_id
         return None
 
+    async def customer_exists_for_user(self, *, user_id, customer_id):  # noqa: ANN001
+        del user_id
+        del customer_id
+        return False
+
     async def get_by_source_document_id(self, *, source_document_id, user_id):  # noqa: ANN001
         if str(source_document_id) == self._quote_id and str(user_id) == self._user_id:
             return None
@@ -66,6 +71,10 @@ class _RetryingInvoiceRepository:
             id=uuid4(),
             customer_id=source_quote.customer_id,
         )
+
+    async def create(self, **kwargs):  # noqa: ANN001
+        del kwargs
+        raise AssertionError("Direct invoice creation should not be used in this test")
 
     async def update_due_date(self, *, invoice, due_date: date):  # noqa: ANN001
         del due_date

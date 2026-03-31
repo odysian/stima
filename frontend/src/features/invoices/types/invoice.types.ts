@@ -1,5 +1,19 @@
 import type { InvoiceStatus } from "@/features/invoices/types/invoice-status";
-import type { LineItem } from "@/features/quotes/types/quote.types";
+import type {
+  LineItem,
+  LineItemDraft,
+  QuoteSourceType,
+} from "@/features/quotes/types/quote.types";
+
+export interface InvoiceCreateRequest {
+  customer_id: string;
+  title: string | null;
+  transcript: string;
+  line_items: LineItemDraft[];
+  total_amount: number | null;
+  notes: string;
+  source_type: QuoteSourceType;
+}
 
 export interface Invoice {
   id: string;
@@ -12,14 +26,14 @@ export interface Invoice {
   due_date: string | null;
   shared_at: string | null;
   share_token: string | null;
-  source_document_id: string;
+  source_document_id: string | null;
   line_items: LineItem[];
   created_at: string;
   updated_at: string;
 }
 
 export interface InvoiceDetail extends Invoice {
-  source_quote_number: string;
+  source_quote_number: string | null;
   customer: {
     id: string;
     name: string;

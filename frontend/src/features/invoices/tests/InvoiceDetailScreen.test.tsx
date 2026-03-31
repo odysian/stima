@@ -138,6 +138,22 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.getByRole("button", { name: /back to q-001/i })).toBeInTheDocument();
   });
 
+  it("hides source quote UI for direct invoices", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        source_document_id: null,
+        source_quote_number: null,
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
+    expect(screen.getByText(/created on mar 20, 2026/i)).toBeInTheDocument();
+    expect(screen.queryByText(/created from quote/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /back to/i })).not.toBeInTheDocument();
+  });
+
   it("saves the due date update", async () => {
     renderScreen();
 
