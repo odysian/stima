@@ -3,18 +3,23 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerInfoForm } from "@/features/customers/components/CustomerInfoForm";
+import { InvoiceHistoryList } from "@/features/customers/components/InvoiceHistoryList";
 import { QuoteHistoryList } from "@/features/customers/components/QuoteHistoryList";
 import { customerService } from "@/features/customers/services/customerService";
 import type {
   Customer,
   CustomerUpdateRequest,
 } from "@/features/customers/types/customer.types";
+import { invoiceService } from "@/features/invoices/services/invoiceService";
+import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+
+type HistoryMode = "quotes" | "invoices";
 
 function getCustomerDraftValues(nextCustomer: Customer): {
   name: string;
@@ -37,16 +42,20 @@ export function CustomerDetailScreen(): React.ReactElement {
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerQuotes, setCustomerQuotes] = useState<QuoteListItem[]>([]);
+  const [customerInvoices, setCustomerInvoices] = useState<InvoiceListItem[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
+  const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [historyMode, setHistoryMode] = useState<HistoryMode>("quotes");
 
   function populateDraftFields(nextCustomer: Customer): void {
     const draftValues = getCustomerDraftValues(nextCustomer);
@@ -124,6 +133,46 @@ export function CustomerDetailScreen(): React.ReactElement {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!id) {
+      setCustomerInvoices([]);
+      setInvoiceLoadError("Missing customer id.");
+      setIsLoadingInvoices(false);
+      return;
+    }
+
+    let isActive = true;
+
+    async function fetchCustomerInvoices(): Promise<void> {
+      setIsLoadingInvoices(true);
+      setInvoiceLoadError(null);
+      setCustomerInvoices([]);
+
+      try {
+        const nextInvoices = await invoiceService.listInvoices({ customer_id: id });
+        if (isActive) {
+          setCustomerInvoices(nextInvoices);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to load invoices";
+        if (isActive) {
+          setCustomerInvoices([]);
+          setInvoiceLoadError(message);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingInvoices(false);
+        }
+      }
+    }
+
+    void fetchCustomerInvoices();
+
+    return () => {
+      isActive = false;
+    };
+  }, [id]);
+
   async function onSaveChanges(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
@@ -171,6 +220,9 @@ export function CustomerDetailScreen(): React.ReactElement {
     const trimmedValue = value.trim();
     return trimmedValue || fallback;
   }
+
+  const activeHistoryCount = historyMode === "quotes" ? customerQuotes.length : customerInvoices.length;
+  const activeHistoryCountLabel = `${activeHistoryCount} ${activeHistoryCount === 1 ? "ITEM" : "ITEMS"}`;
 
   return (
     <main className="min-h-screen bg-background pb-24">
@@ -268,11 +320,60 @@ export function CustomerDetailScreen(): React.ReactElement {
               />
             )}
 
-            <QuoteHistoryList
-              quotes={customerQuotes}
-              onQuoteClick={(quoteId) => navigate(`/quotes/${quoteId}/preview`)}
-              timezone={user?.timezone}
-            />
+            <section>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div
+                  aria-label="Customer history type filter"
+                  className="inline-flex rounded-full bg-surface-container-low p-1"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={historyMode === "quotes"}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      historyMode === "quotes"
+                        ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                        : "text-on-surface-variant"
+                    }`}
+                    onClick={() => setHistoryMode("quotes")}
+                  >
+                    Quotes
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={historyMode === "invoices"}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      historyMode === "invoices"
+                        ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                        : "text-on-surface-variant"
+                    }`}
+                    onClick={() => setHistoryMode("invoices")}
+                  >
+                    Invoices
+                  </button>
+                </div>
+                <p className="shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                  {activeHistoryCountLabel}
+                </p>
+              </div>
+
+              {historyMode === "quotes" ? (
+                <QuoteHistoryList
+                  quotes={customerQuotes}
+                  onQuoteClick={(quoteId) => navigate(`/quotes/${quoteId}/preview`)}
+                  timezone={user?.timezone}
+                  showHeader={false}
+                />
+              ) : (
+                <InvoiceHistoryList
+                  invoices={customerInvoices}
+                  isLoading={isLoadingInvoices}
+                  loadError={invoiceLoadError}
+                  onInvoiceClick={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
+                  timezone={user?.timezone}
+                  showHeader={false}
+                />
+              )}
+            </section>
           </>
         ) : null}
       </section>

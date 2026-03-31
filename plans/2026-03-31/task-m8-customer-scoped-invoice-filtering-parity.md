@@ -14,9 +14,12 @@ quotes, which means invoices do not yet benefit from that parity on the customer
 - Non-goals: account-wide invoice IA redesign, invoice payments/AR workflows, invoice public
   landing pages, or changes to invoice edit/share semantics.
 - Constraints:
+  - Scope this work to the existing customer detail screen.
   - Reuse the existing `GET /api/invoices?customer_id=<id>` contract.
   - Preserve the current quote-scoped customer history behavior.
   - Keep the UI lightweight and customer-contextual rather than adding a new standalone invoice hub.
+  - Add invoice history within the existing customer history area using a lightweight quote/invoice
+    switcher rather than inventing a new customer-context surface.
   - Direct invoices and quote-derived invoices must both appear correctly when filtered to one
     customer.
   - Empty/loading/error states should be explicit, not implied.
@@ -26,7 +29,7 @@ quotes, which means invoices do not yet benefit from that parity on the customer
 2. Reuse `invoiceService.listInvoices({ customer_id })` rather than introducing a new transport
    shape.
 3. Add the smallest UI needed to expose invoice history in customer context, keeping quote and
-   invoice concerns readable.
+   invoice concerns readable through a simple history toggle.
 4. Add backend/frontend tests covering customer-filtered invoice data, including direct and
    quote-derived invoices.
 5. Update docs only if the customer-detail/history contract or UX expectations materially change.
@@ -41,12 +44,17 @@ quotes, which means invoices do not yet benefit from that parity on the customer
 ## Acceptance Criteria
 - [ ] A contractor can view invoices filtered to a single customer on the intended customer-scoped
       surface.
+- [ ] The intended surface is the existing customer detail screen.
+- [ ] The customer detail screen exposes a lightweight history switcher so contractors can toggle
+      between customer-scoped quotes and invoices on the same surface.
 - [ ] The feature uses existing `GET /api/invoices?customer_id=<id>` filtering rather than a new
       backend contract.
 - [ ] Both direct invoices and quote-derived invoices appear when they belong to the selected
       customer.
-- [ ] Quotes remain available on the existing customer-scoped surface without regression.
-- [ ] Empty, loading, and error states are explicit for customer-scoped invoice history.
+- [ ] Quotes remain available on the same customer-scoped surface without regression when switching
+      history modes.
+- [ ] Empty, loading, and error states are explicit for customer-scoped invoice history when the
+      invoice history mode is active.
 - [ ] No new standalone invoice dashboard or navigation surface is introduced.
 - [ ] `make backend-verify` passes if backend tests change.
 - [ ] `make frontend-verify` passes.
