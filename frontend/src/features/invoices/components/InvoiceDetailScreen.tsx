@@ -305,7 +305,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   }}
                   isLoading={isGeneratingPdf}
                 >
-                  Open PDF
+                  Generate PDF
                 </Button>
               )}
 
