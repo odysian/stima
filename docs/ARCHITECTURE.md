@@ -230,7 +230,7 @@ Rules:
 | `/invoices` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type }` | `201 Invoice` with `doc_number` (`I-001`), `status: "draft"`, server-default `due_date`, and nullable `source_document_id` |
 | `/invoices` | GET | no | cookie | `customer_id?` (UUID query param) | `200 InvoiceListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; includes both direct invoices and quote-derived invoices) |
 | `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail`, `404 { detail: "Not found" }` |
-| `/invoices/{id}` | PATCH | yes | cookie | `{ due_date }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
+| `/invoices/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, due_date? }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
 | `/invoices/{id}/share` | POST | yes | cookie | — | `200 Invoice`; creates/reuses `share_token` and transitions invoice to `sent` |
 
@@ -305,7 +305,11 @@ Invoice rules:
 - only `approved` quotes can convert to invoices
 - quote conversion is one-to-one; duplicate conversions are blocked by service guard plus the DB partial unique index
 - invoice lifecycle is `draft -> ready -> sent`
-- `PATCH /invoices/{id}` is allowed while invoice status is `draft`, `ready`, or `sent`, and preserves the existing `share_token`
+- if `title` is present, blank or whitespace-only values are normalized to `null`
+- if `title`, `total_amount`, `notes`, or `due_date` are omitted, the existing persisted values are preserved
+- if `line_items` is present, existing rows are fully replaced; if omitted, existing rows are preserved
+- editing preserves the persisted invoice status plus any existing `share_token` / `shared_at` values
+- editing a `ready` invoice keeps it in `ready`; editing a `sent` invoice keeps it in `sent`
 - first-cut invoice copy/share surfaces the raw PDF route `/share/{share_token}` rather than the frontend `/doc/{share_token}` landing page
 
 ### Error format

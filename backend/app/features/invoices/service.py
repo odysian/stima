@@ -24,7 +24,7 @@ from app.features.invoices.repository import (
     InvoiceRepository,
     build_default_due_date,
 )
-from app.features.invoices.schemas import InvoiceCreateRequest
+from app.features.invoices.schemas import InvoiceCreateRequest, InvoiceUpdateRequest
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext
 from app.features.quotes.schemas import LineItemDraft
@@ -96,7 +96,21 @@ class InvoiceRepositoryProtocol(Protocol):
         due_date: date,
     ) -> Document: ...
 
-    async def update_due_date(self, *, invoice: Document, due_date: date) -> Document: ...
+    async def update(
+        self,
+        *,
+        invoice: Document,
+        title: str | None,
+        update_title: bool,
+        total_amount: float | None,
+        update_total_amount: bool,
+        notes: str | None,
+        update_notes: bool,
+        line_items: list[LineItemDraft] | None,
+        replace_line_items: bool,
+        due_date: date | None,
+        update_due_date: bool,
+    ) -> Document: ...
 
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None: ...
 
@@ -253,26 +267,35 @@ class InvoiceService:
             raise QuoteServiceError(detail="Not found", status_code=404)
         return row
 
-    async def update_invoice_due_date(
+    async def update_invoice(
         self,
         user: User,
         invoice_id: UUID,
-        due_date: date,
+        data: InvoiceUpdateRequest,
     ) -> Document:
-        """Update the due date for an editable invoice."""
+        """Patch editable invoice fields while preserving status and share continuity."""
         user_id = _resolve_user_id(user)
         invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
         if invoice is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
         if invoice.status not in _EDITABLE_INVOICE_STATUSES:
             raise QuoteServiceError(
-                detail="Sent invoices cannot be edited",
+                detail="Invoice cannot be edited",
                 status_code=409,
             )
 
-        updated_invoice = await self._invoice_repository.update_due_date(
+        updated_invoice = await self._invoice_repository.update(
             invoice=invoice,
-            due_date=due_date,
+            title=data.title,
+            update_title="title" in data.model_fields_set,
+            total_amount=data.total_amount,
+            update_total_amount="total_amount" in data.model_fields_set,
+            notes=data.notes,
+            update_notes="notes" in data.model_fields_set,
+            line_items=data.line_items,
+            replace_line_items="line_items" in data.model_fields_set,
+            due_date=data.due_date,
+            update_due_date="due_date" in data.model_fields_set,
         )
         await self._invoice_repository.commit()
         return await self._invoice_repository.refresh(updated_invoice)

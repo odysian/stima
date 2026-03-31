@@ -1,7 +1,10 @@
 import { http, HttpResponse } from "msw";
 
 import type { CustomerCreateRequest } from "@/features/customers/types/customer.types";
-import type { InvoiceCreateRequest } from "@/features/invoices/types/invoice.types";
+import type {
+  InvoiceCreateRequest,
+  InvoiceUpdateRequest,
+} from "@/features/invoices/types/invoice.types";
 import type { ProfileUpdateRequest } from "@/features/profile/types/profile.types";
 import type { QuoteCreateRequest } from "@/features/quotes/types/quote.types";
 
@@ -563,21 +566,18 @@ export const handlers = [
     if (csrfError) return csrfError;
 
     const invoiceId = String(params.id);
-    const body = (await request.json()) as { due_date: string };
-    return HttpResponse.json(
-      {
-        id: invoiceId,
-        customer_id: "cust-1",
-        doc_number: "I-001",
-        title: "Spring cleanup",
-        status: "draft",
-        total_amount: 120,
-        notes: "Thanks for your business",
-        due_date: body.due_date,
-        shared_at: null,
-        share_token: null,
-        source_document_id: "quote-1",
-        line_items: [
+    const body = (await request.json()) as InvoiceUpdateRequest;
+    const hasField = <K extends keyof InvoiceUpdateRequest>(field: K): boolean =>
+      Object.prototype.hasOwnProperty.call(body, field);
+    const lineItems = hasField("line_items")
+      ? (body.line_items ?? []).map((lineItem, index) => ({
+          id: `line-${index + 1}`,
+          description: lineItem.description,
+          details: lineItem.details,
+          price: lineItem.price,
+          sort_order: index,
+        }))
+      : [
           {
             id: "line-1",
             description: "Brown mulch",
@@ -585,7 +585,21 @@ export const handlers = [
             price: 120,
             sort_order: 0,
           },
-        ],
+        ];
+    return HttpResponse.json(
+      {
+        id: invoiceId,
+        customer_id: "cust-1",
+        doc_number: "I-001",
+        title: hasField("title") ? (body.title ?? null) : "Spring cleanup",
+        status: "draft",
+        total_amount: hasField("total_amount") ? (body.total_amount ?? null) : 120,
+        notes: hasField("notes") ? (body.notes ?? null) : "Thanks for your business",
+        due_date: hasField("due_date") ? (body.due_date ?? null) : "2026-04-19",
+        shared_at: null,
+        share_token: null,
+        source_document_id: "quote-1",
+        line_items: lineItems,
         created_at: "2026-03-20T00:00:00.000Z",
         updated_at: "2026-03-20T00:10:00.000Z",
       },

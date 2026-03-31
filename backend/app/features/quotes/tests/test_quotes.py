@@ -2717,6 +2717,44 @@ async def test_list_invoices_can_filter_by_customer_id(client: AsyncClient) -> N
     ]
 
 
+async def test_invoice_patch_preserves_omitted_fields_and_ready_status_for_direct_invoice(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    direct_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Direct invoice",
+        transcript="direct invoice transcript",
+        total_amount=220,
+    )
+    invoice_id = direct_invoice["id"]
+
+    preview_response = await client.post(
+        f"/api/invoices/{invoice_id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert preview_response.status_code == 200
+
+    patch_response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"notes": "Updated note only"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    patched_invoice = patch_response.json()
+    assert patched_invoice["status"] == "ready"
+    assert patched_invoice["title"] == "Direct invoice"
+    assert patched_invoice["notes"] == "Updated note only"
+    assert patched_invoice["due_date"] == direct_invoice["due_date"]
+    assert patched_invoice["total_amount"] == 220
+    assert patched_invoice["line_items"] == direct_invoice["line_items"]
+    assert patched_invoice["share_token"] is None
+    assert patched_invoice["shared_at"] is None
+
+
 async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_preserves_sent_invoice_status(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -2752,13 +2790,38 @@ async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_preserves_s
 
     patch_response = await client.patch(
         f"/api/invoices/{invoice_id}",
-        json={"due_date": "2026-05-01"},
+        json={
+            "title": "Updated invoice",
+            "line_items": [
+                {
+                    "description": "Final walkthrough",
+                    "details": "Touch-up and cleanup",
+                    "price": 90,
+                }
+            ],
+            "total_amount": 90,
+            "notes": "Updated after customer call",
+            "due_date": "2026-05-01",
+        },
         headers={"X-CSRF-Token": csrf_token},
     )
     assert patch_response.status_code == 200
-    assert patch_response.json()["status"] == "sent"
-    assert patch_response.json()["due_date"] == "2026-05-01"
-    assert patch_response.json()["share_token"] == original_share_token
+    patched_invoice = patch_response.json()
+    assert patched_invoice["status"] == "sent"
+    assert patched_invoice["title"] == "Updated invoice"
+    assert patched_invoice["total_amount"] == 90
+    assert patched_invoice["notes"] == "Updated after customer call"
+    assert patched_invoice["due_date"] == "2026-05-01"
+    assert patched_invoice["share_token"] == original_share_token
+    assert patched_invoice["line_items"] == [
+        {
+            "description": "Final walkthrough",
+            "details": "Touch-up and cleanup",
+            "id": patched_invoice["line_items"][0]["id"],
+            "price": 90,
+            "sort_order": 0,
+        }
+    ]
 
 
 @pytest.mark.parametrize(

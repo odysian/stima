@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.features.quotes.schemas import LineItemDraft, LineItemResponse
 
@@ -88,6 +88,21 @@ class InvoiceDetailResponse(InvoiceResponse):
 
 
 class InvoiceUpdateRequest(BaseModel):
-    """Request payload for lightweight invoice updates."""
+    """Request payload for partial invoice updates with full line-item replacement."""
 
-    due_date: date
+    title: str | None = Field(default=None, max_length=120)
+    line_items: list[LineItemDraft] | None = None
+    total_amount: float | None = None
+    notes: str | None = None
+    due_date: date | None = None
+
+    _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
+
+    @model_validator(mode="after")
+    def validate_patch_fields(self) -> InvoiceUpdateRequest:
+        """Reject explicit null for fields that only support omission semantics."""
+        if "line_items" in self.model_fields_set and self.line_items is None:
+            raise ValueError("line_items cannot be null")
+        if "due_date" in self.model_fields_set and self.due_date is None:
+            raise ValueError("due_date cannot be null")
+        return self

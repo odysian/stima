@@ -344,11 +344,37 @@ class InvoiceRepository:
         await self.refresh(invoice)
         return invoice
 
-    async def update_due_date(self, *, invoice: Document, due_date: date) -> Document:
-        """Update the due date for an editable invoice."""
-        invoice.due_date = due_date
+    async def update(
+        self,
+        *,
+        invoice: Document,
+        title: str | None,
+        update_title: bool,
+        total_amount: float | None,
+        update_total_amount: bool,
+        notes: str | None,
+        update_notes: bool,
+        line_items: list[LineItemDraft] | None,
+        replace_line_items: bool,
+        due_date: date | None,
+        update_due_date: bool,
+    ) -> Document:
+        """Apply partial invoice updates and optional full line-item replacement."""
+        if update_title:
+            invoice.title = title
+        if update_total_amount:
+            invoice.total_amount = _to_decimal(total_amount)
+        if update_notes:
+            invoice.notes = notes
+        if update_due_date:
+            invoice.due_date = due_date
+
+        if replace_line_items and line_items is not None:
+            await self._replace_line_items(invoice.id, line_items)
+
         await self._session.flush()
-        await self.refresh(invoice)
+        await self._session.refresh(invoice)
+        await self._session.refresh(invoice, attribute_names=["line_items"])
         return invoice
 
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None:
