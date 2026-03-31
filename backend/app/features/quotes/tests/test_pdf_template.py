@@ -452,7 +452,10 @@ def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
         re.DOTALL,
     )
     assert re.search(
-        r"<p class=\"label\" style=\"margin-top: 10px\">Issued</p>\s*<p class=\"value\">Mar 01, 2026</p>",
+        (
+            r"<p class=\"label\" style=\"margin-top: 10px\">Issued</p>\s*"
+            r"<p class=\"value\">Mar 01, 2026</p>"
+        ),
         rendered_html,
         re.DOTALL,
     )
