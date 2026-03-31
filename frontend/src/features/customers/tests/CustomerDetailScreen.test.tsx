@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -88,6 +88,11 @@ async function openEditForm(): Promise<void> {
   await screen.findByLabelText(/^name$/i);
 }
 
+async function switchToInvoicesTab(): Promise<void> {
+  await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
+  fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
+}
+
 beforeEach(() => {
   mockedCustomerService.getCustomer.mockResolvedValue({
     id: "cust-1",
@@ -163,6 +168,9 @@ describe("CustomerDetailScreen", () => {
     expect(screen.getByText("555-0101")).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
     expect(screen.getByText("1 Main St")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Invoices" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("1 ITEM")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument();
   });
 
@@ -288,6 +296,7 @@ describe("CustomerDetailScreen", () => {
     expect(await screen.findByText("Q-001")).toBeInTheDocument();
     expect(screen.getByText(/Mar 24, 2026\s*·\s*1 item/)).toBeInTheDocument();
     expect(screen.queryByText("Q-002")).not.toBeInTheDocument();
+    expect(screen.queryByText("I-001")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /q-001/i }));
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
@@ -295,14 +304,16 @@ describe("CustomerDetailScreen", () => {
 
   it("renders invoice history filtered to this customer and opens detail on click", async () => {
     renderScreen();
+    await switchToInvoicesTab();
 
     expect(await screen.findByText("I-001")).toBeInTheDocument();
-    const invoiceHistorySection = screen.getByText("Invoice History").closest("section");
-    expect(invoiceHistorySection).not.toBeNull();
-    expect(within(invoiceHistorySection as HTMLElement).getByText("2 INVOICES")).toBeInTheDocument();
-    expect(within(invoiceHistorySection as HTMLElement).getByText("Mar 24, 2026")).toBeInTheDocument();
-    expect(within(invoiceHistorySection as HTMLElement).getByText(/I-002\s*·\s*Mar 25, 2026/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Invoices" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("2 ITEMS")).toBeInTheDocument();
+    expect(screen.getByText("Mar 24, 2026")).toBeInTheDocument();
+    expect(screen.getByText(/I-002\s*·\s*Mar 25, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Final walkthrough")).toBeInTheDocument();
+    expect(screen.queryByText("Q-001")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /i-001/i }));
     expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1");
@@ -312,6 +323,7 @@ describe("CustomerDetailScreen", () => {
     mockedInvoiceService.listInvoices.mockResolvedValueOnce([]);
 
     renderScreen();
+    await switchToInvoicesTab();
 
     expect(await screen.findByText("No invoices yet.")).toBeInTheDocument();
   });
@@ -320,19 +332,20 @@ describe("CustomerDetailScreen", () => {
     mockedInvoiceService.listInvoices.mockRejectedValueOnce(new Error("Unable to load invoices"));
 
     renderScreen();
+    await switchToInvoicesTab();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load invoices");
     expect(screen.getByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
-    expect(screen.getByText("Q-001")).toBeInTheDocument();
+    expect(screen.queryByText("Q-001")).not.toBeInTheDocument();
   });
 
   it("renders invoice history loading state while invoices are in flight", async () => {
     mockedInvoiceService.listInvoices.mockImplementationOnce(() => new Promise<InvoiceListItem[]>(() => {}));
 
     renderScreen();
+    await switchToInvoicesTab();
 
     expect(await screen.findByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
-    expect(screen.getByText("Q-001")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Loading invoices...");
   });
 

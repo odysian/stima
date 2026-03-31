@@ -9,6 +9,7 @@ interface InvoiceHistoryListProps {
   loadError: string | null;
   onInvoiceClick: (invoiceId: string) => void;
   timezone?: string | null;
+  showHeader?: boolean;
 }
 
 export function InvoiceHistoryList({
@@ -17,19 +18,22 @@ export function InvoiceHistoryList({
   loadError,
   onInvoiceClick,
   timezone,
+  showHeader = true,
 }: InvoiceHistoryListProps): React.ReactElement {
   const invoiceCountLabel = `${invoices.length} ${invoices.length === 1 ? "INVOICE" : "INVOICES"}`;
 
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-          Invoice History
-        </p>
-        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-          {invoiceCountLabel}
-        </p>
-      </div>
+      {showHeader ? (
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+            Invoice History
+          </p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+            {invoiceCountLabel}
+          </p>
+        </div>
+      ) : null}
 
       {isLoading ? (
         <p role="status" className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline ghost-shadow">

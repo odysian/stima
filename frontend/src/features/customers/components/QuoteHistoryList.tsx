@@ -6,25 +6,29 @@ interface QuoteHistoryListProps {
   quotes: QuoteListItem[];
   onQuoteClick: (quoteId: string) => void;
   timezone?: string | null;
+  showHeader?: boolean;
 }
 
 export function QuoteHistoryList({
   quotes,
   onQuoteClick,
   timezone,
+  showHeader = true,
 }: QuoteHistoryListProps): React.ReactElement {
   const quoteCountLabel = `${quotes.length} ${quotes.length === 1 ? "QUOTE" : "QUOTES"}`;
 
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-          Quote History
-        </p>
-        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-          {quoteCountLabel}
-        </p>
-      </div>
+      {showHeader ? (
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+            Quote History
+          </p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+            {quoteCountLabel}
+          </p>
+        </div>
+      ) : null}
 
       {quotes.length > 0 ? (
         <div className="rounded-xl bg-surface-container-low p-3">
