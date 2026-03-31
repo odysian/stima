@@ -8,6 +8,12 @@
       @page {
         size: A4;
         margin: 18mm;
+        @bottom-center {
+          content: "Page " counter(page) " of " counter(pages);
+          font-family: "Inter", sans-serif;
+          font-size: 11px;
+          color: #6b7280;
+        }
       }
 
       @font-face {
@@ -55,10 +61,20 @@
         white-space: nowrap;
       }
 
+      .header-doc-type {
+        margin: 12px 0 0;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #111827;
+      }
+
       .company-name {
         margin: 0;
         font-size: 30px;
         font-weight: 700;
+        overflow-wrap: break-word;
       }
 
       .owner-name {
@@ -101,6 +117,11 @@
         padding: 0 24px 12px 0;
       }
 
+      .meta-right {
+        text-align: right;
+        padding-right: 0;
+      }
+
       .label {
         margin: 0 0 4px;
         font-size: 11px;
@@ -131,11 +152,20 @@
         padding: 10px 8px;
       }
 
+      table.line-items thead th.price-col {
+        text-align: right;
+      }
+
+      table.line-items tbody tr {
+        page-break-inside: avoid;
+      }
+
       table.line-items tbody td {
         border-bottom: 1px solid #e5e7eb;
         padding: 14px 8px;
         font-size: 13px;
         vertical-align: top;
+        overflow-wrap: break-word;
       }
 
       .price-col {
@@ -183,7 +213,7 @@
       .notes {
         margin-top: 24px;
         padding-left: 16px;
-        border-left: 3px solid #d1d5db;
+        border-left: 3px solid #9ca3af;
       }
 
       .notes p {
@@ -212,11 +242,12 @@
                 <p class="header-contact">{{ contractor_email }}</p>
                 {% endif %}
               </td>
-              {% if logo_data_uri %}
               <td class="header-logo-cell">
+                {% if logo_data_uri %}
                 <img class="company-logo" src="{{ logo_data_uri }}" alt="Company logo" />
+                {% endif %}
+                <p class="header-doc-type">Quote</p>
               </td>
-              {% endif %}
             </tr>
           </tbody>
         </table>
@@ -242,7 +273,7 @@
               <p class="value">{{ customer_address }}</p>
               {% endif %}
             </td>
-            <td>
+            <td class="meta-right">
               <p class="label">Quote Number</p>
               <p class="value">{{ doc_number }}</p>
               <p class="label" style="margin-top: 10px">Issued</p>
