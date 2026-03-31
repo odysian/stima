@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
 
 import type { CustomerCreateRequest } from "@/features/customers/types/customer.types";
+import type { InvoiceCreateRequest } from "@/features/invoices/types/invoice.types";
 import type { ProfileUpdateRequest } from "@/features/profile/types/profile.types";
 import type { QuoteCreateRequest } from "@/features/quotes/types/quote.types";
 
@@ -443,6 +444,38 @@ export const handlers = [
             sort_order: 0,
           },
         ],
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
+      { status: 201 },
+    );
+  }),
+
+  http.post("/api/invoices", async ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const body = (await request.json()) as InvoiceCreateRequest;
+    return HttpResponse.json(
+      {
+        id: "invoice-1",
+        customer_id: body.customer_id,
+        doc_number: "I-001",
+        title: body.title,
+        status: "draft",
+        total_amount: body.total_amount,
+        notes: body.notes,
+        due_date: "2026-04-19",
+        shared_at: null,
+        share_token: null,
+        source_document_id: null,
+        line_items: body.line_items.map((lineItem, index) => ({
+          id: `line-${index + 1}`,
+          description: lineItem.description,
+          details: lineItem.details,
+          price: lineItem.price,
+          sort_order: index,
+        })),
         created_at: "2026-03-20T00:00:00.000Z",
         updated_at: "2026-03-20T00:00:00.000Z",
       },

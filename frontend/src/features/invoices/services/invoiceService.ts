@@ -1,9 +1,17 @@
 import type {
+  InvoiceCreateRequest,
   Invoice,
   InvoiceDetail,
   InvoiceUpdateRequest,
 } from "@/features/invoices/types/invoice.types";
 import { request, requestBlob } from "@/shared/lib/http";
+
+function createInvoice(data: InvoiceCreateRequest): Promise<Invoice> {
+  return request<Invoice>("/api/invoices", {
+    method: "POST",
+    body: data,
+  });
+}
 
 function getInvoice(id: string): Promise<InvoiceDetail> {
   return request<InvoiceDetail>(`/api/invoices/${id}`);
@@ -29,6 +37,7 @@ function shareInvoice(id: string): Promise<Invoice> {
 }
 
 export const invoiceService = {
+  createInvoice,
   getInvoice,
   updateInvoice,
   generatePdf,

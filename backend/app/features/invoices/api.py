@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
 from app.features.invoices.schemas import (
+    InvoiceCreateRequest,
     InvoiceCustomerResponse,
     InvoiceDetailResponse,
     InvoiceResponse,
@@ -21,6 +22,25 @@ from app.features.quotes.service import QuoteServiceError
 from app.shared.dependencies import get_current_user, get_invoice_service, require_csrf
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
+
+
+@router.post(
+    "",
+    response_model=InvoiceResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+async def create_invoice(
+    payload: InvoiceCreateRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+) -> InvoiceResponse:
+    """Create a direct invoice for the authenticated user."""
+    try:
+        invoice = await invoice_service.create_invoice(user, payload)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return InvoiceResponse.model_validate(invoice)
 
 
 @router.get("/{invoice_id}", response_model=InvoiceDetailResponse)

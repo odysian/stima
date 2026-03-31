@@ -77,6 +77,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
   const rawShareUrl = invoice?.share_token ? `${apiBase}/share/${invoice.share_token}` : null;
   const openPdfUrl = pdfUrl ?? rawShareUrl;
+  const hasSourceQuote = Boolean(invoice?.source_document_id && invoice.source_quote_number);
   const clientContact =
     [invoice?.customer.email, invoice?.customer.phone]
       .map((value) => value?.trim())
@@ -226,20 +227,24 @@ export function InvoiceDetailScreen(): React.ReactElement {
                       Invoice Status
                     </p>
                     <p className="mt-2 text-sm text-on-surface-variant">
-                      Created from quote {invoice.source_quote_number} on {formatDate(invoice.created_at)}
+                      {hasSourceQuote
+                        ? `Created from quote ${invoice.source_quote_number} on ${formatDate(invoice.created_at)}`
+                        : `Created on ${formatDate(invoice.created_at)}`}
                     </p>
                   </div>
                   <StatusBadge variant={invoice.status} />
                 </div>
 
-                <button
-                  type="button"
-                  className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary"
-                  onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
-                >
-                  Back to {invoice.source_quote_number}
-                  <span className="material-symbols-outlined text-base">arrow_back</span>
-                </button>
+                {hasSourceQuote ? (
+                  <button
+                    type="button"
+                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary"
+                    onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
+                  >
+                    Back to {invoice.source_quote_number}
+                    <span className="material-symbols-outlined text-base">arrow_back</span>
+                  </button>
+                ) : null}
               </div>
             </section>
 

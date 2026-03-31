@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { ReviewScreen } from "@/features/quotes/components/ReviewScreen";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -38,8 +39,19 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
+vi.mock("@/features/invoices/services/invoiceService", () => ({
+  invoiceService: {
+    createInvoice: vi.fn(),
+    getInvoice: vi.fn(),
+    updateInvoice: vi.fn(),
+    generatePdf: vi.fn(),
+    shareInvoice: vi.fn(),
+  },
+}));
+
 const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
 const mockedQuoteService = vi.mocked(quoteService);
+const mockedInvoiceService = vi.mocked(invoiceService);
 
 function createDeferredPromise<T>(): {
   promise: Promise<T>;
@@ -109,6 +121,22 @@ beforeEach(() => {
     notes: "",
     shared_at: null,
     share_token: null,
+    line_items: [],
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T00:00:00.000Z",
+  });
+  mockedInvoiceService.createInvoice.mockResolvedValue({
+    id: "invoice-1",
+    customer_id: "cust-1",
+    doc_number: "I-001",
+    title: null,
+    status: "draft",
+    total_amount: 120,
+    notes: "",
+    due_date: "2026-04-19",
+    shared_at: null,
+    share_token: null,
+    source_document_id: null,
     line_items: [],
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
@@ -443,6 +471,31 @@ describe("ReviewScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
   });
 
+  it("creates a direct invoice when invoice is selected", async () => {
+    const user = userEvent.setup();
+    renderScreen(makeDraft({ title: "  Front Yard Refresh  ", notes: "Thanks for your business" }));
+
+    await user.click(screen.getByRole("radio", { name: /invoice/i }));
+    expect(screen.getByRole("button", { name: /^create invoice$/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^create invoice$/i }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.createInvoice).toHaveBeenCalledWith({
+        customer_id: "cust-1",
+        title: "Front Yard Refresh",
+        transcript: "5 yards brown mulch and edge front beds",
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
+        total_amount: 120,
+        notes: "Thanks for your business",
+        source_type: "text",
+      });
+    });
+    expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+    expect(clearDraftMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1");
+  });
+
   it("shows save error when create fails", async () => {
     mockedQuoteService.createQuote.mockRejectedValueOnce(new Error("Unable to create quote"));
     renderScreen(makeDraft());
@@ -450,6 +503,17 @@ describe("ReviewScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /^generate quote$/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to create quote");
+  });
+
+  it("shows save error when direct invoice creation fails", async () => {
+    const user = userEvent.setup();
+    mockedInvoiceService.createInvoice.mockRejectedValueOnce(new Error("Unable to create invoice"));
+    renderScreen(makeDraft());
+
+    await user.click(screen.getByRole("radio", { name: /invoice/i }));
+    await user.click(screen.getByRole("button", { name: /^create invoice$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to create invoice");
   });
 
   it("filters blank rows before submit and only sends described line items", async () => {

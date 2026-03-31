@@ -18,8 +18,10 @@ from app.features.invoices.repository import (
     InvoiceRepository,
     build_default_due_date,
 )
+from app.features.invoices.schemas import InvoiceCreateRequest
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext
+from app.features.quotes.schemas import LineItemDraft
 from app.features.quotes.service import QuoteRepositoryProtocol, QuoteServiceError
 from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageReaderProtocol
@@ -32,6 +34,8 @@ _EDITABLE_INVOICE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY, Qu
 
 class InvoiceRepositoryProtocol(Protocol):
     """Structural protocol for invoice repository dependencies."""
+
+    async def customer_exists_for_user(self, *, user_id: UUID, customer_id: UUID) -> bool: ...
 
     async def get_by_id(self, invoice_id: UUID, user_id: UUID) -> Document | None: ...
 
@@ -63,6 +67,20 @@ class InvoiceRepositoryProtocol(Protocol):
         self,
         *,
         source_quote: Document,
+        due_date: date,
+    ) -> Document: ...
+
+    async def create(
+        self,
+        *,
+        user_id: UUID,
+        customer_id: UUID,
+        title: str | None,
+        transcript: str,
+        line_items: list[LineItemDraft],
+        total_amount: float | None,
+        notes: str | None,
+        source_type: str,
         due_date: date,
     ) -> Document: ...
 
@@ -98,6 +116,49 @@ class InvoiceService:
         self._quote_repository = quote_repository
         self._pdf = pdf_integration
         self._storage_service = storage_service
+
+    async def create_invoice(self, user: User, data: InvoiceCreateRequest) -> Document:
+        """Create a direct invoice and retry once on sequence collisions."""
+        user_id = _resolve_user_id(user)
+        customer_exists = await self._invoice_repository.customer_exists_for_user(
+            user_id=user_id,
+            customer_id=data.customer_id,
+        )
+        if not customer_exists:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        for attempt in range(2):
+            try:
+                invoice = await self._invoice_repository.create(
+                    user_id=user_id,
+                    customer_id=data.customer_id,
+                    title=data.title,
+                    transcript=data.transcript,
+                    line_items=data.line_items,
+                    total_amount=data.total_amount,
+                    notes=data.notes,
+                    source_type=data.source_type,
+                    due_date=build_default_due_date(),
+                )
+                await self._invoice_repository.commit()
+                log_event(
+                    "invoice_created",
+                    user_id=user_id,
+                    customer_id=invoice.customer_id,
+                )
+                return invoice
+            except IntegrityError as exc:
+                await self._invoice_repository.rollback()
+                if attempt == 0 and _is_doc_sequence_collision(exc):
+                    continue
+                if _is_doc_sequence_collision(exc):
+                    raise QuoteServiceError(
+                        detail="Unable to create invoice",
+                        status_code=409,
+                    ) from exc
+                raise
+
+        raise QuoteServiceError(detail="Unable to create invoice", status_code=409)
 
     async def convert_quote_to_invoice(self, user: User, quote_id: UUID) -> Document:
         """Create one invoice from an approved quote."""

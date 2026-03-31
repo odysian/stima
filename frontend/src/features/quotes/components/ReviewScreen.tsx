@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
+import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
+import { ReviewSubmitFooter } from "@/features/quotes/components/ReviewSubmitFooter";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type {
-  ExtractionResult,
-  LineItemDraft,
-  LineItemDraftWithFlags,
-} from "@/features/quotes/types/quote.types";
+import type { ExtractionResult, LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
-import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
 const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
@@ -79,6 +77,7 @@ export function ReviewScreen(): React.ReactElement | null {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [documentType, setDocumentType] = useState<ReviewDocumentType>("quote");
   const hasSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -181,7 +180,7 @@ export function ReviewScreen(): React.ReactElement | null {
     setIsSaving(true);
 
     try {
-      const createdQuote = await quoteService.createQuote({
+      const createPayload = {
         customer_id: currentDraft.customerId,
         title: normalizeOptionalTitle(currentDraft.title),
         transcript: currentDraft.transcript,
@@ -189,12 +188,24 @@ export function ReviewScreen(): React.ReactElement | null {
         total_amount: currentDraft.total,
         notes: currentDraft.notes,
         source_type: currentDraft.sourceType,
-      });
+      };
+
+      if (documentType === "quote") {
+        const createdQuote = await quoteService.createQuote(createPayload);
+        hasSubmittedRef.current = true;
+        clearDraft();
+        navigate(`/quotes/${createdQuote.id}/preview`);
+        return;
+      }
+
+      const createdInvoice = await invoiceService.createInvoice(createPayload);
       hasSubmittedRef.current = true;
       clearDraft();
-      navigate(`/quotes/${createdQuote.id}/preview`);
+      navigate(`/invoices/${createdInvoice.id}`);
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : "Unable to create quote";
+      const message = submitError instanceof Error ? submitError.message : documentType === "quote"
+        ? "Unable to create quote"
+        : "Unable to create invoice";
       setSaveError(message);
     } finally {
       setIsSaving(false);
@@ -398,28 +409,21 @@ export function ReviewScreen(): React.ReactElement | null {
             placeholder="Any notes to include for the customer."
           />
         </section>
+
+        <ReviewDocumentTypeSelector
+          value={documentType}
+          disabled={isInteractionLocked}
+          onChange={setDocumentType}
+        />
       </form>
 
-      <ScreenFooter>
-        <div className="mx-auto w-full max-w-2xl">
-          {hasNullPrices ? (
-            <p className="mb-2 rounded-lg bg-warning-container px-3 py-2 text-center text-xs text-warning">
-              Review missing prices before sharing. Quote generation stays enabled, and any blank
-              prices will render as "TBD".
-            </p>
-          ) : null}
-          <Button
-            type="submit"
-            form="quote-review-form"
-            variant="primary"
-            className="w-full"
-            disabled={!canSubmit || isInteractionLocked}
-            isLoading={isSaving}
-          >
-            Generate Quote
-          </Button>
-        </div>
-      </ScreenFooter>
+      <ReviewSubmitFooter
+        documentType={documentType}
+        hasNullPrices={hasNullPrices}
+        canSubmit={canSubmit}
+        isInteractionLocked={isInteractionLocked}
+        isSaving={isSaving}
+      />
 
       {showRegenerateConfirm ? (
         <ConfirmModal

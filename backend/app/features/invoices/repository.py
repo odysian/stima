@@ -39,8 +39,8 @@ class InvoiceDetailRow:
     due_date: date | None
     shared_at: datetime | None
     share_token: str | None
-    source_document_id: UUID
-    source_quote_number: str
+    source_document_id: UUID | None
+    source_quote_number: str | None
     line_items: list[LineItem]
     created_at: datetime
     updated_at: datetime
@@ -51,6 +51,16 @@ class InvoiceRepository:
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def customer_exists_for_user(self, *, user_id: UUID, customer_id: UUID) -> bool:
+        """Return true when the customer belongs to the given authenticated user."""
+        customer = await self._session.scalar(
+            select(Customer.id).where(
+                Customer.id == customer_id,
+                Customer.user_id == user_id,
+            )
+        )
+        return customer is not None
 
     async def get_by_id(self, invoice_id: UUID, user_id: UUID) -> Document | None:
         """Return one invoice owned by a user, including line items."""
@@ -89,12 +99,15 @@ class InvoiceRepository:
         result = await self._session.execute(
             select(Document, Customer, source_quote)
             .join(Customer, Customer.id == Document.customer_id)
-            .join(source_quote, source_quote.id == Document.source_document_id)
+            .outerjoin(
+                source_quote,
+                (source_quote.id == Document.source_document_id)
+                & (source_quote.doc_type == "quote"),
+            )
             .where(
                 Document.id == invoice_id,
                 Document.user_id == user_id,
                 Document.doc_type == _INVOICE_DOC_TYPE,
-                source_quote.doc_type == "quote",
             )
             .options(selectinload(Document.line_items))
         )
@@ -122,7 +135,7 @@ class InvoiceRepository:
             shared_at=document.shared_at,
             share_token=document.share_token,
             source_document_id=document.source_document_id,
-            source_quote_number=quote.doc_number,
+            source_quote_number=quote.doc_number if quote is not None else None,
             line_items=document.line_items,
             created_at=document.created_at,
             updated_at=document.updated_at,
@@ -214,6 +227,49 @@ class InvoiceRepository:
         ]
         if copied_items:
             await self._replace_line_items(invoice.id, copied_items)
+            await self._session.flush()
+
+        await self.refresh(invoice)
+        return invoice
+
+    async def create(
+        self,
+        *,
+        user_id: UUID,
+        customer_id: UUID,
+        title: str | None,
+        transcript: str,
+        line_items: list[LineItemDraft],
+        total_amount: float | None,
+        notes: str | None,
+        source_type: str,
+        due_date: date,
+    ) -> Document:
+        """Create a direct invoice and optional line items for the owning user."""
+        next_sequence = await self.get_next_doc_sequence_for_type(
+            user_id=user_id,
+            doc_type=_INVOICE_DOC_TYPE,
+        )
+        invoice = Document(
+            user_id=user_id,
+            customer_id=customer_id,
+            doc_type=_INVOICE_DOC_TYPE,
+            doc_sequence=next_sequence,
+            doc_number=f"I-{next_sequence:03d}",
+            title=title,
+            source_document_id=None,
+            status=QuoteStatus.DRAFT,
+            source_type=source_type,
+            transcript=transcript,
+            total_amount=_to_decimal(total_amount),
+            notes=notes,
+            due_date=due_date,
+        )
+        self._session.add(invoice)
+        await self._session.flush()
+
+        if line_items:
+            await self._replace_line_items(invoice.id, line_items)
             await self._session.flush()
 
         await self.refresh(invoice)

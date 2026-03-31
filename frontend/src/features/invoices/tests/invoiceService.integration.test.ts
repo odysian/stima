@@ -10,6 +10,66 @@ describe("invoiceService integration (MSW)", () => {
     clearCsrfToken();
   });
 
+  it("createInvoice sends CSRF and returns a direct invoice", async () => {
+    setCsrfToken("invoice-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+    let capturedPayload: Record<string, unknown> | null = null;
+
+    server.use(
+      http.post("/api/invoices", async ({ request }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        capturedPayload = (await request.json()) as Record<string, unknown>;
+
+        return HttpResponse.json(
+          {
+            id: "invoice-1",
+            customer_id: "cust-1",
+            doc_number: "I-001",
+            title: "Spring cleanup",
+            status: "draft",
+            total_amount: 120,
+            notes: "Thanks for your business",
+            due_date: "2026-04-19",
+            shared_at: null,
+            share_token: null,
+            source_document_id: null,
+            line_items: [
+              {
+                id: "line-1",
+                description: "Brown mulch",
+                details: "5 yards",
+                price: 120,
+                sort_order: 0,
+              },
+            ],
+            created_at: "2026-03-20T00:00:00.000Z",
+            updated_at: "2026-03-20T00:00:00.000Z",
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const invoice = await invoiceService.createInvoice({
+      customer_id: "cust-1",
+      title: "Spring cleanup",
+      transcript: "5 yards brown mulch",
+      line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      total_amount: 120,
+      notes: "Thanks for your business",
+      source_type: "text",
+    });
+
+    expect(capturedCsrfHeader).toBe("invoice-csrf-token");
+    expect(capturedPayload).toMatchObject({
+      customer_id: "cust-1",
+      title: "Spring cleanup",
+      source_type: "text",
+    });
+    expect(invoice.doc_number).toBe("I-001");
+    expect(invoice.source_document_id).toBeNull();
+  });
+
   it("getInvoice returns the invoice detail contract", async () => {
     const invoice = await invoiceService.getInvoice("invoice-1");
 
