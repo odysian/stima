@@ -911,6 +911,68 @@ async def test_invoice_share_returns_sent_and_raw_share_token_renders_pdf(
     assert pdf_response.content == b"PDF for I-001"
 
 
+async def test_sent_invoice_share_pdf_renders_latest_persisted_content_after_edit(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    share_response = await client.post(
+        f"/api/invoices/{invoice_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+    assert share_token is not None
+
+    patch_response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={
+            "title": "Updated invoice title",
+            "line_items": [
+                {
+                    "description": "Final walkthrough",
+                    "details": "Touch-up and cleanup",
+                    "price": 90,
+                }
+            ],
+            "total_amount": 90,
+            "notes": "Updated after the customer requested revisions",
+            "due_date": "2026-05-01",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+
+    pdf_response = await client.get(f"/share/{share_token}")
+    assert pdf_response.status_code == 200
+    assert _override_quote_service_dependency.last_context is not None
+    assert _override_quote_service_dependency.last_context.title == "Updated invoice title"
+    assert _override_quote_service_dependency.last_context.notes == (
+        "Updated after the customer requested revisions"
+    )
+    assert _override_quote_service_dependency.last_context.total_amount == 90
+    assert _override_quote_service_dependency.last_context.due_date == "May 01, 2026"
+    assert _override_quote_service_dependency.last_context.line_items[0].description == (
+        "Final walkthrough"
+    )
+    assert _override_quote_service_dependency.last_context.line_items[0].details == (
+        "Touch-up and cleanup"
+    )
+    assert _override_quote_service_dependency.last_context.line_items[0].price == 90
+
+
 async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) -> str:
     register_response = await client.post("/api/auth/register", json=credentials)
     assert register_response.status_code == 201

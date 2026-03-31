@@ -3,12 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { Invoice, InvoiceDetail } from "@/features/invoices/types/invoice.types";
+import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
-import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatDate } from "@/shared/lib/formatters";
@@ -19,10 +19,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [dueDateInput, setDueDateInput] = useState("");
-  const [isSavingDueDate, setIsSavingDueDate] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -49,7 +45,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
           return;
         }
         setInvoice(fetchedInvoice);
-        setDueDateInput(fetchedInvoice.due_date ?? "");
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load invoice";
         if (isActive) {
@@ -78,6 +73,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const rawShareUrl = invoice?.share_token ? `${apiBase}/share/${invoice.share_token}` : null;
   const openPdfUrl = pdfUrl ?? rawShareUrl;
   const hasSourceQuote = Boolean(invoice?.source_document_id && invoice.source_quote_number);
+  const canEdit = Boolean(invoice && id && isInvoiceEditableStatus(invoice.status));
   const clientContact =
     [invoice?.customer.email, invoice?.customer.phone]
       .map((value) => value?.trim())
@@ -107,29 +103,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
         line_items: updatedInvoice.line_items,
       };
     });
-    setDueDateInput(updatedInvoice.due_date ?? "");
-  }
-
-  async function onSaveDueDate(): Promise<void> {
-    if (!id || !dueDateInput) {
-      return;
-    }
-
-    setSaveError(null);
-    setSaveMessage(null);
-    setIsSavingDueDate(true);
-    try {
-      const updatedInvoice = await invoiceService.updateInvoice(id, {
-        due_date: dueDateInput,
-      });
-      applyInvoiceUpdate(updatedInvoice);
-      setSaveMessage("Due date updated.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to update due date";
-      setSaveError(message);
-    } finally {
-      setIsSavingDueDate(false);
-    }
   }
 
   async function onGeneratePdf(): Promise<void> {
@@ -202,6 +175,21 @@ export function InvoiceDetailScreen(): React.ReactElement {
         title={invoice?.title ?? invoice?.doc_number ?? "Invoice"}
         subtitle={invoice?.title ? invoice.doc_number : undefined}
         onBack={() => navigate(-1)}
+        trailing={invoice ? (
+          <div className="flex items-center gap-2">
+            <StatusBadge variant={invoice.status} />
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
+                aria-label="Edit invoice"
+                className="rounded-full border border-outline-variant/30 bg-surface-container-lowest p-2 text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[1.125rem]">edit</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       />
 
       <section className="mx-auto w-full max-w-3xl">
@@ -232,19 +220,20 @@ export function InvoiceDetailScreen(): React.ReactElement {
                         : `Created on ${formatDate(invoice.created_at)}`}
                     </p>
                   </div>
-                  <StatusBadge variant={invoice.status} />
                 </div>
 
-                {hasSourceQuote ? (
-                  <button
-                    type="button"
-                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary"
-                    onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
-                  >
-                    Back to {invoice.source_quote_number}
-                    <span className="material-symbols-outlined text-base">arrow_back</span>
-                  </button>
-                ) : null}
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  {hasSourceQuote ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary"
+                      onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
+                    >
+                      Back to {invoice.source_quote_number}
+                      <span className="material-symbols-outlined text-base">arrow_back</span>
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </section>
 
@@ -260,28 +249,20 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                   Due Date
                 </p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <Input
-                      id="invoice-due-date"
-                      label="Invoice due date"
-                      type="date"
-                      value={dueDateInput}
-                      onChange={(event) => setDueDateInput(event.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    className="sm:w-auto"
-                    onClick={() => {
-                      void onSaveDueDate();
-                    }}
-                    isLoading={isSavingDueDate}
-                    disabled={!dueDateInput || dueDateInput === invoice.due_date}
-                  >
-                    Save Due Date
-                  </Button>
-                </div>
+                <p className="mt-3 text-sm text-on-surface">
+                  {invoice.due_date ? formatDate(`${invoice.due_date}T00:00:00.000Z`) : "No due date"}
+                </p>
+              </div>
+            </section>
+
+            <section className="px-4 pb-2">
+              <div className="rounded-lg bg-surface-container-low p-4">
+                <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                  Customer Notes
+                </p>
+                <p className="mt-3 whitespace-pre-wrap text-sm text-on-surface-variant">
+                  {invoice.notes?.trim() ? invoice.notes : "No customer notes"}
+                </p>
               </div>
             </section>
 
@@ -321,11 +302,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
               </Button>
             </div>
 
-            {saveError ? (
-              <div className="mx-4 mt-3">
-                <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
-              </div>
-            ) : null}
             {pdfError ? (
               <div className="mx-4 mt-3">
                 <FeedbackMessage variant="error">{pdfError}</FeedbackMessage>
@@ -335,11 +311,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
               <div className="mx-4 mt-3">
                 <FeedbackMessage variant="error">{shareError}</FeedbackMessage>
               </div>
-            ) : null}
-            {saveMessage ? (
-              <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">
-                {saveMessage}
-              </p>
             ) : null}
             {shareMessage ? (
               <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">

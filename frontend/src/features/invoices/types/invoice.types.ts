@@ -56,5 +56,9 @@ export interface InvoiceDetail extends Invoice {
 }
 
 export interface InvoiceUpdateRequest {
-  due_date: string;
+  title?: string | null;
+  line_items?: LineItemDraft[];
+  total_amount?: number | null;
+  notes?: string | null;
+  due_date?: string;
 }

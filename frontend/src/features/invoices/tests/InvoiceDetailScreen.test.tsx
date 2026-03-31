@@ -87,6 +87,7 @@ function renderScreen(path = "/invoices/invoice-1"): void {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
+        <Route path="/invoices/:id/edit" element={<div>Invoice Edit Screen</div>} />
         <Route path="/quotes/:id/preview" element={<div>Quote Preview Screen</div>} />
       </Routes>
     </MemoryRouter>,
@@ -95,9 +96,6 @@ function renderScreen(path = "/invoices/invoice-1"): void {
 
 beforeEach(() => {
   mockedInvoiceService.getInvoice.mockResolvedValue(makeInvoiceDetail());
-  mockedInvoiceService.updateInvoice.mockResolvedValue(
-    makeInvoice({ due_date: "2026-04-30", updated_at: "2026-03-20T00:10:00.000Z" }),
-  );
   mockedInvoiceService.generatePdf.mockResolvedValue(
     new Blob(["invoice-pdf"], { type: "application/pdf" }),
   );
@@ -130,12 +128,15 @@ beforeEach(() => {
 });
 
 describe("InvoiceDetailScreen", () => {
-  it("loads the invoice detail and shows the source quote link", async () => {
+  it("loads the invoice detail, shows the source quote link, and exposes edit", async () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
     expect(screen.getByText(/created from quote q-001/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /back to q-001/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit invoice/i })).toBeInTheDocument();
+    expect(screen.getByText("Thanks for your business")).toBeInTheDocument();
+    expect(screen.getByText("Apr 19, 2026")).toBeInTheDocument();
   });
 
   it("hides source quote UI for direct invoices", async () => {
@@ -154,23 +155,7 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.queryByRole("button", { name: /back to/i })).not.toBeInTheDocument();
   });
 
-  it("saves the due date update", async () => {
-    renderScreen();
-
-    const dueDateInput = await screen.findByLabelText(/invoice due date/i);
-    fireEvent.change(dueDateInput, { target: { value: "2026-04-30" } });
-    fireEvent.click(screen.getByRole("button", { name: /save due date/i }));
-
-    await waitFor(() => {
-      expect(mockedInvoiceService.updateInvoice).toHaveBeenCalledWith("invoice-1", {
-        due_date: "2026-04-30",
-      });
-    });
-
-    expect(await screen.findByText("Due date updated.")).toBeInTheDocument();
-  });
-
-  it("keeps sent invoices editable for due date updates", async () => {
+  it("keeps sent invoices editable by leaving the edit action available", async () => {
     mockedInvoiceService.getInvoice.mockResolvedValueOnce(
       makeInvoiceDetail({
         status: "sent",
@@ -178,29 +163,20 @@ describe("InvoiceDetailScreen", () => {
         shared_at: "2026-03-20T00:15:00.000Z",
       }),
     );
-    mockedInvoiceService.updateInvoice.mockResolvedValueOnce(
-      makeInvoice({
-        status: "sent",
-        due_date: "2026-04-30",
-        share_token: "invoice-share-token-1",
-        shared_at: "2026-03-20T00:15:00.000Z",
-        updated_at: "2026-03-20T00:10:00.000Z",
-      }),
-    );
 
     renderScreen();
 
-    const dueDateInput = await screen.findByLabelText(/invoice due date/i);
-    fireEvent.change(dueDateInput, { target: { value: "2026-04-30" } });
-    fireEvent.click(screen.getByRole("button", { name: /save due date/i }));
-
-    await waitFor(() => {
-      expect(mockedInvoiceService.updateInvoice).toHaveBeenCalledWith("invoice-1", {
-        due_date: "2026-04-30",
-      });
-    });
-    expect(await screen.findByText("Due date updated.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit invoice/i })).toBeInTheDocument();
     expect(screen.queryByText(/sent invoices are read-only/i)).not.toBeInTheDocument();
+  });
+
+  it("navigates to the invoice editor when edit is clicked", async () => {
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /edit invoice/i }));
+
+    expect(await screen.findByText("Invoice Edit Screen")).toBeInTheDocument();
   });
 
   it("shares the invoice using the raw /share token URL", async () => {
@@ -217,7 +193,7 @@ describe("InvoiceDetailScreen", () => {
     expect(await screen.findByText("Invoice link copied to clipboard.")).toBeInTheDocument();
   });
 
-  it("clears a generated local PDF after saving a due date change", async () => {
+  it("clears a generated local PDF after sharing the invoice", async () => {
     renderScreen();
 
     fireEvent.click(await screen.findByRole("button", { name: "Generate PDF" }));
@@ -225,20 +201,14 @@ describe("InvoiceDetailScreen", () => {
     const openPdfLink = (await screen.findByText("Open PDF")).closest("a");
     expect(openPdfLink).toHaveAttribute("href", "blob:invoice-preview");
 
-    const dueDateInput = screen.getByLabelText(/invoice due date/i);
-    fireEvent.change(dueDateInput, { target: { value: "2026-04-30" } });
-    fireEvent.click(screen.getByRole("button", { name: /save due date/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     await waitFor(() => {
-      expect(mockedInvoiceService.updateInvoice).toHaveBeenCalledWith("invoice-1", {
-        due_date: "2026-04-30",
-      });
+      expect(mockedInvoiceService.shareInvoice).toHaveBeenCalledWith("invoice-1");
     });
-
     await waitFor(() => {
       expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:invoice-preview");
     });
     expect(screen.queryByRole("link", { name: "Open PDF" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate PDF" })).toBeInTheDocument();
   });
 });

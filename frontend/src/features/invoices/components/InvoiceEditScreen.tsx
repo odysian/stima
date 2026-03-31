@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { invoiceService } from "@/features/invoices/services/invoiceService";
+import { useInvoiceEdit, type InvoiceEditDraft } from "@/features/invoices/hooks/useInvoiceEdit";
+import type { InvoiceDetail } from "@/features/invoices/types/invoice.types";
+import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
-import { useQuoteEdit, type QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
-import { quoteService } from "@/features/quotes/services/quoteService";
-import type { LineItemDraft, LineItemDraftWithFlags, QuoteDetail } from "@/features/quotes/types/quote.types";
-import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
+import type { LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -19,17 +20,18 @@ const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   price: null,
 };
 
-function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
+function mapInvoiceToEditDraft(invoice: InvoiceDetail): InvoiceEditDraft {
   return {
-    quoteId: quote.id,
-    title: quote.title ?? "",
-    lineItems: quote.line_items.map((item) => ({
+    invoiceId: invoice.id,
+    title: invoice.title ?? "",
+    lineItems: invoice.line_items.map((item) => ({
       description: item.description,
       details: item.details,
       price: item.price,
     })),
-    total: quote.total_amount,
-    notes: quote.notes ?? "",
+    total: invoice.total_amount,
+    notes: invoice.notes ?? "",
+    dueDate: invoice.due_date ?? "",
   };
 }
 
@@ -52,12 +54,12 @@ function isInvalidLineItem(item: LineItemDraftWithFlags): boolean {
   return item.description.length === 0 && !isBlankLineItem(item);
 }
 
-export function QuoteEditScreen(): React.ReactElement {
+export function InvoiceEditScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { draft, setDraft, clearDraft } = useQuoteEdit();
-  const [quote, setQuote] = useState<QuoteDetail | null>(null);
-  const [isLoadingQuote, setIsLoadingQuote] = useState(true);
+  const { draft, setDraft, clearDraft } = useInvoiceEdit();
+  const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  const [isLoadingInvoice, setIsLoadingInvoice] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -67,55 +69,57 @@ export function QuoteEditScreen(): React.ReactElement {
     setShouldSkipSeeding(false);
 
     if (!id) {
-      setLoadError("Missing quote id.");
-      setIsLoadingQuote(false);
+      setLoadError("Missing invoice id.");
+      setIsLoadingInvoice(false);
       return;
     }
 
-    const quoteId = id;
+    const invoiceId = id;
     let isActive = true;
 
-    async function fetchQuote(): Promise<void> {
-      setIsLoadingQuote(true);
+    async function fetchInvoice(): Promise<void> {
+      setIsLoadingInvoice(true);
       setLoadError(null);
       try {
-        const fetchedQuote = await quoteService.getQuote(quoteId);
+        const fetchedInvoice = await invoiceService.getInvoice(invoiceId);
         if (isActive) {
-          if (!isQuoteEditableStatus(fetchedQuote.status)) {
+          if (!isInvoiceEditableStatus(fetchedInvoice.status)) {
             setShouldSkipSeeding(true);
             clearDraft();
-            navigate(`/quotes/${quoteId}/preview`, { replace: true });
+            navigate(`/invoices/${invoiceId}`, { replace: true });
             return;
           }
-          setQuote(fetchedQuote);
+          setInvoice(fetchedInvoice);
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unable to load quote";
+        const message = error instanceof Error ? error.message : "Unable to load invoice";
         if (isActive) {
           setLoadError(message);
         }
       } finally {
         if (isActive) {
-          setIsLoadingQuote(false);
+          setIsLoadingInvoice(false);
         }
       }
     }
 
-    void fetchQuote();
-    return () => { isActive = false; };
+    void fetchInvoice();
+    return () => {
+      isActive = false;
+    };
   }, [clearDraft, id, navigate]);
 
   useEffect(() => {
-    if (!quote || shouldSkipSeeding) {
+    if (!invoice || shouldSkipSeeding) {
       return;
     }
 
-    if (!draft || draft.quoteId !== quote.id) {
-      setDraft(mapQuoteToEditDraft(quote));
+    if (!draft || draft.invoiceId !== invoice.id) {
+      setDraft(mapInvoiceToEditDraft(invoice));
     }
-  }, [draft, quote, setDraft, shouldSkipSeeding]);
+  }, [draft, invoice, setDraft, shouldSkipSeeding]);
 
-  const currentDraft = draft && quote && draft.quoteId === quote.id ? draft : null;
+  const currentDraft = draft && invoice && draft.invoiceId === invoice.id ? draft : null;
   const normalizedLineItems = currentDraft?.lineItems.map(normalizeLineItem) ?? [];
   const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
   const lineItemsForSubmit: LineItemDraft[] = normalizedLineItems
@@ -126,7 +130,7 @@ export function QuoteEditScreen(): React.ReactElement {
       price: lineItem.price,
     }));
   const hasNullPrices = lineItemsForSubmit.some((lineItem) => lineItem.price === null);
-  const canSubmit = !isLoadingQuote && !loadError && currentDraft !== null;
+  const canSubmit = !isLoadingInvoice && !loadError && currentDraft !== null;
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
       return runningTotal;
@@ -134,14 +138,14 @@ export function QuoteEditScreen(): React.ReactElement {
     return runningTotal + lineItem.price;
   }, 0);
   const draftTitle = currentDraft?.title.trim() ?? "";
-  const headerTitle = draftTitle || quote?.doc_number || "Edit Quote";
-  const headerSubtitle = quote
+  const headerTitle = draftTitle || invoice?.doc_number || "Edit Invoice";
+  const headerSubtitle = invoice
     ? draftTitle
-      ? `${quote.doc_number} · QUOTE EDITOR`
-      : "QUOTE EDITOR"
+      ? `${invoice.doc_number} · INVOICE EDITOR`
+      : "INVOICE EDITOR"
     : undefined;
 
-  function updateDraft(updater: (current: QuoteEditDraft) => QuoteEditDraft): void {
+  function updateDraft(updater: (current: InvoiceEditDraft) => InvoiceEditDraft): void {
     if (!currentDraft) {
       return;
     }
@@ -152,7 +156,7 @@ export function QuoteEditScreen(): React.ReactElement {
     setShouldSkipSeeding(true);
     clearDraft();
     if (id) {
-      navigate(`/quotes/${id}/preview`);
+      navigate(`/invoices/${id}`);
       return;
     }
     navigate("/");
@@ -180,24 +184,26 @@ export function QuoteEditScreen(): React.ReactElement {
     }
 
     if (lineItemsForSubmit.length === 0) {
-      setSaveError("Add at least one line item description before saving the quote.");
+      setSaveError("Add at least one line item description before saving the invoice.");
       return;
     }
 
     setIsSaving(true);
 
     try {
-      await quoteService.updateQuote(id, {
+      const updatePayload = {
         title: normalizeOptionalTitle(currentDraft.title),
         line_items: lineItemsForSubmit,
         total_amount: currentDraft.total,
         notes: currentDraft.notes.trim().length > 0 ? currentDraft.notes.trim() : null,
-      });
+        ...(currentDraft.dueDate ? { due_date: currentDraft.dueDate } : {}),
+      };
+      await invoiceService.updateInvoice(id, updatePayload);
       setShouldSkipSeeding(true);
       clearDraft();
-      navigate(`/quotes/${id}/preview`);
+      navigate(`/invoices/${id}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to save quote";
+      const message = error instanceof Error ? error.message : "Unable to save invoice";
       setSaveError(message);
     } finally {
       setIsSaving(false);
@@ -214,13 +220,13 @@ export function QuoteEditScreen(): React.ReactElement {
       />
 
       <form
-        id="quote-edit-form"
+        id="invoice-edit-form"
         className="mx-auto w-full max-w-2xl space-y-5 px-4 pb-24 pt-20"
         onSubmit={onSave}
       >
-        {isLoadingQuote ? (
+        {isLoadingInvoice ? (
           <p role="status" className="text-sm text-on-surface-variant">
-            Loading quote...
+            Loading invoice...
           </p>
         ) : null}
 
@@ -232,29 +238,50 @@ export function QuoteEditScreen(): React.ReactElement {
           <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
         ) : null}
 
-        {quote && currentDraft ? (
+        {invoice && currentDraft ? (
           <>
-            <section className="space-y-2">
-              <label
-                htmlFor="quote-edit-title"
-                className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
-              >
-                QUOTE TITLE
-              </label>
-              <input
-                id="quote-edit-title"
-                type="text"
-                value={currentDraft.title}
-                onChange={(event) =>
-                  updateDraft((nextDraft) => ({
-                    ...nextDraft,
-                    title: event.target.value,
-                  }))
-                }
-                className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                placeholder="Front yard refresh (optional)"
-                maxLength={120}
-              />
+            <section className="grid gap-4 md:grid-cols-2 md:items-end">
+              <div className="space-y-2">
+                <label
+                  htmlFor="invoice-edit-title"
+                  className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
+                >
+                  INVOICE TITLE
+                </label>
+                <input
+                  id="invoice-edit-title"
+                  type="text"
+                  value={currentDraft.title}
+                  onChange={(event) =>
+                    updateDraft((nextDraft) => ({
+                      ...nextDraft,
+                      title: event.target.value,
+                    }))}
+                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="Front yard refresh (optional)"
+                  maxLength={120}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="invoice-edit-due-date"
+                  className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
+                >
+                  INVOICE DUE DATE
+                </label>
+                <input
+                  id="invoice-edit-due-date"
+                  type="date"
+                  value={currentDraft.dueDate}
+                  onChange={(event) =>
+                    updateDraft((nextDraft) => ({
+                      ...nextDraft,
+                      dueDate: event.target.value,
+                    }))}
+                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
             </section>
 
             <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
@@ -270,17 +297,17 @@ export function QuoteEditScreen(): React.ReactElement {
               {currentDraft.lineItems.length > 0 ? (
                 currentDraft.lineItems.map((lineItem, index) => (
                   <LineItemCard
-                    key={`quote-edit-line-item-${index}`}
+                    key={`invoice-edit-line-item-${index}`}
                     description={lineItem.description || "Untitled line item"}
                     details={lineItem.details}
                     price={lineItem.price}
                     flagged={lineItem.flagged}
-                    onClick={() => navigate(`/quotes/${id}/edit/line-items/${index}/edit`)}
+                    onClick={() => navigate(`/invoices/${id}/edit/line-items/${index}/edit`)}
                   />
                 ))
               ) : (
                 <p className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline">
-                  No line items on this quote yet.
+                  No line items on this invoice yet.
                 </p>
               )}
             </div>
@@ -305,21 +332,20 @@ export function QuoteEditScreen(): React.ReactElement {
 
               <section className="space-y-2">
                 <label
-                  htmlFor="quote-edit-notes"
+                  htmlFor="invoice-edit-notes"
                   className="text-xs font-bold uppercase tracking-wider text-outline-variant"
                 >
                   CUSTOMER NOTES
                 </label>
                 <textarea
-                  id="quote-edit-notes"
+                  id="invoice-edit-notes"
                   rows={3}
                   value={currentDraft.notes}
                   onChange={(event) =>
                     updateDraft((nextDraft) => ({
                       ...nextDraft,
                       notes: event.target.value,
-                    }))
-                  }
+                    }))}
                   className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Any notes to include for the customer."
                 />
@@ -333,13 +359,13 @@ export function QuoteEditScreen(): React.ReactElement {
         <div className="mx-auto w-full max-w-2xl">
           {hasNullPrices ? (
             <p className="mb-2 rounded-lg bg-warning-container px-3 py-2 text-center text-xs text-warning">
-              Some line items have no price — the quote will show "TBD" for those items.
+              Some line items have no price — the invoice will show "TBD" for those items.
             </p>
           ) : null}
           <div className="flex flex-col gap-3">
             <Button
               type="submit"
-              form="quote-edit-form"
+              form="invoice-edit-form"
               variant="primary"
               className="w-full"
               disabled={!canSubmit}

@@ -82,8 +82,8 @@ class _RetryingInvoiceRepository:
         del kwargs
         raise AssertionError("Direct invoice creation should not be used in this test")
 
-    async def update_due_date(self, *, invoice, due_date: date):  # noqa: ANN001
-        del due_date
+    async def update(self, **kwargs):  # noqa: ANN001
+        invoice = kwargs["invoice"]
         return invoice
 
     async def mark_ready_if_draft(self, *, invoice_id, user_id):  # noqa: ANN001
@@ -179,8 +179,8 @@ class _DirectInvoiceCollisionRepository:
             ),
         )
 
-    async def update_due_date(self, *, invoice, due_date: date):  # noqa: ANN001
-        del due_date
+    async def update(self, **kwargs):  # noqa: ANN001
+        invoice = kwargs["invoice"]
         return invoice
 
     async def mark_ready_if_draft(self, *, invoice_id, user_id):  # noqa: ANN001

@@ -103,13 +103,9 @@ async def update_invoice(
     user: Annotated[User, Depends(get_current_user)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
 ) -> InvoiceResponse:
-    """Update lightweight editable invoice fields."""
+    """Patch editable invoice fields without changing invoice lifecycle state."""
     try:
-        invoice = await invoice_service.update_invoice_due_date(
-            user,
-            invoice_id,
-            payload.due_date,
-        )
+        invoice = await invoice_service.update_invoice(user, invoice_id, payload)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return InvoiceResponse.model_validate(invoice)

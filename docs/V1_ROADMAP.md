@@ -1,7 +1,7 @@
 # Stima V1 Roadmap
 
 **Version:** 1.0 — March 2026
-**Status:** Active (foundations shipped; forward path is M3 -> M4 -> M5 -> M8 -> M7)
+**Status:** Active (core V1 document flow shipped; remaining forward path is M7)
 **Assumes:** V0 is complete, deployed, and pilot-ready
 **Reference:** `docs/PRODUCT.md` for strategic context
 
@@ -255,6 +255,8 @@ Invoice pages also render read-only.
 
 ### Milestone 3: Email Delivery and Copy Link Visibility
 
+**Status:** Shipped
+
 **Goal:** The contractor can send the quote by email directly from Stima. Copy Link is
 always immediately accessible as a secondary action — not hidden in a menu or restricted
 to a narrow state transition. Both email and manual link-sharing are first-class delivery
@@ -318,6 +320,8 @@ the build sequence, not on the day Milestone 3 begins.
 
 ### Milestone 4: Quote PDF Presentation Refinement
 
+**Status:** Shipped
+
 **Goal:** Make the quote PDF professional and trustworthy enough to send to a new customer
 without apology. Tighten visual hierarchy, typography, and layout so the document reflects the
 quality the contractor intended.
@@ -363,6 +367,8 @@ contracts. No schema migration.
 ---
 
 ### Milestone 5: Won Quote -> Linked Invoice
+
+**Status:** Shipped
 
 **Goal:** Let a contractor convert a won quote (`approved` status) into a linked invoice
 with minimal extra input, using the same delivery and public-document patterns already
@@ -539,6 +545,8 @@ full bookkeeping.
 
 ### Milestone 8: Contractor-First Document Flow
 
+**Status:** Shipped
+
 **Goal:** Reset document behavior around a simpler contractor-first model: one shared builder,
 late quote/invoice type choice, always-editable documents, and statuses used for internal
 tracking rather than permission gates.
@@ -690,23 +698,23 @@ required — blank is fine.
 V1 remains organized into shipping phases, but the foundation sequence is now complete.
 From the current state forward, execution is focused on the remaining milestones only.
 
-### Completed Foundations (already shipped)
+### Completed Foundations And Flow Milestones (already shipped)
 
 1. Pre-V1 Polish — Customer detail layout + quote title field
 2. Milestone 0 — Branding foundation
 3. Milestone 1 — Quote status expansion
 4. Milestone 6 — Operational visibility
 5. Milestone 2 — Public landing page (read-only customer quote page)
+6. Milestone 3 - Email delivery and always-visible Copy Link
+7. Milestone 4 - Quote PDF presentation refinement
+8. Milestone 5 - Invoice conversion from won quote
+9. Milestone 8 - Contractor-first document flow baseline reset
 
 ### Active Forward Path
 
 Ship in this order from current state:
 
-1. Milestone 3 (revised) — Email delivery and always-visible Copy Link
-2. Milestone 4 — Quote PDF presentation refinement
-3. Milestone 5 — Invoice conversion from won quote
-4. Milestone 8 — Contractor-first document flow baseline reset
-5. Milestone 7 — Optional pricing controls
+1. Milestone 7 - Optional pricing controls
 
 ---
 

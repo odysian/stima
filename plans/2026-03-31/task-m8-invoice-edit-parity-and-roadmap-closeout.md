@@ -16,6 +16,8 @@ partially complete.
 - Constraints:
   - `PATCH /api/invoices/{id}` remains the single invoice edit endpoint.
   - The edit contract must support `title`, `line_items`, `total_amount`, `notes`, and `due_date`.
+  - Patch semantics should mirror quote editing: omitted fields preserve existing values, and
+    provided `line_items` replace the existing line items in full.
   - The contract must work for `draft`, `ready`, and `sent` invoices.
   - Editing a `ready` invoice must preserve `ready`.
   - Editing a `sent` invoice must preserve `sent`, `share_token`, and `shared_at`.
@@ -48,6 +50,9 @@ partially complete.
 ## Acceptance Criteria
 - [ ] `PATCH /api/invoices/{id}` accepts `title`, `line_items`, `total_amount`, `notes`, and
       `due_date`.
+- [ ] Omitted invoice patch fields preserve existing persisted values.
+- [ ] Providing `line_items` in the invoice patch payload fully replaces existing invoice line
+      items.
 - [ ] The expanded patch contract works for both direct invoices and quote-derived invoices.
 - [ ] `draft` invoices remain editable through the single invoice patch contract.
 - [ ] Editing a `ready` invoice keeps it in `ready`.
@@ -67,6 +72,11 @@ partially complete.
 make backend-verify
 make frontend-verify
 ```
+
+## Implementation Notes
+- Review follow-up: the invoice editor no longer hard-requires `due_date`; blank/null persisted due dates now remain editable because the frontend omits `due_date` from the patch payload when left empty.
+- UI refinement: invoice detail now uses the same compact header edit affordance as quotes, and the quote/invoice editors share the same two-line header pattern with tighter section spacing. The invoice editor also promotes `due_date` beside the title as top-level metadata.
+- PDF refinement: the shared quote/invoice PDF keeps the original metadata labels and copy, but reuses the whitespace above the customer block so the right-side metadata sits higher, with `Updated` directly under `Issued`.
 
 Manual checks:
 1. Create a direct invoice, edit title/line items/total/notes/due date, and confirm the changes

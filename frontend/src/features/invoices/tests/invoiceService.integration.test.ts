@@ -124,39 +124,49 @@ describe("invoiceService integration (MSW)", () => {
     expect(capturedCustomerId).toBe("cust-1");
   });
 
-  it("updateInvoice sends CSRF and persists the due date payload", async () => {
+  it("updateInvoice sends CSRF and persists the full invoice patch payload", async () => {
     setCsrfToken("invoice-csrf-token");
     let capturedCsrfHeader: string | null = null;
-    let capturedDueDate: string | null = null;
+    let capturedPayload: Record<string, unknown> | null = null;
 
     server.use(
       http.patch("/api/invoices/:id", async ({ request, params }) => {
         capturedCsrfHeader = request.headers.get("X-CSRF-Token");
-        const body = (await request.json()) as { due_date: string };
-        capturedDueDate = body.due_date;
+        const body = (await request.json()) as {
+          title?: string | null;
+          line_items?: Array<{ description: string; details: string | null; price: number | null }>;
+          total_amount?: number | null;
+          notes?: string | null;
+          due_date?: string;
+        };
+        capturedPayload = body as Record<string, unknown>;
 
         return HttpResponse.json(
           {
             id: String(params.id),
             customer_id: "cust-1",
             doc_number: "I-001",
-            title: "Spring cleanup",
+            title: body.title ?? "Spring cleanup",
             status: "draft",
-            total_amount: 120,
-            notes: "Thanks for your business",
-            due_date: body.due_date,
+            total_amount: body.total_amount ?? 120,
+            notes: body.notes ?? "Thanks for your business",
+            due_date: body.due_date ?? "2026-04-19",
             shared_at: null,
             share_token: null,
             source_document_id: "quote-1",
-            line_items: [
+            line_items: (body.line_items ?? [
               {
-                id: "line-1",
                 description: "Brown mulch",
                 details: "5 yards",
                 price: 120,
-                sort_order: 0,
               },
-            ],
+            ]).map((lineItem, index) => ({
+              id: `line-${index + 1}`,
+              description: lineItem.description,
+              details: lineItem.details,
+              price: lineItem.price,
+              sort_order: index,
+            })),
             created_at: "2026-03-20T00:00:00.000Z",
             updated_at: "2026-03-20T00:10:00.000Z",
           },
@@ -166,11 +176,24 @@ describe("invoiceService integration (MSW)", () => {
     );
 
     const invoice = await invoiceService.updateInvoice("invoice-1", {
+      title: "Updated invoice",
+      line_items: [{ description: "Final walkthrough", details: null, price: 90 }],
+      total_amount: 90,
+      notes: "Updated note",
       due_date: "2026-04-30",
     });
 
     expect(capturedCsrfHeader).toBe("invoice-csrf-token");
-    expect(capturedDueDate).toBe("2026-04-30");
+    expect(capturedPayload).toEqual({
+      title: "Updated invoice",
+      line_items: [{ description: "Final walkthrough", details: null, price: 90 }],
+      total_amount: 90,
+      notes: "Updated note",
+      due_date: "2026-04-30",
+    });
+    expect(invoice.title).toBe("Updated invoice");
+    expect(invoice.total_amount).toBe(90);
+    expect(invoice.notes).toBe("Updated note");
     expect(invoice.due_date).toBe("2026-04-30");
   });
 
