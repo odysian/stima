@@ -228,6 +228,7 @@ Rules:
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
 | `/invoices` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type }` | `201 Invoice` with `doc_number` (`I-001`), `status: "draft"`, server-default `due_date`, and nullable `source_document_id` |
+| `/invoices` | GET | no | cookie | `customer_id?` (UUID query param) | `200 InvoiceListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; includes both direct invoices and quote-derived invoices) |
 | `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail`, `404 { detail: "Not found" }` |
 | `/invoices/{id}` | PATCH | yes | cookie | `{ due_date }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
@@ -272,6 +273,18 @@ Public landing-page rules:
 - `item_count`
 - `created_at`
 
+`InvoiceListItem` fields:
+- `id`
+- `customer_id`
+- `customer_name`
+- `doc_number`
+- `title`
+- `status`
+- `total_amount`
+- `due_date`
+- `created_at`
+- `source_document_id`
+
 `QuoteDetailResponse` fields:
 - Standard `Quote` fields, including `id`, `customer_id`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
 - Customer display fields: `customer_name`, `customer_email`, `customer_phone`
@@ -284,6 +297,9 @@ Public landing-page rules:
 
 Invoice rules:
 - direct invoices can be created from the shared builder via `POST /api/invoices` without a source quote
+- the authenticated `/` route remains the main document list, defaulting to `Quotes` with an `Invoices` secondary filter
+- list search stays parallel in both modes (`customer_name`, `title`, `doc_number`)
+- quote rows continue to route to `/quotes/{id}/preview`; invoice rows route to `/invoices/{id}`
 - direct invoices receive the server-side default due date on create
 - direct invoices use `source_document_id = null` and `source_quote_number = null`
 - only `approved` quotes can convert to invoices

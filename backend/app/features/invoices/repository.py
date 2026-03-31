@@ -1,4 +1,9 @@
-"""Invoice repository operations."""
+"""Invoice repository operations.
+
+This module owns invoice persistence and read models for authenticated users.
+It returns detail/list summaries plus PDF render context, but leaves HTTP errors
+and higher-level workflow rules to the service layer.
+"""
 
 from __future__ import annotations
 
@@ -46,6 +51,22 @@ class InvoiceDetailRow:
     updated_at: datetime
 
 
+@dataclass(slots=True)
+class InvoiceListItemSummary:
+    """Summary row returned by the invoice list query."""
+
+    id: UUID
+    customer_id: UUID
+    customer_name: str
+    doc_number: str
+    title: str | None
+    status: str
+    total_amount: Decimal | None
+    due_date: date | None
+    created_at: datetime
+    source_document_id: UUID | None
+
+
 class InvoiceRepository:
     """Persist and query invoice documents using SQLAlchemy async sessions."""
 
@@ -61,6 +82,54 @@ class InvoiceRepository:
             )
         )
         return customer is not None
+
+    async def list_by_user(
+        self,
+        user_id: UUID,
+        customer_id: UUID | None = None,
+    ) -> list[InvoiceListItemSummary]:
+        """Return invoice summaries for a user ordered newest-first."""
+        statement = (
+            select(
+                Document.id,
+                Document.customer_id,
+                Customer.name.label("customer_name"),
+                Document.doc_number,
+                Document.title,
+                Document.status,
+                Document.total_amount,
+                Document.due_date,
+                Document.created_at,
+                Document.source_document_id,
+            )
+            .join(Customer, Customer.id == Document.customer_id)
+            .where(
+                Document.user_id == user_id,
+                Document.doc_type == _INVOICE_DOC_TYPE,
+            )
+            .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
+        )
+        if customer_id is not None:
+            statement = statement.where(Document.customer_id == customer_id)
+
+        result = await self._session.execute(statement)
+        return [
+            InvoiceListItemSummary(
+                id=row.id,
+                customer_id=row.customer_id,
+                customer_name=row.customer_name,
+                doc_number=row.doc_number,
+                title=row.title,
+                status=(
+                    row.status.value if isinstance(row.status, QuoteStatus) else str(row.status)
+                ),
+                total_amount=row.total_amount,
+                due_date=row.due_date,
+                created_at=row.created_at,
+                source_document_id=row.source_document_id,
+            )
+            for row in result.all()
+        ]
 
     async def get_by_id(self, invoice_id: UUID, user_id: UUID) -> Document | None:
         """Return one invoice owned by a user, including line items."""

@@ -2,6 +2,7 @@ import type {
   InvoiceCreateRequest,
   Invoice,
   InvoiceDetail,
+  InvoiceListItem,
   InvoiceUpdateRequest,
 } from "@/features/invoices/types/invoice.types";
 import { request, requestBlob } from "@/shared/lib/http";
@@ -15,6 +16,11 @@ function createInvoice(data: InvoiceCreateRequest): Promise<Invoice> {
 
 function getInvoice(id: string): Promise<InvoiceDetail> {
   return request<InvoiceDetail>(`/api/invoices/${id}`);
+}
+
+function listInvoices(params?: { customer_id?: string }): Promise<InvoiceListItem[]> {
+  const query = params?.customer_id ? `?customer_id=${params.customer_id}` : "";
+  return request<InvoiceListItem[]>(`/api/invoices${query}`);
 }
 
 function updateInvoice(id: string, data: InvoiceUpdateRequest): Promise<Invoice> {
@@ -39,6 +45,7 @@ function shareInvoice(id: string): Promise<Invoice> {
 export const invoiceService = {
   createInvoice,
   getInvoice,
+  listInvoices,
   updateInvoice,
   generatePdf,
   shareInvoice,

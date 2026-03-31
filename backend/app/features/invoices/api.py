@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
@@ -13,6 +13,7 @@ from app.features.invoices.schemas import (
     InvoiceCreateRequest,
     InvoiceCustomerResponse,
     InvoiceDetailResponse,
+    InvoiceListItemResponse,
     InvoiceResponse,
     InvoiceUpdateRequest,
 )
@@ -41,6 +42,17 @@ async def create_invoice(
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return InvoiceResponse.model_validate(invoice)
+
+
+@router.get("", response_model=list[InvoiceListItemResponse])
+async def list_invoices(
+    user: Annotated[User, Depends(get_current_user)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+    customer_id: Annotated[UUID | None, Query()] = None,
+) -> list[InvoiceListItemResponse]:
+    """List invoices for the authenticated user."""
+    invoices = await invoice_service.list_invoices(user, customer_id=customer_id)
+    return [InvoiceListItemResponse.model_validate(invoice) for invoice in invoices]
 
 
 @router.get("/{invoice_id}", response_model=InvoiceDetailResponse)

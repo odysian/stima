@@ -78,6 +78,52 @@ describe("invoiceService integration (MSW)", () => {
     expect(invoice.customer.name).toBe("Alice Johnson");
   });
 
+  it("listInvoices returns the invoice summary contract", async () => {
+    const invoices = await invoiceService.listInvoices();
+
+    expect(invoices).toEqual([
+      {
+        id: "invoice-2",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "I-002",
+        title: "Front bed refresh",
+        status: "ready",
+        total_amount: 220,
+        due_date: "2026-04-22",
+        created_at: "2026-03-21T00:00:00.000Z",
+        source_document_id: null,
+      },
+      {
+        id: "invoice-1",
+        customer_id: "cust-1",
+        customer_name: "Alice Johnson",
+        doc_number: "I-001",
+        title: "Spring cleanup",
+        status: "draft",
+        total_amount: 120,
+        due_date: "2026-04-19",
+        created_at: "2026-03-20T00:00:00.000Z",
+        source_document_id: "quote-1",
+      },
+    ]);
+  });
+
+  it("listInvoices sends customer_id query param when provided", async () => {
+    let capturedCustomerId: string | null = null;
+
+    server.use(
+      http.get("/api/invoices", ({ request }) => {
+        capturedCustomerId = new URL(request.url).searchParams.get("customer_id");
+        return HttpResponse.json([], { status: 200 });
+      }),
+    );
+
+    await invoiceService.listInvoices({ customer_id: "cust-1" });
+
+    expect(capturedCustomerId).toBe("cust-1");
+  });
+
   it("updateInvoice sends CSRF and persists the due date payload", async () => {
     setCsrfToken("invoice-csrf-token");
     let capturedCsrfHeader: string | null = null;

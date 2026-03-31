@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { invoiceService } from "@/features/invoices/services/invoiceService";
+import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -11,85 +13,223 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
+type DocumentMode = "quotes" | "invoices";
+type DocumentStatus = QuoteListItem["status"] | InvoiceListItem["status"];
+
+interface DocumentRow {
+  id: string;
+  primaryLabel: string;
+  supportingDetails: string;
+  totalAmount: number | null;
+  status: DocumentStatus;
+  destination: string;
+}
+
+function matchesSearch(
+  item: Pick<QuoteListItem, "customer_name" | "doc_number" | "title">,
+  normalizedSearchQuery: string,
+): boolean {
+  if (!normalizedSearchQuery) {
+    return true;
+  }
+
+  return (
+    item.customer_name.toLowerCase().includes(normalizedSearchQuery)
+    || item.doc_number.toLowerCase().includes(normalizedSearchQuery)
+    || (item.title?.toLowerCase() ?? "").includes(normalizedSearchQuery)
+  );
+}
+
+function buildQuoteSubtitle(quotes: QuoteListItem[], isLoading: boolean, loadError: string | null): string | undefined {
+  if (isLoading || loadError) {
+    return undefined;
+  }
+
+  const activeQuoteCount = quotes.filter((quote) => quote.status === "ready" || quote.status === "shared").length;
+  const pendingReviewCount = quotes.filter((quote) => quote.status === "draft").length;
+  return `${activeQuoteCount} active · ${pendingReviewCount} pending`;
+}
+
+function buildInvoiceSubtitle(
+  invoices: InvoiceListItem[],
+  isLoading: boolean,
+  loadError: string | null,
+): string | undefined {
+  if (isLoading || loadError) {
+    return undefined;
+  }
+
+  const activeInvoiceCount = invoices.filter((invoice) => invoice.status === "ready" || invoice.status === "sent").length;
+  const pendingInvoiceCount = invoices.filter((invoice) => invoice.status === "draft").length;
+  return `${activeInvoiceCount} active · ${pendingInvoiceCount} pending`;
+}
+
 export function QuoteList(): React.ReactElement {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [documentMode, setDocumentMode] = useState<DocumentMode>("quotes");
   const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoadingQuotes, setIsLoadingQuotes] = useState(true);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
+  const [quoteLoadError, setQuoteLoadError] = useState<string | null>(null);
+  const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let isActive = true;
 
-    async function fetchQuotes(): Promise<void> {
-      setIsLoading(true);
-      setLoadError(null);
+    async function fetchDocuments(): Promise<void> {
+      if (documentMode === "quotes") {
+        setIsLoadingQuotes(true);
+        setQuoteLoadError(null);
+        try {
+          const nextQuotes = await quoteService.listQuotes();
+          if (isActive) {
+            setQuotes(nextQuotes);
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unable to load quotes";
+          if (isActive) {
+            setQuoteLoadError(message);
+          }
+        } finally {
+          if (isActive) {
+            setIsLoadingQuotes(false);
+          }
+        }
+        return;
+      }
+
+      setIsLoadingInvoices(true);
+      setInvoiceLoadError(null);
       try {
-        const nextQuotes = await quoteService.listQuotes();
+        const nextInvoices = await invoiceService.listInvoices();
         if (isActive) {
-          setQuotes(nextQuotes);
+          setInvoices(nextInvoices);
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unable to load quotes";
+        const message = error instanceof Error ? error.message : "Unable to load invoices";
         if (isActive) {
-          setLoadError(message);
+          setInvoiceLoadError(message);
         }
       } finally {
         if (isActive) {
-          setIsLoading(false);
+          setIsLoadingInvoices(false);
         }
       }
     }
 
-    void fetchQuotes();
+    void fetchDocuments();
 
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [documentMode]);
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQuotes = useMemo(() => {
-    if (!normalizedSearchQuery) {
-      return quotes;
-    }
-
-    return quotes.filter((quote) => {
-      const customerName = quote.customer_name.toLowerCase();
-      const docNumber = quote.doc_number.toLowerCase();
-      const title = quote.title?.toLowerCase() ?? "";
-      return (
-        customerName.includes(normalizedSearchQuery) ||
-        docNumber.includes(normalizedSearchQuery) ||
-        title.includes(normalizedSearchQuery)
-      );
-    });
+    return quotes.filter((quote) => matchesSearch(quote, normalizedSearchQuery));
   }, [normalizedSearchQuery, quotes]);
 
-  // Active: ready/shared quotes. Pending: draft quotes.
-  const activeQuoteCount = useMemo(
-    () => quotes.filter((quote) => quote.status === "ready" || quote.status === "shared").length,
-    [quotes],
+  const filteredInvoices = useMemo(
+    () => invoices.filter((invoice) => matchesSearch(invoice, normalizedSearchQuery)),
+    [invoices, normalizedSearchQuery],
   );
-  const pendingReviewCount = useMemo(
-    () => quotes.filter((quote) => quote.status === "draft").length,
-    [quotes],
-  );
+
   const timezone = user?.timezone ?? null;
-  const quoteSubtitle =
-    !isLoading && !loadError ? `${activeQuoteCount} active · ${pendingReviewCount} pending` : undefined;
+  const quoteSubtitle = useMemo(
+    () => buildQuoteSubtitle(quotes, isLoadingQuotes, quoteLoadError),
+    [isLoadingQuotes, quoteLoadError, quotes],
+  );
+  const invoiceSubtitle = useMemo(
+    () => buildInvoiceSubtitle(invoices, isLoadingInvoices, invoiceLoadError),
+    [invoiceLoadError, invoices, isLoadingInvoices],
+  );
+  const isLoading = documentMode === "quotes" ? isLoadingQuotes : isLoadingInvoices;
+  const loadError = documentMode === "quotes" ? quoteLoadError : invoiceLoadError;
+  const filteredRows = documentMode === "quotes" ? filteredQuotes : filteredInvoices;
+  const totalRows = documentMode === "quotes" ? quotes.length : invoices.length;
+  const headerTitle = documentMode === "quotes" ? "Quotes" : "Invoices";
+  const headerSubtitle = documentMode === "quotes" ? quoteSubtitle : invoiceSubtitle;
+  const searchLabel = documentMode === "quotes" ? "Search quotes" : "Search invoices";
+  const searchPlaceholder = documentMode === "quotes"
+    ? "Search customer, title, or quote ID..."
+    : "Search customer, title, or invoice ID...";
+  const emptyStateMessage = totalRows === 0
+    ? `No ${documentMode} yet. Tap Create Document to create your first.`
+    : `No ${documentMode} match your search.`;
+  const sectionLabel = documentMode === "quotes" ? "PAST QUOTES" : "PAST INVOICES";
+
+  const documentRows = useMemo<DocumentRow[]>(() => {
+    if (documentMode === "quotes") {
+      return filteredQuotes.map((quote) => ({
+        id: quote.id,
+        primaryLabel: quote.title ?? quote.doc_number,
+        supportingDetails: [
+          quote.customer_name,
+          ...(quote.title ? [quote.doc_number] : []),
+          formatDate(quote.created_at, timezone),
+          `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
+        ].join(" · "),
+        totalAmount: quote.total_amount,
+        status: quote.status,
+        destination: `/quotes/${quote.id}/preview`,
+      }));
+    }
+
+    return filteredInvoices.map((invoice) => ({
+      id: invoice.id,
+      primaryLabel: invoice.title ?? invoice.doc_number,
+      supportingDetails: [
+        invoice.customer_name,
+        ...(invoice.title ? [invoice.doc_number] : []),
+        formatDate(invoice.created_at, timezone),
+      ].join(" · "),
+      totalAmount: invoice.total_amount,
+      status: invoice.status,
+      destination: `/invoices/${invoice.id}`,
+    }));
+  }, [documentMode, filteredInvoices, filteredQuotes, timezone]);
 
   return (
     <main className="min-h-screen bg-background pb-24">
-      <ScreenHeader title="Quotes" subtitle={quoteSubtitle} />
+      <ScreenHeader title={headerTitle} subtitle={headerSubtitle} />
       <section className="mx-auto w-full max-w-3xl pb-2 pt-20">
-
         <div className="mb-4 px-4">
+          <div
+            aria-label="Document type filter"
+            className="mb-4 inline-flex rounded-full bg-surface-container-low p-1"
+          >
+            <button
+              type="button"
+              aria-pressed={documentMode === "quotes"}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                documentMode === "quotes"
+                  ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                  : "text-on-surface-variant"
+              }`}
+              onClick={() => setDocumentMode("quotes")}
+            >
+              Quotes
+            </button>
+            <button
+              type="button"
+              aria-pressed={documentMode === "invoices"}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                documentMode === "invoices"
+                  ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                  : "text-on-surface-variant"
+              }`}
+              onClick={() => setDocumentMode("invoices")}
+            >
+              Invoices
+            </button>
+          </div>
           <Input
-            label="Search quotes"
-            id="quote-search"
-            placeholder="Search customer, title, or quote ID..."
+            label={searchLabel}
+            id="document-search"
+            placeholder={searchPlaceholder}
             hideLabel
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -98,7 +238,7 @@ export function QuoteList(): React.ReactElement {
 
         {isLoading ? (
           <p role="status" className="px-4 text-sm text-on-surface-variant">
-            Loading quotes...
+            {documentMode === "quotes" ? "Loading quotes..." : "Loading invoices..."}
           </p>
         ) : null}
 
@@ -108,60 +248,46 @@ export function QuoteList(): React.ReactElement {
           </div>
         ) : null}
 
-        {!isLoading && !loadError && filteredQuotes.length === 0 ? (
+        {!isLoading && !loadError && filteredRows.length === 0 ? (
           <section className="mx-4 mt-8 flex flex-col items-center rounded-lg bg-surface-container-lowest p-8 text-center ghost-shadow">
             <span className="material-symbols-outlined mb-2 text-3xl text-outline">description</span>
-            <p className="text-sm text-outline">
-              {quotes.length === 0
-                ? "No quotes yet. Tap + to create your first."
-                : "No quotes match your search."}
-            </p>
+            <p className="text-sm text-outline">{emptyStateMessage}</p>
           </section>
         ) : null}
 
-        {!isLoading && !loadError && filteredQuotes.length > 0 ? (
+        {!isLoading && !loadError && filteredRows.length > 0 ? (
           <>
             <div className="mb-2 px-4">
               <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                PAST QUOTES
+                {sectionLabel}
               </p>
             </div>
             <div className="mx-4 rounded-xl bg-surface-container-low p-3">
               <ul className="flex flex-col gap-3">
-                {filteredQuotes.map((quote) => {
-                  const primaryLabel = quote.title ?? quote.doc_number;
-                  const supportingDetails = [
-                    quote.customer_name,
-                    ...(quote.title ? [quote.doc_number] : []),
-                    formatDate(quote.created_at, timezone),
-                    `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
-                  ].join(" · ");
-
-                  return (
-                    <li key={quote.id}>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/quotes/${quote.id}/preview`)}
-                        className="w-full rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
-                      >
-                        <div className="flex items-baseline justify-between gap-3">
-                          <p className="font-headline font-bold text-on-surface">
-                            {primaryLabel}
-                          </p>
-                          <p className="font-headline font-bold text-on-surface">
-                            {formatCurrency(quote.total_amount)}
-                          </p>
-                        </div>
-                        <div className="mt-1 flex items-center justify-between gap-3">
-                          <p className="text-sm text-on-surface-variant">
-                            {supportingDetails}
-                          </p>
-                          <StatusBadge variant={quote.status} />
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
+                {documentRows.map((row) => (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(row.destination)}
+                      className="w-full rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="font-headline font-bold text-on-surface">
+                          {row.primaryLabel}
+                        </p>
+                        <p className="font-headline font-bold text-on-surface">
+                          {formatCurrency(row.totalAmount)}
+                        </p>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-3">
+                        <p className="text-sm text-on-surface-variant">
+                          {row.supportingDetails}
+                        </p>
+                        <StatusBadge variant={row.status} />
+                      </div>
+                    </button>
+                  </li>
+                ))}
               </ul>
             </div>
           </>
@@ -170,7 +296,7 @@ export function QuoteList(): React.ReactElement {
 
       <button
         type="button"
-        aria-label="Create quote"
+        aria-label="Create document"
         className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full forest-gradient text-white shadow-[0_0_24px_rgba(0,0,0,0.12)] transition-all active:scale-95"
         onClick={() => navigate("/quotes/new")}
       >

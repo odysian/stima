@@ -2619,6 +2619,104 @@ async def test_create_direct_invoice_sets_default_due_date_and_keeps_quote_list_
     assert invoice_count == 1
 
 
+async def test_list_invoices_returns_direct_and_quote_derived_summaries_newest_first(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    quote_customer_id = await _create_customer(client, csrf_token, name="Quote Customer")
+    direct_customer_id = await _create_customer(client, csrf_token, name="Direct Customer")
+
+    quote = await _create_quote(client, csrf_token, quote_customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    linked_invoice_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert linked_invoice_response.status_code == 201
+    linked_invoice = linked_invoice_response.json()
+
+    direct_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        direct_customer_id,
+        title="Direct invoice",
+        transcript="direct invoice transcript",
+        total_amount=220,
+    )
+
+    response = await client.get("/api/invoices")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": direct_invoice["id"],
+            "customer_id": direct_customer_id,
+            "customer_name": "Direct Customer",
+            "doc_number": "I-002",
+            "title": "Direct invoice",
+            "status": "draft",
+            "total_amount": 220,
+            "due_date": direct_invoice["due_date"],
+            "created_at": direct_invoice["created_at"],
+            "source_document_id": None,
+        },
+        {
+            "id": linked_invoice["id"],
+            "customer_id": quote_customer_id,
+            "customer_name": "Quote Customer",
+            "doc_number": "I-001",
+            "title": None,
+            "status": "draft",
+            "total_amount": 55,
+            "due_date": linked_invoice["due_date"],
+            "created_at": linked_invoice["created_at"],
+            "source_document_id": quote["id"],
+        },
+    ]
+
+
+async def test_list_invoices_can_filter_by_customer_id(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id_a = await _create_customer(client, csrf_token, name="Customer A")
+    customer_id_b = await _create_customer(client, csrf_token, name="Customer B")
+
+    await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id_a,
+        title="Invoice for A",
+        transcript="invoice for customer a",
+        total_amount=120,
+    )
+    invoice_b = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id_b,
+        title="Invoice for B",
+        transcript="invoice for customer b",
+        total_amount=220,
+    )
+
+    response = await client.get(f"/api/invoices?customer_id={customer_id_b}")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": invoice_b["id"],
+            "customer_id": customer_id_b,
+            "customer_name": "Customer B",
+            "doc_number": "I-002",
+            "title": "Invoice for B",
+            "status": "draft",
+            "total_amount": 220,
+            "due_date": invoice_b["due_date"],
+            "created_at": invoice_b["created_at"],
+            "source_document_id": None,
+        }
+    ]
+
+
 async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_preserves_sent_invoice_status(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -2743,6 +2841,32 @@ async def _create_quote(client: AsyncClient, csrf_token: str, customer_id: str) 
             "transcript": "quote transcript",
             "line_items": [{"description": "line item", "details": None, "price": 55}],
             "total_amount": 55,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+async def _create_direct_invoice(
+    client: AsyncClient,
+    csrf_token: str,
+    customer_id: str,
+    *,
+    title: str | None,
+    transcript: str,
+    total_amount: int,
+) -> dict[str, object]:
+    response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "title": title,
+            "transcript": transcript,
+            "line_items": [{"description": "line item", "details": None, "price": total_amount}],
+            "total_amount": total_amount,
             "notes": "Original note",
             "source_type": "text",
         },
