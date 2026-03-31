@@ -219,6 +219,12 @@ def test_render_shows_quote_title_only_when_present(
     assert ("Quote Title" in rendered_html) is False
     assert ("Front Yard Refresh" in rendered_html) is should_render_title
     assert ('class="quote-title"' in rendered_html) is should_render_title
+    if should_render_title:
+        assert re.search(
+            r"<h2 class=\"quote-title\">Front Yard Refresh</h2>\s*<table class=\"meta-grid\">",
+            rendered_html,
+            re.DOTALL,
+        )
 
 
 def test_render_stacks_line_item_details_in_description_column(

@@ -183,6 +183,11 @@ export function InvoiceEditScreen(): React.ReactElement {
       return;
     }
 
+    if (lineItemsForSubmit.length === 0) {
+      setSaveError("Add at least one line item description before saving the invoice.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {

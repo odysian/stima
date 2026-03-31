@@ -280,6 +280,27 @@ describe("InvoiceEditScreen", () => {
     expect(mockedInvoiceService.updateInvoice).not.toHaveBeenCalled();
   });
 
+  it("blocks save when all line items have been removed", async () => {
+    window.sessionStorage.setItem(
+      EDIT_STORAGE_KEY,
+      JSON.stringify(
+        makeDraft({
+          lineItems: [],
+        }),
+      ),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "I-001" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(
+      await screen.findByText("Add at least one line item description before saving the invoice."),
+    ).toBeInTheDocument();
+    expect(mockedInvoiceService.updateInvoice).not.toHaveBeenCalled();
+  });
+
   it("navigates to the line item edit route when a card is clicked", async () => {
     window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
 
