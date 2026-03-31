@@ -25,3 +25,16 @@ Actionable items intentionally deferred during implementation. Each entry includ
 Ruff currently runs with defaults only (`E` + `F`). No import sorting, no formatting enforcement, no bugbear checks. This allows style drift across contributors and agents.
 
 **Priority:** Low — standalone cleanup task, no behavior change.
+
+---
+
+## Customer-Scoped Invoice Filtering Parity
+
+**Source:** Spec #137 close-out review; follow-up Task #146
+**Where:** customer-context contractor surfaces using document history, starting from `frontend/src/features/customers/components/CustomerDetailScreen.tsx`
+
+Milestone 8 shipped `GET /api/invoices?customer_id=<id>` plus frontend service support, but the app still only exposes customer-scoped history for quotes. That leaves invoice filtering parity available in the transport contract without a first-class contractor surface using it.
+
+**Fix:** Reuse the existing invoice list contract on the customer-scoped history surface so direct and quote-derived invoices can be viewed in customer context without creating a new invoice dashboard.
+
+**Priority:** Medium — useful parity follow-up after M8 close-out, but not a blocker for the shipped milestone baseline.
