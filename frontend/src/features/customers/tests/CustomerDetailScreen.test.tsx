@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,7 +6,9 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer } from "@/features/customers/types/customer.types";
+import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { quoteService } from "@/features/quotes/services/quoteService";
+import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 
 const navigateMock = vi.fn();
 
@@ -42,13 +44,36 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
+vi.mock("@/features/invoices/services/invoiceService", () => ({
+  invoiceService: {
+    listInvoices: vi.fn(),
+  },
+}));
+
 vi.mock("@/features/auth/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
 const mockedCustomerService = vi.mocked(customerService);
+const mockedInvoiceService = vi.mocked(invoiceService);
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedUseAuth = vi.mocked(useAuth);
+
+function makeInvoice(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem {
+  return {
+    id: "invoice-1",
+    customer_id: "cust-1",
+    customer_name: "Alice Johnson",
+    doc_number: "I-001",
+    title: null,
+    status: "draft",
+    total_amount: 120,
+    due_date: "2026-04-19",
+    created_at: "2026-03-25T00:00:00.000Z",
+    source_document_id: null,
+    ...overrides,
+  };
+}
 
 function renderScreen(): void {
   render(
@@ -86,6 +111,18 @@ beforeEach(() => {
       created_at: "2026-03-25T00:00:00.000Z",
     },
   ]);
+  mockedInvoiceService.listInvoices.mockResolvedValue([
+    makeInvoice({ source_document_id: "quote-1" }),
+    makeInvoice({
+      id: "invoice-2",
+      doc_number: "I-002",
+      title: "Final walkthrough",
+      status: "ready",
+      total_amount: 300,
+      source_document_id: null,
+      created_at: "2026-03-26T00:00:00.000Z",
+    }),
+  ]);
   mockedUseAuth.mockReturnValue({
     isLoading: false,
     isOnboarded: true,
@@ -122,6 +159,7 @@ describe("CustomerDetailScreen", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
     expect(mockedQuoteService.listQuotes).toHaveBeenCalledWith({ customer_id: "cust-1" });
+    expect(mockedInvoiceService.listInvoices).toHaveBeenCalledWith({ customer_id: "cust-1" });
     expect(screen.getByText("555-0101")).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
     expect(screen.getByText("1 Main St")).toBeInTheDocument();
@@ -130,6 +168,7 @@ describe("CustomerDetailScreen", () => {
 
   it("shows loading state while fetching", () => {
     mockedCustomerService.getCustomer.mockImplementationOnce(() => new Promise<Customer>(() => {}));
+    mockedInvoiceService.listInvoices.mockImplementationOnce(() => new Promise<InvoiceListItem[]>(() => {}));
 
     renderScreen();
 
@@ -252,6 +291,49 @@ describe("CustomerDetailScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /q-001/i }));
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
+  });
+
+  it("renders invoice history filtered to this customer and opens detail on click", async () => {
+    renderScreen();
+
+    expect(await screen.findByText("I-001")).toBeInTheDocument();
+    const invoiceHistorySection = screen.getByText("Invoice History").closest("section");
+    expect(invoiceHistorySection).not.toBeNull();
+    expect(within(invoiceHistorySection as HTMLElement).getByText("2 INVOICES")).toBeInTheDocument();
+    expect(within(invoiceHistorySection as HTMLElement).getByText("Mar 24, 2026")).toBeInTheDocument();
+    expect(within(invoiceHistorySection as HTMLElement).getByText(/I-002\s*·\s*Mar 25, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("Final walkthrough")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /i-001/i }));
+    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1");
+  });
+
+  it("renders invoice history empty state when customer has no invoices", async () => {
+    mockedInvoiceService.listInvoices.mockResolvedValueOnce([]);
+
+    renderScreen();
+
+    expect(await screen.findByText("No invoices yet.")).toBeInTheDocument();
+  });
+
+  it("renders invoice history error state without hiding the customer details", async () => {
+    mockedInvoiceService.listInvoices.mockRejectedValueOnce(new Error("Unable to load invoices"));
+
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load invoices");
+    expect(screen.getByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
+    expect(screen.getByText("Q-001")).toBeInTheDocument();
+  });
+
+  it("renders invoice history loading state while invoices are in flight", async () => {
+    mockedInvoiceService.listInvoices.mockImplementationOnce(() => new Promise<InvoiceListItem[]>(() => {}));
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
+    expect(screen.getByText("Q-001")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading invoices...");
   });
 
   it("renders quote history empty state when customer has no quotes", async () => {

@@ -3,12 +3,15 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerInfoForm } from "@/features/customers/components/CustomerInfoForm";
+import { InvoiceHistoryList } from "@/features/customers/components/InvoiceHistoryList";
 import { QuoteHistoryList } from "@/features/customers/components/QuoteHistoryList";
 import { customerService } from "@/features/customers/services/customerService";
 import type {
   Customer,
   CustomerUpdateRequest,
 } from "@/features/customers/types/customer.types";
+import { invoiceService } from "@/features/invoices/services/invoiceService";
+import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -37,12 +40,15 @@ export function CustomerDetailScreen(): React.ReactElement {
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerQuotes, setCustomerQuotes] = useState<QuoteListItem[]>([]);
+  const [customerInvoices, setCustomerInvoices] = useState<InvoiceListItem[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
+  const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -118,6 +124,46 @@ export function CustomerDetailScreen(): React.ReactElement {
     }
 
     void fetchCustomerHubData();
+
+    return () => {
+      isActive = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) {
+      setCustomerInvoices([]);
+      setInvoiceLoadError("Missing customer id.");
+      setIsLoadingInvoices(false);
+      return;
+    }
+
+    let isActive = true;
+
+    async function fetchCustomerInvoices(): Promise<void> {
+      setIsLoadingInvoices(true);
+      setInvoiceLoadError(null);
+      setCustomerInvoices([]);
+
+      try {
+        const nextInvoices = await invoiceService.listInvoices({ customer_id: id });
+        if (isActive) {
+          setCustomerInvoices(nextInvoices);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to load invoices";
+        if (isActive) {
+          setCustomerInvoices([]);
+          setInvoiceLoadError(message);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingInvoices(false);
+        }
+      }
+    }
+
+    void fetchCustomerInvoices();
 
     return () => {
       isActive = false;
@@ -271,6 +317,13 @@ export function CustomerDetailScreen(): React.ReactElement {
             <QuoteHistoryList
               quotes={customerQuotes}
               onQuoteClick={(quoteId) => navigate(`/quotes/${quoteId}/preview`)}
+              timezone={user?.timezone}
+            />
+            <InvoiceHistoryList
+              invoices={customerInvoices}
+              isLoading={isLoadingInvoices}
+              loadError={invoiceLoadError}
+              onInvoiceClick={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
               timezone={user?.timezone}
             />
           </>
