@@ -137,8 +137,8 @@ export function QuoteEditScreen(): React.ReactElement {
   const headerTitle = draftTitle || quote?.doc_number || "Edit Quote";
   const headerSubtitle = quote
     ? draftTitle
-      ? `${quote.doc_number} · Update line items, total, and notes`
-      : "Update line items, total, and notes"
+      ? `${quote.doc_number} · QUOTE EDITOR`
+      : "QUOTE EDITOR"
     : undefined;
 
   function updateDraft(updater: (current: QuoteEditDraft) => QuoteEditDraft): void {
@@ -208,7 +208,6 @@ export function QuoteEditScreen(): React.ReactElement {
     <main className="min-h-screen bg-background pb-28">
       <ScreenHeader
         title={headerTitle}
-        eyebrow="QUOTE EDITOR"
         subtitle={headerSubtitle}
         backLabel="Cancel edit"
         onBack={onCancel}
@@ -216,7 +215,7 @@ export function QuoteEditScreen(): React.ReactElement {
 
       <form
         id="quote-edit-form"
-        className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-24 pt-20"
+        className="mx-auto w-full max-w-2xl space-y-5 px-4 pb-24 pt-20"
         onSubmit={onSave}
       >
         {isLoadingQuote ? (
@@ -267,7 +266,7 @@ export function QuoteEditScreen(): React.ReactElement {
               </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {currentDraft.lineItems.length > 0 ? (
                 currentDraft.lineItems.map((lineItem, index) => (
                   <LineItemCard
@@ -295,35 +294,37 @@ export function QuoteEditScreen(): React.ReactElement {
               + Add Line Item
             </button>
 
-            <TotalAmountSection
-              lineItemSum={lineItemSum}
-              total={currentDraft.total}
-              onTotalChange={(total) => {
-                updateDraft((nextDraft) => ({ ...nextDraft, total }));
-              }}
-            />
-
-            <section className="space-y-2">
-              <label
-                htmlFor="quote-edit-notes"
-                className="text-xs font-bold uppercase tracking-wider text-outline-variant"
-              >
-                CUSTOMER NOTES
-              </label>
-              <textarea
-                id="quote-edit-notes"
-                rows={3}
-                value={currentDraft.notes}
-                onChange={(event) =>
-                  updateDraft((nextDraft) => ({
-                    ...nextDraft,
-                    notes: event.target.value,
-                  }))
-                }
-                className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-                placeholder="Any notes to include for the customer."
+            <div className="space-y-4">
+              <TotalAmountSection
+                lineItemSum={lineItemSum}
+                total={currentDraft.total}
+                onTotalChange={(total) => {
+                  updateDraft((nextDraft) => ({ ...nextDraft, total }));
+                }}
               />
-            </section>
+
+              <section className="space-y-2">
+                <label
+                  htmlFor="quote-edit-notes"
+                  className="text-xs font-bold uppercase tracking-wider text-outline-variant"
+                >
+                  CUSTOMER NOTES
+                </label>
+                <textarea
+                  id="quote-edit-notes"
+                  rows={3}
+                  value={currentDraft.notes}
+                  onChange={(event) =>
+                    updateDraft((nextDraft) => ({
+                      ...nextDraft,
+                      notes: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  placeholder="Any notes to include for the customer."
+                />
+              </section>
+            </div>
           </>
         ) : null}
       </form>

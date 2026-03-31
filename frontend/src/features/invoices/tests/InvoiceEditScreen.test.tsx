@@ -209,7 +209,7 @@ describe("InvoiceEditScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Patio Refresh" })).toBeInTheDocument();
     expect(
-      screen.getByText("I-001 · Update line items, total, notes, and due date"),
+      screen.getByText("I-001 · INVOICE EDITOR"),
     ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/invoice title/i), {
@@ -217,7 +217,7 @@ describe("InvoiceEditScreen", () => {
     });
 
     expect(screen.getByRole("heading", { name: "I-001" })).toBeInTheDocument();
-    expect(screen.getByText("Update line items, total, notes, and due date")).toBeInTheDocument();
+    expect(screen.getByText("INVOICE EDITOR")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 

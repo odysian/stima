@@ -11,7 +11,6 @@ import type { LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/ty
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
-import { Input } from "@/shared/components/Input";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
@@ -142,8 +141,8 @@ export function InvoiceEditScreen(): React.ReactElement {
   const headerTitle = draftTitle || invoice?.doc_number || "Edit Invoice";
   const headerSubtitle = invoice
     ? draftTitle
-      ? `${invoice.doc_number} · Update line items, total, notes, and due date`
-      : "Update line items, total, notes, and due date"
+      ? `${invoice.doc_number} · INVOICE EDITOR`
+      : "INVOICE EDITOR"
     : undefined;
 
   function updateDraft(updater: (current: InvoiceEditDraft) => InvoiceEditDraft): void {
@@ -210,7 +209,6 @@ export function InvoiceEditScreen(): React.ReactElement {
     <main className="min-h-screen bg-background pb-28">
       <ScreenHeader
         title={headerTitle}
-        eyebrow="INVOICE EDITOR"
         subtitle={headerSubtitle}
         backLabel="Cancel edit"
         onBack={onCancel}
@@ -218,7 +216,7 @@ export function InvoiceEditScreen(): React.ReactElement {
 
       <form
         id="invoice-edit-form"
-        className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-24 pt-20"
+        className="mx-auto w-full max-w-2xl space-y-5 px-4 pb-24 pt-20"
         onSubmit={onSave}
       >
         {isLoadingInvoice ? (
@@ -237,26 +235,48 @@ export function InvoiceEditScreen(): React.ReactElement {
 
         {invoice && currentDraft ? (
           <>
-            <section className="space-y-2">
-              <label
-                htmlFor="invoice-edit-title"
-                className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
-              >
-                INVOICE TITLE
-              </label>
-              <input
-                id="invoice-edit-title"
-                type="text"
-                value={currentDraft.title}
-                onChange={(event) =>
-                  updateDraft((nextDraft) => ({
-                    ...nextDraft,
-                    title: event.target.value,
-                  }))}
-                className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                placeholder="Front yard refresh (optional)"
-                maxLength={120}
-              />
+            <section className="grid gap-4 md:grid-cols-2 md:items-end">
+              <div className="space-y-2">
+                <label
+                  htmlFor="invoice-edit-title"
+                  className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
+                >
+                  INVOICE TITLE
+                </label>
+                <input
+                  id="invoice-edit-title"
+                  type="text"
+                  value={currentDraft.title}
+                  onChange={(event) =>
+                    updateDraft((nextDraft) => ({
+                      ...nextDraft,
+                      title: event.target.value,
+                    }))}
+                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="Front yard refresh (optional)"
+                  maxLength={120}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="invoice-edit-due-date"
+                  className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
+                >
+                  INVOICE DUE DATE
+                </label>
+                <input
+                  id="invoice-edit-due-date"
+                  type="date"
+                  value={currentDraft.dueDate}
+                  onChange={(event) =>
+                    updateDraft((nextDraft) => ({
+                      ...nextDraft,
+                      dueDate: event.target.value,
+                    }))}
+                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
             </section>
 
             <div className="flex items-end justify-between border-b border-outline-variant/20 pb-2">
@@ -268,7 +288,7 @@ export function InvoiceEditScreen(): React.ReactElement {
               </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {currentDraft.lineItems.length > 0 ? (
                 currentDraft.lineItems.map((lineItem, index) => (
                   <LineItemCard
@@ -296,48 +316,36 @@ export function InvoiceEditScreen(): React.ReactElement {
               + Add Line Item
             </button>
 
-            <TotalAmountSection
-              lineItemSum={lineItemSum}
-              total={currentDraft.total}
-              onTotalChange={(total) => {
-                updateDraft((nextDraft) => ({ ...nextDraft, total }));
-              }}
-            />
-
-            <section className="space-y-2">
-              <label
-                htmlFor="invoice-edit-notes"
-                className="text-xs font-bold uppercase tracking-wider text-outline-variant"
-              >
-                CUSTOMER NOTES
-              </label>
-              <textarea
-                id="invoice-edit-notes"
-                rows={3}
-                value={currentDraft.notes}
-                onChange={(event) =>
-                  updateDraft((nextDraft) => ({
-                    ...nextDraft,
-                    notes: event.target.value,
-                  }))}
-                className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-                placeholder="Any notes to include for the customer."
+            <div className="space-y-4">
+              <TotalAmountSection
+                lineItemSum={lineItemSum}
+                total={currentDraft.total}
+                onTotalChange={(total) => {
+                  updateDraft((nextDraft) => ({ ...nextDraft, total }));
+                }}
               />
-            </section>
 
-            <section className="rounded-lg bg-surface-container-low p-4">
-              <Input
-                id="invoice-edit-due-date"
-                label="Invoice due date"
-                type="date"
-                value={currentDraft.dueDate}
-                onChange={(event) =>
-                  updateDraft((nextDraft) => ({
-                    ...nextDraft,
-                    dueDate: event.target.value,
-                  }))}
-              />
-            </section>
+              <section className="space-y-2">
+                <label
+                  htmlFor="invoice-edit-notes"
+                  className="text-xs font-bold uppercase tracking-wider text-outline-variant"
+                >
+                  CUSTOMER NOTES
+                </label>
+                <textarea
+                  id="invoice-edit-notes"
+                  rows={3}
+                  value={currentDraft.notes}
+                  onChange={(event) =>
+                    updateDraft((nextDraft) => ({
+                      ...nextDraft,
+                      notes: event.target.value,
+                    }))}
+                  className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  placeholder="Any notes to include for the customer."
+                />
+              </section>
+            </div>
           </>
         ) : null}
       </form>

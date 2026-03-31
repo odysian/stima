@@ -198,7 +198,7 @@ describe("QuoteEditScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Patio Refresh" })).toBeInTheDocument();
     expect(
-      screen.getByText("Q-001 · Update line items, total, and notes"),
+      screen.getByText("Q-001 · QUOTE EDITOR"),
     ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/quote title/i), {
@@ -206,7 +206,7 @@ describe("QuoteEditScreen", () => {
     });
 
     expect(screen.getByRole("heading", { name: "Q-001" })).toBeInTheDocument();
-    expect(screen.getByText("Update line items, total, and notes")).toBeInTheDocument();
+    expect(screen.getByText("QUOTE EDITOR")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
