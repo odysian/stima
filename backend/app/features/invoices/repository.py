@@ -373,8 +373,7 @@ class InvoiceRepository:
             await self._replace_line_items(invoice.id, line_items)
 
         await self._session.flush()
-        await self._session.refresh(invoice)
-        await self._session.refresh(invoice, attribute_names=["line_items"])
+        await self.refresh(invoice)
         return invoice
 
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None:
