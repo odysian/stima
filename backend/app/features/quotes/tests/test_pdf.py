@@ -15,6 +15,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
@@ -139,6 +140,46 @@ async def test_generate_pdf_includes_logo_data_uri_when_logo_exists(
     assert _override_quote_service_dependency.last_context.logo_data_uri.startswith(
         "data:image/png;base64,"
     )
+
+
+async def test_generate_pdf_handles_sparse_quote_context(
+    client: AsyncClient,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(
+        client,
+        csrf_token,
+        customer_id,
+        payload={
+            "title": None,
+            "line_items": [
+                {
+                    "description": "Install mulch",
+                    "details": None,
+                    "price": None,
+                }
+            ],
+            "total_amount": None,
+            "notes": None,
+        },
+    )
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert _override_quote_service_dependency.last_context is not None
+    assert _override_quote_service_dependency.last_context.title is None
+    assert _override_quote_service_dependency.last_context.logo_data_uri is None
+    assert _override_quote_service_dependency.last_context.notes is None
+    assert _override_quote_service_dependency.last_context.total_amount is None
+    assert len(_override_quote_service_dependency.last_context.line_items) == 1
+    assert _override_quote_service_dependency.last_context.line_items[0].details is None
 
 
 async def test_generate_pdf_does_not_downgrade_shared_quote(client: AsyncClient) -> None:
@@ -419,6 +460,73 @@ async def test_public_share_endpoint_includes_logo_data_uri_when_logo_exists(
     assert response.status_code == 200
     assert _override_quote_service_dependency.last_context is not None
     assert _override_quote_service_dependency.last_context.logo_data_uri is not None
+
+
+async def test_public_share_endpoint_passes_contractor_contact_fields_to_pdf_render(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_user_email_and_phone_number(
+        db_session,
+        email=credentials["email"],
+        updated_email="quotes@example.com",
+        phone_number="+1-555-111-2222",
+    )
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    client.cookies.clear()
+    response = await client.get(f"/share/{share_token}")
+
+    assert response.status_code == 200
+    assert _override_quote_service_dependency.last_context is not None
+    assert _override_quote_service_dependency.last_context.phone_number == "+1-555-111-2222"
+    assert _override_quote_service_dependency.last_context.contractor_email == "quotes@example.com"
+
+
+async def test_render_context_queries_return_same_contractor_contact_fields_for_shared_quotes(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_user_email_and_phone_number(
+        db_session,
+        email=credentials["email"],
+        updated_email="quotes@example.com",
+        phone_number="+1-555-111-2222",
+    )
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    user = await _get_user_by_email(db_session, "quotes@example.com")
+    repository = QuoteRepository(db_session)
+    authenticated_context = await repository.get_render_context(UUID(quote["id"]), user.id)
+    shared_context = await repository.get_render_context_by_share_token(share_token)
+
+    assert authenticated_context is not None
+    assert shared_context is not None
+    assert authenticated_context.phone_number == "+1-555-111-2222"
+    assert shared_context.phone_number == authenticated_context.phone_number
+    assert authenticated_context.contractor_email == "quotes@example.com"
+    assert shared_context.contractor_email == authenticated_context.contractor_email
 
 
 async def test_public_share_endpoint_returns_404_for_unknown_token(client: AsyncClient) -> None:
@@ -744,23 +852,32 @@ async def _create_customer(client: AsyncClient, csrf_token: str) -> str:
     return response.json()["id"]
 
 
-async def _create_quote(client: AsyncClient, csrf_token: str, customer_id: str) -> dict[str, str]:
+async def _create_quote(
+    client: AsyncClient,
+    csrf_token: str,
+    customer_id: str,
+    payload: dict[str, object] | None = None,
+) -> dict[str, str]:
+    quote_payload: dict[str, object] = {
+        "customer_id": customer_id,
+        "transcript": "Install mulch and edge beds",
+        "line_items": [
+            {
+                "description": "Install mulch",
+                "details": "5 yards",
+                "price": None,
+            }
+        ],
+        "total_amount": 125,
+        "notes": "Schedule for next Tuesday",
+        "source_type": "text",
+    }
+    if payload is not None:
+        quote_payload.update(payload)
+
     response = await client.post(
         "/api/quotes",
-        json={
-            "customer_id": customer_id,
-            "transcript": "Install mulch and edge beds",
-            "line_items": [
-                {
-                    "description": "Install mulch",
-                    "details": "5 yards",
-                    "price": None,
-                }
-            ],
-            "total_amount": 125,
-            "notes": "Schedule for next Tuesday",
-            "source_type": "text",
-        },
+        json=quote_payload,
         headers={"X-CSRF-Token": csrf_token},
     )
     assert response.status_code == 201
@@ -793,3 +910,22 @@ def _credentials() -> dict[str, str]:
         "email": f"user-{suffix}@example.com",
         "password": "StrongPass123!",
     }
+
+
+async def _set_user_email_and_phone_number(
+    db_session: AsyncSession,
+    *,
+    email: str,
+    updated_email: str,
+    phone_number: str | None,
+) -> None:
+    user = await _get_user_by_email(db_session, email)
+    user.email = updated_email
+    user.phone_number = phone_number
+    await db_session.commit()
+
+
+async def _get_user_by_email(db_session: AsyncSession, email: str) -> User:
+    user = await db_session.scalar(select(User).where(User.email == email))
+    assert user is not None
+    return user

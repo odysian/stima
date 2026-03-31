@@ -28,6 +28,15 @@ def _make_context(
     line_item_price: Decimal | None,
     total: Decimal | None,
     logo_data_uri: str | None = None,
+    first_name: str | None = "Taylor",
+    last_name: str | None = "Owner",
+    phone_number: str | None = None,
+    contractor_email: str | None = None,
+    customer_phone: str | None = None,
+    customer_email: str | None = None,
+    customer_address: str | None = None,
+    notes: str | None = None,
+    line_item_details: str | None = None,
 ) -> QuoteRenderContext:
     created_at = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
     return QuoteRenderContext(
@@ -35,23 +44,25 @@ def _make_context(
         user_id=uuid4(),
         customer_id=uuid4(),
         business_name="Acme Landscaping",
-        first_name="Taylor",
-        last_name="Owner",
+        first_name=first_name,
+        last_name=last_name,
+        phone_number=phone_number,
+        contractor_email=contractor_email,
         logo_path=None,
         logo_data_uri=logo_data_uri,
         customer_name="Jamie Customer",
-        customer_phone=None,
-        customer_email=None,
-        customer_address=None,
+        customer_phone=customer_phone,
+        customer_email=customer_email,
+        customer_address=customer_address,
         doc_number="Q-201",
         title=title,
         status="ready",
         total_amount=total,
-        notes=None,
+        notes=notes,
         line_items=[
             QuoteRenderLineItem(
                 description="Leaf cleanup",
-                details=None,
+                details=line_item_details,
                 price=line_item_price,
             )
         ],
@@ -102,7 +113,7 @@ def test_render_shows_updated_date_only_when_delta_exceeds_threshold(
     assert ("Updated" in captured_html[0]) is should_show_updated
 
 
-def test_render_blanks_null_line_item_and_total_prices(
+def test_render_shows_em_dash_for_null_line_item_and_total_prices(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured_html: list[str] = []
@@ -133,16 +144,17 @@ def test_render_blanks_null_line_item_and_total_prices(
     rendered_html = captured_html[0]
     assert "$0.00" not in rendered_html
     assert "$None" not in rendered_html
+    assert rendered_html.count("&mdash;") == 2
     assert re.search(
-        r"<td>Leaf cleanup</td>\s*<td class=\"details\"></td>\s*<td class=\"price-col\">\s*</td>",
+        (
+            r"<td>\s*<span class=\"line-item-description\">Leaf cleanup</span>\s*</td>\s*"
+            r"<td class=\"price-col\">\s*&mdash;\s*</td>"
+        ),
         rendered_html,
         re.DOTALL,
     )
     assert re.search(
-        (
-            r"<tr class=\"total-row\">\s*<td colspan=\"2\">Total</td>\s*"
-            r"<td class=\"price-col\">\s*</td>"
-        ),
+        r"<section class=\"total-block\">.*?<p class=\"total-amount\">\s*&mdash;\s*</p>",
         rendered_html,
         re.DOTALL,
     )
@@ -186,8 +198,114 @@ def test_render_shows_quote_title_only_when_present(
 
     assert result == b"fake-pdf"
     assert len(captured_html) == 1
-    assert ("Quote Title" in captured_html[0]) is should_render_title
-    assert ("Front Yard Refresh" in captured_html[0]) is should_render_title
+    rendered_html = captured_html[0]
+    assert ("Quote Title" in rendered_html) is False
+    assert ("Front Yard Refresh" in rendered_html) is should_render_title
+    assert ('class="quote-title"' in rendered_html) is should_render_title
+
+
+def test_render_stacks_line_item_details_in_description_column(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            line_item_details="Bag and haul debris",
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert "line-item-details" in rendered_html
+    assert re.search(
+        (
+            r"<td>\s*<span class=\"line-item-description\">Leaf cleanup</span>\s*"
+            r"<span class=\"line-item-details\">Bag and haul debris</span>\s*</td>"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert "<th>Details</th>" not in rendered_html
+
+
+def test_render_includes_contractor_contact_details_when_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            phone_number="+1-555-111-2222",
+            contractor_email="owner@example.com",
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert "+1-555-111-2222" in rendered_html
+    assert "owner@example.com" in rendered_html
+
+
+def test_render_hides_owner_name_when_both_name_fields_are_null(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            first_name=None,
+            last_name=None,
+        )
+    )
+
+    assert result == b"fake-pdf"
+    assert 'class="owner-name"' not in captured_html[0]
 
 
 def test_render_includes_logo_image_only_when_logo_data_uri_is_present(
@@ -220,7 +338,91 @@ def test_render_includes_logo_image_only_when_logo_data_uri_is_present(
     assert result == b"fake-pdf"
     assert len(captured_html) == 1
     assert 'class="company-logo"' in captured_html[0]
-    assert "max-height: 48px" in captured_html[0]
+    assert "max-height: 56px" in captured_html[0]
+
+
+def test_render_uses_a4_page_size_and_refined_total_and_notes_styles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            notes="Call before arrival",
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert "@page" in rendered_html
+    assert "size: A4;" in rendered_html
+    assert "margin: 18mm;" in rendered_html
+    assert ".total-amount" in rendered_html
+    assert "font-weight: 700;" in rendered_html
+    assert "font-size: 16px;" in rendered_html
+    assert re.search(r"\.total-block\s*\{[^}]*border-top:", rendered_html, re.DOTALL)
+    assert re.search(r"\.notes\s*\{[^}]*border-left:", rendered_html, re.DOTALL)
+    assert not re.search(r"\.notes\s*\{[^}]*\bborder:", rendered_html, re.DOTALL)
+    assert not re.search(r"\.notes\s*\{[^}]*background(?:-color)?:", rendered_html, re.DOTALL)
+    line_items_table, total_block = rendered_html.split('<section class="total-block">', maxsplit=1)
+    assert "</table>" in line_items_table
+    assert "<table" not in total_block
+
+
+def test_render_handles_sparse_quote_without_blank_placeholders(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            title=None,
+            line_item_price=None,
+            total=None,
+            logo_data_uri=None,
+            customer_phone=None,
+            customer_email=None,
+            customer_address=None,
+            notes=None,
+            line_item_details=None,
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert 'class="quote-title"' not in rendered_html
+    assert 'class="company-logo"' not in rendered_html
+    assert 'class="notes"' not in rendered_html
+    assert 'class="line-item-details"' not in rendered_html
+    assert rendered_html.count("&mdash;") == 2
 
 
 def test_build_render_context_formats_dates_in_business_timezone() -> None:
@@ -264,3 +466,5 @@ def test_build_render_context_formats_dates_in_business_timezone() -> None:
     assert context.issued_date == "Mar 24, 2026"
     assert context.updated_date == "Mar 24, 2026"
     assert context.title == "Front Yard Refresh"
+    assert context.phone_number is None
+    assert context.contractor_email == "owner@example.com"
