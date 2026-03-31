@@ -341,7 +341,7 @@ def test_render_includes_logo_image_only_when_logo_data_uri_is_present(
     assert "max-height: 56px" in captured_html[0]
 
 
-def test_render_uses_a4_page_size_and_refined_total_and_notes_styles(
+def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured_html: list[str] = []
@@ -372,11 +372,47 @@ def test_render_uses_a4_page_size_and_refined_total_and_notes_styles(
     assert "@page" in rendered_html
     assert "size: A4;" in rendered_html
     assert "margin: 18mm;" in rendered_html
+    assert "@bottom-center" in rendered_html
+    assert 'content: "Page " counter(page) " of " counter(pages);' in rendered_html
+    assert "page-break-inside: avoid;" in rendered_html
+    assert "overflow-wrap: break-word;" in rendered_html
+    assert re.search(r"\.meta-right\s*\{[^}]*text-align:\s*right;", rendered_html, re.DOTALL)
+    assert 'class="meta-right"' in rendered_html
+    assert re.search(
+        (
+            r"<table class=\"meta-grid\">.*?<tr>\s*<td>.*?</td>\s*"
+            r"<td class=\"meta-right\">"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.header-doc-type\s*\{[^}]*font-size:\s*28px;[^}]*text-transform:\s*uppercase;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        (
+            r"<td class=\"header-logo-cell\">\s*"
+            r"(?:<img class=\"company-logo\"[^>]*>\s*)?"
+            r"<p class=\"header-doc-type\">Quote</p>\s*</td>"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert "table.line-items thead th.price-col" in rendered_html
+    assert re.search(
+        r"table\.line-items thead th\.price-col\s*\{[^}]*text-align:\s*right;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(r"<th class=\"price-col\">Price</th>", rendered_html)
     assert ".total-amount" in rendered_html
     assert "font-weight: 700;" in rendered_html
     assert "font-size: 16px;" in rendered_html
     assert re.search(r"\.total-block\s*\{[^}]*border-top:", rendered_html, re.DOTALL)
     assert re.search(r"\.notes\s*\{[^}]*border-left:", rendered_html, re.DOTALL)
+    assert "#9ca3af" in rendered_html
     assert not re.search(r"\.notes\s*\{[^}]*\bborder:", rendered_html, re.DOTALL)
     assert not re.search(r"\.notes\s*\{[^}]*background(?:-color)?:", rendered_html, re.DOTALL)
     line_items_table, total_block = rendered_html.split('<section class="total-block">', maxsplit=1)
@@ -418,6 +454,7 @@ def test_render_handles_sparse_quote_without_blank_placeholders(
 
     assert result == b"fake-pdf"
     rendered_html = captured_html[0]
+    assert 'class="header-doc-type"' in rendered_html
     assert 'class="quote-title"' not in rendered_html
     assert 'class="company-logo"' not in rendered_html
     assert 'class="notes"' not in rendered_html
