@@ -242,9 +242,9 @@ describe("InvoiceEditScreen", () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "I-001" })).toBeInTheDocument();
-    expect(screen.getByLabelText(/invoice due date/i)).toHaveValue("");
+    expect(await screen.findByLabelText(/invoice due date/i)).toHaveValue("");
 
-    fireEvent.change(screen.getByLabelText(/customer notes/i), {
+    fireEvent.change(await screen.findByLabelText(/customer notes/i), {
       target: { value: "Updated note without a due date" },
     });
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
