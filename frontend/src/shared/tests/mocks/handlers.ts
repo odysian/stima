@@ -320,6 +320,7 @@ export const handlers = [
         notes: "Thanks for your business",
         shared_at: null,
         share_token: null,
+        linked_invoice: null,
         line_items: [
           {
             id: "line-1",
@@ -411,6 +412,159 @@ export const handlers = [
         ],
         created_at: "2026-03-20T00:00:00.000Z",
         updated_at: "2026-03-20T00:05:00.000Z",
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.post("/api/quotes/:id/convert-to-invoice", ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    return HttpResponse.json(
+      {
+        id: "invoice-1",
+        customer_id: "cust-1",
+        doc_number: "I-001",
+        title: "Spring cleanup",
+        status: "draft",
+        total_amount: 120,
+        notes: "Thanks for your business",
+        due_date: "2026-04-19",
+        shared_at: null,
+        share_token: null,
+        source_document_id: "quote-1",
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
+      { status: 201 },
+    );
+  }),
+
+  http.get("/api/invoices/:id", ({ params }) => {
+    const invoiceId = String(params.id);
+
+    return HttpResponse.json(
+      {
+        id: invoiceId,
+        customer_id: "cust-1",
+        doc_number: "I-001",
+        title: "Spring cleanup",
+        status: "draft",
+        total_amount: 120,
+        notes: "Thanks for your business",
+        due_date: "2026-04-19",
+        shared_at: null,
+        share_token: null,
+        source_document_id: "quote-1",
+        source_quote_number: "Q-001",
+        customer: {
+          id: "cust-1",
+          name: "Alice Johnson",
+          email: "alice@example.com",
+          phone: "+1-555-0100",
+        },
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.patch("/api/invoices/:id", async ({ request, params }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const invoiceId = String(params.id);
+    const body = (await request.json()) as { due_date: string };
+    return HttpResponse.json(
+      {
+        id: invoiceId,
+        customer_id: "cust-1",
+        doc_number: "I-001",
+        title: "Spring cleanup",
+        status: "draft",
+        total_amount: 120,
+        notes: "Thanks for your business",
+        due_date: body.due_date,
+        shared_at: null,
+        share_token: null,
+        source_document_id: "quote-1",
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:10:00.000Z",
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.post("/api/invoices/:id/pdf", ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    return new HttpResponse("mock-invoice-pdf-bytes", {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+      },
+    });
+  }),
+
+  http.post("/api/invoices/:id/share", ({ request, params }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const invoiceId = String(params.id);
+    return HttpResponse.json(
+      {
+        id: invoiceId,
+        customer_id: "cust-1",
+        doc_number: "I-001",
+        title: "Spring cleanup",
+        status: "sent",
+        total_amount: 120,
+        notes: "Thanks for your business",
+        due_date: "2026-04-19",
+        shared_at: "2026-03-20T00:15:00.000Z",
+        share_token: "invoice-share-token-1",
+        source_document_id: "quote-1",
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:15:00.000Z",
       },
       { status: 200 },
     );

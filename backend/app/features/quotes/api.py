@@ -20,6 +20,8 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
+from app.features.invoices.schemas import InvoiceResponse
+from app.features.invoices.service import InvoiceService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
 from app.features.quotes.schemas import (
@@ -37,6 +39,7 @@ from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.shared.dependencies import (
     get_current_user,
     get_extraction_service,
+    get_invoice_service,
     get_quote_email_delivery_service,
     get_quote_service,
     require_csrf,
@@ -229,6 +232,25 @@ async def delete_quote(
 
 
 @router.post(
+    "/{quote_id}/convert-to-invoice",
+    response_model=InvoiceResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+async def convert_quote_to_invoice(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+) -> InvoiceResponse:
+    """Convert an approved quote into a linked invoice."""
+    try:
+        invoice = await invoice_service.convert_quote_to_invoice(user, quote_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return InvoiceResponse.model_validate(invoice)
+
+
+@router.post(
     "/{quote_id}/pdf",
     dependencies=[Depends(require_csrf)],
 )
@@ -336,25 +358,38 @@ async def mark_quote_lost(
 
 
 @public_router.get("/share/{share_token}")
-async def get_shared_quote_pdf(
+async def get_shared_document_pdf(
     share_token: str,
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
 ) -> StreamingResponse:
-    """Render and stream a public quote PDF without auth."""
+    """Render and stream a public quote or invoice PDF without auth."""
     try:
         doc_number, pdf_bytes = await quote_service.generate_shared_pdf(share_token)
+        filename = f'inline; filename="quote-{doc_number}.pdf"'
     except QuoteServiceError as exc:
-        raise HTTPException(
-            status_code=exc.status_code,
-            detail=exc.detail,
-            headers=_NOINDEX_HEADERS,
-        ) from exc
+        if exc.status_code != 404:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail=exc.detail,
+                headers=_NOINDEX_HEADERS,
+            ) from exc
+
+        try:
+            doc_number, pdf_bytes = await invoice_service.generate_shared_pdf(share_token)
+            filename = f'inline; filename="invoice-{doc_number}.pdf"'
+        except QuoteServiceError as invoice_exc:
+            raise HTTPException(
+                status_code=invoice_exc.status_code,
+                detail=invoice_exc.detail,
+                headers=_NOINDEX_HEADERS,
+            ) from invoice_exc
 
     return StreamingResponse(
         iter((pdf_bytes,)),
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="quote-{doc_number}.pdf"',
+            "Content-Disposition": filename,
             "Cache-Control": "no-store",
             "X-Robots-Tag": "noindex",
         },
@@ -380,7 +415,7 @@ async def get_public_quote(
         ) from exc
 
     logo_url = str(request.url_for("get_public_quote_logo", share_token=share_token))
-    download_url = str(request.url_for("get_shared_quote_pdf", share_token=share_token))
+    download_url = str(request.url_for("get_shared_document_pdf", share_token=share_token))
     return PublicQuoteResponse(
         business_name=_resolve_public_business_name(quote),
         customer_name=quote.customer_name,

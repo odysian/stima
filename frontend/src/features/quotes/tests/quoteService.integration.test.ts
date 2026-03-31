@@ -150,6 +150,7 @@ describe("quoteService integration (MSW)", () => {
       notes: "Thank you",
       shared_at: null,
       share_token: null,
+      linked_invoice: null,
       line_items: [
         { id: "line-1", description: "Mulch", details: "5 yards", price: 120, sort_order: 0 },
       ],
@@ -164,6 +165,52 @@ describe("quoteService integration (MSW)", () => {
     expect(quote.customer_name).toBe("Alice Johnson");
     expect(quote.customer_email).toBe("alice@example.com");
     expect(quote.customer_phone).toBe("+1-555-0100");
+    expect(quote.linked_invoice).toBeNull();
+  });
+
+  it("convertToInvoice posts to the conversion endpoint and returns the created invoice", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.post("/api/quotes/:id/convert-to-invoice", ({ request, params }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        return HttpResponse.json(
+          {
+            id: "invoice-1",
+            customer_id: "cust-1",
+            doc_number: "I-001",
+            title: "Front Yard Refresh",
+            status: "draft",
+            total_amount: 120,
+            notes: "Thank you",
+            due_date: "2026-04-19",
+            shared_at: null,
+            share_token: null,
+            source_document_id: String(params.id),
+            line_items: [
+              {
+                id: "line-1",
+                description: "Mulch",
+                details: "5 yards",
+                price: 120,
+                sort_order: 0,
+              },
+            ],
+            created_at: "2026-03-20T00:00:00.000Z",
+            updated_at: "2026-03-20T00:00:00.000Z",
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const invoice = await quoteService.convertToInvoice("quote-1");
+
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(invoice.doc_number).toBe("I-001");
+    expect(invoice.source_document_id).toBe("quote-1");
+    expect(invoice.due_date).toBe("2026-04-19");
   });
 
   it("sendQuoteEmail posts to the email delivery endpoint and returns the updated quote", async () => {

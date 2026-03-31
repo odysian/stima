@@ -1,3 +1,4 @@
+import type { Invoice } from "@/features/invoices/types/invoice.types";
 import type {
   ExtractionResult,
   Quote,
@@ -130,6 +131,12 @@ function markQuoteLost(id: string): Promise<Quote> {
   });
 }
 
+function convertToInvoice(id: string): Promise<Invoice> {
+  return request<Invoice>(`/api/quotes/${id}/convert-to-invoice`, {
+    method: "POST",
+  });
+}
+
 export const quoteService = {
   extract,
   convertNotes,
@@ -144,4 +151,5 @@ export const quoteService = {
   sendQuoteEmail,
   markQuoteWon,
   markQuoteLost,
+  convertToInvoice,
 };

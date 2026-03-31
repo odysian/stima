@@ -21,6 +21,7 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     sendQuoteEmail: vi.fn(),
     markQuoteWon: vi.fn(),
     markQuoteLost: vi.fn(),
+    convertToInvoice: vi.fn(),
   },
 }));
 
@@ -44,6 +45,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     notes: "Thanks for your business",
     shared_at: null,
     share_token: null,
+    linked_invoice: null,
     line_items: [
       {
         id: "line-1",
@@ -99,6 +101,7 @@ function renderScreen(
       <Routes>
         <Route path="/quotes/:id/preview" element={<QuotePreview />} />
         <Route path="/quotes/:id/edit" element={<div>Edit Quote Screen</div>} />
+        <Route path="/invoices/:id" element={<div>Invoice Detail Screen</div>} />
         <Route path="/" element={<div>Quote List Screen</div>} />
       </Routes>
     </MemoryRouter>,
@@ -123,6 +126,30 @@ beforeEach(() => {
   mockedQuoteService.markQuoteLost.mockResolvedValue(
     makeQuoteResponse({ status: "declined" }),
   );
+  mockedQuoteService.convertToInvoice.mockResolvedValue({
+    id: "invoice-1",
+    customer_id: "cust-1",
+    doc_number: "I-001",
+    title: "Spring Cleanup",
+    status: "draft",
+    total_amount: 120,
+    notes: "Thanks for your business",
+    due_date: "2026-04-19",
+    shared_at: null,
+    share_token: null,
+    source_document_id: "quote-1",
+    line_items: [
+      {
+        id: "line-1",
+        description: "Brown mulch",
+        details: "5 yards",
+        price: 120,
+        sort_order: 0,
+      },
+    ],
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T00:00:00.000Z",
+  });
   createObjectUrlMock.mockReturnValue("blob:quote-preview");
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
@@ -179,6 +206,95 @@ describe("QuotePreview", () => {
       expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
     },
   );
+
+  it("shows convert to invoice only for approved quotes without a linked invoice", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "approved", share_token: "share-token-1" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    expect(screen.getByRole("button", { name: /convert to invoice/i })).toBeInTheDocument();
+    expect(screen.getByText("No invoice yet")).toBeInTheDocument();
+  });
+
+  it("shows the linked invoice summary when the approved quote already has one", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        status: "approved",
+        share_token: "share-token-1",
+        linked_invoice: {
+          id: "invoice-1",
+          doc_number: "I-001",
+          status: "sent",
+          due_date: "2026-04-19",
+          total_amount: 120,
+          created_at: "2026-03-20T00:00:00.000Z",
+        },
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    expect(screen.getByText("I-001")).toBeInTheDocument();
+    expect(screen.getByText("Sent")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open invoice/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /convert to invoice/i })).not.toBeInTheDocument();
+  });
+
+  it("converts an approved quote to an invoice and navigates to the invoice detail screen", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "approved", share_token: "share-token-1" }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /convert to invoice/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.convertToInvoice).toHaveBeenCalledWith("quote-1");
+    });
+
+    expect(await screen.findByText("Invoice Detail Screen")).toBeInTheDocument();
+  });
+
+  it("recovers from duplicate invoice conflicts using structured HTTP errors", async () => {
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(makeQuoteDetail({ status: "approved", share_token: "share-token-1" }))
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "approved",
+          linked_invoice: {
+            id: "invoice-1",
+            doc_number: "I-001",
+            status: "draft",
+            due_date: "2026-04-19",
+            total_amount: 120,
+            created_at: "2026-03-20T00:00:00.000Z",
+          },
+        }),
+      );
+    mockedQuoteService.convertToInvoice.mockRejectedValueOnce(
+      new HttpRequestError("conflict", 409, {
+        detail: "An invoice already exists for this quote",
+      }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /convert to invoice/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.convertToInvoice).toHaveBeenCalledWith("quote-1");
+    });
+    await waitFor(() => {
+      expect(mockedQuoteService.getQuote).toHaveBeenCalledTimes(2);
+    });
+
+    expect(await screen.findByText("Invoice Detail Screen")).toBeInTheDocument();
+  });
 
   it.each(["shared", "viewed"] as const)(
     "hides edit while keeping follow-up actions available for %s quotes",

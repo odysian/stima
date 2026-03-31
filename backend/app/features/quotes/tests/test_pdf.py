@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
+from app.features.invoices.repository import InvoiceRepository
+from app.features.invoices.service import InvoiceService
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.service import QuoteService
@@ -24,7 +26,7 @@ from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError
 from app.main import app
 from app.shared import event_logger
-from app.shared.dependencies import get_quote_service, get_storage_service
+from app.shared.dependencies import get_invoice_service, get_quote_service, get_storage_service
 
 pytestmark = pytest.mark.asyncio
 
@@ -95,9 +97,21 @@ def _override_quote_service_dependency(
             storage_service=_storage_service_dependency,
         )
 
+    async def _override_get_invoice_service(
+        db: Annotated[AsyncSession, Depends(get_db)],
+    ) -> InvoiceService:
+        return InvoiceService(
+            invoice_repository=InvoiceRepository(db),
+            quote_repository=QuoteRepository(db),
+            pdf_integration=pdf_integration,
+            storage_service=_storage_service_dependency,
+        )
+
     app.dependency_overrides[get_quote_service] = _override_get_quote_service
+    app.dependency_overrides[get_invoice_service] = _override_get_invoice_service
     yield pdf_integration
     app.dependency_overrides.pop(get_quote_service, None)
+    app.dependency_overrides.pop(get_invoice_service, None)
 
 
 async def test_generate_pdf_returns_pdf_and_sets_ready(client: AsyncClient) -> None:
@@ -830,6 +844,71 @@ async def test_generate_pdf_logs_and_omits_logo_when_storage_fetch_fails(
     assert _override_quote_service_dependency.last_context is not None
     assert _override_quote_service_dependency.last_context.logo_data_uri is None
     assert any("omitting logo" in record.message for record in caplog.records)
+
+
+async def test_invoice_pdf_generation_sets_ready_and_renders_invoice_context(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    response = await client.post(
+        f"/api/invoices/{invoice_id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"] == 'inline; filename="invoice-I-001.pdf"'
+    assert response.content == b"PDF for I-001"
+    assert _override_quote_service_dependency.last_context is not None
+    assert _override_quote_service_dependency.last_context.doc_label == "Invoice"
+    assert _override_quote_service_dependency.last_context.due_date is not None
+
+    detail_response = await client.get(f"/api/invoices/{invoice_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["status"] == "ready"
+
+
+async def test_invoice_share_returns_sent_and_raw_share_token_renders_pdf(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    share_response = await client.post(
+        f"/api/invoices/{invoice_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_payload = share_response.json()
+    assert share_payload["status"] == "sent"
+    assert share_payload["share_token"]
+
+    pdf_response = await client.get(f"/share/{share_payload['share_token']}")
+    assert pdf_response.status_code == 200
+    assert pdf_response.headers["content-disposition"] == 'inline; filename="invoice-I-001.pdf"'
+    assert pdf_response.content == b"PDF for I-001"
 
 
 async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) -> str:
