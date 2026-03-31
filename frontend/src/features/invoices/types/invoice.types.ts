@@ -1,4 +1,5 @@
-import type { LineItem, InvoiceStatus } from "@/features/quotes/types/quote.types";
+import type { InvoiceStatus } from "@/features/invoices/types/invoice-status";
+import type { LineItem } from "@/features/quotes/types/quote.types";
 
 export interface Invoice {
   id: string;

@@ -16,6 +16,8 @@ vi.mock("@/features/invoices/services/invoiceService", () => ({
 }));
 
 const mockedInvoiceService = vi.mocked(invoiceService);
+const createObjectUrlMock = vi.fn(() => "blob:invoice-preview");
+const revokeObjectUrlMock = vi.fn();
 
 function makeInvoiceDetail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
   return {
@@ -107,6 +109,16 @@ beforeEach(() => {
       updated_at: "2026-03-20T00:15:00.000Z",
     }),
   );
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: createObjectUrlMock,
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: revokeObjectUrlMock,
+  });
 
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -154,5 +166,30 @@ describe("InvoiceDetailScreen", () => {
       "http://localhost:3000/share/invoice-share-token-1",
     );
     expect(await screen.findByText("Invoice link copied to clipboard.")).toBeInTheDocument();
+  });
+
+  it("clears a generated local PDF after saving a due date change", async () => {
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open PDF" }));
+
+    const openPdfLink = (await screen.findByText("Open PDF")).closest("a");
+    expect(openPdfLink).toHaveAttribute("href", "blob:invoice-preview");
+
+    const dueDateInput = screen.getByLabelText(/invoice due date/i);
+    fireEvent.change(dueDateInput, { target: { value: "2026-04-30" } });
+    fireEvent.click(screen.getByRole("button", { name: /save due date/i }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.updateInvoice).toHaveBeenCalledWith("invoice-1", {
+        due_date: "2026-04-30",
+      });
+    });
+
+    await waitFor(() => {
+      expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:invoice-preview");
+    });
+    expect(screen.queryByText("Open PDF")?.closest("a")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open PDF" })).toBeInTheDocument();
   });
 });

@@ -348,8 +348,5 @@ def _format_timestamp(value: datetime, timezone: str | None) -> str:
 def _format_document_date(value: date | None, timezone: str | None) -> str | None:
     if value is None:
         return None
-
-    return _format_timestamp(
-        datetime.combine(value, datetime.min.time(), tzinfo=UTC),
-        timezone,
-    )
+    del timezone
+    return value.strftime("%b %d, %Y")

@@ -1,3 +1,5 @@
+import type { InvoiceStatus } from "@/features/invoices/types/invoice-status";
+
 export interface LineItemDraft {
   description: string;
   details: string | null;
@@ -37,8 +39,6 @@ export type QuoteStatus =
   | "approved"
   | "declined";
 export type QuoteSourceType = "text" | "voice";
-export type InvoiceStatus = "draft" | "ready" | "sent";
-
 export interface Quote {
   id: string;
   customer_id: string;

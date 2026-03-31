@@ -543,3 +543,46 @@ def test_build_render_context_formats_dates_in_business_timezone() -> None:
     assert context.title == "Front Yard Refresh"
     assert context.phone_number is None
     assert context.contractor_email == "owner@example.com"
+
+
+def test_build_render_context_keeps_invoice_due_date_calendar_day_in_non_utc_timezone() -> None:
+    context = _build_render_context(
+        document=Document(
+            id=uuid4(),
+            user_id=uuid4(),
+            customer_id=uuid4(),
+            doc_type="invoice",
+            doc_sequence=1,
+            doc_number="I-001",
+            title="Front Yard Refresh",
+            status=QuoteStatus.READY,
+            source_type="text",
+            transcript="Notes",
+            total_amount=Decimal("120.00"),
+            notes=None,
+            due_date=datetime(2026, 4, 19, tzinfo=UTC).date(),
+            created_at=datetime(2026, 3, 25, 0, 0, tzinfo=UTC),
+            updated_at=datetime(2026, 3, 25, 0, 6, tzinfo=UTC),
+            line_items=[],
+        ),
+        customer=Customer(
+            id=uuid4(),
+            user_id=uuid4(),
+            name="Jamie Customer",
+            phone=None,
+            email=None,
+            address=None,
+        ),
+        user=User(
+            id=uuid4(),
+            email="owner@example.com",
+            password_hash="hashed",
+            business_name="Acme Landscaping",
+            first_name="Taylor",
+            last_name="Owner",
+            trade_type="Landscaper",
+            timezone="America/New_York",
+        ),
+    )
+
+    assert context.due_date == "Apr 19, 2026"

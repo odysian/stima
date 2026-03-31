@@ -84,7 +84,12 @@ export function InvoiceDetailScreen(): React.ReactElement {
       .join(" · ") || "No contact details";
   const isSent = invoice?.status === "sent";
 
+  function invalidateLocalPdf(): void {
+    setPdfUrl(null);
+  }
+
   function applyInvoiceUpdate(updatedInvoice: Invoice): void {
+    invalidateLocalPdf();
     setInvoice((currentInvoice) => {
       if (!currentInvoice) {
         return currentInvoice;

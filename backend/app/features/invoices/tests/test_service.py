@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 from app.features.auth.models import User
+from app.features.invoices import service as invoice_service_module
 from app.features.invoices.service import InvoiceService
 from app.features.quotes.models import QuoteStatus
 from app.features.quotes.service import QuoteRepositoryProtocol
@@ -107,7 +108,16 @@ class _UnusedStorageService:
         raise AssertionError("Storage should not be used in this test")
 
 
-async def test_convert_quote_to_invoice_retries_sequence_collision_once() -> None:
+async def test_convert_quote_to_invoice_retries_sequence_collision_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    logged_events: list[dict[str, object]] = []
+
+    def _capture_log_event(event: str, **payload: object) -> None:
+        logged_events.append({"event": event, **payload})
+
+    monkeypatch.setattr(invoice_service_module, "log_event", _capture_log_event)
+
     user = User(
         email="owner@example.com",
         password_hash="hash",  # nosec B106 - test-only stub value
@@ -133,3 +143,11 @@ async def test_convert_quote_to_invoice_retries_sequence_collision_once() -> Non
     assert invoice_repository.rollback_calls == 1  # nosec B101 - pytest assertion
     assert invoice_repository.commit_calls == 1  # nosec B101 - pytest assertion
     assert invoice.customer_id == quote.customer_id  # nosec B101 - pytest assertion
+    assert logged_events == [  # nosec B101 - pytest assertion
+        {
+            "event": "invoice_created",
+            "user_id": user.id,
+            "quote_id": quote.id,
+            "customer_id": quote.customer_id,
+        }
+    ]

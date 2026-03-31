@@ -260,6 +260,42 @@ describe("QuotePreview", () => {
     expect(await screen.findByText("Invoice Detail Screen")).toBeInTheDocument();
   });
 
+  it("recovers from duplicate invoice conflicts using structured HTTP errors", async () => {
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(makeQuoteDetail({ status: "approved", share_token: "share-token-1" }))
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "approved",
+          linked_invoice: {
+            id: "invoice-1",
+            doc_number: "I-001",
+            status: "draft",
+            due_date: "2026-04-19",
+            total_amount: 120,
+            created_at: "2026-03-20T00:00:00.000Z",
+          },
+        }),
+      );
+    mockedQuoteService.convertToInvoice.mockRejectedValueOnce(
+      new HttpRequestError("conflict", 409, {
+        detail: "An invoice already exists for this quote",
+      }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /convert to invoice/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.convertToInvoice).toHaveBeenCalledWith("quote-1");
+    });
+    await waitFor(() => {
+      expect(mockedQuoteService.getQuote).toHaveBeenCalledTimes(2);
+    });
+
+    expect(await screen.findByText("Invoice Detail Screen")).toBeInTheDocument();
+  });
+
   it.each(["shared", "viewed"] as const)(
     "hides edit while keeping follow-up actions available for %s quotes",
     async (status) => {

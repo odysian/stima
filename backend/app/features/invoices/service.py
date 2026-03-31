@@ -154,7 +154,7 @@ class InvoiceService:
         log_event(
             "invoice_created",
             user_id=user_id,
-            quote_id=invoice.id,
+            quote_id=quote.id,
             customer_id=invoice.customer_id,
         )
         return invoice

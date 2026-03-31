@@ -4,6 +4,7 @@ import type { NavigateFunction } from "react-router-dom";
 
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
+import { isHttpRequestError } from "@/shared/lib/http";
 
 interface UseQuoteInvoiceConversionArgs {
   quoteId: string | undefined;
@@ -39,9 +40,25 @@ export function useQuoteInvoiceConversion({
       setQuote(refreshedQuote);
       navigate(`/invoices/${createdInvoice.id}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to convert quote to invoice";
+      let message = error instanceof Error ? error.message : "Unable to convert quote to invoice";
+      const detail =
+        isHttpRequestError(error)
+        && error.payload
+        && typeof error.payload === "object"
+        && "detail" in error.payload
+        && typeof error.payload.detail === "string"
+          ? error.payload.detail
+          : null;
+      if (detail) {
+        message = detail;
+      }
+      const isDuplicateInvoiceError = (
+        isHttpRequestError(error)
+        && error.status === 409
+        && detail === "An invoice already exists for this quote"
+      );
 
-      if (message === "An invoice already exists for this quote") {
+      if (isDuplicateInvoiceError) {
         try {
           const refreshedQuote = await quoteService.getQuote(quoteId);
           setQuote(refreshedQuote);
