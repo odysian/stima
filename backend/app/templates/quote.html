@@ -253,14 +253,13 @@
         </table>
       </header>
 
-      {% if title %}
-      <h2 class="quote-title">{{ title }}</h2>
-      {% endif %}
-
       <table class="meta-grid">
         <tbody>
           <tr>
             <td>
+              {% if title %}
+              <h2 class="quote-title">{{ title }}</h2>
+              {% endif %}
               <p class="label">Prepared For</p>
               <p class="value">{{ customer_name }}</p>
               {% if customer_phone %}
@@ -278,13 +277,13 @@
               <p class="value">{{ doc_number }}</p>
               <p class="label" style="margin-top: 10px">Issued</p>
               <p class="value">{{ issued_date }}</p>
-              {% if due_date %}
-              <p class="label" style="margin-top: 10px">Due Date</p>
-              <p class="value">{{ due_date }}</p>
-              {% endif %}
               {% if show_updated_date %}
               <p class="label" style="margin-top: 10px">Updated</p>
               <p class="value">{{ updated_date }}</p>
+              {% endif %}
+              {% if due_date %}
+              <p class="label" style="margin-top: 10px">Due Date</p>
+              <p class="value">{{ due_date }}</p>
               {% endif %}
             </td>
           </tr>

@@ -25,6 +25,7 @@ def _make_context(
     *,
     title: str | None = None,
     doc_label: str = "Quote",
+    doc_number: str = "Q-201",
     due_date: str | None = None,
     updated_at: datetime,
     line_item_price: Decimal | None,
@@ -56,7 +57,7 @@ def _make_context(
         customer_phone=customer_phone,
         customer_email=customer_email,
         customer_address=customer_address,
-        doc_number="Q-201",
+        doc_number=doc_number,
         doc_label=doc_label,
         title=title,
         status="ready",
@@ -115,6 +116,18 @@ def test_render_shows_updated_date_only_when_delta_exceeds_threshold(
     assert result == b"fake-pdf"
     assert len(captured_html) == 1
     assert ("Updated" in captured_html[0]) is should_show_updated
+    assert "Revised" not in captured_html[0]
+    if should_show_updated:
+        assert re.search(
+            (
+                r"<p class=\"label\" style=\"margin-top: 10px\">Issued</p>\s*"
+                r"<p class=\"value\">Mar 01, 2026</p>\s*"
+                r"<p class=\"label\" style=\"margin-top: 10px\">Updated</p>\s*"
+                r"<p class=\"value\">Mar 01, 2026</p>"
+            ),
+            captured_html[0],
+            re.DOTALL,
+        )
 
 
 def test_render_shows_em_dash_for_null_line_item_and_total_prices(
@@ -268,6 +281,7 @@ def test_render_includes_due_date_and_doc_label_for_invoices(
     result = integration.render(
         _make_context(
             doc_label="Invoice",
+            doc_number="I-201",
             due_date="Apr 19, 2026",
             updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
             line_item_price=Decimal("120.00"),
@@ -278,6 +292,8 @@ def test_render_includes_due_date_and_doc_label_for_invoices(
     assert result == b"fake-pdf"
     rendered_html = captured_html[0]
     assert "Invoice Number" in rendered_html
+    assert "I-201" in rendered_html
+    assert "Issued" in rendered_html
     assert "Due Date" in rendered_html
     assert "Apr 19, 2026" in rendered_html
 
@@ -421,6 +437,16 @@ def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
             r"<table class=\"meta-grid\">.*?<tr>\s*<td>.*?</td>\s*"
             r"<td class=\"meta-right\">"
         ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"<p class=\"label\">Quote Number</p>\s*<p class=\"value\">Q-201</p>",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"<p class=\"label\" style=\"margin-top: 10px\">Issued</p>\s*<p class=\"value\">Mar 01, 2026</p>",
         rendered_html,
         re.DOTALL,
     )
