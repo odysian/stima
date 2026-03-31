@@ -1645,6 +1645,38 @@ async def test_all_quote_endpoints_require_authentication(
     assert response.status_code == 401
 
 
+@pytest.mark.parametrize(
+    ("method", "path", "payload"),
+    [
+        ("get", "/api/invoices/00000000-0000-0000-0000-000000000000", None),
+        (
+            "patch",
+            "/api/invoices/00000000-0000-0000-0000-000000000000",
+            {"due_date": "2026-05-01"},
+        ),
+        ("post", "/api/invoices/00000000-0000-0000-0000-000000000000/pdf", None),
+        ("post", "/api/invoices/00000000-0000-0000-0000-000000000000/share", None),
+    ],
+)
+async def test_all_invoice_endpoints_require_authentication(
+    client: AsyncClient,
+    method: str,
+    path: str,
+    payload: dict[str, object] | None,
+) -> None:
+    client.cookies.clear()
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf", path="/")
+
+    headers = {"X-CSRF-Token": "csrf"}
+    request_method = getattr(client, method)
+    if payload is None:
+        response = await request_method(path, headers=headers)
+    else:
+        response = await request_method(path, json=payload, headers=headers)
+
+    assert response.status_code == 401
+
+
 async def test_capture_audio_requires_authentication(client: AsyncClient) -> None:
     client.cookies.clear()
     client.cookies.set(CSRF_COOKIE_NAME, "csrf", path="/")
@@ -1820,6 +1852,37 @@ async def test_mark_lost_quote_requires_csrf(client: AsyncClient) -> None:
     assert share_response.status_code == 200
 
     response = await client.post(f"/api/quotes/{quote['id']}/mark-lost")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
+@pytest.mark.parametrize(
+    ("method", "path_suffix", "payload"),
+    [
+        ("patch", "", {"due_date": "2026-05-01"}),
+        ("post", "/pdf", None),
+        ("post", "/share", None),
+    ],
+)
+async def test_invoice_mutations_require_csrf(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    method: str,
+    path_suffix: str,
+    payload: dict[str, object] | None,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    invoice = await _create_approved_invoice(client, csrf_token, db_session)
+
+    request_method = getattr(client, method)
+    if payload is None:
+        response = await request_method(f"/api/invoices/{invoice['id']}{path_suffix}")
+    else:
+        response = await request_method(
+            f"/api/invoices/{invoice['id']}{path_suffix}",
+            json=payload,
+        )
 
     assert response.status_code == 403
     assert response.json() == {"detail": "CSRF token missing"}
@@ -2472,6 +2535,45 @@ async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_blocks_sent
     assert patch_response.json() == {"detail": "Sent invoices cannot be edited"}
 
 
+@pytest.mark.parametrize(
+    ("method", "path_suffix", "payload"),
+    [
+        ("get", "", None),
+        ("patch", "", {"due_date": "2026-05-01"}),
+        ("post", "/pdf", None),
+        ("post", "/share", None),
+    ],
+)
+async def test_invoice_endpoints_return_404_for_different_users_invoice(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    method: str,
+    path_suffix: str,
+    payload: dict[str, object] | None,
+) -> None:
+    owner_csrf_token = await _register_and_login(client, _credentials())
+    invoice = await _create_approved_invoice(client, owner_csrf_token, db_session)
+
+    other_user_csrf_token = await _register_and_login(client, _credentials())
+    request_method = getattr(client, method)
+    headers = {"X-CSRF-Token": other_user_csrf_token} if method != "get" else None
+
+    if payload is None:
+        response = await request_method(
+            f"/api/invoices/{invoice['id']}{path_suffix}",
+            headers=headers,
+        )
+    else:
+        response = await request_method(
+            f"/api/invoices/{invoice['id']}{path_suffix}",
+            json=payload,
+            headers=headers,
+        )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
 async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) -> str:
     register_response = await client.post("/api/auth/register", json=credentials)
     assert register_response.status_code == 201
@@ -2516,6 +2618,23 @@ async def _create_quote(client: AsyncClient, csrf_token: str, customer_id: str) 
             "notes": "Original note",
             "source_type": "text",
         },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+async def _create_approved_invoice(
+    client: AsyncClient,
+    csrf_token: str,
+    db_session: AsyncSession,
+) -> dict[str, object]:
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
         headers={"X-CSRF-Token": csrf_token},
     )
     assert response.status_code == 201

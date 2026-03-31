@@ -121,24 +121,35 @@ class InvoiceService:
                 status_code=409,
             )
 
-        try:
-            invoice = await self._invoice_repository.create_from_quote(
-                source_quote=quote,
-                due_date=build_default_due_date(),
-            )
-            await self._invoice_repository.commit()
-        except IntegrityError as exc:
-            await self._invoice_repository.rollback()
-            duplicate_invoice = await self._invoice_repository.get_by_source_document_id(
-                source_document_id=quote.id,
-                user_id=user_id,
-            )
-            if duplicate_invoice is not None:
-                raise QuoteServiceError(
-                    detail="An invoice already exists for this quote",
-                    status_code=409,
-                ) from exc
-            raise
+        for attempt in range(2):
+            try:
+                invoice = await self._invoice_repository.create_from_quote(
+                    source_quote=quote,
+                    due_date=build_default_due_date(),
+                )
+                await self._invoice_repository.commit()
+                break
+            except IntegrityError as exc:
+                await self._invoice_repository.rollback()
+                duplicate_invoice = await self._invoice_repository.get_by_source_document_id(
+                    source_document_id=quote.id,
+                    user_id=user_id,
+                )
+                if duplicate_invoice is not None:
+                    raise QuoteServiceError(
+                        detail="An invoice already exists for this quote",
+                        status_code=409,
+                    ) from exc
+                if attempt == 0 and _is_doc_sequence_collision(exc):
+                    continue
+                if _is_doc_sequence_collision(exc):
+                    raise QuoteServiceError(
+                        detail="Unable to create invoice",
+                        status_code=409,
+                    ) from exc
+                raise
+        else:
+            raise QuoteServiceError(detail="Unable to create invoice", status_code=409)
 
         log_event(
             "invoice_created",
@@ -276,3 +287,8 @@ def _resolve_user_id(user: User) -> UUID:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
+    """Return true when IntegrityError was caused by doc-sequence uniqueness collision."""
+    return "uq_documents_user_type_sequence" in str(exc.orig)
