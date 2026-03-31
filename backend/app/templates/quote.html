@@ -98,13 +98,6 @@
         margin-left: auto;
       }
 
-      .quote-title {
-        margin: 0 0 18px;
-        font-size: 24px;
-        font-weight: 700;
-        line-height: 1.25;
-      }
-
       .meta-grid {
         width: 100%;
         border-collapse: collapse;
@@ -120,6 +113,39 @@
       .meta-right {
         text-align: right;
         padding-right: 0;
+      }
+
+      .meta-details {
+        width: auto;
+        border-collapse: collapse;
+        margin-left: auto;
+      }
+
+      .meta-details td {
+        padding: 0 0 8px;
+        vertical-align: top;
+      }
+
+      .meta-details tr:last-child td {
+        padding-bottom: 0;
+      }
+
+      .meta-label-inline {
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6b7280;
+        white-space: nowrap;
+        padding-right: 14px;
+      }
+
+      .meta-value-inline {
+        text-align: right;
+        font-size: 14px;
+        color: #111827;
+        white-space: nowrap;
       }
 
       .label {
@@ -253,39 +279,44 @@
         </table>
       </header>
 
-      {% if title %}
-      <h2 class="quote-title">{{ title }}</h2>
-      {% endif %}
-
       <table class="meta-grid">
         <tbody>
           <tr>
             <td>
               <p class="label">Prepared For</p>
               <p class="value">{{ customer_name }}</p>
-              {% if customer_phone %}
-              <p class="value">{{ customer_phone }}</p>
-              {% endif %}
-              {% if customer_email %}
-              <p class="value">{{ customer_email }}</p>
-              {% endif %}
               {% if customer_address %}
               <p class="value">{{ customer_address }}</p>
               {% endif %}
+              {% if customer_phone %}
+              <p class="value">{{ customer_phone }}</p>
+              {% endif %}
             </td>
             <td class="meta-right">
-              <p class="label">{{ doc_label }} Number</p>
-              <p class="value">{{ doc_number }}</p>
-              <p class="label" style="margin-top: 10px">Issued</p>
-              <p class="value">{{ issued_date }}</p>
-              {% if show_updated_date %}
-              <p class="label" style="margin-top: 10px">Updated</p>
-              <p class="value">{{ updated_date }}</p>
-              {% endif %}
-              {% if due_date %}
-              <p class="label" style="margin-top: 10px">Due Date</p>
-              <p class="value">{{ due_date }}</p>
-              {% endif %}
+              <table class="meta-details">
+                <tbody>
+                  <tr>
+                    <td class="meta-label-inline">{{ doc_label }} Number:</td>
+                    <td class="meta-value-inline">{{ doc_number }}</td>
+                  </tr>
+                  <tr>
+                    <td class="meta-label-inline">Issued:</td>
+                    <td class="meta-value-inline">{{ issued_date }}</td>
+                  </tr>
+                  {% if show_updated_date %}
+                  <tr>
+                    <td class="meta-label-inline">Updated:</td>
+                    <td class="meta-value-inline">{{ updated_date }}</td>
+                  </tr>
+                  {% endif %}
+                  {% if due_date %}
+                  <tr>
+                    <td class="meta-label-inline">Due Date:</td>
+                    <td class="meta-value-inline">{{ due_date }}</td>
+                  </tr>
+                  {% endif %}
+                </tbody>
+              </table>
             </td>
           </tr>
         </tbody>

@@ -5,9 +5,9 @@ Use these prompts to start an agent on already-scoped work with predictable outp
 ## 1) Execute Existing Task Issue
 
 ```text
-Run kickoff for existing Task #<task-id> mode=single.
+Run kickoff for existing Task #145 mode=single.
 
-Reference <filename>
+Reference /home/odys/stima/plans/2026-03-31/task-m8-invoice-edit-parity-and-roadmap-closeout.md
 
 Then execute the full Task flow end-to-end:
 1. Restate goal, non-goals, acceptance criteria, and exact verification commands from the issue.
@@ -133,6 +133,8 @@ Constraints:
   - quick hardening fix
   - follow-up product/UX decision
 - Avoid escalating unresolved wording/copy/product decisions as correctness bugs unless they violate a documented contract.
+- Do not return `APPROVED` while required PR checks are failing, stale, or missing unless you explicitly inspected that CI state and determined it is non-blocking.
+
 
 Required Output:
 1. Verdict: APPROVED or ACTIONABLE
@@ -142,6 +144,7 @@ Required Output:
    - category: correctness|regression|contract|architecture|security|performance|tests|docs
 3. Verification notes:
    - targeted checks run (if any) and why
+   - whether PR CI/check status was inspected, and any blocking failures
 4. Residual risk/testing gaps:
    - up to 5 concise bullets
 ```

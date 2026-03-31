@@ -335,7 +335,7 @@ set. Reminder automation (the original M4) is a V2 candidate; this improvement i
 **Scope:**
 - Typography: upgrade font stack (embed Inter or prefer Noto Sans / Ubuntu over bare Arial)
 - Header: increase logo size; add contractor phone (and email if present) to the identity block
-- Title: render as a standalone document headline above the meta grid, not a labeled meta field
+- Internal quote title remains app-only and does not render in the customer-facing PDF
 - Line items: collapse to 2-column layout (Description+Details | Price); items without details
   use the full cell width; null prices render as `—`
 - Total section: visually separated from the line-items table, stronger typographic weight
@@ -353,11 +353,11 @@ contracts. No schema migration.
 
 **Acceptance criteria:**
 - PDF renders correctly for quotes with and without a logo
-- Sparse-quote case renders cleanly: no title, no logo, no customer contact, one item with no
+- Sparse-quote case renders cleanly: no logo, no customer address/phone, one item with no
   details, null total, null owner name — no blank gaps or phantom labels
 - Line items with details show a two-line stack in one cell; items without details show
   description only
-- Title (when present) appears as a headline above the meta grid; absent title leaves no gap
+- Prepared For shows customer name first, then address, then optional phone; customer email is omitted
 - Contractor phone appears in the header identity block when present on the user profile
 - Total section is visually separated from line items
 - Notes section renders with accent-bar treatment

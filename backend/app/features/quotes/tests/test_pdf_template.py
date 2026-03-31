@@ -120,10 +120,10 @@ def test_render_shows_updated_date_only_when_delta_exceeds_threshold(
     if should_show_updated:
         assert re.search(
             (
-                r"<p class=\"label\" style=\"margin-top: 10px\">Issued</p>\s*"
-                r"<p class=\"value\">Mar 01, 2026</p>\s*"
-                r"<p class=\"label\" style=\"margin-top: 10px\">Updated</p>\s*"
-                r"<p class=\"value\">Mar 01, 2026</p>"
+                r"<tr>\s*<td class=\"meta-label-inline\">Issued:</td>\s*"
+                r"<td class=\"meta-value-inline\">Mar 01, 2026</td>\s*</tr>\s*"
+                r"<tr>\s*<td class=\"meta-label-inline\">Updated:</td>\s*"
+                r"<td class=\"meta-value-inline\">Mar 01, 2026</td>\s*</tr>"
             ),
             captured_html[0],
             re.DOTALL,
@@ -177,17 +177,8 @@ def test_render_shows_em_dash_for_null_line_item_and_total_prices(
     )
 
 
-@pytest.mark.parametrize(
-    ("title", "should_render_title"),
-    [
-        ("Front Yard Refresh", True),
-        (None, False),
-    ],
-)
-def test_render_shows_quote_title_only_when_present(
+def test_render_omits_internal_quote_title_from_pdf(
     monkeypatch: pytest.MonkeyPatch,
-    title: str | None,
-    should_render_title: bool,
 ) -> None:
     captured_html: list[str] = []
 
@@ -206,7 +197,7 @@ def test_render_shows_quote_title_only_when_present(
 
     result = integration.render(
         _make_context(
-            title=title,
+            title="Front Yard Refresh",
             updated_at=updated_at,
             line_item_price=Decimal("120.00"),
             total=Decimal("120.00"),
@@ -217,14 +208,51 @@ def test_render_shows_quote_title_only_when_present(
     assert len(captured_html) == 1
     rendered_html = captured_html[0]
     assert ("Quote Title" in rendered_html) is False
-    assert ("Front Yard Refresh" in rendered_html) is should_render_title
-    assert ('class="quote-title"' in rendered_html) is should_render_title
-    if should_render_title:
-        assert re.search(
-            r"<h2 class=\"quote-title\">Front Yard Refresh</h2>\s*<table class=\"meta-grid\">",
-            rendered_html,
-            re.DOTALL,
+    assert "Front Yard Refresh" not in rendered_html
+    assert 'class="quote-title"' not in rendered_html
+
+
+def test_render_orders_customer_details_as_name_address_phone_and_omits_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            customer_address="123 Main St",
+            customer_phone="+1-555-000-1111",
+            customer_email="customer@example.com",
         )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert "customer@example.com" not in rendered_html
+    assert re.search(
+        (
+            r"<p class=\"label\">Prepared For</p>\s*"
+            r"<p class=\"value\">Jamie Customer</p>\s*"
+            r"<p class=\"value\">123 Main St</p>\s*"
+            r"<p class=\"value\">\+1-555-000-1111</p>"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
 
 
 def test_render_stacks_line_item_details_in_description_column(
@@ -297,11 +325,22 @@ def test_render_includes_due_date_and_doc_label_for_invoices(
 
     assert result == b"fake-pdf"
     rendered_html = captured_html[0]
-    assert "Invoice Number" in rendered_html
-    assert "I-201" in rendered_html
-    assert "Issued" in rendered_html
-    assert "Due Date" in rendered_html
-    assert "Apr 19, 2026" in rendered_html
+    assert re.search(
+        (
+            r"<tr>\s*<td class=\"meta-label-inline\">Invoice Number:</td>\s*"
+            r"<td class=\"meta-value-inline\">I-201</td>\s*</tr>"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        (
+            r"<tr>\s*<td class=\"meta-label-inline\">Due Date:</td>\s*"
+            r"<td class=\"meta-value-inline\">Apr 19, 2026</td>\s*</tr>"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
 
 
 def test_render_includes_contractor_contact_details_when_present(
@@ -437,6 +476,8 @@ def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
     assert "page-break-inside: avoid;" in rendered_html
     assert "overflow-wrap: break-word;" in rendered_html
     assert re.search(r"\.meta-right\s*\{[^}]*text-align:\s*right;", rendered_html, re.DOTALL)
+    assert re.search(r"\.meta-details\s*\{[^}]*width:\s*auto;", rendered_html, re.DOTALL)
+    assert re.search(r"\.meta-details\s*\{[^}]*margin-left:\s*auto;", rendered_html, re.DOTALL)
     assert 'class="meta-right"' in rendered_html
     assert re.search(
         (
@@ -447,14 +488,17 @@ def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
         re.DOTALL,
     )
     assert re.search(
-        r"<p class=\"label\">Quote Number</p>\s*<p class=\"value\">Q-201</p>",
+        (
+            r"<tr>\s*<td class=\"meta-label-inline\">Quote Number:</td>\s*"
+            r"<td class=\"meta-value-inline\">Q-201</td>\s*</tr>"
+        ),
         rendered_html,
         re.DOTALL,
     )
     assert re.search(
         (
-            r"<p class=\"label\" style=\"margin-top: 10px\">Issued</p>\s*"
-            r"<p class=\"value\">Mar 01, 2026</p>"
+            r"<tr>\s*<td class=\"meta-label-inline\">Issued:</td>\s*"
+            r"<td class=\"meta-value-inline\">Mar 01, 2026</td>\s*</tr>"
         ),
         rendered_html,
         re.DOTALL,
