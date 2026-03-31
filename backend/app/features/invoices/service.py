@@ -151,6 +151,11 @@ class InvoiceService:
                 await self._invoice_repository.rollback()
                 if attempt == 0 and _is_doc_sequence_collision(exc):
                     continue
+                if _is_doc_sequence_collision(exc):
+                    raise QuoteServiceError(
+                        detail="Unable to create invoice",
+                        status_code=409,
+                    ) from exc
                 raise
 
         raise QuoteServiceError(detail="Unable to create invoice", status_code=409)
