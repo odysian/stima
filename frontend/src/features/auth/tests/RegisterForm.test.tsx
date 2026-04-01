@@ -50,6 +50,7 @@ describe("RegisterForm", () => {
     });
 
     renderRegister();
+    expect(await screen.findByRole("main")).toHaveClass("screen-radial-backdrop");
 
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "new@example.com" },
@@ -78,6 +79,7 @@ describe("RegisterForm", () => {
     mockedAuthService.register.mockRejectedValueOnce(new Error("Email already exists"));
 
     renderRegister();
+    expect(await screen.findByRole("main")).toHaveClass("screen-radial-backdrop");
 
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "new@example.com" },

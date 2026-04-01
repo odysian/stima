@@ -223,6 +223,15 @@
   );
 }
 
+.screen-radial-backdrop {
+  background: radial-gradient(
+    circle at top,
+    var(--color-surface-container-high) 0%,
+    var(--color-background) 42%,
+    var(--color-surface-container-low) 100%
+  );
+}
+
 .ghost-shadow {
   box-shadow: var(--shadow-ghost);
 }

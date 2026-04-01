@@ -83,8 +83,10 @@ describe("PublicQuotePage", () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "Spring Cleanup" })).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
     expect(mockedPublicService.getQuote).toHaveBeenCalledWith("token-1");
     expect(screen.getByText("This quote has been accepted")).toBeInTheDocument();
+    expect(screen.getByText("Northline Landscaping")).toHaveClass("text-on-primary/70");
     expect(screen.getByText("Taylor Morgan")).toBeInTheDocument();
     expect(screen.getByText("$425.00")).toBeInTheDocument();
     expect(screen.getByText("Mulch refresh")).toBeInTheDocument();
@@ -106,6 +108,7 @@ describe("PublicQuotePage", () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "This link is not valid" })).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
     expect(screen.queryByRole("link", { name: /download pdf/i })).not.toBeInTheDocument();
   });
 
@@ -115,6 +118,7 @@ describe("PublicQuotePage", () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: /we couldn't load this quote/i })).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
     expect(screen.queryByRole("link", { name: /download pdf/i })).not.toBeInTheDocument();
   });
 

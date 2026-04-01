@@ -124,7 +124,7 @@ export function PublicQuotePage(): React.ReactElement {
 
   if (effectiveLoadState === "loading") {
     return (
-      <main className="min-h-screen bg-background px-4 py-10 text-on-surface">
+      <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
         <div className="mx-auto max-w-3xl rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest p-8 ghost-shadow">
           <p role="status" className="text-sm text-on-surface-variant">
             Loading shared quote...
@@ -136,7 +136,7 @@ export function PublicQuotePage(): React.ReactElement {
 
   if (effectiveLoadState === "invalid") {
     return (
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#dce9ff_0%,_#f8f9ff_45%,_#eff4ff_100%)] px-4 py-10 text-on-surface">
+      <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
         <div className="mx-auto max-w-xl rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest p-8 text-center ghost-shadow">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-outline">Shared Quote</p>
           <h1 className="mt-4 text-3xl font-semibold">This link is not valid</h1>
@@ -150,7 +150,7 @@ export function PublicQuotePage(): React.ReactElement {
 
   if (effectiveLoadState === "error" || quote === null) {
     return (
-      <main className="min-h-screen bg-background px-4 py-10 text-on-surface">
+      <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
         <div className="mx-auto max-w-xl rounded-[1.75rem] border border-error/15 bg-surface-container-lowest p-8 ghost-shadow">
           <h1 className="text-2xl font-semibold">We couldn&apos;t load this quote</h1>
           <p className="mt-3 text-sm text-on-surface-variant">
@@ -177,12 +177,12 @@ export function PublicQuotePage(): React.ReactElement {
   );
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#dce9ff_0%,_#f8f9ff_42%,_#eff4ff_100%)] px-4 py-6 text-on-surface sm:px-6 lg:py-10">
+    <main className="screen-radial-backdrop min-h-screen px-4 py-6 text-on-surface sm:px-6 lg:py-10">
       <div className="mx-auto max-w-4xl">
         <section className="overflow-hidden rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest ghost-shadow">
           <div className="forest-gradient px-5 py-6 text-on-primary sm:px-8 sm:py-8">
             <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/15 text-xl font-semibold uppercase text-on-primary">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-on-primary/15 text-xl font-semibold uppercase text-on-primary">
                 {showLogo ? (
                   <img
                     src={quote.logo_url}
@@ -195,13 +195,13 @@ export function PublicQuotePage(): React.ReactElement {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/70">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-on-primary/70">
                   {getDisplayBusinessName(quote)}
                 </p>
                 <h1 className="mt-3 text-3xl font-semibold leading-tight">
                   {getDisplayTitle(quote)}
                 </h1>
-                <p className="mt-2 text-sm text-white/80">
+                <p className="mt-2 text-sm text-on-primary/80">
                   {quote.doc_number} · Issued {quote.issued_date}
                 </p>
               </div>
