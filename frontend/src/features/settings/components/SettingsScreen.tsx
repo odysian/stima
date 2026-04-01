@@ -367,7 +367,6 @@ export function SettingsScreen(): React.ReactElement {
                           name="settings-theme"
                           value={option.value}
                           checked={isSelected}
-                          aria-checked={isSelected}
                           onChange={() => setThemePreference(option.value)}
                           className="sr-only"
                         />

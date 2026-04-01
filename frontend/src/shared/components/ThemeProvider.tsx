@@ -21,7 +21,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
   const [preference, setPreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
   const [systemTheme, setSystemTheme] = useState<EffectiveTheme>(() => getSystemTheme());
 
-  useEffect(() => subscribeToSystemTheme(setSystemTheme), []);
+  useEffect(() => {
+    if (preference !== "system") {
+      return;
+    }
+
+    setSystemTheme(getSystemTheme());
+
+    return subscribeToSystemTheme(setSystemTheme);
+  }, [preference]);
 
   const effectiveTheme = resolveEffectiveTheme(preference, systemTheme);
 
