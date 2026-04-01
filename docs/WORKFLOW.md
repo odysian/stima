@@ -34,7 +34,7 @@ Every feature follows:
 4. Verify
 5. Review handoff
 6. Patch (if needed)
-7. Learning handoff (after `APPROVED`)
+7. In-chat learning handoff (after `APPROVED`)
 8. Finalize
 
 ## Operator Flow Optimization
@@ -46,7 +46,7 @@ Use this as the default human-in-the-loop sequence to reduce handoff overhead:
 3. Open PR with `Closes #<task-id>`.
 4. Run one reviewer pass using the standardized prompt from `docs/template/KICKOFF.md`.
 5. If verdict is `ACTIONABLE`, patch in the implementation branch and rerun targeted verification only.
-6. When verdict is `APPROVED` and relayed back to the implementation agent, generate the lightweight tutoring handoff at `docs/learning/YYYY-MM-DD-feature-slug-learning.md`.
+6. When verdict is `APPROVED` and relayed back to the implementation agent, post the lightweight tutoring handoff directly in chat.
 7. Merge PR and sync local branch.
 8. If this Task belongs to a Spec, check whether all sibling Tasks are now done or deferred; if so, close the Spec issue.
 
@@ -119,7 +119,7 @@ After implementation and PR creation, run one focused reviewer follow-up pass:
 - Reviewer scope: major correctness bugs, regressions, and missing tests/docs.
 - Reviewer output: `APPROVED` or `ACTIONABLE`.
 - If `ACTIONABLE`, patch findings and rerun only relevant verification.
-- If `APPROVED`, generate the required learning handoff before claiming completion.
+- If `APPROVED`, post the required in-chat learning handoff before claiming completion.
 - Default to one review pass; run a second pass only when explicitly requested.
 
 Default reviewer constraints:
@@ -148,15 +148,15 @@ Do not redefine the format in this file; keep `docs/template/KICKOFF.md` as the 
 
 After reviewer verdict `APPROVED` is explicitly relayed back to the implementation agent:
 
-- Write one learning handoff for the completed unit (`Task` completion and `Spec` closure) at `docs/learning/YYYY-MM-DD-feature-slug-learning.md`.
-- Keep it to a 5-minute tutoring handoff: four bullets plus exact code pointers.
-- Required bullets:
+- Post one lightweight tutoring handoff directly in the same chat/thread for the completed unit (`Task` completion and `Spec` closure).
+- Do not create a separate markdown handoff unless explicitly requested.
+- Keep it ephemeral and practical, not archival documentation.
+- Keep it to 4 short bullets:
   - what changed
   - why it was done this way
   - one tradeoff or pattern worth learning
-  - what to review first when reading the diff
-- Add `Code pointers` using `filename > line number` format.
-- No static header or long section template.
+  - what to review first
+- Add 3-6 code pointers using `path:line-line — why it matters` format.
 
 ## Planning And Scope
 

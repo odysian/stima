@@ -33,7 +33,7 @@ Read conditionally (only when relevant):
   - If `mode` is omitted, default to `single`.
   - Do not switch to `gated` or `fast` unless explicitly requested.
   - Planning kickoff output: issue body file(s), `gh issue create` command(s) when applicable, created issue link(s), and a 3-5 step implementation plan.
-  - Execution kickoff output: implementation + verification + PR + standardized reviewer follow-up prompt + required lightweight tutoring handoff after explicit `APPROVED`.
+  - Execution kickoff output: implementation + verification + PR + standardized reviewer follow-up prompt + required lightweight tutoring handoff in chat after explicit `APPROVED`.
 
 ## Agent Operating Loop
 
@@ -46,8 +46,8 @@ Read conditionally (only when relevant):
 7. For issue-backed work, open PR that closes the Task issue; close Spec after child Tasks are done/deferred.
 8. Provide a lean reviewer follow-up prompt for a separate review pass.
 9. Patch only actionable findings, rerun relevant verification, and repeat review only if explicitly requested.
-10. After explicit reviewer verdict `APPROVED` is relayed back, generate a lightweight tutoring handoff file in `docs/learning/` (format defined below).
-11. Finalize: include handoff path in completion output and then close/complete the Task or Spec as applicable.
+10. After explicit reviewer verdict `APPROVED` is relayed back, post a lightweight tutoring handoff directly in chat (format defined below).
+11. Finalize: include the handoff in the completion output and then close/complete the Task or Spec as applicable.
 
 ## Project Context
 
@@ -128,15 +128,17 @@ Use the exact reviewer prompt/output contract from `docs/template/KICKOFF.md`.
 
 Required completion gate:
 
-- Generate a learning handoff whenever a Task is finished and whenever a Spec is closed.
+- Post a learning handoff whenever a Task is finished and whenever a Spec is closed.
 - Trigger only after explicit reviewer verdict `APPROVED` is provided back to the implementation agent.
-- Write to `docs/learning/YYYY-MM-DD-feature-slug-learning.md` (create `docs/learning/` if missing).
-- Keep it as a 5-minute tutoring handoff in plain English, not a large document.
-- Required content:
-  - what changed
-  - why it was done this way
-  - one tradeoff or pattern worth learning
-  - exact code pointers to review using `filename > line number` format
+- Post it directly in the same chat/thread; do not create a separate markdown handoff unless explicitly requested.
+- Keep it brief, tutor-style, and practical rather than archival.
+- Required shape:
+  - 4 short bullets covering:
+    - what changed
+    - why it was done this way
+    - one tradeoff or pattern worth learning
+    - what to review first
+  - 3-6 code pointers using `path:line-line — why it matters` format
 
 ## Verification
 
