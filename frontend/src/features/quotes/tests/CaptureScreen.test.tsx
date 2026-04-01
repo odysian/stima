@@ -176,7 +176,7 @@ describe("CaptureScreen", () => {
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
   });
 
-  it("uses token-backed styles for the recording controls", () => {
+  it("uses token-backed styles for the start recording control", () => {
     renderScreen();
 
     const startButton = screen.getByText("mic").closest("button");
@@ -185,7 +185,9 @@ describe("CaptureScreen", () => {
     }
 
     expect(startButton).toHaveClass("forest-gradient", "ghost-shadow", "text-on-primary");
+  });
 
+  it("uses token-backed styles for the stop recording control", () => {
     mockVoiceCapture({ isRecording: true, elapsedSeconds: 3 });
     renderScreen();
 
