@@ -5,9 +5,9 @@ Use these prompts to start an agent on already-scoped work with predictable outp
 ## 1) Execute Existing Task Issue
 
 ```text
-Run kickoff for existing Task #145 mode=single.
+Run kickoff for existing Task # mode=single.
 
-Reference /home/odys/stima/plans/2026-03-31/task-m8-invoice-edit-parity-and-roadmap-closeout.md
+Reference <filepath>
 
 Then execute the full Task flow end-to-end:
 1. Restate goal, non-goals, acceptance criteria, and exact verification commands from the issue.
@@ -122,6 +122,7 @@ Review Scope (in priority order):
 
 Constraints:
 - Use local diff and repository context first.
+- Use the local diff as the review entrypoint. Expand to surrounding code/tests/docs only when the change touches state transitions, contracts, shared utilities, templates, or cross-layer behavior.
 - No environment triage loops or worktree setup.
 - Run targeted checks only when needed to validate a specific finding.
 - Do not rerun broad verification already reported green unless prior results are suspect.
