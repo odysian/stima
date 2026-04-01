@@ -143,7 +143,10 @@ describe("CustomerListScreen", () => {
     renderScreen();
     await screen.findByText("Alice Johnson");
 
-    fireEvent.click(screen.getByRole("button", { name: "New customer" }));
+    const newCustomerButton = screen.getByRole("button", { name: "New customer" });
+    expect(newCustomerButton).toHaveClass("forest-gradient", "text-on-primary", "ghost-shadow");
+
+    fireEvent.click(newCustomerButton);
 
     expect(navigateMock).toHaveBeenCalledWith("/customers/new");
   });
