@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import type { LineItemDraftWithFlags, QuoteSourceType } from "@/features/quotes/types/quote.types";
+import type { DiscountType } from "@/shared/lib/pricing";
 
 const DRAFT_STORAGE_KEY = "stima_quote_draft";
 
@@ -10,6 +11,10 @@ export interface QuoteDraft {
   transcript: string;
   lineItems: LineItemDraftWithFlags[];
   total: number | null;
+  taxRate: number | null;
+  discountType: DiscountType | null;
+  discountValue: number | null;
+  depositAmount: number | null;
   confidenceNotes: string[];
   notes: string;
   sourceType: QuoteSourceType;
@@ -44,6 +49,10 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
       transcript,
       lineItems,
       total,
+      taxRate,
+      discountType,
+      discountValue,
+      depositAmount,
       confidenceNotes,
       notes,
       sourceType,
@@ -63,6 +72,23 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
     if (total !== null && typeof total !== "number") {
       return null;
     }
+    if (taxRate !== undefined && taxRate !== null && typeof taxRate !== "number") {
+      return null;
+    }
+    if (
+      discountType !== undefined
+      && discountType !== null
+      && discountType !== "fixed"
+      && discountType !== "percent"
+    ) {
+      return null;
+    }
+    if (discountValue !== undefined && discountValue !== null && typeof discountValue !== "number") {
+      return null;
+    }
+    if (depositAmount !== undefined && depositAmount !== null && typeof depositAmount !== "number") {
+      return null;
+    }
 
     const parsedSourceType: QuoteSourceType =
       sourceType === "voice" || sourceType === "text" ? sourceType : "text";
@@ -73,6 +99,10 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
       transcript,
       lineItems: lineItems as LineItemDraftWithFlags[],
       total,
+      taxRate: typeof taxRate === "number" ? taxRate : null,
+      discountType: discountType === "fixed" || discountType === "percent" ? discountType : null,
+      discountValue: typeof discountValue === "number" ? discountValue : null,
+      depositAmount: typeof depositAmount === "number" ? depositAmount : null,
       confidenceNotes: confidenceNotes.filter(
         (entry): entry is string => typeof entry === "string",
       ),

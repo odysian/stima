@@ -6,7 +6,9 @@ import {
   publicService,
 } from "@/features/public/services/publicService";
 import type { PublicQuote } from "@/features/public/types/public.types";
+import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
+import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
 
 type LoadState = "loading" | "ready" | "invalid" | "error";
 
@@ -163,6 +165,16 @@ export function PublicQuotePage(): React.ReactElement {
     ? statusCopy[quote.status]
     : null;
   const businessInitial = getDisplayBusinessName(quote).slice(0, 1).toUpperCase();
+  const pricingBreakdown = calculatePricingFromPersisted(
+    {
+      totalAmount: quote.total_amount,
+      taxRate: quote.tax_rate,
+      discountType: quote.discount_type,
+      discountValue: quote.discount_value,
+      depositAmount: quote.deposit_amount,
+    },
+    resolveLineItemSum(quote.line_items.map((item) => item.price)),
+  );
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#dce9ff_0%,_#f8f9ff_42%,_#eff4ff_100%)] px-4 py-6 text-on-surface sm:px-6 lg:py-10">
@@ -219,6 +231,27 @@ export function PublicQuotePage(): React.ReactElement {
                 </p>
               </div>
             </section>
+
+            {pricingBreakdown.hasPricingBreakdown ? (
+              <section className="rounded-2xl bg-surface-container-low p-4">
+                <div className="space-y-2 text-sm">
+                  <PricingRow label="Subtotal" value={pricingBreakdown.subtotal} />
+                  {pricingBreakdown.discountAmount !== null ? (
+                    <PricingRow label="Discount" value={-pricingBreakdown.discountAmount} />
+                  ) : null}
+                  {pricingBreakdown.taxAmount !== null ? (
+                    <PricingRow label="Tax" value={pricingBreakdown.taxAmount} />
+                  ) : null}
+                  <PricingRow label="Total" value={pricingBreakdown.totalAmount} emphasized />
+                  {pricingBreakdown.depositAmount !== null ? (
+                    <>
+                      <PricingRow label="Deposit" value={pricingBreakdown.depositAmount} />
+                      <PricingRow label="Balance Due" value={pricingBreakdown.balanceDue} emphasized />
+                    </>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
 
             <section>
               <div className="flex items-center justify-between gap-3">

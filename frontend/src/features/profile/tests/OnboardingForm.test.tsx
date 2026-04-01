@@ -49,6 +49,7 @@ function profileResponse(overrides: Partial<ProfileResponse> = {}): ProfileRespo
     last_name: "Doe",
     trade_type: "Landscaper",
     timezone: null,
+    default_tax_rate: null,
     has_logo: false,
     ...overrides,
   };

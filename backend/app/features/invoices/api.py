@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,6 +21,7 @@ from app.features.invoices.service import InvoiceService
 from app.features.quotes.schemas import LineItemResponse
 from app.features.quotes.service import QuoteServiceError
 from app.shared.dependencies import get_current_user, get_invoice_service, require_csrf
+from app.shared.pricing import DiscountType
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
@@ -74,6 +75,14 @@ async def get_invoice(
         title=invoice.title,
         status=invoice.status,  # type: ignore[arg-type]
         total_amount=float(invoice.total_amount) if invoice.total_amount is not None else None,
+        tax_rate=float(invoice.tax_rate) if invoice.tax_rate is not None else None,
+        discount_type=cast(DiscountType | None, invoice.discount_type),
+        discount_value=(
+            float(invoice.discount_value) if invoice.discount_value is not None else None
+        ),
+        deposit_amount=(
+            float(invoice.deposit_amount) if invoice.deposit_amount is not None else None
+        ),
         notes=invoice.notes,
         due_date=invoice.due_date,
         shared_at=invoice.shared_at,

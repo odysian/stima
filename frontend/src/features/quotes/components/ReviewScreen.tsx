@@ -2,72 +2,27 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { invoiceService } from "@/features/invoices/services/invoiceService";
+import { profileService } from "@/features/profile/services/profileService";
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
 import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewSubmitFooter } from "@/features/quotes/components/ReviewSubmitFooter";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
+import {
+  buildCreatePayload,
+  EMPTY_LINE_ITEM,
+  getReviewMessages,
+  isInvalidLineItem,
+  mapExtractedLineItems,
+  normalizeLineItem,
+} from "@/features/quotes/components/reviewScreenUtils";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { ExtractionResult, LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
-import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
+import type { LineItemDraft } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-
-const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
-  description: "",
-  details: null,
-  price: null,
-};
-
-function normalizeLineItem(item: LineItemDraftWithFlags): LineItemDraftWithFlags {
-  const normalizedDetails = item.details?.trim() ?? "";
-  return {
-    description: item.description.trim(),
-    details: normalizedDetails.length > 0 ? normalizedDetails : null,
-    price: item.price,
-    flagged: item.flagged,
-    flagReason: item.flagReason,
-  };
-}
-
-function isBlankLineItem(item: LineItemDraftWithFlags): boolean {
-  return item.description.length === 0 && item.details === null && item.price === null;
-}
-
-function isInvalidLineItem(item: LineItemDraftWithFlags): boolean {
-  return item.description.length === 0 && !isBlankLineItem(item);
-}
-
-function mapExtractedLineItems(extraction: ExtractionResult): LineItemDraftWithFlags[] {
-  return extraction.line_items.map((lineItem) => ({
-    description: lineItem.description,
-    details: lineItem.details,
-    price: lineItem.price,
-    flagged: lineItem.flagged,
-    flagReason: lineItem.flag_reason,
-  }));
-}
-
-function getReviewMessages(draft: QuoteDraft): string[] {
-  const flaggedReasonSet = new Set<string>();
-  const flaggedMessages = draft.lineItems.flatMap((lineItem, index) => {
-    if (!lineItem.flagged) {
-      return [];
-    }
-
-    const lineItemLabel = lineItem.description.trim() || `Line item ${index + 1}`;
-    const reason = lineItem.flagReason?.trim() || "Needs manual review before generating the quote.";
-    flaggedReasonSet.add(reason.toLowerCase());
-    return [`${lineItemLabel}: ${reason}`];
-  });
-  const confidenceMessages = draft.confidenceNotes
-    .map((note) => note.trim())
-    .filter((note) => note.length > 0 && !flaggedReasonSet.has(note.toLowerCase()));
-
-  return [...new Set([...confidenceMessages, ...flaggedMessages])];
-}
+import { getPricingValidationMessage } from "@/shared/lib/pricing";
 
 export function ReviewScreen(): React.ReactElement | null {
   const navigate = useNavigate();
@@ -78,6 +33,7 @@ export function ReviewScreen(): React.ReactElement | null {
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [documentType, setDocumentType] = useState<ReviewDocumentType>("quote");
+  const [suggestedTaxRate, setSuggestedTaxRate] = useState<number | null>(null);
   const hasSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -85,6 +41,28 @@ export function ReviewScreen(): React.ReactElement | null {
       navigate("/", { replace: true });
     }
   }, [draft, navigate]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadSuggestedTaxRate(): Promise<void> {
+      try {
+        const profile = await profileService.getProfile();
+        if (isActive) {
+          setSuggestedTaxRate(profile.default_tax_rate);
+        }
+      } catch {
+        if (isActive) {
+          setSuggestedTaxRate(null);
+        }
+      }
+    }
+
+    void loadSuggestedTaxRate();
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   if (!draft) {
     return null;
@@ -136,7 +114,13 @@ export function ReviewScreen(): React.ReactElement | null {
         transcript: extraction.transcript,
         lineItems: mapExtractedLineItems(extraction),
         total: extraction.total,
+        taxRate: currentDraft.taxRate,
+        discountType: currentDraft.discountType,
+        discountValue: currentDraft.discountValue,
+        depositAmount: currentDraft.depositAmount,
         confidenceNotes: extraction.confidence_notes,
+        notes: currentDraft.notes,
+        sourceType: currentDraft.sourceType,
       });
       setIsTranscriptEditorVisible(false);
     } catch (regenerateError) {
@@ -177,18 +161,22 @@ export function ReviewScreen(): React.ReactElement | null {
       return;
     }
 
+    const pricingError = getPricingValidationMessage({
+      totalAmount: currentDraft.total,
+      taxRate: currentDraft.taxRate,
+      discountType: currentDraft.discountType,
+      discountValue: currentDraft.discountValue,
+      depositAmount: currentDraft.depositAmount,
+    });
+    if (pricingError) {
+      setSaveError(pricingError);
+      return;
+    }
+
     setIsSaving(true);
 
     try {
-      const createPayload = {
-        customer_id: currentDraft.customerId,
-        title: normalizeOptionalTitle(currentDraft.title),
-        transcript: currentDraft.transcript,
-        line_items: lineItemsForSubmit,
-        total_amount: currentDraft.total,
-        notes: currentDraft.notes,
-        source_type: currentDraft.sourceType,
-      };
+      const createPayload = buildCreatePayload(currentDraft, lineItemsForSubmit);
 
       if (documentType === "quote") {
         const createdQuote = await quoteService.createQuote(createPayload);
@@ -381,9 +369,26 @@ export function ReviewScreen(): React.ReactElement | null {
         <TotalAmountSection
           lineItemSum={lineItemSum}
           total={currentDraft.total}
+          taxRate={currentDraft.taxRate}
+          discountType={currentDraft.discountType}
+          discountValue={currentDraft.discountValue}
+          depositAmount={currentDraft.depositAmount}
+          suggestedTaxRate={suggestedTaxRate}
           disabled={isInteractionLocked}
           onTotalChange={(total) => {
             updateDraft((nextDraft) => ({ ...nextDraft, total }));
+          }}
+          onTaxRateChange={(taxRate) => {
+            updateDraft((nextDraft) => ({ ...nextDraft, taxRate }));
+          }}
+          onDiscountTypeChange={(discountType) => {
+            updateDraft((nextDraft) => ({ ...nextDraft, discountType }));
+          }}
+          onDiscountValueChange={(discountValue) => {
+            updateDraft((nextDraft) => ({ ...nextDraft, discountValue }));
+          }}
+          onDepositAmountChange={(depositAmount) => {
+            updateDraft((nextDraft) => ({ ...nextDraft, depositAmount }));
           }}
         />
 

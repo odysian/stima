@@ -498,6 +498,208 @@ async def test_update_quote_replaces_line_items_when_provided(client: AsyncClien
             "sort_order": 0,
         }
     ]
+    assert payload["total_amount"] == 180
+
+
+async def test_update_quote_recomputes_priced_total_when_line_items_change_without_subtotal_patch(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [
+                {"description": "Mulch", "details": "5 yards", "price": 100},
+            ],
+            "total_amount": 100,
+            "discount_type": "fixed",
+            "discount_value": 10,
+            "tax_rate": 0.1,
+            "notes": "Initial note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={
+            "line_items": [
+                {
+                    "description": "Premium mulch refresh",
+                    "details": "6 yards",
+                    "price": 200,
+                }
+            ]
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_amount"] == 209
+    assert payload["discount_type"] == "fixed"
+    assert payload["discount_value"] == 10
+    assert payload["tax_rate"] == 0.1
+
+
+async def test_quote_patch_deposit_only_preserves_total_and_stores_deposit(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "Work", "details": None, "price": 100}],
+            "total_amount": 100,
+            "discount_type": "fixed",
+            "discount_value": 10,
+            "tax_rate": 0.1,
+            "notes": "Initial note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+    expected_total = create_response.json()["total_amount"]
+    assert expected_total == 99
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"deposit_amount": 25},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    patched = patch_response.json()
+    assert patched["total_amount"] == expected_total
+    assert patched["deposit_amount"] == 25
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["total_amount"] == expected_total
+    assert detail_response.json()["deposit_amount"] == 25
+
+
+async def test_quote_patch_deposit_exceeds_total_returns_422_without_partial_write(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "Work", "details": None, "price": 100}],
+            "total_amount": 100,
+            "discount_type": "fixed",
+            "discount_value": 10,
+            "tax_rate": 0.1,
+            "notes": "Initial note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+    expected_total = create_response.json()["total_amount"]
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"deposit_amount": float(expected_total) + 1},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 422
+    assert patch_response.json() == {"detail": "Deposit cannot exceed the total amount"}
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["deposit_amount"] is None
+    assert detail_response.json()["total_amount"] == expected_total
+
+
+async def test_quote_patch_discount_value_null_clears_discount_and_recomputes_total(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "Work", "details": None, "price": 100}],
+            "total_amount": 100,
+            "discount_type": "fixed",
+            "discount_value": 20,
+            "tax_rate": 0.1,
+            "notes": "Initial note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+    assert create_response.json()["total_amount"] == 88
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"discount_value": None},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    patched = patch_response.json()
+    assert patched["discount_type"] is None
+    assert patched["discount_value"] is None
+    assert patched["tax_rate"] == 0.1
+    assert patched["total_amount"] == 110
+
+
+async def test_quote_patch_tax_rate_only_recomputes_total_from_reverse_subtotal(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "Work", "details": None, "price": 100}],
+            "total_amount": 100,
+            "tax_rate": 0.1,
+            "notes": "Initial note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+    assert create_response.json()["total_amount"] == 110
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"tax_rate": 0.2},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    patched = patch_response.json()
+    assert patched["tax_rate"] == 0.2
+    assert patched["total_amount"] == 120
 
 
 async def test_business_events_are_logged_for_quote_customer_and_extraction_flows(
@@ -2303,6 +2505,10 @@ async def test_mark_quote_outcome_updates_status_and_persists_event_log(
         "source_type",
         "transcript",
         "total_amount",
+        "tax_rate",
+        "discount_type",
+        "discount_value",
+        "deposit_amount",
         "notes",
         "shared_at",
         "share_token",
@@ -2559,6 +2765,73 @@ async def test_convert_quote_to_invoice_creates_linked_invoice_and_keeps_quote_l
     assert invoice_count == 1
 
 
+async def test_optional_pricing_persists_on_quotes_public_payloads_and_converted_invoices(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "title": "Priced quote",
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 120}],
+            "total_amount": 120,
+            "discount_type": "fixed",
+            "discount_value": 10,
+            "tax_rate": 0.1,
+            "deposit_amount": 30,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert create_response.status_code == 201
+    quote_payload = create_response.json()
+    assert quote_payload["total_amount"] == 121
+    assert quote_payload["discount_type"] == "fixed"
+    assert quote_payload["discount_value"] == 10
+    assert quote_payload["tax_rate"] == 0.1
+    assert quote_payload["deposit_amount"] == 30
+
+    quote_id = quote_payload["id"]
+    quote_detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert quote_detail_response.status_code == 200
+    assert quote_detail_response.json()["total_amount"] == 121
+
+    share_response = await client.post(
+        f"/api/quotes/{quote_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+    assert share_token is not None
+
+    public_response = await client.get(f"/api/public/doc/{share_token}")
+    assert public_response.status_code == 200
+    assert public_response.json()["discount_type"] == "fixed"
+    assert public_response.json()["discount_value"] == 10
+    assert public_response.json()["tax_rate"] == 0.1
+    assert public_response.json()["deposit_amount"] == 30
+
+    await _set_quote_status(db_session, quote_id, QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote_id}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_payload = convert_response.json()
+    assert invoice_payload["total_amount"] == 121
+    assert invoice_payload["discount_type"] == "fixed"
+    assert invoice_payload["discount_value"] == 10
+    assert invoice_payload["tax_rate"] == 0.1
+    assert invoice_payload["deposit_amount"] == 30
+
+
 async def test_create_direct_invoice_sets_default_due_date_and_keeps_quote_list_clean(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -2617,6 +2890,81 @@ async def test_create_direct_invoice_sets_default_due_date_and_keeps_quote_list_
     )
     assert quote_count == 0
     assert invoice_count == 1
+
+
+@pytest.mark.parametrize(
+    ("pricing_payload", "expected_detail"),
+    [
+        (
+            {
+                "discount_type": "fixed",
+                "discount_value": None,
+            },
+            "Discount type and value must be provided together",
+        ),
+        (
+            {
+                "discount_value": 0,
+            },
+            "Discount type and value must be provided together",
+        ),
+        (
+            {
+                "discount_type": "fixed",
+                "discount_value": 150,
+            },
+            "Discount cannot exceed the subtotal",
+        ),
+        (
+            {
+                "tax_rate": 1.5,
+            },
+            "Tax rate must be between 0 and 1",
+        ),
+        (
+            {
+                "deposit_amount": -10,
+            },
+            "Deposit amount cannot be negative",
+        ),
+        (
+            {
+                "deposit_amount": 130,
+            },
+            "Deposit cannot exceed the total amount",
+        ),
+    ],
+)
+async def test_create_quote_rejects_invalid_optional_pricing_without_persisting_document(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    pricing_payload: dict[str, object],
+    expected_detail: str,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    initial_count = await db_session.scalar(select(func.count()).select_from(Document))
+
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 120}],
+            "total_amount": 120,
+            "notes": "Original note",
+            "source_type": "text",
+            **pricing_payload,
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": expected_detail}
+
+    final_count = await db_session.scalar(select(func.count()).select_from(Document))
+    assert final_count == initial_count
 
 
 async def test_list_invoices_returns_direct_and_quote_derived_summaries_newest_first(
@@ -2753,6 +3101,241 @@ async def test_invoice_patch_preserves_omitted_fields_and_ready_status_for_direc
     assert patched_invoice["line_items"] == direct_invoice["line_items"]
     assert patched_invoice["share_token"] is None
     assert patched_invoice["shared_at"] is None
+
+
+async def test_invoice_patch_rejects_invalid_optional_pricing_without_partial_write(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    direct_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Direct invoice",
+        transcript="direct invoice transcript",
+        total_amount=120,
+    )
+    invoice_id = direct_invoice["id"]
+
+    patch_response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"tax_rate": 1.25},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert patch_response.status_code == 422
+    assert patch_response.json() == {"detail": "Tax rate must be between 0 and 1"}
+
+    invoice_detail_response = await client.get(f"/api/invoices/{invoice_id}")
+    assert invoice_detail_response.status_code == 200
+    assert invoice_detail_response.json()["tax_rate"] is None
+    assert invoice_detail_response.json()["discount_type"] is None
+
+
+async def test_invoice_patch_recomputes_priced_total_when_line_items_change_without_subtotal_patch(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "title": "Direct invoice",
+            "transcript": "direct invoice transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 100}],
+            "total_amount": 100,
+            "discount_type": "fixed",
+            "discount_value": 10,
+            "tax_rate": 0.1,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    invoice_id = create_response.json()["id"]
+
+    patch_response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={
+            "line_items": [
+                {"description": "updated line item", "details": None, "price": 200},
+            ]
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert patch_response.status_code == 200
+    patched_invoice = patch_response.json()
+    assert patched_invoice["total_amount"] == 209
+    assert patched_invoice["discount_type"] == "fixed"
+    assert patched_invoice["discount_value"] == 10
+    assert patched_invoice["tax_rate"] == 0.1
+
+    invoice_detail_response = await client.get(f"/api/invoices/{invoice_id}")
+    assert invoice_detail_response.status_code == 200
+    assert invoice_detail_response.json()["deposit_amount"] is None
+    assert invoice_detail_response.json()["total_amount"] == 209
+
+
+async def test_invoice_patch_deposit_only_preserves_total_and_stores_deposit(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "title": "Direct invoice",
+            "transcript": "direct invoice transcript",
+            "line_items": [{"description": "Work", "details": None, "price": 100}],
+            "total_amount": 100,
+            "discount_type": "fixed",
+            "discount_value": 10,
+            "tax_rate": 0.1,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    invoice_id = create_response.json()["id"]
+    expected_total = create_response.json()["total_amount"]
+    assert expected_total == 99
+
+    patch_response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"deposit_amount": 25},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    patched = patch_response.json()
+    assert patched["total_amount"] == expected_total
+    assert patched["deposit_amount"] == 25
+
+    detail_response = await client.get(f"/api/invoices/{invoice_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["total_amount"] == expected_total
+    assert detail_response.json()["deposit_amount"] == 25
+
+
+async def test_invoice_patch_deposit_exceeds_total_returns_422_without_partial_write(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "title": "Direct invoice",
+            "transcript": "direct invoice transcript",
+            "line_items": [{"description": "Work", "details": None, "price": 100}],
+            "total_amount": 100,
+            "discount_type": "fixed",
+            "discount_value": 10,
+            "tax_rate": 0.1,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    invoice_id = create_response.json()["id"]
+    expected_total = create_response.json()["total_amount"]
+
+    patch_response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"deposit_amount": float(expected_total) + 1},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 422
+    assert patch_response.json() == {"detail": "Deposit cannot exceed the total amount"}
+
+    detail_response = await client.get(f"/api/invoices/{invoice_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["deposit_amount"] is None
+    assert detail_response.json()["total_amount"] == expected_total
+
+
+async def test_invoice_patch_discount_value_null_clears_discount_and_recomputes_total(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "title": "Direct invoice",
+            "transcript": "direct invoice transcript",
+            "line_items": [{"description": "Work", "details": None, "price": 100}],
+            "total_amount": 100,
+            "discount_type": "fixed",
+            "discount_value": 20,
+            "tax_rate": 0.1,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    invoice_id = create_response.json()["id"]
+    assert create_response.json()["total_amount"] == 88
+
+    patch_response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"discount_value": None},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    patched = patch_response.json()
+    assert patched["discount_type"] is None
+    assert patched["discount_value"] is None
+    assert patched["tax_rate"] == 0.1
+    assert patched["total_amount"] == 110
+
+
+async def test_invoice_patch_tax_rate_only_recomputes_total_from_reverse_subtotal(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "title": "Direct invoice",
+            "transcript": "direct invoice transcript",
+            "line_items": [{"description": "Work", "details": None, "price": 100}],
+            "total_amount": 100,
+            "tax_rate": 0.1,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    invoice_id = create_response.json()["id"]
+    assert create_response.json()["total_amount"] == 110
+
+    patch_response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"tax_rate": 0.2},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    patched = patch_response.json()
+    assert patched["tax_rate"] == 0.2
+    assert patched["total_amount"] == 120
 
 
 async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_preserves_sent_invoice_status(

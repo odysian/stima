@@ -17,6 +17,7 @@ export interface ProfileResponse {
   business_name: string | null;
   trade_type: TradeType | null;
   timezone: string | null;
+  default_tax_rate: number | null;
   has_logo: boolean;
   is_active: boolean;
   is_onboarded: boolean;
@@ -28,4 +29,5 @@ export interface ProfileUpdateRequest {
   last_name: string;
   trade_type: TradeType;
   timezone?: string | null;
+  default_tax_rate?: number | null;
 }

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from typing import Protocol, cast
 from uuid import UUID, uuid4
@@ -33,6 +34,13 @@ from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageReaderProtocol
 from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
+from app.shared.pricing import (
+    PricingValidationError,
+    derive_document_subtotal_from_line_items,
+    document_field_float_or_none,
+    resolve_document_subtotal_for_edit,
+    validate_document_pricing_input,
+)
 
 LOGGER = logging.getLogger(__name__)
 _EDITABLE_INVOICE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY, QuoteStatus.SENT})
@@ -91,6 +99,10 @@ class InvoiceRepositoryProtocol(Protocol):
         transcript: str,
         line_items: list[LineItemDraft],
         total_amount: float | None,
+        tax_rate: float | None,
+        discount_type: str | None,
+        discount_value: float | None,
+        deposit_amount: float | None,
         notes: str | None,
         source_type: str,
         due_date: date,
@@ -104,6 +116,14 @@ class InvoiceRepositoryProtocol(Protocol):
         update_title: bool,
         total_amount: float | None,
         update_total_amount: bool,
+        tax_rate: float | None,
+        update_tax_rate: bool,
+        discount_type: str | None,
+        update_discount_type: bool,
+        discount_value: float | None,
+        update_discount_value: bool,
+        deposit_amount: float | None,
+        update_deposit_amount: bool,
         notes: str | None,
         update_notes: bool,
         line_items: list[LineItemDraft] | None,
@@ -153,6 +173,15 @@ class InvoiceService:
         if not customer_exists:
             raise QuoteServiceError(detail="Not found", status_code=404)
 
+        validated_pricing = _validate_document_pricing_for_invoice(
+            total_amount=data.total_amount,
+            line_items=data.line_items,
+            discount_type=data.discount_type,
+            discount_value=data.discount_value,
+            tax_rate=data.tax_rate,
+            deposit_amount=data.deposit_amount,
+        )
+
         for attempt in range(2):
             try:
                 invoice = await self._invoice_repository.create(
@@ -161,7 +190,11 @@ class InvoiceService:
                     title=data.title,
                     transcript=data.transcript,
                     line_items=data.line_items,
-                    total_amount=data.total_amount,
+                    total_amount=document_field_float_or_none(validated_pricing.total_amount),
+                    tax_rate=document_field_float_or_none(validated_pricing.tax_rate),
+                    discount_type=validated_pricing.discount_type,
+                    discount_value=document_field_float_or_none(validated_pricing.discount_value),
+                    deposit_amount=document_field_float_or_none(validated_pricing.deposit_amount),
                     notes=data.notes,
                     source_type=data.source_type,
                     due_date=build_default_due_date(),
@@ -284,12 +317,81 @@ class InvoiceService:
                 status_code=409,
             )
 
+        next_line_items = (
+            data.line_items if "line_items" in data.model_fields_set else invoice.line_items
+        )
+        line_items_define_subtotal, derived_line_item_subtotal = (
+            derive_document_subtotal_from_line_items(next_line_items)
+        )
+        current_subtotal = resolve_document_subtotal_for_edit(
+            total_amount=invoice.total_amount,
+            discount_type=invoice.discount_type,
+            discount_value=invoice.discount_value,
+            tax_rate=invoice.tax_rate,
+            deposit_amount=invoice.deposit_amount,
+            line_items=next_line_items,
+        )
+        current_pricing = _validate_document_pricing_for_invoice(
+            total_amount=(
+                data.total_amount
+                if "total_amount" in data.model_fields_set
+                else (
+                    derived_line_item_subtotal
+                    if "line_items" in data.model_fields_set and line_items_define_subtotal
+                    else current_subtotal
+                )
+            ),
+            line_items=next_line_items,
+            discount_type=(
+                None
+                if "discount_value" in data.model_fields_set and data.discount_value is None
+                else (
+                    data.discount_type
+                    if "discount_type" in data.model_fields_set
+                    else invoice.discount_type
+                )
+            ),
+            discount_value=(
+                data.discount_value
+                if "discount_value" in data.model_fields_set
+                else document_field_float_or_none(invoice.discount_value)
+            ),
+            tax_rate=(
+                data.tax_rate
+                if "tax_rate" in data.model_fields_set
+                else document_field_float_or_none(invoice.tax_rate)
+            ),
+            deposit_amount=(
+                data.deposit_amount
+                if "deposit_amount" in data.model_fields_set
+                else document_field_float_or_none(invoice.deposit_amount)
+            ),
+        )
+
         updated_invoice = await self._invoice_repository.update(
             invoice=invoice,
             title=data.title,
             update_title="title" in data.model_fields_set,
-            total_amount=data.total_amount,
-            update_total_amount="total_amount" in data.model_fields_set,
+            total_amount=document_field_float_or_none(current_pricing.total_amount),
+            update_total_amount="total_amount" in data.model_fields_set
+            or ("line_items" in data.model_fields_set and line_items_define_subtotal)
+            or "discount_type" in data.model_fields_set
+            or "discount_value" in data.model_fields_set
+            or "tax_rate" in data.model_fields_set,
+            tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+            update_tax_rate="tax_rate" in data.model_fields_set,
+            discount_type=current_pricing.discount_type,
+            update_discount_type=(
+                "discount_type" in data.model_fields_set
+                or (
+                    "discount_value" in data.model_fields_set
+                    and current_pricing.discount_type is None
+                )
+            ),
+            discount_value=document_field_float_or_none(current_pricing.discount_value),
+            update_discount_value="discount_value" in data.model_fields_set,
+            deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+            update_deposit_amount="deposit_amount" in data.model_fields_set,
             notes=data.notes,
             update_notes="notes" in data.model_fields_set,
             line_items=data.line_items,
@@ -398,4 +500,27 @@ def _utcnow() -> datetime:
 
 def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
     """Return true when IntegrityError was caused by doc-sequence uniqueness collision."""
-    return "uq_documents_user_type_sequence" in str(exc.orig)
+    message = str(exc.orig)
+    return "uq_documents_user_type_sequence" in message
+
+
+def _validate_document_pricing_for_invoice(
+    *,
+    total_amount: float | None,
+    line_items: Sequence[object] | None,
+    discount_type: str | None,
+    discount_value: float | None,
+    tax_rate: float | None,
+    deposit_amount: float | None,
+):
+    try:
+        return validate_document_pricing_input(
+            total_amount=total_amount,
+            line_items=line_items,
+            discount_type=discount_type,
+            discount_value=discount_value,
+            tax_rate=tax_rate,
+            deposit_amount=deposit_amount,
+        )
+    except PricingValidationError as exc:
+        raise QuoteServiceError(detail=str(exc), status_code=422) from exc

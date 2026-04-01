@@ -37,6 +37,10 @@ function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
       },
     ],
     total: 120,
+    taxRate: null,
+    discountType: null,
+    discountValue: null,
+    depositAmount: null,
     notes: "",
     ...overrides,
   };

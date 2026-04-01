@@ -32,6 +32,10 @@ function makePublicQuote(overrides: Partial<PublicQuote> = {}): PublicQuote {
     title: "Spring Cleanup",
     status: "viewed",
     total_amount: 425,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "Includes disposal and bed edging.",
     issued_date: "Mar 28, 2026",
     logo_url: "https://example.com/logo.png",
@@ -127,5 +131,35 @@ describe("PublicQuotePage", () => {
       ).not.toBeInTheDocument();
     });
     expect(screen.getByText(/^N$/)).toBeInTheDocument();
+  });
+
+  it("renders the optional pricing breakdown when public pricing controls are present", async () => {
+    mockedPublicService.getQuote.mockResolvedValueOnce(
+      makePublicQuote({
+        total_amount: 99,
+        tax_rate: 0.1,
+        discount_type: "fixed",
+        discount_value: 10,
+        deposit_amount: 40,
+        line_items: [
+          {
+            description: "Mulch refresh",
+            details: "Front beds",
+            price: 100,
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText("Subtotal")).toBeInTheDocument();
+    expect(screen.getByText("Discount")).toBeInTheDocument();
+    expect(screen.getByText("Tax")).toBeInTheDocument();
+    expect(screen.getByText("Deposit")).toBeInTheDocument();
+    expect(screen.getByText("Balance Due")).toBeInTheDocument();
+    expect(screen.getByText("-$10.00")).toBeInTheDocument();
+    expect(screen.getByText("$9.00")).toBeInTheDocument();
+    expect(screen.getByText("$59.00")).toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, tzinfo
 from decimal import Decimal
+from typing import cast
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -22,6 +23,12 @@ from app.features.customers.models import Customer
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRenderLineItem
 from app.features.quotes.schemas import LineItemDraft
+from app.shared.pricing import (
+    DiscountType,
+    PricingInput,
+    calculate_breakdown_from_persisted,
+    calculate_line_item_sum,
+)
 
 _INVOICE_DOC_TYPE = "invoice"
 _SENT_INVOICE_STATUS = QuoteStatus.SENT
@@ -40,6 +47,10 @@ class InvoiceDetailRow:
     title: str | None
     status: str
     total_amount: Decimal | None
+    tax_rate: Decimal | None
+    discount_type: str | None
+    discount_value: Decimal | None
+    deposit_amount: Decimal | None
     notes: str | None
     due_date: date | None
     shared_at: datetime | None
@@ -199,6 +210,10 @@ class InvoiceRepository:
                 else str(document.status)
             ),
             total_amount=document.total_amount,
+            tax_rate=document.tax_rate,
+            discount_type=document.discount_type,
+            discount_value=document.discount_value,
+            deposit_amount=document.deposit_amount,
             notes=document.notes,
             due_date=document.due_date,
             shared_at=document.shared_at,
@@ -280,6 +295,10 @@ class InvoiceRepository:
             source_type=source_quote.source_type,
             transcript=source_quote.transcript,
             total_amount=source_quote.total_amount,
+            tax_rate=source_quote.tax_rate,
+            discount_type=source_quote.discount_type,
+            discount_value=source_quote.discount_value,
+            deposit_amount=source_quote.deposit_amount,
             notes=source_quote.notes,
             due_date=due_date,
         )
@@ -310,6 +329,10 @@ class InvoiceRepository:
         transcript: str,
         line_items: list[LineItemDraft],
         total_amount: float | None,
+        tax_rate: float | None,
+        discount_type: str | None,
+        discount_value: float | None,
+        deposit_amount: float | None,
         notes: str | None,
         source_type: str,
         due_date: date,
@@ -331,6 +354,10 @@ class InvoiceRepository:
             source_type=source_type,
             transcript=transcript,
             total_amount=_to_decimal(total_amount),
+            tax_rate=_to_decimal(tax_rate),
+            discount_type=discount_type,
+            discount_value=_to_decimal(discount_value),
+            deposit_amount=_to_decimal(deposit_amount),
             notes=notes,
             due_date=due_date,
         )
@@ -352,6 +379,14 @@ class InvoiceRepository:
         update_title: bool,
         total_amount: float | None,
         update_total_amount: bool,
+        tax_rate: float | None,
+        update_tax_rate: bool,
+        discount_type: str | None,
+        update_discount_type: bool,
+        discount_value: float | None,
+        update_discount_value: bool,
+        deposit_amount: float | None,
+        update_deposit_amount: bool,
         notes: str | None,
         update_notes: bool,
         line_items: list[LineItemDraft] | None,
@@ -364,6 +399,14 @@ class InvoiceRepository:
             invoice.title = title
         if update_total_amount:
             invoice.total_amount = _to_decimal(total_amount)
+        if update_tax_rate:
+            invoice.tax_rate = _to_decimal(tax_rate)
+        if update_discount_type:
+            invoice.discount_type = discount_type
+        if update_discount_value:
+            invoice.discount_value = _to_decimal(discount_value)
+        if update_deposit_amount:
+            invoice.deposit_amount = _to_decimal(deposit_amount)
         if update_notes:
             invoice.notes = notes
         if update_due_date:
@@ -447,6 +490,18 @@ def _build_render_context(
     customer: Customer,
     user: User,
 ) -> QuoteRenderContext:
+    pricing_breakdown = calculate_breakdown_from_persisted(
+        PricingInput(
+            total_amount=document.total_amount,
+            discount_type=cast(DiscountType | None, document.discount_type),
+            discount_value=document.discount_value,
+            tax_rate=document.tax_rate,
+            deposit_amount=document.deposit_amount,
+        ),
+        line_item_sum=calculate_line_item_sum(
+            [line_item.price for line_item in document.line_items]
+        ),
+    )
     return QuoteRenderContext(
         quote_id=document.id,
         user_id=document.user_id,
@@ -467,6 +522,14 @@ def _build_render_context(
         title=document.title,
         status=document.status.value,
         total_amount=document.total_amount,
+        subtotal_amount=pricing_breakdown.subtotal,
+        discount_type=pricing_breakdown.discount_type,
+        discount_value=pricing_breakdown.discount_value,
+        discount_amount=pricing_breakdown.discount_amount,
+        tax_rate=pricing_breakdown.tax_rate,
+        tax_amount=pricing_breakdown.tax_amount,
+        deposit_amount=pricing_breakdown.deposit_amount,
+        balance_due=pricing_breakdown.balance_due,
         notes=document.notes,
         due_date=_format_document_date(document.due_date, user.timezone),
         line_items=[

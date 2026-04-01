@@ -41,6 +41,10 @@ function makeInvoiceDetail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetai
     title: null,
     status: "ready",
     total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "Thanks for your business",
     due_date: "2026-04-19",
     shared_at: null,
@@ -76,6 +80,10 @@ function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
     title: "Patio Refresh",
     status: "ready",
     total_amount: 145,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "Updated note",
     due_date: "2026-04-30",
     shared_at: null,
@@ -94,6 +102,10 @@ function makeDraft(overrides: Partial<InvoiceEditDraft> = {}): InvoiceEditDraft 
     title: "",
     lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
     total: 120,
+    taxRate: null,
+    discountType: null,
+    discountValue: null,
+    depositAmount: null,
     notes: "Thanks for your business",
     dueDate: "2026-04-19",
     ...overrides,
@@ -133,8 +145,70 @@ describe("InvoiceEditScreen", () => {
         title: "",
         lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total: 120,
+        taxRate: null,
+        discountType: null,
+        discountValue: null,
+        depositAmount: null,
         notes: "Thanks for your business",
         dueDate: "2026-04-19",
+      });
+    });
+  });
+
+  it("seeds subtotal from persisted pricing when discount is active and preserves it on save", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        total_amount: 110,
+        discount_type: "fixed",
+        discount_value: 10,
+        tax_rate: null,
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    await waitFor(() => {
+      expect(JSON.parse(window.sessionStorage.getItem(EDIT_STORAGE_KEY) ?? "")).toEqual({
+        invoiceId: "invoice-1",
+        title: "",
+        lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total: 120,
+        taxRate: null,
+        discountType: "fixed",
+        discountValue: 10,
+        depositAmount: null,
+        notes: "Thanks for your business",
+        dueDate: "2026-04-19",
+      });
+    });
+
+    expect(await screen.findByRole("spinbutton", { name: /subtotal/i })).toHaveValue(120);
+
+    fireEvent.change(screen.getByLabelText(/customer notes/i), {
+      target: { value: "Notes only change" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.updateInvoice).toHaveBeenCalledWith("invoice-1", {
+        title: null,
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total_amount: 120,
+        tax_rate: null,
+        discount_type: "fixed",
+        discount_value: 10,
+        deposit_amount: null,
+        notes: "Notes only change",
+        due_date: "2026-04-19",
       });
     });
   });
@@ -190,6 +264,10 @@ describe("InvoiceEditScreen", () => {
         title: "Patio Refresh",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total_amount: 145,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
         notes: "Updated note",
         due_date: "2026-04-30",
       });
@@ -226,6 +304,10 @@ describe("InvoiceEditScreen", () => {
         title: null,
         line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total_amount: 120,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
         notes: "Thanks for your business",
         due_date: "2026-04-19",
       });
@@ -254,6 +336,10 @@ describe("InvoiceEditScreen", () => {
         title: null,
         line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total_amount: 120,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
         notes: "Updated note without a due date",
       });
     });

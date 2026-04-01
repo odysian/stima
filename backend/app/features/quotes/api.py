@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Protocol
+from typing import Annotated, Protocol, cast
 from uuid import UUID
 
 from fastapi import (
@@ -26,6 +26,7 @@ from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
 from app.features.quotes.schemas import (
     ConvertNotesRequest,
+    DiscountType,
     ExtractionResult,
     PublicLineItemResponse,
     PublicQuoteResponse,
@@ -423,6 +424,10 @@ async def get_public_quote(
         title=quote.title,
         status=quote.status,
         total_amount=float(quote.total_amount) if quote.total_amount is not None else None,
+        tax_rate=float(quote.tax_rate) if quote.tax_rate is not None else None,
+        discount_type=cast(DiscountType | None, quote.discount_type),
+        discount_value=float(quote.discount_value) if quote.discount_value is not None else None,
+        deposit_amount=float(quote.deposit_amount) if quote.deposit_amount is not None else None,
         notes=quote.notes,
         issued_date=quote.issued_date,
         logo_url=logo_url,

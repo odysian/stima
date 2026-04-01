@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -31,9 +32,11 @@ class ProfileRepository:
         trade_type: str,
         timezone: str | None,
         update_timezone: bool,
+        default_tax_rate: Decimal | None,
+        update_default_tax_rate: bool,
     ) -> User | None:
         """Update onboarding-relevant user profile fields and return the updated user."""
-        values: dict[str, str | None] = {
+        values: dict[str, str | Decimal | None] = {
             "business_name": business_name,
             "first_name": first_name,
             "last_name": last_name,
@@ -41,6 +44,8 @@ class ProfileRepository:
         }
         if update_timezone:
             values["timezone"] = timezone
+        if update_default_tax_rate:
+            values["default_tax_rate"] = default_tax_rate
 
         result = await self._session.execute(
             update(User).where(User.id == user_id).values(**values).returning(User)

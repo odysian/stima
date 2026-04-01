@@ -32,6 +32,7 @@ class ProfileResponse(BaseModel):
     business_name: str | None
     trade_type: TradeType | None
     timezone: str | None
+    default_tax_rate: float | None
     has_logo: bool
     is_active: bool
     is_onboarded: bool
@@ -45,6 +46,7 @@ class ProfileUpdateRequest(BaseModel):
     last_name: str = Field(min_length=1, max_length=100)
     trade_type: TradeType
     timezone: str | None = Field(default=None, max_length=64)
+    default_tax_rate: float | None = None
 
     @field_validator("timezone")
     @classmethod
@@ -63,3 +65,13 @@ class ProfileUpdateRequest(BaseModel):
             raise ValueError("Timezone must be a valid IANA timezone identifier") from exc
 
         return normalized_value
+
+    @field_validator("default_tax_rate")
+    @classmethod
+    def validate_default_tax_rate(cls, value: float | None) -> float | None:
+        """Accept only fractional tax rates between 0 and 1 when provided."""
+        if value is None:
+            return None
+        if value < 0 or value > 1:
+            raise ValueError("Default tax rate must be between 0 and 1")
+        return value

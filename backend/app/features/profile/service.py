@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
@@ -47,6 +48,8 @@ class ProfileRepositoryProtocol(Protocol):
         trade_type: str,
         timezone: str | None,
         update_timezone: bool,
+        default_tax_rate: Decimal | None,
+        update_default_tax_rate: bool,
     ) -> User | None: ...
 
     async def update_logo_path(self, *, user_id: UUID, path: str) -> User | None: ...
@@ -82,6 +85,8 @@ class ProfileService:
         trade_type: str,
         timezone: str | None,
         update_timezone: bool,
+        default_tax_rate: float | None,
+        update_default_tax_rate: bool,
     ) -> User:
         """Persist onboarding fields and return the updated user profile."""
         updated_profile = await self._repository.update_user_fields(
@@ -92,6 +97,8 @@ class ProfileService:
             trade_type=trade_type,
             timezone=timezone,
             update_timezone=update_timezone,
+            default_tax_rate=_normalize_default_tax_rate(default_tax_rate),
+            update_default_tax_rate=update_default_tax_rate,
         )
         if updated_profile is None:
             raise ProfileServiceError(detail="Profile not found", status_code=404)
@@ -166,3 +173,12 @@ class ProfileService:
         if profile is None:
             raise ProfileServiceError(detail="Profile not found", status_code=404)
         return profile
+
+
+def _normalize_default_tax_rate(value: float | None) -> Decimal | None:
+    if value is None:
+        return None
+    normalized = Decimal(str(value))
+    if normalized == Decimal("0"):
+        return None
+    return normalized

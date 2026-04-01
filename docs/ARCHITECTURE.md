@@ -213,10 +213,10 @@ Rules:
 | `/quotes/convert-notes` | POST | yes | cookie | `{ notes }` | `200 ExtractionResult` |
 | `/quotes/capture-audio` | POST | yes | cookie | multipart form-data `clips` files | `200 ExtractionResult` |
 | `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `200 ExtractionResult` |
-| `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
+| `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
 | `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`, `linked_invoice`) or `404 { detail: "Not found" }` |
-| `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes, or `404 { detail: "Not found" }` |
+| `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes, or `404 { detail: "Not found" }` |
 | `/quotes/{id}/share` | POST | yes | cookie | — | `200 Quote`; returns existing quote unchanged when status is already `viewed`, `approved`, or `declined` |
 | `/quotes/{id}/send-email` | POST | yes | cookie | — | `200 Quote` after ensuring the quote is shared and emailing the customer link, `404` when quote is missing/not owned, `409` when still `draft`, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
 | `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
@@ -227,10 +227,10 @@ Rules:
 
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
-| `/invoices` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type }` | `201 Invoice` with `doc_number` (`I-001`), `status: "draft"`, server-default `due_date`, and nullable `source_document_id` |
+| `/invoices` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Invoice` with `doc_number` (`I-001`), `status: "draft"`, server-default `due_date`, and nullable `source_document_id` |
 | `/invoices` | GET | no | cookie | `customer_id?` (UUID query param) | `200 InvoiceListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; includes both direct invoices and quote-derived invoices) |
 | `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail`, `404 { detail: "Not found" }` |
-| `/invoices/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, due_date? }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
+| `/invoices/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, due_date?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
 | `/invoices/{id}/share` | POST | yes | cookie | — | `200 Invoice`; creates/reuses `share_token` and transitions invoice to `sent` |
 
@@ -238,7 +238,7 @@ Rules:
 
 | Endpoint | Method | Auth | Response |
 |---|---|---|---|
-| `/api/public/doc/{share_token}` | GET | no | `200 PublicQuoteResponse` with `logo_url` and `download_url`, `404 { detail: "Not found" }` for unknown or non-public tokens |
+| `/api/public/doc/{share_token}` | GET | no | `200 PublicQuoteResponse` (`Quote`-shaped fields including `tax_rate?`, `discount_type?`, `discount_value?`, `deposit_amount?`, plus `logo_url`, `download_url`), `404 { detail: "Not found" }` for unknown or non-public tokens |
 | `/api/public/doc/{share_token}/logo` | GET | no | raw image bytes with correct `Content-Type`, `Cache-Control: public, max-age=300`, `404 { detail: "Logo not found" }`, or `500 { detail: "Unable to load logo" }` |
 | `/share/{share_token}` | GET | no | raw quote or sent-invoice PDF bytes with `Content-Type: application/pdf`, `Cache-Control: no-store`, and `X-Robots-Tag: noindex` |
 
@@ -286,12 +286,12 @@ Public landing-page rules:
 - `source_document_id`
 
 `QuoteDetailResponse` fields:
-- Standard `Quote` fields, including `id`, `customer_id`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
+- Standard `Quote` fields, including `id`, `customer_id`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
 - Customer display fields: `customer_name`, `customer_email`, `customer_phone`
 - `linked_invoice`: `{ id, doc_number, status, due_date, total_amount, created_at } | null`
 
 `InvoiceDetail` fields:
-- Standard invoice fields: `id`, `customer_id`, `doc_number`, `title`, `status`, `total_amount`, `notes`, `due_date`, `shared_at`, `share_token`, `source_document_id`, `line_items`, `created_at`, and `updated_at`
+- Standard invoice fields: `id`, `customer_id`, `doc_number`, `title`, `status`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `due_date`, `shared_at`, `share_token`, `source_document_id`, `line_items`, `created_at`, and `updated_at`
 - `source_quote_number` (`null` for direct invoices with no parent quote)
 - `customer`: `{ id, name, email, phone }`
 

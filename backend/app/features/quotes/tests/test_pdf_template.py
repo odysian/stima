@@ -40,6 +40,14 @@ def _make_context(
     customer_address: str | None = None,
     notes: str | None = None,
     line_item_details: str | None = None,
+    subtotal_amount: Decimal | None = None,
+    discount_type: str | None = None,
+    discount_value: Decimal | None = None,
+    discount_amount: Decimal | None = None,
+    tax_rate: Decimal | None = None,
+    tax_amount: Decimal | None = None,
+    deposit_amount: Decimal | None = None,
+    balance_due: Decimal | None = None,
 ) -> QuoteRenderContext:
     created_at = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
     return QuoteRenderContext(
@@ -62,6 +70,14 @@ def _make_context(
         title=title,
         status="ready",
         total_amount=total,
+        subtotal_amount=subtotal_amount,
+        discount_type=discount_type,
+        discount_value=discount_value,
+        discount_amount=discount_amount,
+        tax_rate=tax_rate,
+        tax_amount=tax_amount,
+        deposit_amount=deposit_amount,
+        balance_due=balance_due,
         notes=notes,
         due_date=due_date,
         line_items=[
@@ -175,6 +191,52 @@ def test_render_shows_em_dash_for_null_line_item_and_total_prices(
         rendered_html,
         re.DOTALL,
     )
+
+
+def test_render_shows_conditional_pricing_breakdown_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+    updated_at = datetime(2026, 3, 1, 12, 6, tzinfo=UTC)
+
+    result = integration.render(
+        _make_context(
+            updated_at=updated_at,
+            line_item_price=Decimal("120.00"),
+            subtotal_amount=Decimal("120.00"),
+            discount_type="fixed",
+            discount_value=Decimal("10.00"),
+            discount_amount=Decimal("10.00"),
+            tax_rate=Decimal("0.1000"),
+            tax_amount=Decimal("11.00"),
+            deposit_amount=Decimal("30.00"),
+            total=Decimal("121.00"),
+            balance_due=Decimal("91.00"),
+        )
+    )
+
+    assert result == b"fake-pdf"
+    assert len(captured_html) == 1
+    rendered_html = captured_html[0]
+    for label in ("Subtotal", "Discount", "Tax", "Total", "Deposit", "Balance Due"):
+        assert label in rendered_html
+    assert "$120.00" in rendered_html
+    assert "$10.00" in rendered_html
+    assert "$11.00" in rendered_html
+    assert "$30.00" in rendered_html
+    assert "$91.00" in rendered_html
 
 
 def test_render_omits_internal_quote_title_from_pdf(

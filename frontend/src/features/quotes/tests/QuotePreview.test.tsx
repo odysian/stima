@@ -42,6 +42,10 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     source_type: "text",
     transcript: "5 yards brown mulch",
     total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "Thanks for your business",
     shared_at: null,
     share_token: null,
@@ -71,6 +75,10 @@ function makeQuoteResponse(overrides: Partial<Quote> = {}): Quote {
     source_type: "text",
     transcript: "5 yards brown mulch",
     total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "Thanks for your business",
     shared_at: "2026-03-20T01:00:00.000Z",
     share_token: "share-token-1",
@@ -133,6 +141,10 @@ beforeEach(() => {
     title: "Spring Cleanup",
     status: "draft",
     total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "Thanks for your business",
     due_date: "2026-04-19",
     shared_at: null,
@@ -526,6 +538,38 @@ describe("QuotePreview", () => {
     expect(screen.getByRole("heading", { name: "Q-001" })).toBeInTheDocument();
     expect(screen.getAllByText("cust-1")).toHaveLength(1);
     expect(screen.getByText("No contact details")).toBeInTheDocument();
+  });
+
+  it("renders the pricing breakdown when optional pricing controls are present", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        total_amount: 99,
+        tax_rate: 0.1,
+        discount_type: "fixed",
+        discount_value: 10,
+        deposit_amount: 40,
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 100,
+            sort_order: 0,
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText("Subtotal")).toBeInTheDocument();
+    expect(screen.getByText("Discount")).toBeInTheDocument();
+    expect(screen.getByText("Tax")).toBeInTheDocument();
+    expect(screen.getByText("Deposit")).toBeInTheDocument();
+    expect(screen.getByText("Balance Due")).toBeInTheDocument();
+    expect(screen.getByText("-$10.00")).toBeInTheDocument();
+    expect(screen.getByText("$9.00")).toBeInTheDocument();
+    expect(screen.getByText("$59.00")).toBeInTheDocument();
   });
 
   it("renders quote line items with details and TBD for missing prices", async () => {

@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.shared.pricing import DiscountType
+
 
 def _normalize_optional_title(value: object) -> object:
     """Trim optional title values and collapse blanks to null."""
@@ -55,6 +57,10 @@ class QuoteCreateRequest(BaseModel):
     transcript: str = Field(min_length=1)
     line_items: list[LineItemDraft] = Field(default_factory=list)
     total_amount: float | None = None
+    tax_rate: float | None = None
+    discount_type: DiscountType | None = None
+    discount_value: float | None = None
+    deposit_amount: float | None = None
     notes: str | None = None
     source_type: Literal["text", "voice"]
 
@@ -67,6 +73,10 @@ class QuoteUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
     line_items: list[LineItemDraft] | None = None
     total_amount: float | None = None
+    tax_rate: float | None = None
+    discount_type: DiscountType | None = None
+    discount_value: float | None = None
+    deposit_amount: float | None = None
     notes: str | None = None
 
     _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
@@ -130,6 +140,10 @@ class QuoteResponse(BaseModel):
     source_type: Literal["text", "voice"]
     transcript: str
     total_amount: float | None
+    tax_rate: float | None
+    discount_type: DiscountType | None
+    discount_value: float | None
+    deposit_amount: float | None
     notes: str | None
     shared_at: datetime | None
     share_token: str | None
@@ -169,6 +183,10 @@ class PublicQuoteResponse(BaseModel):
     title: str | None
     status: str
     total_amount: float | None
+    tax_rate: float | None
+    discount_type: DiscountType | None
+    discount_value: float | None
+    deposit_amount: float | None
     notes: str | None
     issued_date: str
     logo_url: str
