@@ -58,6 +58,8 @@ Label selection rules:
 11. If scope is a no-contract refactor, include a parity lock checklist in the Task acceptance criteria.
 12. For greenfield repos, align issue scope with `docs/GREENFIELD_BLUEPRINT.md` boundaries and structure defaults.
 
+Guiding principle: be strict about scope, contracts, acceptance criteria, verification, and layer boundaries. Be flexible about internal decomposition and helper structure as long as the implementation stays readable, testable, and consistent with repo patterns.
+
 ## Execution Modes (Choose Before Opening Issues)
 
 Use `single` by default. Use `gated` or `fast` only when explicitly requested.
@@ -121,12 +123,13 @@ Dev tooling, CI fixes, proxy config, and startup scripts that don't fit cleanly 
 
 A Task is ready when:
 
-- acceptance criteria are explicit
-- verification commands are listed
+- acceptance criteria are explicit and testable
+- verification commands are listed and exact
 - dependencies/links are included
 - runtime/toolchain versions are explicit if verify depends on specific versions
 - for backend-coupled work: Decision Locks are checked in the controlling issue (Task in `single`, Spec in `gated`)
 - for no-contract refactors: parity lock checklist is explicitly listed in acceptance criteria
+- for bug fixes, backend business logic, contract-sensitive behavior, and stateful/cross-layer changes: the first test/assertion to add is identified when practical
 
 ## Definition Of Done
 
@@ -135,12 +138,14 @@ A Task is done when:
 - PR is merged
 - verification commands pass
 - tests for the feature are included in the same Task by default
+- targeted tests/assertions for the touched behavior are added when practical; lower-risk UI polish or exploratory work can stay lighter
 - docs are updated when behavior/contracts changed
 - changed code complies with `docs/CODE_COMMENTING_CONTRACT.md`
 - follow-up issues are created for deferred work
 - reviewer follow-up is complete with verdict and actionable findings addressed or deferred explicitly
 - boundary/layer guardrail checks pass when applicable
-- no-contract refactors include reported parity lock results (status/shape/error/side-effects)
+- no-contract refactors include reported parity lock results (status/shape/error/side-effects), not just a prose claim
+- after explicit reviewer verdict `APPROVED`, the lightweight tutoring handoff is written to `docs/learning/YYYY-MM-DD-feature-slug-learning.md`
 
 ## Decision Records And ADRs
 
@@ -184,6 +189,11 @@ Rules:
 - If `mode` is omitted, default to `single`.
 - Do not switch to `gated` or `fast` unless explicitly requested.
 - This kickoff is planning-only by default: no code changes, no PR creation.
+- Immediately before issue-ready markdown / issue creation output, include a short `Why this approach` checkpoint with:
+  - chosen approach
+  - one rejected alternative
+  - main tradeoff
+  - assumptions/contracts that must hold
 - Output should include: issue body file(s), `gh issue create` command(s) when applicable, created issue link(s), and a 3-5 step implementation plan.
 - For `mode=fast`, output a quick-fix checklist and verification plan; no issue creation by default.
 - Keep chatter minimal; ask follow-up questions only for hard blockers (auth/permissions/missing required labels).
@@ -237,6 +247,7 @@ Reviewer constraints:
 - no worktree setup by default
 - no broad verification reruns already reported green
 - no command transcript unless a command failed
+- be strict about contract drift, acceptance criteria, verification evidence, and layer-boundary violations; be flexible about internal helper structure when the code remains readable, testable, and consistent with repo patterns
 
 Use the exact output contract in `docs/template/KICKOFF.md` (single source of truth).
 

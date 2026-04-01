@@ -33,6 +33,8 @@ Open Product Decisions (required when applicable):
 
 Constraints:
 - Keep mode `single` unless explicitly requested otherwise.
+- Be strict about scope, contracts, acceptance criteria, verification, and layer boundaries. Be flexible about internal decomposition and helper structure as long as the implementation stays readable, testable, and consistent with repo patterns.
+- For bug fixes, backend business logic, contract-sensitive behavior, and stateful/cross-layer changes, identify the first test/assertion to add before implementation when practical.
 - No environment triage loops, no worktree setup, no broad verification reruns.
 - For live/provider-backed checks (for example `make extraction-live`), ask the human operator to run them manually and share output instead of running them in agent sessions.
 - Keep output concise and findings-first.
@@ -91,12 +93,19 @@ Deliver:
 3. Risks and edge cases.
 4. Acceptance criteria draft.
 5. Verification plan (exact commands).
-6. Recommended issue artifact markdown (Task/Spec as applicable) ready for `gh issue create --body-file` when applicable.
+6. `Why this approach` checkpoint:
+   - chosen approach
+   - one rejected alternative
+   - main tradeoff
+   - assumptions/contracts that must hold
+7. Recommended issue artifact markdown (Task/Spec as applicable) ready for `gh issue create --body-file` when applicable.
 
 Constraints:
 - Keep it lean and concrete.
 - Default to one Task unless explicitly asked for split/gated mode.
 - No speculative architecture.
+- For bug fixes, backend business logic, contract-sensitive behavior, and stateful/cross-layer changes, identify the first test/assertion to add when practical.
+- UI polish, exploratory work, copy tweaks, and other low-risk changes can stay lighter.
 ```
 
 Notes:
@@ -134,6 +143,7 @@ Constraints:
   - quick hardening fix
   - follow-up product/UX decision
 - Avoid escalating unresolved wording/copy/product decisions as correctness bugs unless they violate a documented contract.
+- Be strict about contract drift, verification gaps, acceptance-criteria misses, and layer-boundary violations. Be flexible about internal helper decomposition when readability, testability, and repo-pattern consistency are intact.
 - Do not return `APPROVED` while required PR checks are failing, stale, or missing unless you explicitly inspected that CI state and determined it is non-blocking.
 
 
@@ -150,66 +160,53 @@ Required Output:
    - up to 5 concise bullets
 ```
 
-## 4) Required Learning Handoff Template (After APPROVED)
+## 4) Required Lightweight Tutoring Handoff (After APPROVED)
 
 Use this after explicit reviewer verdict `APPROVED` is provided back to the implementation agent.
 
 Filename and location:
 - `docs/learning/YYYY-MM-DD-feature-slug-learning.md`
 
-The following header block is static and must be copied verbatim at the top of every generated learning handoff:
+Keep it lightweight enough to generate and consume in about five minutes.
+Use plain English, tutoring tone, and cap it at four bullets plus code pointers.
 
 ```text
----
-TUTORING SESSION CONTEXT (do not modify)
+- What changed: <2-3 sentences max>
+- Why it was done this way: <brief rationale>
+- Tradeoff or pattern worth learning: <one thing to teach>
+- What to review first: <how a junior operator should read the diff>
 
-I am a junior developer learning through code review. You are a
-senior dev explaining this to me as your intern.
-
-My stack: FastAPI, PostgreSQL + pgvector, SQLAlchemy async,
-Next.js/TypeScript, Redis, ARQ, OpenAI embeddings, Anthropic API.
-My projects: Quaero (RAG/document Q&A), Rostra (real-time chat),
-FAROS (task manager/AWS).
-
-How to explain: go block by block, 5-15 lines at a time. For each
-block give me WHAT, WHY, TRADEOFF, and PATTERN. Stop after each
-block and ask if I want to go deeper or move on. Do not proceed
-until I respond.
-
-If a concept connects to Rostra, FAROS, or another part of Quaero,
-say so explicitly. If there is a security implication, flag it
-with [SECURITY]. If I ask "why not X", give me a real answer.
-
-Depth signals: "keep going" = next block, "go deeper" = expand
-current block, "how would I explain this in an interview" = give
-me a 2-sentence out-loud answer.
----
-```
-
-Everything below the header is agent-generated per task/spec.
-
-Required section order below the header:
-
-```text
-## What Was Built
-- 2-3 sentences describing what was delivered.
-
-## Top 3 Decisions and Why
-1. <decision> - <why>
-2. <decision> - <why>
-3. <decision> - <why>
-
-## Non-Obvious Patterns Used
-- Patterns a junior dev might not immediately recognize, with plain-English explanation.
-
-## Tradeoffs Evaluated
-- Options considered and why one was chosen.
-
-## What I'm Uncertain About
-- Any decisions that felt like a coin flip
-- Anything I'd do differently with more context
-- Edge cases I didn't handle and why
-
-## Relevant Code Pointers
+Code pointers:
 - Use `filename > line number` entries for web-chat/no-IDE contexts.
 ```
+
+
+## 5) Copilot/Codex Code Review PR Review Triage Prompt (Light)
+
+Copy-paste this exact prompt when GitHub Copilot or Codex leaves comments on a Task PR:
+
+```text
+Review all GitHub Copilot comments on Task #<task-id> / PR #<pr-number>.
+
+You are the final decision maker. Evaluate every comment strictly against the Stima contract:
+
+- docs/REVIEW_CHECKLIST.md
+- docs/AGENTS.md (single-task scope, file-size budgets, no migration edits, match style)
+- docs/WORKFLOW.md (Lean Review Mode + tight boundaries, loose middle)
+
+For each comment decide:
+- ACCEPT → valid and in-scope; make the smallest surgical fix if needed
+- REJECT → violates contract; state the exact rule
+- DEFER → useful but out-of-scope; create a one-line follow-up issue
+
+Constraints:
+- Stay inside the approved task scope and single mode.
+- Never make large refactors or pattern changes just because Copilot suggested them.
+- Respect “tight boundaries, loose middle”.
+
+Output (keep it short):
+1. Bullet list of decisions with one-line reasons.
+2. Any code changes made (file + one-line summary).
+3. Final verdict: APPROVED / ACTIONABLE / NO_CHANGES_NEEDED
+
+If APPROVED, also generate the updated lightweight learning handoff.
