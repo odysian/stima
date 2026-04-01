@@ -103,6 +103,16 @@ describe("theme helpers", () => {
     expect(document.documentElement.style.colorScheme).toBe("dark");
     expect(document.documentElement.style.backgroundColor).toBe("rgb(11, 16, 19)");
   });
+
+  it("removes the explicit theme override for system preference", () => {
+    applyThemeToDocument("light", "light");
+    applyThemeToDocument("dark", "system");
+
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(document.documentElement.style.backgroundColor).toBe("rgb(11, 16, 19)");
+    expect(document.documentElement.style.color).toBe("rgb(238, 242, 239)");
+  });
 });
 
 describe("ThemeProvider", () => {

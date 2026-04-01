@@ -625,6 +625,9 @@ Required behavior:
 - while preference is `system`, keep the effective theme in sync if the OS theme changes during the session
 - keep the CSS token overrides compatible with both the media-query path and explicit attribute overrides
 
+Implementation note:
+- in `system`, the `<html>` element should not keep a stale `data-theme` value; clearing the attribute is the contract that lets the OS-fallback selector path own dark tokens
+
 Canonical selector pattern:
 ```css
 /* Follows OS by default */

@@ -93,6 +93,7 @@ export function resolveEffectiveTheme(
   return preference === "system" ? systemTheme : preference;
 }
 
+// System mode removes the explicit html[data-theme] override so the OS-driven CSS path can apply.
 export function applyThemeToDocument(
   theme: EffectiveTheme,
   preference: ThemePreference = theme,
