@@ -3,8 +3,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { useInvoiceEdit, type InvoiceEditDraft } from "@/features/invoices/hooks/useInvoiceEdit";
 
-const EDIT_STORAGE_KEY = "stima_invoice_edit";
-
 const draftFixture: InvoiceEditDraft = {
   invoiceId: "invoice-1",
   title: "Spring Cleanup",

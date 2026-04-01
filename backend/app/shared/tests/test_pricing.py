@@ -5,7 +5,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
-
 from app.shared.pricing import (
     PricingInput,
     PricingValidationError,

@@ -556,7 +556,9 @@ def _resolve_document_subtotal(
 def _derive_subtotal_from_line_items(
     line_items: Sequence[object] | None,
 ) -> tuple[bool, float | None]:
-    substantive_items = [line_item for line_item in (line_items or ()) if _line_item_has_content(line_item)]
+    substantive_items = [
+        line_item for line_item in (line_items or ()) if _line_item_has_content(line_item)
+    ]
     if not substantive_items:
         return True, None
     if any(getattr(line_item, "price", None) is None for line_item in substantive_items):
