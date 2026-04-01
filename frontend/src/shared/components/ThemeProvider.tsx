@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import { ThemeContext, type ThemeContextValue } from "@/shared/lib/theme-context";
@@ -19,17 +20,22 @@ import {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [preference, setPreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
-  const [systemTheme, setSystemTheme] = useState<EffectiveTheme>(() => getSystemTheme());
+  const systemTheme = useSyncExternalStore(
+    useCallback(
+      (onStoreChange) => {
+        if (preference !== "system") {
+          return () => undefined;
+        }
 
-  useEffect(() => {
-    if (preference !== "system") {
-      return;
-    }
-
-    setSystemTheme(getSystemTheme());
-
-    return subscribeToSystemTheme(setSystemTheme);
-  }, [preference]);
+        return subscribeToSystemTheme(() => {
+          onStoreChange();
+        });
+      },
+      [preference],
+    ),
+    getSystemTheme,
+    () => "light" as EffectiveTheme,
+  );
 
   const effectiveTheme = resolveEffectiveTheme(preference, systemTheme);
 
