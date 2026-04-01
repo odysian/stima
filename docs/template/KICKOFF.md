@@ -18,7 +18,7 @@ Then execute the full Task flow end-to-end:
 6. Return the standardized reviewer follow-up prompt from section 3 below.
 7. After review verdict is relayed back:
    - if verdict is `ACTIONABLE`: patch required fixes and rerun targeted verification only.
-   - if verdict is `APPROVED`: write `docs/learning/YYYY-MM-DD-feature-slug-learning.md` using section 4 below, then return the file path and final completion summary.
+   - if verdict is `APPROVED`: post the lightweight tutoring handoff directly in chat using section 4 below, then return the final completion summary.
 8. If the Task touches state transitions, frontend action availability, external provider side effects, or contract/error semantics, include a short Behavior Matrix before implementation.
 
 Behavior Matrix (required for stateful/cross-layer tasks):
@@ -138,6 +138,7 @@ Constraints:
 - Keep output concise and findings-first.
 - No command transcript unless a command failed and that failure matters to a finding.
 - For stateful/cross-layer Tasks, verify status/action/error/side-effect parity across all affected states, not just the changed happy path.
+- If the verdict is `APPROVED`, end the same response with the lightweight tutoring handoff from section 4.
 - Classify findings as one of:
   - merge-blocking bug/contract issue
   - quick hardening fix
@@ -158,17 +159,18 @@ Required Output:
    - whether PR CI/check status was inspected, and any blocking failures
 4. Residual risk/testing gaps:
    - up to 5 concise bullets
+5. If verdict is `APPROVED`, end with the lightweight tutoring handoff from section 4 in the same chat response
 ```
 
-## 4) Required Lightweight Tutoring Handoff (After APPROVED)
+## 4) Required Lightweight Tutoring Handoff In Chat (After APPROVED)
 
-Use this after explicit reviewer verdict `APPROVED` is provided back to the implementation agent.
+Use this after explicit reviewer verdict `APPROVED`.
+If you are the reviewer returning `APPROVED`, include it at the end of that same response.
 
-Filename and location:
-- `docs/learning/YYYY-MM-DD-feature-slug-learning.md`
-
+Post it directly in the same chat/thread.
+Do not create a separate markdown handoff unless explicitly requested.
 Keep it lightweight enough to generate and consume in about five minutes.
-Use plain English, tutoring tone, and cap it at four bullets plus code pointers.
+Use plain English, tutoring tone, and cap it at 4 short bullets plus 3-6 code pointers.
 
 ```text
 - What changed: <2-3 sentences max>
@@ -177,7 +179,7 @@ Use plain English, tutoring tone, and cap it at four bullets plus code pointers.
 - What to review first: <how a junior operator should read the diff>
 
 Code pointers:
-- Use `filename > line number` entries for web-chat/no-IDE contexts.
+- `path:line-line — why it matters`
 ```
 
 
@@ -209,4 +211,5 @@ Output (keep it short):
 2. Any code changes made (file + one-line summary).
 3. Final verdict: APPROVED / ACTIONABLE / NO_CHANGES_NEEDED
 
-If APPROVED, also generate the updated lightweight learning handoff.
+This review step is for findings triage only. Do not generate a learning handoff here. Reserve the lightweight tutoring handoff for the final reviewer response when the change is explicitly approved.
+```
