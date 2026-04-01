@@ -211,5 +211,5 @@ Output (keep it short):
 2. Any code changes made (file + one-line summary).
 3. Final verdict: APPROVED / ACTIONABLE / NO_CHANGES_NEEDED
 
-If APPROVED, also generate the updated lightweight learning handoff directly in chat.
+This review step is for findings triage only. Do not generate a learning handoff here. Reserve the lightweight tutoring handoff for the final reviewer response when the change is explicitly approved.
 ```
