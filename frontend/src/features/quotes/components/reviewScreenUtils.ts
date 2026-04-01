@@ -60,6 +60,23 @@ export function getReviewMessages(draft: QuoteDraft): string[] {
   return [...new Set([...confidenceMessages, ...flaggedMessages])];
 }
 
+export function getWarningMessages(
+  reviewMessages: string[],
+  hasNullPrices: boolean,
+  documentType: "quote" | "invoice",
+): string[] {
+  if (!hasNullPrices) {
+    return reviewMessages;
+  }
+
+  return [
+    ...reviewMessages,
+    documentType === "quote"
+      ? "Line items without prices will render as \"TBD\" when the quote is shared."
+      : "Line items without prices will render as \"TBD\" when the invoice is created.",
+  ];
+}
+
 export function buildCreatePayload(draft: QuoteDraft, lineItems: LineItemDraft[]) {
   return {
     customer_id: draft.customerId,

@@ -271,7 +271,11 @@ describe("ReviewScreen", () => {
   });
 
   it("hides review guidance when there are no confidence notes and no flagged items", () => {
-    renderScreen(makeDraft());
+    renderScreen(
+      makeDraft({
+        lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      }),
+    );
 
     expect(screen.queryByText(/review required before generating/i)).not.toBeInTheDocument();
   });
@@ -279,8 +283,8 @@ describe("ReviewScreen", () => {
   it("shows a clearer null-price warning when any submitted line item has no price", () => {
     renderScreen(makeDraft());
 
-    expect(screen.getByText(/review missing prices before sharing/i)).toBeInTheDocument();
-    expect(screen.getByText(/render as "TBD"/i)).toBeInTheDocument();
+    expect(screen.getByText(/review required before generating/i)).toBeInTheDocument();
+    expect(screen.getByText(/render as "TBD" when the quote is shared/i)).toBeInTheDocument();
   });
 
   it("hides the null-price warning when all submitted line items have prices", () => {
@@ -290,13 +294,14 @@ describe("ReviewScreen", () => {
       }),
     );
 
-    expect(screen.queryByText(/review missing prices before sharing/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/render as "TBD" when the quote is shared/i)).not.toBeInTheDocument();
   });
 
-  it("keeps quote generation enabled when the null-price warning is shown", () => {
+  it("keeps quote generation enabled and removes the sticky footer warning when prices are missing", () => {
     renderScreen(makeDraft());
 
-    expect(screen.getByText(/review missing prices before sharing/i)).toBeInTheDocument();
+    expect(screen.queryByText(/review missing prices before sharing/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/render as "TBD" when the quote is shared/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^generate quote$/i })).toBeEnabled();
   });
 

@@ -12,6 +12,7 @@ import {
   buildCreatePayload,
   EMPTY_LINE_ITEM,
   getReviewMessages,
+  getWarningMessages,
   isInvalidLineItem,
   mapExtractedLineItems,
   normalizeLineItem,
@@ -89,6 +90,7 @@ export function ReviewScreen(): React.ReactElement | null {
   }, 0);
   const trimmedTranscript = currentDraft.transcript.trim();
   const reviewMessages = getReviewMessages(currentDraft);
+  const warningMessages = getWarningMessages(reviewMessages, hasNullPrices, documentType);
   const isInteractionLocked = isSaving || isRegenerating;
 
   function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void {
@@ -223,16 +225,13 @@ export function ReviewScreen(): React.ReactElement | null {
           <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
         ) : null}
 
-        {reviewMessages.length > 0 ? (
+        {warningMessages.length > 0 ? (
           <section className="rounded-lg border border-warning-accent/30 bg-warning-container p-4 text-warning">
             <p className="text-[0.6875rem] font-bold uppercase tracking-widest">
               Review required before generating
             </p>
-            <p className="mt-2 text-sm font-medium">
-              Check these items so the quote matches the job before you continue.
-            </p>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm">
-              {reviewMessages.map((message) => (
+              {warningMessages.map((message) => (
                 <li key={message}>{message}</li>
               ))}
             </ul>
@@ -424,7 +423,6 @@ export function ReviewScreen(): React.ReactElement | null {
       </form>
       <ReviewSubmitFooter
         documentType={documentType}
-        hasNullPrices={hasNullPrices}
         canSubmit={canSubmit}
         isInteractionLocked={isInteractionLocked}
         isSaving={isSaving}
