@@ -10,6 +10,8 @@ import {
   type ProfileResponse,
 } from "@/features/profile/types/profile.types";
 import { SettingsScreen } from "@/features/settings/components/SettingsScreen";
+import { ThemeProvider } from "@/shared/components/ThemeProvider";
+import { THEME_STORAGE_KEY } from "@/shared/lib/theme";
 
 vi.mock("@/features/auth/hooks/useAuth", () => ({
   useAuth: vi.fn(),
@@ -51,13 +53,29 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
 
 function renderScreen() {
   return render(
-    <MemoryRouter>
-      <SettingsScreen />
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter>
+        <SettingsScreen />
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
 beforeEach(() => {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation(() => ({
+      matches: false,
+      media: "(prefers-color-scheme: dark)",
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+  window.localStorage.clear();
   mockedUseAuth.mockReturnValue({
     user: {
       id: "user-1",
@@ -206,6 +224,36 @@ describe("SettingsScreen", () => {
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("Saved")).toHaveClass("rounded-lg");
+  });
+
+  it("updates the theme preference immediately from the segmented control", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+
+    renderScreen();
+
+    await screen.findByLabelText(/business name/i);
+
+    const systemButton = screen.getByRole("button", { name: "System" });
+    const lightButton = screen.getByRole("button", { name: "Light" });
+    const darkButton = screen.getByRole("button", { name: "Dark" });
+
+    expect(systemButton).toHaveAttribute("aria-pressed", "true");
+    expect(lightButton).toHaveAttribute("aria-pressed", "false");
+    expect(darkButton).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(darkButton);
+
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(darkButton).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(lightButton);
+
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(lightButton).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows the saved default tax as a percent and persists edited values as fractions", async () => {

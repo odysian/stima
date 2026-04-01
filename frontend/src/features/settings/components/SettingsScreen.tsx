@@ -15,11 +15,20 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { useTheme } from "@/shared/hooks/useTheme";
 import { parseTaxPercentInput, toTaxPercentDisplay } from "@/shared/lib/pricing";
+import type { ThemePreference } from "@/shared/lib/theme";
+
+const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = [
+  { label: "System", value: "system" },
+  { label: "Light", value: "light" },
+  { label: "Dark", value: "dark" },
+];
 
 export function SettingsScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { logout, refreshUser } = useAuth();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const logoPreviewSrc = `${import.meta.env.VITE_API_URL ?? ""}/api/profile/logo`;
 
   const [businessName, setBusinessName] = useState("");
@@ -318,6 +327,52 @@ export function SettingsScreen(): React.ReactElement {
                   <p className="text-xs text-on-surface-variant">
                     Used as the suggested tax rate for new documents. Tax stays off until you enable it.
                   </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl bg-surface-container-low p-4">
+              <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                Appearance
+              </h2>
+              <div className="mt-3 rounded-xl bg-surface-container-lowest p-4">
+                <div className="space-y-1">
+                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                    Theme
+                  </p>
+                  <p className="text-sm text-on-surface">
+                    Choose how Stima looks across the app.
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    System follows your device. Light and Dark override it immediately.
+                  </p>
+                </div>
+
+                <div
+                  role="group"
+                  aria-label="Theme"
+                  className="mt-4 grid grid-cols-3 gap-2"
+                >
+                  {THEME_OPTIONS.map((option) => {
+                    const isSelected = option.value === themePreference;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => setThemePreference(option.value)}
+                        className={[
+                          "rounded-lg py-3 font-label text-sm transition-all",
+                          isSelected
+                            ? "border-2 border-primary bg-primary/5 font-semibold text-primary"
+                            : "border border-outline-variant/30 bg-surface-container-low text-on-surface-variant",
+                        ].join(" ")}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </section>

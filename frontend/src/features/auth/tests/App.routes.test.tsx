@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import { AuthProvider } from "@/features/auth/hooks/useAuth";
 import { authService } from "@/features/auth/services/authService";
+import { ThemeProvider } from "@/shared/components/ThemeProvider";
 
 vi.mock("@/features/auth/services/authService", () => ({
   authService: {
@@ -18,12 +19,28 @@ vi.mock("@/features/auth/services/authService", () => ({
 const mockedAuthService = vi.mocked(authService);
 
 function renderApp(path: string): void {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation(() => ({
+      matches: false,
+      media: "(prefers-color-scheme: dark)",
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
