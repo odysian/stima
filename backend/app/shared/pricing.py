@@ -106,26 +106,6 @@ def validate_and_calculate_from_input(
         deposit_amount=deposit_amount,
     )
 
-    if discount_type is None and discount_value is not None and normalized.discount_value is None:
-        # `0` clears discount entirely and behaves like omission.
-        breakdown = calculate_breakdown_from_subtotal(
-            subtotal=normalized.total_amount,
-            discount_type=normalized.discount_type,
-            discount_value=normalized.discount_value,
-            tax_rate=normalized.tax_rate,
-            deposit_amount=normalized.deposit_amount,
-        )
-        return (
-            PricingInput(
-                total_amount=breakdown.total_amount,
-                discount_type=normalized.discount_type,
-                discount_value=normalized.discount_value,
-                tax_rate=normalized.tax_rate,
-                deposit_amount=normalized.deposit_amount,
-            ),
-            breakdown,
-        )
-
     _validate_negative_amount("discount value", normalized.discount_value)
     _validate_negative_amount("deposit amount", normalized.deposit_amount)
     _validate_discount_fields(

@@ -1,4 +1,6 @@
-import { PricingRow } from "@/features/quotes/components/PricingRow";
+import { useState } from "react";
+
+import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import {
   calculatePricingFromSubtotal,
@@ -38,6 +40,15 @@ export function TotalAmountSection({
   onDiscountValueChange,
   onDepositAmountChange,
 }: TotalAmountSectionProps): React.ReactElement {
+  const [discountToggleOverride, setDiscountToggleOverride] = useState<boolean | null>(null);
+  const [taxToggleOverride, setTaxToggleOverride] = useState<boolean | null>(null);
+  const [depositToggleOverride, setDepositToggleOverride] = useState<boolean | null>(null);
+  const isDiscountEnabled = discountToggleOverride ?? (
+    discountType !== null || isPopulatedPricingValue(discountValue)
+  );
+  const isTaxEnabled = taxToggleOverride ?? isPopulatedPricingValue(taxRate);
+  const isDepositEnabled = depositToggleOverride ?? isPopulatedPricingValue(depositAmount);
+
   const pricingBreakdown = calculatePricingFromSubtotal({
     totalAmount: total,
     taxRate,
@@ -45,10 +56,12 @@ export function TotalAmountSection({
     discountValue,
     depositAmount,
   });
-  const hasDiscount = discountType !== null || discountValue !== null;
-  const hasTax = taxRate !== null;
-  const hasDeposit = depositAmount !== null;
-  const hasPricingControls = hasDiscount || hasTax || hasDeposit || suggestedTaxRate !== null;
+  const hasPricingControls = (
+    isDiscountEnabled
+    || isTaxEnabled
+    || isDepositEnabled
+    || suggestedTaxRate !== null
+  );
   const hasPricingBreakdown = pricingBreakdown.hasPricingBreakdown;
 
   return (
@@ -102,21 +115,25 @@ export function TotalAmountSection({
             <label className="flex items-center gap-3 text-sm text-on-surface">
               <input
                 type="checkbox"
-                checked={hasDiscount}
+                checked={isDiscountEnabled}
                 disabled={disabled}
                 onChange={(event) => {
                   if (event.target.checked) {
+                    setDiscountToggleOverride(true);
                     onDiscountTypeChange(discountType ?? "fixed");
-                    onDiscountValueChange(discountValue ?? 0);
+                    if (discountValue === 0) {
+                      onDiscountValueChange(null);
+                    }
                     return;
                   }
+                  setDiscountToggleOverride(false);
                   onDiscountTypeChange(null);
                   onDiscountValueChange(null);
                 }}
               />
               Discount
             </label>
-            {hasDiscount ? (
+            {isDiscountEnabled ? (
               <div className="grid gap-3 md:grid-cols-[minmax(0,140px)_1fr]">
                 <select
                   value={discountType ?? "fixed"}
@@ -145,19 +162,21 @@ export function TotalAmountSection({
             <label className="flex items-center gap-3 text-sm text-on-surface">
               <input
                 type="checkbox"
-                checked={hasTax}
+                checked={isTaxEnabled}
                 disabled={disabled}
                 onChange={(event) => {
                   if (event.target.checked) {
-                    onTaxRateChange(taxRate ?? suggestedTaxRate ?? 0);
+                    setTaxToggleOverride(true);
+                    onTaxRateChange(taxRate ?? suggestedTaxRate ?? null);
                     return;
                   }
+                  setTaxToggleOverride(false);
                   onTaxRateChange(null);
                 }}
               />
               Tax
             </label>
-            {suggestedTaxRate !== null && !hasTax ? (
+            {suggestedTaxRate !== null && !isTaxEnabled ? (
               <div className="rounded-lg bg-surface-container-lowest p-3 text-sm text-on-surface-variant">
                 <p className="text-xs font-bold uppercase tracking-widest text-outline">Suggested Tax</p>
                 <input
@@ -171,7 +190,7 @@ export function TotalAmountSection({
                 </p>
               </div>
             ) : null}
-            {hasTax ? (
+            {isTaxEnabled ? (
               <input
                 type="number"
                 step="0.01"
@@ -186,19 +205,23 @@ export function TotalAmountSection({
             <label className="flex items-center gap-3 text-sm text-on-surface">
               <input
                 type="checkbox"
-                checked={hasDeposit}
+                checked={isDepositEnabled}
                 disabled={disabled}
                 onChange={(event) => {
                   if (event.target.checked) {
-                    onDepositAmountChange(depositAmount ?? 0);
+                    setDepositToggleOverride(true);
+                    if (depositAmount === 0) {
+                      onDepositAmountChange(null);
+                    }
                     return;
                   }
+                  setDepositToggleOverride(false);
                   onDepositAmountChange(null);
                 }}
               />
               Deposit
             </label>
-            {hasDeposit ? (
+            {isDepositEnabled ? (
               <input
                 type="number"
                 step="0.01"
@@ -236,4 +259,8 @@ export function TotalAmountSection({
       ) : null}
     </section>
   );
+}
+
+function isPopulatedPricingValue(value: number | null): boolean {
+  return value !== null && value !== 0;
 }

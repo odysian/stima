@@ -202,7 +202,7 @@ class QuoteService:
                     title=data.title,
                     transcript=data.transcript,
                     line_items=data.line_items,
-                    total_amount=validated_pricing.total_amount,
+                    total_amount=_to_float_or_none(validated_pricing.total_amount),
                     tax_rate=_to_float_or_none(validated_pricing.tax_rate),
                     discount_type=validated_pricing.discount_type,
                     discount_value=_to_float_or_none(validated_pricing.discount_value),

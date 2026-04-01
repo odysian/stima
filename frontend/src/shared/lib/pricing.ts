@@ -103,10 +103,12 @@ export function calculatePricingFromPersisted(
 }
 
 export function getPricingValidationMessage(pricing: PricingFields): string | null {
+  const normalized = normalizePricingFields(pricing);
+
   if (pricing.discountType !== null && pricing.discountValue === null) {
     return "Enter a discount value or turn discount off.";
   }
-  if (pricing.discountType === null && pricing.discountValue !== null && pricing.discountValue !== 0) {
+  if (pricing.discountType === null && pricing.discountValue !== null) {
     return "Choose a discount type or clear the discount value.";
   }
   if (pricing.discountValue !== null && pricing.discountValue < 0) {
@@ -122,7 +124,9 @@ export function getPricingValidationMessage(pricing: PricingFields): string | nu
     return "Deposit amount cannot be negative.";
   }
   const hasActivePricing =
-    pricing.discountType !== null || pricing.taxRate !== null || pricing.depositAmount !== null;
+    normalized.discountType !== null
+    || normalized.taxRate !== null
+    || normalized.depositAmount !== null;
   if (hasActivePricing && pricing.totalAmount === null) {
     return "Enter a subtotal before using optional pricing.";
   }

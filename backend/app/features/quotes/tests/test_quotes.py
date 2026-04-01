@@ -2702,6 +2702,12 @@ async def test_create_direct_invoice_sets_default_due_date_and_keeps_quote_list_
         ),
         (
             {
+                "discount_value": 0,
+            },
+            "Discount type and value must be provided together",
+        ),
+        (
+            {
                 "discount_type": "fixed",
                 "discount_value": 150,
             },

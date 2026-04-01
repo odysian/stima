@@ -1,4 +1,4 @@
-import { PricingRow } from "@/features/quotes/components/PricingRow";
+import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum, type DiscountType } from "@/shared/lib/pricing";
 
