@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.shared.pricing import DiscountType
+
 
 def _normalize_optional_title(value: object) -> object:
     """Trim optional title values and collapse blanks to null."""
@@ -39,9 +41,6 @@ class ExtractionResult(BaseModel):
     line_items: list[LineItemExtracted] = Field(default_factory=list)
     total: float | None = None
     confidence_notes: list[str] = Field(default_factory=list)
-
-
-DiscountType = Literal["fixed", "percent"]
 
 
 class ConvertNotesRequest(BaseModel):

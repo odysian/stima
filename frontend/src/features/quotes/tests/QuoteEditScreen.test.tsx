@@ -148,6 +148,62 @@ describe("QuoteEditScreen", () => {
     });
   });
 
+  it("seeds subtotal from persisted pricing when discount is active and preserves it on save", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        total_amount: 110,
+        discount_type: "fixed",
+        discount_value: 10,
+        tax_rate: null,
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    await waitFor(() => {
+      expect(JSON.parse(window.sessionStorage.getItem(EDIT_STORAGE_KEY) ?? "")).toEqual({
+        quoteId: "quote-1",
+        title: "",
+        lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total: 120,
+        taxRate: null,
+        discountType: "fixed",
+        discountValue: 10,
+        depositAmount: null,
+        notes: "Thanks for your business",
+      });
+    });
+
+    expect(await screen.findByRole("spinbutton", { name: /subtotal/i })).toHaveValue(120);
+
+    fireEvent.change(screen.getByLabelText(/customer notes/i), {
+      target: { value: "Notes only change" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-1", {
+        title: null,
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total_amount: 120,
+        tax_rate: null,
+        discount_type: "fixed",
+        discount_value: 10,
+        deposit_amount: null,
+        notes: "Notes only change",
+      });
+    });
+  });
+
   it("shows a load error when the quote fetch fails", async () => {
     mockedQuoteService.getQuote.mockRejectedValueOnce(new Error("Unable to load quote"));
 

@@ -12,7 +12,11 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { getPricingValidationMessage } from "@/shared/lib/pricing";
+import {
+  calculatePricingFromPersisted,
+  getPricingValidationMessage,
+  resolveLineItemSum,
+} from "@/shared/lib/pricing";
 
 const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   description: "",
@@ -21,6 +25,17 @@ const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
 };
 
 function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
+  const lineItemSum = resolveLineItemSum(quote.line_items.map((item) => item.price));
+  const breakdown = calculatePricingFromPersisted(
+    {
+      totalAmount: quote.total_amount,
+      taxRate: quote.tax_rate,
+      discountType: quote.discount_type,
+      discountValue: quote.discount_value,
+      depositAmount: quote.deposit_amount,
+    },
+    lineItemSum,
+  );
   return {
     quoteId: quote.id,
     title: quote.title ?? "",
@@ -29,7 +44,7 @@ function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
       details: item.details,
       price: item.price,
     })),
-    total: quote.total_amount,
+    total: breakdown.subtotal ?? quote.total_amount,
     taxRate: quote.tax_rate,
     discountType: quote.discount_type,
     discountValue: quote.discount_value,

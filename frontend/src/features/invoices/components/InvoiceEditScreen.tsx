@@ -13,7 +13,11 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { getPricingValidationMessage } from "@/shared/lib/pricing";
+import {
+  calculatePricingFromPersisted,
+  getPricingValidationMessage,
+  resolveLineItemSum,
+} from "@/shared/lib/pricing";
 
 const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   description: "",
@@ -22,6 +26,17 @@ const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
 };
 
 function mapInvoiceToEditDraft(invoice: InvoiceDetail): InvoiceEditDraft {
+  const lineItemSum = resolveLineItemSum(invoice.line_items.map((item) => item.price));
+  const breakdown = calculatePricingFromPersisted(
+    {
+      totalAmount: invoice.total_amount,
+      taxRate: invoice.tax_rate,
+      discountType: invoice.discount_type,
+      discountValue: invoice.discount_value,
+      depositAmount: invoice.deposit_amount,
+    },
+    lineItemSum,
+  );
   return {
     invoiceId: invoice.id,
     title: invoice.title ?? "",
@@ -30,7 +45,7 @@ function mapInvoiceToEditDraft(invoice: InvoiceDetail): InvoiceEditDraft {
       details: item.details,
       price: item.price,
     })),
-    total: invoice.total_amount,
+    total: breakdown.subtotal ?? invoice.total_amount,
     taxRate: invoice.tax_rate,
     discountType: invoice.discount_type,
     discountValue: invoice.discount_value,
