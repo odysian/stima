@@ -97,7 +97,7 @@ export function TotalAmountSection({
               const parsedValue = Number(rawValue);
               onTotalChange(Number.isFinite(parsedValue) ? parsedValue : null);
             }}
-            className="w-full rounded-lg border-2 border-primary bg-white py-3 pl-10 pr-4 font-headline text-3xl font-bold tracking-tight text-primary outline-none transition-all focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-lg border-2 border-primary bg-surface-container-lowest py-3 pl-10 pr-4 font-headline text-3xl font-bold tracking-tight text-primary outline-none transition-all focus:ring-2 focus:ring-primary/20"
           />
         </div>
       </div>

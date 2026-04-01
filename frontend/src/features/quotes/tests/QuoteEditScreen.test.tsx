@@ -263,6 +263,17 @@ describe("QuoteEditScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
   });
 
+  it("uses token-backed surfaces for the edit notes field", async () => {
+    window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
+
+    renderScreen();
+
+    expect(await screen.findByLabelText(/customer notes/i)).toHaveClass(
+      "bg-surface-container-high",
+      "text-on-surface",
+    );
+  });
+
   it("falls back to the doc number after clearing a saved title and submits null", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({

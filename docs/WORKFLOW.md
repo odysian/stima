@@ -34,7 +34,7 @@ Every feature follows:
 4. Verify
 5. Review handoff
 6. Patch (if needed)
-7. In-chat learning handoff (after `APPROVED`)
+7. In-chat learning handoff in the approving review response
 8. Finalize
 
 ## Operator Flow Optimization
@@ -46,7 +46,7 @@ Use this as the default human-in-the-loop sequence to reduce handoff overhead:
 3. Open PR with `Closes #<task-id>`.
 4. Run one reviewer pass using the standardized prompt from `docs/template/KICKOFF.md`.
 5. If verdict is `ACTIONABLE`, patch in the implementation branch and rerun targeted verification only.
-6. When verdict is `APPROVED` and relayed back to the implementation agent, post the lightweight tutoring handoff directly in chat.
+6. When verdict is `APPROVED`, the approving reviewer includes the lightweight tutoring handoff in that same response; the implementation agent then finalizes without generating a second handoff.
 7. Merge PR and sync local branch.
 8. If this Task belongs to a Spec, check whether all sibling Tasks are now done or deferred; if so, close the Spec issue.
 
@@ -119,7 +119,7 @@ After implementation and PR creation, run one focused reviewer follow-up pass:
 - Reviewer scope: major correctness bugs, regressions, and missing tests/docs.
 - Reviewer output: `APPROVED` or `ACTIONABLE`.
 - If `ACTIONABLE`, patch findings and rerun only relevant verification.
-- If `APPROVED`, post the required in-chat learning handoff before claiming completion.
+- If `APPROVED`, the approving reviewer posts the required in-chat learning handoff in that same response before the implementation agent claims completion.
 - Default to one review pass; run a second pass only when explicitly requested.
 
 Default reviewer constraints:
@@ -146,9 +146,9 @@ Do not redefine the format in this file; keep `docs/template/KICKOFF.md` as the 
 
 ## Learning Handoff (Required Completion Gate)
 
-After reviewer verdict `APPROVED` is explicitly relayed back to the implementation agent:
+The lightweight tutoring handoff is generated once, by the approving reviewer, in the same `APPROVED` response for the completed unit (`Task` completion and `Spec` closure).
 
-- Post one lightweight tutoring handoff directly in the same chat/thread for the completed unit (`Task` completion and `Spec` closure).
+- Do not generate a second learning handoff after approval is relayed back; the implementation agent finalizes after approval.
 - Do not create a separate markdown handoff unless explicitly requested.
 - Keep it ephemeral and practical, not archival documentation.
 - Keep it to 4 short bullets:

@@ -112,6 +112,18 @@ afterEach(() => {
 });
 
 describe("QuoteList", () => {
+  it("uses token-backed emphasis for the active filter and create button", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+
+    const quotesButton = await screen.findByRole("button", { name: "Quotes" });
+    const createButton = screen.getByRole("button", { name: "Create document" });
+
+    expect(quotesButton).toHaveClass("ghost-shadow", "bg-surface-container-lowest", "text-primary");
+    expect(createButton).toHaveClass("forest-gradient", "ghost-shadow", "text-on-primary");
+  });
+
   it("renders quote cards from listQuotes response", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([
       makeQuoteListItem(),

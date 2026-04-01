@@ -33,7 +33,7 @@ Read conditionally (only when relevant):
   - If `mode` is omitted, default to `single`.
   - Do not switch to `gated` or `fast` unless explicitly requested.
   - Planning kickoff output: issue body file(s), `gh issue create` command(s) when applicable, created issue link(s), and a 3-5 step implementation plan.
-  - Execution kickoff output: implementation + verification + PR + standardized reviewer follow-up prompt + required lightweight tutoring handoff in chat after explicit `APPROVED`.
+  - Execution kickoff output: implementation + verification + PR + standardized reviewer follow-up prompt + final completion after explicit `APPROVED`, with the lightweight tutoring handoff generated once by the approving reviewer in that same response.
 
 ## Agent Operating Loop
 
@@ -46,8 +46,8 @@ Read conditionally (only when relevant):
 7. For issue-backed work, open PR that closes the Task issue; close Spec after child Tasks are done/deferred.
 8. Provide a lean reviewer follow-up prompt for a separate review pass.
 9. Patch only actionable findings, rerun relevant verification, and repeat review only if explicitly requested.
-10. After explicit reviewer verdict `APPROVED` is relayed back, post a lightweight tutoring handoff directly in chat (format defined below).
-11. Finalize: include the handoff in the completion output and then close/complete the Task or Spec as applicable.
+10. After explicit reviewer verdict `APPROVED`, finalize the Task or Spec; do not generate a second lightweight tutoring handoff after approval is relayed back.
+11. Finalize: return the completion output and then close/complete the Task or Spec as applicable.
 
 ## Project Context
 
@@ -121,6 +121,7 @@ Reviewer pass default constraints:
 - no rerun of broad verification already reported green
 - no command transcript in output unless a command failed
 - default to one review pass; run a second pass only if the user explicitly requests it
+- if verdict is `APPROVED`, the approving reviewer ends that same response with the lightweight tutoring handoff, generated once
 
 Use the exact reviewer prompt/output contract from `docs/template/KICKOFF.md`.
 
@@ -129,7 +130,8 @@ Use the exact reviewer prompt/output contract from `docs/template/KICKOFF.md`.
 Required completion gate:
 
 - Post a learning handoff whenever a Task is finished and whenever a Spec is closed.
-- Trigger only after explicit reviewer verdict `APPROVED` is provided back to the implementation agent.
+- The lightweight tutoring handoff is generated once, by the approving reviewer, in the same `APPROVED` response.
+- Do not generate a second learning handoff after approval is relayed back; the implementation agent finalizes after approval.
 - Post it directly in the same chat/thread; do not create a separate markdown handoff unless explicitly requested.
 - Keep it brief, tutor-style, and practical rather than archival.
 - Required shape:

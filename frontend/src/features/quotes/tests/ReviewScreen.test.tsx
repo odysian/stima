@@ -315,6 +315,22 @@ describe("ReviewScreen", () => {
     );
   });
 
+  it("uses token-backed surfaces for editable transcript and customer notes", async () => {
+    const user = userEvent.setup();
+    renderScreen(makeDraft());
+
+    await user.click(screen.getByRole("button", { name: /edit transcript notes/i }));
+
+    expect(screen.getByRole("textbox", { name: /transcript notes/i })).toHaveClass(
+      "bg-surface-container-high",
+      "text-on-surface",
+    );
+    expect(screen.getByRole("textbox", { name: /customer notes/i })).toHaveClass(
+      "bg-surface-container-high",
+      "text-on-surface",
+    );
+  });
+
   it("regenerates directly from the edited transcript when no line items exist", async () => {
     const user = userEvent.setup();
     renderScreen(makeDraft({ lineItems: [], total: null }));

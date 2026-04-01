@@ -35,6 +35,14 @@ function renderSection(): void {
 }
 
 describe("TotalAmountSection", () => {
+  it("uses the token-backed surface for the total amount input", () => {
+    renderSection();
+
+    expect(screen.getByRole("spinbutton", { name: /total amount/i })).toHaveClass(
+      "bg-surface-container-lowest",
+    );
+  });
+
   it("shows editable inputs without seeding zero values and applies the suggested tax rate", () => {
     renderSection();
 

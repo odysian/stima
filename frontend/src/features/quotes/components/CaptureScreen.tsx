@@ -268,10 +268,10 @@ export function CaptureScreen(): React.ReactElement {
             </div>
             <button
               type="button"
-              className="flex h-20 w-20 items-center justify-center rounded-full bg-secondary shadow-[0_0_24px_rgba(0,0,0,0.12)] transition-all active:scale-95"
+              className="ghost-shadow flex h-20 w-20 items-center justify-center rounded-full bg-secondary text-on-secondary transition-all active:scale-95"
               onClick={stopRecording}
             >
-              <span className="material-symbols-outlined text-4xl text-white">stop</span>
+              <span className="material-symbols-outlined text-4xl">stop</span>
             </button>
           </div>
         ) : (
@@ -279,11 +279,11 @@ export function CaptureScreen(): React.ReactElement {
             <p className="text-xs uppercase tracking-widest text-outline">TAP TO START</p>
             <button
               type="button"
-              className="forest-gradient flex h-20 w-20 items-center justify-center rounded-full shadow-[0_0_24px_rgba(0,0,0,0.12)] transition-all active:scale-95"
+              className="forest-gradient ghost-shadow flex h-20 w-20 items-center justify-center rounded-full text-on-primary transition-all active:scale-95"
               onClick={() => void startRecording()}
               disabled={!isSupported}
             >
-              <span className="material-symbols-outlined text-4xl text-white">mic</span>
+              <span className="material-symbols-outlined text-4xl">mic</span>
             </button>
           </div>
         )}
