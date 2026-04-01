@@ -266,6 +266,9 @@ class QuoteService:
         next_line_items = (
             data.line_items if "line_items" in data.model_fields_set else quote.line_items
         )
+        line_items_define_subtotal, derived_line_item_subtotal = _derive_subtotal_from_line_items(
+            next_line_items,
+        )
         current_subtotal = _resolve_document_subtotal(
             total_amount=quote.total_amount,
             discount_type=quote.discount_type,
@@ -276,7 +279,13 @@ class QuoteService:
         )
         current_pricing = _validate_document_pricing(
             total_amount=(
-                data.total_amount if "total_amount" in data.model_fields_set else current_subtotal
+                data.total_amount
+                if "total_amount" in data.model_fields_set
+                else (
+                    derived_line_item_subtotal
+                    if "line_items" in data.model_fields_set and line_items_define_subtotal
+                    else current_subtotal
+                )
             ),
             line_items=next_line_items,
             discount_type=(
@@ -307,6 +316,7 @@ class QuoteService:
             update_title="title" in data.model_fields_set,
             total_amount=_to_float_or_none(current_pricing.total_amount),
             update_total_amount="total_amount" in data.model_fields_set
+            or ("line_items" in data.model_fields_set and line_items_define_subtotal)
             or "discount_type" in data.model_fields_set
             or "discount_value" in data.model_fields_set
             or "tax_rate" in data.model_fields_set,
@@ -620,6 +630,31 @@ def _resolve_document_subtotal(
         line_item_sum=line_item_sum,
     )
     return _to_float_or_none(breakdown.subtotal)
+
+
+def _derive_subtotal_from_line_items(
+    line_items: Sequence[object] | None,
+) -> tuple[bool, float | None]:
+    substantive_items = [line_item for line_item in (line_items or ()) if _line_item_has_content(line_item)]
+    if not substantive_items:
+        return True, None
+    if any(getattr(line_item, "price", None) is None for line_item in substantive_items):
+        return False, None
+
+    line_item_sum = calculate_line_item_sum(
+        [to_decimal(getattr(line_item, "price", None)) for line_item in substantive_items]
+    )
+    return True, _to_float_or_none(line_item_sum)
+
+
+def _line_item_has_content(line_item: object) -> bool:
+    description = getattr(line_item, "description", None)
+    details = getattr(line_item, "details", None)
+    return bool(
+        (isinstance(description, str) and description.strip())
+        or (isinstance(details, str) and details.strip())
+        or getattr(line_item, "price", None) is not None
+    )
 
 
 def _to_float_or_none(value: object) -> float | None:

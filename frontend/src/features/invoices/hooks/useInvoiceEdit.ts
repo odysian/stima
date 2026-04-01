@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
-import type { DiscountType } from "@/shared/lib/pricing";
+import { resolveLineItemSum, type DiscountType } from "@/shared/lib/pricing";
 
 const EDIT_STORAGE_KEY = "stima_invoice_edit";
 
@@ -176,6 +176,12 @@ export function useInvoiceEdit(): UseInvoiceEditResult {
         lineItems: currentDraft.lineItems.map((existingItem, currentIndex) =>
           currentIndex === index ? item : existingItem,
         ),
+        total: syncDraftTotalWithLineItems(
+          currentDraft,
+          currentDraft.lineItems.map((existingItem, currentIndex) =>
+            currentIndex === index ? item : existingItem,
+          ),
+        ),
       };
       persistDraftToStorage(nextDraft);
       return nextDraft;
@@ -191,6 +197,10 @@ export function useInvoiceEdit(): UseInvoiceEditResult {
       const nextDraft: InvoiceEditDraft = {
         ...currentDraft,
         lineItems: currentDraft.lineItems.filter((_, currentIndex) => currentIndex !== index),
+        total: syncDraftTotalWithLineItems(
+          currentDraft,
+          currentDraft.lineItems.filter((_, currentIndex) => currentIndex !== index),
+        ),
       };
       persistDraftToStorage(nextDraft);
       return nextDraft;
@@ -204,4 +214,47 @@ export function useInvoiceEdit(): UseInvoiceEditResult {
     removeLineItem,
     clearDraft,
   };
+}
+
+
+function syncDraftTotalWithLineItems(
+  currentDraft: InvoiceEditDraft,
+  nextLineItems: LineItemDraftWithFlags[],
+): number | null {
+  const currentDerivedSubtotal = resolveFullyPricedLineItemSum(currentDraft.lineItems);
+  if (currentDerivedSubtotal !== currentDraft.total) {
+    return currentDraft.total;
+  }
+
+  const nextDerivedSubtotal = resolveFullyPricedLineItemSum(nextLineItems);
+  if (nextDerivedSubtotal === null) {
+    return hasSubstantiveLineItems(nextLineItems) ? currentDraft.total : null;
+  }
+  return nextDerivedSubtotal;
+}
+
+
+function resolveFullyPricedLineItemSum(lineItems: LineItemDraftWithFlags[]): number | null {
+  const substantiveLineItems = lineItems.filter(hasLineItemContent);
+  if (substantiveLineItems.length === 0) {
+    return null;
+  }
+  if (substantiveLineItems.some((lineItem) => lineItem.price === null)) {
+    return null;
+  }
+  return resolveLineItemSum(substantiveLineItems.map((lineItem) => lineItem.price));
+}
+
+
+function hasSubstantiveLineItems(lineItems: LineItemDraftWithFlags[]): boolean {
+  return lineItems.some(hasLineItemContent);
+}
+
+
+function hasLineItemContent(lineItem: LineItemDraftWithFlags): boolean {
+  return (
+    lineItem.description.trim().length > 0
+    || (lineItem.details?.trim().length ?? 0) > 0
+    || lineItem.price !== null
+  );
 }

@@ -26,4 +26,16 @@ describe("pricing validation", () => {
       }),
     ).toBeNull();
   });
+
+  it("rejects a deposit that exceeds the computed total amount", () => {
+    expect(
+      getPricingValidationMessage({
+        totalAmount: 100,
+        taxRate: 0.1,
+        discountType: "fixed",
+        discountValue: 10,
+        depositAmount: 100,
+      }),
+    ).toBe("Deposit cannot exceed the total amount.");
+  });
 });

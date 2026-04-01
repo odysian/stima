@@ -34,6 +34,17 @@ function HookHarness(): React.ReactElement {
       <button
         type="button"
         onClick={() =>
+          setDraft({
+            ...draftFixture,
+            total: 145,
+          })
+        }
+      >
+        Set Manual Draft
+      </button>
+      <button
+        type="button"
+        onClick={() =>
           updateLineItem(0, {
             description: "Updated mulch",
             details: "6 yards",
@@ -108,13 +119,32 @@ describe("useQuoteEdit", () => {
     expect(screen.getByTestId("draft-state")).toHaveTextContent(
       JSON.stringify({
         ...draftFixture,
+        total: 150,
         lineItems: [{ description: "Updated mulch", details: "6 yards", price: 150 }],
       }),
     );
     expect(JSON.parse(window.sessionStorage.getItem(EDIT_STORAGE_KEY) ?? "")).toEqual({
       ...draftFixture,
       lineItems: [{ description: "Updated mulch", details: "6 yards", price: 150 }],
+      total: 150,
     });
+  });
+
+  it("preserves a manual subtotal override when line items change", () => {
+    render(<HookHarness />);
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Set Manual Draft" }));
+      fireEvent.click(screen.getByRole("button", { name: "Update Line Item" }));
+    });
+
+    expect(screen.getByTestId("draft-state")).toHaveTextContent(
+      JSON.stringify({
+        ...draftFixture,
+        total: 145,
+        lineItems: [{ description: "Updated mulch", details: "6 yards", price: 150 }],
+      }),
+    );
   });
 
   it("removes draft from state and storage when clearDraft is called", () => {
@@ -140,11 +170,13 @@ describe("useQuoteEdit", () => {
     expect(screen.getByTestId("draft-state")).toHaveTextContent(
       JSON.stringify({
         ...draftFixture,
+        total: null,
         lineItems: [],
       }),
     );
     expect(JSON.parse(window.sessionStorage.getItem(EDIT_STORAGE_KEY) ?? "")).toEqual({
       ...draftFixture,
+      total: null,
       lineItems: [],
     });
   });

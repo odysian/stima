@@ -135,6 +135,12 @@ def validate_and_calculate_from_input(
         tax_rate=normalized.tax_rate,
         deposit_amount=normalized.deposit_amount,
     )
+    if (
+        breakdown.deposit_amount is not None
+        and breakdown.total_amount is not None
+        and breakdown.deposit_amount > breakdown.total_amount
+    ):
+        raise PricingValidationError("Deposit cannot exceed the total amount")
     return (
         PricingInput(
             total_amount=breakdown.total_amount,

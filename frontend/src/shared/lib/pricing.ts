@@ -138,6 +138,13 @@ export function getPricingValidationMessage(pricing: PricingFields): string | nu
   ) {
     return "Discount cannot exceed the subtotal.";
   }
+  if (
+    breakdown.totalAmount !== null
+    && breakdown.depositAmount !== null
+    && breakdown.depositAmount > breakdown.totalAmount
+  ) {
+    return "Deposit cannot exceed the total amount.";
+  }
   return null;
 }
 
