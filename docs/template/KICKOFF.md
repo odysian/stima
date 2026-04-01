@@ -191,7 +191,7 @@ Review all GitHub Copilot comments on Task #<task-id> / PR #<pr-number>.
 You are the final decision maker. Evaluate every comment strictly against the Stima contract:
 
 - docs/REVIEW_CHECKLIST.md
-- docs/AGENTS.md (single-task scope, file-size budgets, no migration edits, match style)
+- AGENTS.md (single-task scope, file-size budgets, no migration edits, match style)
 - docs/WORKFLOW.md (Lean Review Mode + tight boundaries, loose middle)
 
 For each comment decide:
