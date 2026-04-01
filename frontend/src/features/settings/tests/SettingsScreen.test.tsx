@@ -233,27 +233,29 @@ describe("SettingsScreen", () => {
 
     await screen.findByLabelText(/business name/i);
 
-    const systemButton = screen.getByRole("button", { name: "System" });
-    const lightButton = screen.getByRole("button", { name: "Light" });
-    const darkButton = screen.getByRole("button", { name: "Dark" });
+    expect(screen.getByRole("radiogroup", { name: "Theme" })).toBeInTheDocument();
 
-    expect(systemButton).toHaveAttribute("aria-pressed", "true");
-    expect(lightButton).toHaveAttribute("aria-pressed", "false");
-    expect(darkButton).toHaveAttribute("aria-pressed", "false");
+    const systemRadio = screen.getByRole("radio", { name: "System" });
+    const lightRadio = screen.getByRole("radio", { name: "Light" });
+    const darkRadio = screen.getByRole("radio", { name: "Dark" });
 
-    fireEvent.click(darkButton);
+    expect(systemRadio).toBeChecked();
+    expect(lightRadio).not.toBeChecked();
+    expect(darkRadio).not.toBeChecked();
+
+    fireEvent.click(darkRadio);
 
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
-    expect(darkButton).toHaveAttribute("aria-pressed", "true");
+    expect(darkRadio).toBeChecked();
 
-    fireEvent.click(lightButton);
+    fireEvent.click(lightRadio);
 
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
     expect(document.documentElement.style.colorScheme).toBe("light");
-    expect(lightButton).toHaveAttribute("aria-pressed", "true");
+    expect(lightRadio).toBeChecked();
   });
 
   it("shows the saved default tax as a percent and persists edited values as fractions", async () => {

@@ -68,6 +68,7 @@
 
 :root {
   color-scheme: light;
+  --shadow-ghost: 0 0 24px rgba(13, 28, 46, 0.04);
 }
 
 [data-theme="light"] {
@@ -76,6 +77,7 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
+  --shadow-ghost: 0 0 24px rgba(0, 0, 0, 0.22);
   --color-primary: #1b8e6c;
   --color-primary-container: #0f7a5d;
   --color-on-primary: #ffffff;
@@ -133,11 +135,15 @@
 }
 
 .forest-gradient {
-  background: linear-gradient(135deg, #004532 0%, #065f46 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-primary-container) 100%
+  );
 }
 
 .ghost-shadow {
-  box-shadow: 0 0 24px rgba(13, 28, 46, 0.04);
+  box-shadow: var(--shadow-ghost);
 }
 
 .material-symbols-outlined {

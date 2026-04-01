@@ -348,29 +348,31 @@ export function SettingsScreen(): React.ReactElement {
                   </p>
                 </div>
 
-                <div
-                  role="group"
-                  aria-label="Theme"
-                  className="mt-4 grid grid-cols-3 gap-2"
-                >
+                <div role="radiogroup" aria-label="Theme" className="mt-4 grid grid-cols-3 gap-2">
                   {THEME_OPTIONS.map((option) => {
                     const isSelected = option.value === themePreference;
 
                     return (
-                      <button
+                      <label
                         key={option.value}
-                        type="button"
-                        aria-pressed={isSelected}
-                        onClick={() => setThemePreference(option.value)}
                         className={[
-                          "rounded-lg py-3 font-label text-sm transition-all",
+                          "cursor-pointer rounded-lg border-2 py-3 font-label text-sm transition-all",
                           isSelected
-                            ? "border-2 border-primary bg-primary/5 font-semibold text-primary"
-                            : "border border-outline-variant/30 bg-surface-container-low text-on-surface-variant",
+                            ? "border-primary bg-primary/5 font-semibold text-primary"
+                            : "border-transparent bg-surface-container-low text-on-surface-variant",
                         ].join(" ")}
                       >
-                        {option.label}
-                      </button>
+                        <input
+                          type="radio"
+                          name="settings-theme"
+                          value={option.value}
+                          checked={isSelected}
+                          aria-checked={isSelected}
+                          onChange={() => setThemePreference(option.value)}
+                          className="sr-only"
+                        />
+                        <span className="block">{option.label}</span>
+                      </label>
                     );
                   })}
                 </div>
