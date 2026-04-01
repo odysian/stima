@@ -50,6 +50,7 @@ describe("LoginForm", () => {
     });
 
     renderLogin();
+    expect(await screen.findByRole("main")).toHaveClass("screen-radial-backdrop");
 
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "user@example.com" },
@@ -84,6 +85,7 @@ describe("LoginForm", () => {
       pathname: "/login",
       state: { from: { pathname: "/dashboard" } },
     });
+    expect(await screen.findByRole("main")).toHaveClass("screen-radial-backdrop");
 
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "user@example.com" },
@@ -101,6 +103,7 @@ describe("LoginForm", () => {
     mockedAuthService.login.mockRejectedValueOnce(new Error("Invalid credentials"));
 
     renderLogin();
+    expect(await screen.findByRole("main")).toHaveClass("screen-radial-backdrop");
 
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "user@example.com" },

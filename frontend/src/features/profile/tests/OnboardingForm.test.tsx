@@ -76,6 +76,7 @@ describe("OnboardingForm", () => {
   it("renders required onboarding fields with default trade type", () => {
     renderForm();
 
+    expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
     expect(screen.getByLabelText(/business name/i)).toBeRequired();
     expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
@@ -104,6 +105,7 @@ describe("OnboardingForm", () => {
     );
 
     renderForm();
+    expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
 
     fireEvent.change(screen.getByLabelText(/business name/i), {
       target: { value: "Summit Exterior Care" },
@@ -134,6 +136,7 @@ describe("OnboardingForm", () => {
     mockedProfileService.updateProfile.mockRejectedValueOnce(new Error("Unable to save profile"));
 
     renderForm();
+    expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
 
     fireEvent.change(screen.getByLabelText(/business name/i), {
       target: { value: "Summit Exterior Care" },
@@ -160,6 +163,7 @@ describe("OnboardingForm", () => {
     );
 
     renderForm();
+    expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
 
     fireEvent.change(screen.getByLabelText(/business name/i), {
       target: { value: "Summit Exterior Care" },

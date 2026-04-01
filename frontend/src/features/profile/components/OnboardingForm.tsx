@@ -47,7 +47,7 @@ export function OnboardingForm(): React.ReactElement {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
+    <main className="screen-radial-backdrop flex min-h-screen flex-col items-center justify-center px-4 py-8">
       <h1 className="mb-8 font-headline text-3xl font-bold text-primary">Stima</h1>
       <section className="w-full max-w-sm rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
         <h2 className="font-headline text-2xl font-bold text-on-surface">Set up your business</h2>
