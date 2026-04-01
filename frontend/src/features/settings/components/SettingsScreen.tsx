@@ -393,7 +393,7 @@ export function SettingsScreen(): React.ReactElement {
                 {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
                 <button
                   type="button"
-                  className="shrink-0 rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white transition-all active:scale-[0.98]"
+                  className="shrink-0 rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-on-secondary transition-all active:scale-[0.98]"
                   onClick={() => setIsSignOutConfirmOpen(true)}
                 >
                   Sign Out

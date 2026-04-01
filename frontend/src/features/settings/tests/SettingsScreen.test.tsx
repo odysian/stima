@@ -381,7 +381,7 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     const signOutButton = await screen.findByRole("button", { name: /sign out/i });
-    expect(signOutButton).toHaveClass("bg-secondary", "text-white");
+    expect(signOutButton).toHaveClass("bg-secondary", "text-on-secondary");
     expect(signOutButton).not.toHaveClass("border");
 
     fireEvent.click(signOutButton);

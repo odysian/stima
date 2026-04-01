@@ -345,6 +345,19 @@ describe("InvoiceEditScreen", () => {
     });
   });
 
+  it("uses token-backed styling for the customer notes textarea", async () => {
+    renderScreen();
+
+    const customerNotes = await screen.findByLabelText(/customer notes/i);
+
+    expect(customerNotes).toHaveClass(
+      "bg-surface-container-high",
+      "text-on-surface",
+      "focus:bg-surface-container-lowest",
+    );
+    expect(customerNotes).not.toHaveClass("bg-white");
+  });
+
   it("blocks save when a line item has details or price but no description", async () => {
     window.sessionStorage.setItem(
       EDIT_STORAGE_KEY,
