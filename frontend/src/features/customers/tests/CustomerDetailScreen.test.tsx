@@ -287,7 +287,9 @@ describe("CustomerDetailScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /create quote/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-1");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-1", {
+      state: { launchOrigin: "/customers/cust-1" },
+    });
   });
 
   it("renders quote history filtered to this customer and opens preview on click", async () => {

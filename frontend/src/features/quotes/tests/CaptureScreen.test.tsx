@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { ExtractionResult } from "@/features/quotes/types/quote.types";
@@ -90,9 +91,9 @@ function mockVoiceCapture(overrides: Partial<ReturnType<typeof useVoiceCapture>>
   });
 }
 
-function renderScreen() {
+function renderScreen(launchOrigin = HOME_ROUTE) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[{ pathname: "/quotes/capture/cust-1", state: { launchOrigin } }]}>
       <CaptureScreen />
     </MemoryRouter>,
   );
@@ -213,7 +214,7 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
 
     expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
-    expect(navigateMock).not.toHaveBeenCalledWith(-1);
+    expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
   it("shows a leave confirmation when navigating back with unsaved notes", () => {
@@ -225,15 +226,15 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
 
     expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
-    expect(navigateMock).not.toHaveBeenCalledWith(-1);
+    expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
-  it("navigates back immediately when there is no unsaved work", () => {
-    renderScreen();
+  it("navigates back to the recorded launch origin when there is no unsaved work", () => {
+    renderScreen("/customers/cust-1");
 
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith(-1);
+    expect(navigateMock).toHaveBeenCalledWith("/customers/cust-1", { replace: true });
     expect(screen.queryByRole("dialog", { name: "Leave this screen?" })).not.toBeInTheDocument();
   });
 
@@ -247,11 +248,11 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Stay" }));
 
     expect(screen.queryByRole("dialog", { name: "Leave this screen?" })).not.toBeInTheDocument();
-    expect(navigateMock).not.toHaveBeenCalledWith(-1);
+    expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
-  it("navigates back after confirming Leave", () => {
-    renderScreen();
+  it("navigates to the launch origin after confirming Leave", () => {
+    renderScreen("/customers/cust-1");
 
     fireEvent.change(screen.getByLabelText(/written description/i), {
       target: { value: "Install sod in backyard" },
@@ -259,7 +260,19 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
     fireEvent.click(screen.getByRole("button", { name: "Leave" }));
 
-    expect(navigateMock).toHaveBeenCalledWith(-1);
+    expect(navigateMock).toHaveBeenCalledWith("/customers/cust-1", { replace: true });
+  });
+
+  it("shows the same leave confirmation when exiting home with unsaved work", () => {
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /exit to home/i }));
+
+    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
   it("submits combined extraction payload and writes voice draft when clips are present", async () => {
@@ -279,6 +292,7 @@ describe("CaptureScreen", () => {
     });
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",
+      launchOrigin: HOME_ROUTE,
       title: "",
       transcript: "5 yards brown mulch",
       lineItems: [
@@ -482,7 +496,7 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
     fireEvent.click(screen.getByRole("button", { name: "Leave" }));
 
-    expect(navigateMock).toHaveBeenCalledWith(-1);
+    expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
 
     view.unmount();
 

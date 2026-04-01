@@ -2,14 +2,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EditLineItemForEditScreen } from "@/features/quotes/components/EditLineItemForEditScreen";
-import { useQuoteEdit, type QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
+import { EditInvoiceLineItemScreen } from "@/features/invoices/components/EditInvoiceLineItemScreen";
+import { useInvoiceEdit, type InvoiceEditDraft } from "@/features/invoices/hooks/useInvoiceEdit";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 
 const navigateMock = vi.fn();
 const updateLineItemMock = vi.fn();
 const removeLineItemMock = vi.fn();
-const useParamsMock = vi.fn(() => ({ id: "quote-1", lineItemIndex: "0" }));
+const useParamsMock = vi.fn(() => ({ id: "invoice-1", lineItemIndex: "0" }));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -20,15 +20,15 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-vi.mock("@/features/quotes/hooks/useQuoteEdit", () => ({
-  useQuoteEdit: vi.fn(),
+vi.mock("@/features/invoices/hooks/useInvoiceEdit", () => ({
+  useInvoiceEdit: vi.fn(),
 }));
 
-const mockedUseQuoteEdit = vi.mocked(useQuoteEdit);
+const mockedUseInvoiceEdit = vi.mocked(useInvoiceEdit);
 
-function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
+function makeDraft(overrides: Partial<InvoiceEditDraft> = {}): InvoiceEditDraft {
   return {
-    quoteId: "quote-1",
+    invoiceId: "invoice-1",
     title: "",
     lineItems: [
       {
@@ -43,12 +43,13 @@ function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
     discountValue: null,
     depositAmount: null,
     notes: "",
+    dueDate: "2026-04-19",
     ...overrides,
   };
 }
 
-function renderScreen(draft: QuoteEditDraft | null): void {
-  mockedUseQuoteEdit.mockReturnValue({
+function renderScreen(draft: InvoiceEditDraft | null): void {
+  mockedUseInvoiceEdit.mockReturnValue({
     draft,
     setDraft: vi.fn(),
     updateLineItem: updateLineItemMock,
@@ -58,20 +59,20 @@ function renderScreen(draft: QuoteEditDraft | null): void {
 
   render(
     <MemoryRouter>
-      <EditLineItemForEditScreen />
+      <EditInvoiceLineItemScreen />
     </MemoryRouter>,
   );
 }
 
 beforeEach(() => {
-  useParamsMock.mockReturnValue({ id: "quote-1", lineItemIndex: "0" });
+  useParamsMock.mockReturnValue({ id: "invoice-1", lineItemIndex: "0" });
 });
 
 afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("EditLineItemForEditScreen", () => {
+describe("EditInvoiceLineItemScreen", () => {
   it("loads the line item by index", () => {
     renderScreen(makeDraft());
 
@@ -80,7 +81,7 @@ describe("EditLineItemForEditScreen", () => {
     expect(screen.getByLabelText(/price/i)).toHaveValue("120");
   });
 
-  it("saves changes and navigates back to the quote edit screen", () => {
+  it("saves changes and navigates back to the invoice edit screen", () => {
     renderScreen(makeDraft());
 
     fireEvent.change(screen.getByLabelText(/description/i), {
@@ -99,16 +100,16 @@ describe("EditLineItemForEditScreen", () => {
       details: "6 yards",
       price: 140,
     });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/edit", { replace: true });
+    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1/edit", { replace: true });
   });
 
-  it("deletes item and navigates back to the quote edit screen", () => {
+  it("deletes item and navigates back to the invoice edit screen", () => {
     renderScreen(makeDraft());
 
     fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
 
     expect(removeLineItemMock).toHaveBeenCalledWith(0);
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/edit", { replace: true });
+    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1/edit", { replace: true });
   });
 
   it("exits home from the workflow header", () => {

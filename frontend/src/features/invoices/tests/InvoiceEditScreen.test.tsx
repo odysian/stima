@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { InvoiceEditScreen } from "@/features/invoices/components/InvoiceEditScreen";
 import type { InvoiceEditDraft } from "@/features/invoices/hooks/useInvoiceEdit";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { Invoice, InvoiceDetail } from "@/features/invoices/types/invoice.types";
 
@@ -273,7 +274,7 @@ describe("InvoiceEditScreen", () => {
       });
     });
     expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).toBeNull();
-    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1");
+    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1", { replace: true });
   });
 
   it("falls back to the doc number after clearing a saved title and submits null", async () => {
@@ -420,6 +421,18 @@ describe("InvoiceEditScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
 
     expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).toBeNull();
-    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1");
+    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1", { replace: true });
+  });
+
+  it("exits home from the workflow header without clearing the draft", async () => {
+    window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "I-001" });
+    fireEvent.click(screen.getByRole("button", { name: /exit to home/i }));
+
+    expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).not.toBeNull();
+    expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 });

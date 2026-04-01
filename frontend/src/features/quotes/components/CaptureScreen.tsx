@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import { HOME_ROUTE, resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
@@ -9,7 +10,7 @@ import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
-import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
 const EXTRACTION_STAGE_DELAY_MS = 2500;
 
@@ -46,8 +47,9 @@ function getExtractionHelperCopy(hasClips: boolean, hasNotes: boolean): string |
 
 export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const location = useLocation();
   const { customerId } = useParams<{ customerId: string }>();
-  const { setDraft } = useQuoteDraft();
+  const { draft, setDraft } = useQuoteDraft();
   const isMountedRef = useRef(true);
   const extractionStageTimerRefs = useRef<number[]>([]);
   const {
@@ -64,12 +66,18 @@ export function CaptureScreen(): React.ReactElement {
 
   const [notes, setNotes] = useState("");
   const [extractionStage, setExtractionStage] = useState<string | null>(null);
-  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [pendingExitTarget, setPendingExitTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
   const extractionHelperCopy = getExtractionHelperCopy(hasClips, hasNotes);
+  const launchOrigin = resolveCaptureLaunchOrigin({
+    customerId,
+    draftCustomerId: draft?.customerId,
+    draftLaunchOrigin: draft?.launchOrigin,
+    locationState: location.state,
+  });
 
   function clearExtractionStageTimers(): void {
     extractionStageTimerRefs.current.forEach((timerId) => {
@@ -96,6 +104,7 @@ export function CaptureScreen(): React.ReactElement {
 
     setDraft({
       customerId,
+      launchOrigin,
       title: "",
       transcript: extraction.transcript,
       lineItems: extraction.line_items.map((lineItem) => ({
@@ -166,13 +175,21 @@ export function CaptureScreen(): React.ReactElement {
     return clips.length > 0 || notes.trim().length > 0;
   }
 
-  function onBack(): void {
+  function requestExit(target: string): void {
     if (hasUnsavedWork()) {
-      setShowLeaveConfirm(true);
+      setPendingExitTarget(target);
       return;
     }
 
-    navigate(-1);
+    navigate(target, { replace: true });
+  }
+
+  function onBack(): void {
+    requestExit(launchOrigin);
+  }
+
+  function onExitHome(): void {
+    requestExit(HOME_ROUTE);
   }
 
   const displayedError = error ?? voiceError;
@@ -180,11 +197,12 @@ export function CaptureScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-36">
-      <ScreenHeader
+      <WorkflowScreenHeader
         title="Capture Job Notes"
         subtitle="Describe the job and we'll extract the line items"
         backLabel="Go back"
         onBack={onBack}
+        onExitHome={onExitHome}
       />
 
       <section className="mx-auto w-full max-w-2xl px-4 pb-24 pt-20">
@@ -309,14 +327,18 @@ export function CaptureScreen(): React.ReactElement {
         </div>
       </ScreenFooter>
 
-      {showLeaveConfirm ? (
+      {pendingExitTarget ? (
         <ConfirmModal
           title="Leave this screen?"
           body="Your clips and notes will be lost."
           confirmLabel="Leave"
           cancelLabel="Stay"
-          onConfirm={() => navigate(-1)}
-          onCancel={() => setShowLeaveConfirm(false)}
+          onConfirm={() => {
+            const nextTarget = pendingExitTarget;
+            setPendingExitTarget(null);
+            navigate(nextTarget, { replace: true });
+          }}
+          onCancel={() => setPendingExitTarget(null)}
         />
       ) : null}
     </main>

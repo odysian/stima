@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { CustomerInlineCreateForm } from "@/features/customers/components/CustomerInlineCreateForm";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import { createCaptureLocationState, HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { customerService } from "@/features/customers/services/customerService";
 import type {
   Customer,
@@ -77,7 +78,9 @@ export function CustomerSelectScreen(): React.ReactElement {
   }, [customers, query]);
 
   function onSelectCustomer(customerId: string): void {
-    navigate(`/quotes/capture/${customerId}`);
+    navigate(`/quotes/capture/${customerId}`, {
+      state: createCaptureLocationState(HOME_ROUTE),
+    });
   }
 
   function onSwitchToCreateMode(): void {
@@ -114,7 +117,9 @@ export function CustomerSelectScreen(): React.ReactElement {
     setIsCreating(true);
     try {
       const createdCustomer = await customerService.createCustomer(payload);
-      navigate(`/quotes/capture/${createdCustomer.id}`);
+      navigate(`/quotes/capture/${createdCustomer.id}`, {
+        state: createCaptureLocationState(HOME_ROUTE),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create customer";
       setCreateError(message);
@@ -129,7 +134,7 @@ export function CustomerSelectScreen(): React.ReactElement {
         title={mode === "search" ? "New Quote" : "New Customer"}
         subtitle={mode === "search" ? "Select a customer to continue" : undefined}
         backLabel="Go back"
-        onBack={() => navigate(-1)}
+        onBack={mode === "create" ? onBackToSearch : () => navigate(HOME_ROUTE, { replace: true })}
       />
 
       <section className={`mx-auto w-full max-w-3xl px-4 pt-20 ${mode === "search" ? "pb-24" : "pb-8"}`}>

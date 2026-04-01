@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerSelectScreen } from "@/features/customers/components/CustomerSelectScreen";
 import { customerService } from "@/features/customers/services/customerService";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import type { Customer } from "@/features/customers/types/customer.types";
 
 const navigateMock = vi.fn();
@@ -122,7 +123,9 @@ describe("CustomerSelectScreen", () => {
     const customerButton = await screen.findByRole("button", { name: /alice johnson/i });
     fireEvent.click(customerButton);
 
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-1");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-1", {
+      state: { launchOrigin: HOME_ROUTE },
+    });
   });
 
   it("shows create mode with New Customer heading when CTA is clicked", async () => {
@@ -163,7 +166,9 @@ describe("CustomerSelectScreen", () => {
         address: "100 River Rd",
       });
     });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-new");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-new", {
+      state: { launchOrigin: HOME_ROUTE },
+    });
   });
 
   it("shows inline error when create customer fails", async () => {
@@ -189,5 +194,14 @@ describe("CustomerSelectScreen", () => {
 
     expect(screen.getByRole("heading", { name: "New Quote" })).toBeInTheDocument();
     expect(screen.getByLabelText(/search customers/i)).toBeInTheDocument();
+  });
+
+  it("returns home from search mode when the header back button is tapped", async () => {
+    renderScreen();
+    await screen.findByText("Alice Johnson");
+
+    fireEvent.click(screen.getByRole("button", { name: /go back/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 });

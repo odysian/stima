@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
-import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
 function parsePrice(rawPrice: string): number | null {
   const trimmedPrice = rawPrice.trim();
@@ -79,21 +80,22 @@ export function EditLineItemScreen(): React.ReactElement | null {
       details: details.trim().length > 0 ? details.trim() : null,
       price: parsedPrice,
     });
-    navigate("/quotes/review");
+    navigate("/quotes/review", { replace: true });
   }
 
   function onDelete(): void {
     removeLineItem(parsedLineItemIndex);
-    navigate("/quotes/review");
+    navigate("/quotes/review", { replace: true });
   }
 
   return (
     <main className="min-h-screen bg-surface-container-low pb-28">
-      <ScreenHeader
+      <WorkflowScreenHeader
         title="Edit Line Item"
         eyebrow="REVIEW & EDIT"
         backLabel="Back to review"
-        onBack={() => navigate("/quotes/review")}
+        onBack={() => navigate("/quotes/review", { replace: true })}
+        onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
 
       <section className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-6 pt-20">
