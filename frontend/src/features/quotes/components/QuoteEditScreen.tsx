@@ -12,6 +12,7 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { getPricingValidationMessage } from "@/shared/lib/pricing";
 
 const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   description: "",
@@ -29,6 +30,10 @@ function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
       price: item.price,
     })),
     total: quote.total_amount,
+    taxRate: quote.tax_rate,
+    discountType: quote.discount_type,
+    discountValue: quote.discount_value,
+    depositAmount: quote.deposit_amount,
     notes: quote.notes ?? "",
   };
 }
@@ -184,6 +189,18 @@ export function QuoteEditScreen(): React.ReactElement {
       return;
     }
 
+    const pricingError = getPricingValidationMessage({
+      totalAmount: currentDraft.total,
+      taxRate: currentDraft.taxRate,
+      discountType: currentDraft.discountType,
+      discountValue: currentDraft.discountValue,
+      depositAmount: currentDraft.depositAmount,
+    });
+    if (pricingError) {
+      setSaveError(pricingError);
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -191,6 +208,10 @@ export function QuoteEditScreen(): React.ReactElement {
         title: normalizeOptionalTitle(currentDraft.title),
         line_items: lineItemsForSubmit,
         total_amount: currentDraft.total,
+        tax_rate: currentDraft.taxRate,
+        discount_type: currentDraft.discountType,
+        discount_value: currentDraft.discountValue,
+        deposit_amount: currentDraft.depositAmount,
         notes: currentDraft.notes.trim().length > 0 ? currentDraft.notes.trim() : null,
       });
       setShouldSkipSeeding(true);
@@ -298,8 +319,24 @@ export function QuoteEditScreen(): React.ReactElement {
               <TotalAmountSection
                 lineItemSum={lineItemSum}
                 total={currentDraft.total}
+                taxRate={currentDraft.taxRate}
+                discountType={currentDraft.discountType}
+                discountValue={currentDraft.discountValue}
+                depositAmount={currentDraft.depositAmount}
                 onTotalChange={(total) => {
                   updateDraft((nextDraft) => ({ ...nextDraft, total }));
+                }}
+                onTaxRateChange={(taxRate) => {
+                  updateDraft((nextDraft) => ({ ...nextDraft, taxRate }));
+                }}
+                onDiscountTypeChange={(discountType) => {
+                  updateDraft((nextDraft) => ({ ...nextDraft, discountType }));
+                }}
+                onDiscountValueChange={(discountValue) => {
+                  updateDraft((nextDraft) => ({ ...nextDraft, discountValue }));
+                }}
+                onDepositAmountChange={(depositAmount) => {
+                  updateDraft((nextDraft) => ({ ...nextDraft, depositAmount }));
                 }}
               />
 

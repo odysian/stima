@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.features.quotes.schemas import LineItemDraft, LineItemResponse
+from app.features.quotes.schemas import DiscountType, LineItemDraft, LineItemResponse
 
 
 def _normalize_optional_title(value: object) -> object:
@@ -27,6 +27,10 @@ class InvoiceCreateRequest(BaseModel):
     transcript: str = Field(min_length=1)
     line_items: list[LineItemDraft] = Field(default_factory=list)
     total_amount: float | None = None
+    tax_rate: float | None = None
+    discount_type: DiscountType | None = None
+    discount_value: float | None = None
+    deposit_amount: float | None = None
     notes: str | None = None
     source_type: Literal["text", "voice"]
 
@@ -44,6 +48,10 @@ class InvoiceResponse(BaseModel):
     title: str | None
     status: Literal["draft", "ready", "sent"]
     total_amount: float | None
+    tax_rate: float | None
+    discount_type: DiscountType | None
+    discount_value: float | None
+    deposit_amount: float | None
     notes: str | None
     due_date: date | None
     shared_at: datetime | None
@@ -93,6 +101,10 @@ class InvoiceUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
     line_items: list[LineItemDraft] | None = None
     total_amount: float | None = None
+    tax_rate: float | None = None
+    discount_type: DiscountType | None = None
+    discount_value: float | None = None
+    deposit_amount: float | None = None
     notes: str | None = None
     due_date: date | None = None
 

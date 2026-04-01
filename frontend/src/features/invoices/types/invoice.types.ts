@@ -4,6 +4,7 @@ import type {
   LineItemDraft,
   QuoteSourceType,
 } from "@/features/quotes/types/quote.types";
+import type { DiscountType } from "@/shared/lib/pricing";
 
 export interface InvoiceCreateRequest {
   customer_id: string;
@@ -11,6 +12,10 @@ export interface InvoiceCreateRequest {
   transcript: string;
   line_items: LineItemDraft[];
   total_amount: number | null;
+  tax_rate: number | null;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  deposit_amount: number | null;
   notes: string;
   source_type: QuoteSourceType;
 }
@@ -22,6 +27,10 @@ export interface Invoice {
   title: string | null;
   status: InvoiceStatus;
   total_amount: number | null;
+  tax_rate: number | null;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  deposit_amount: number | null;
   notes: string | null;
   due_date: string | null;
   shared_at: string | null;
@@ -59,6 +68,10 @@ export interface InvoiceUpdateRequest {
   title?: string | null;
   line_items?: LineItemDraft[];
   total_amount?: number | null;
+  tax_rate?: number | null;
+  discount_type?: DiscountType | null;
+  discount_value?: number | null;
+  deposit_amount?: number | null;
   notes?: string | null;
   due_date?: string;
 }

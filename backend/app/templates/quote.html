@@ -221,6 +221,28 @@
         border-top: 2px solid #111827;
       }
 
+      .total-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 8px;
+      }
+
+      .total-row:first-child {
+        margin-top: 0;
+      }
+
+      .total-row--final {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #d1d5db;
+      }
+
+      .total-row--balance {
+        font-weight: 700;
+      }
+
       .total-label {
         margin: 0;
         font-size: 12px;
@@ -230,7 +252,7 @@
       }
 
       .total-amount {
-        margin: 6px 0 0;
+        margin: 0;
         font-size: 16px;
         font-weight: 700;
         text-align: right;
@@ -351,6 +373,56 @@
       </table>
 
       <section class="total-block">
+        {% if discount_amount is not none or tax_amount is not none or deposit_amount is not none %}
+        <div class="total-row">
+          <p class="total-label">Subtotal</p>
+          <p class="total-amount">
+            {% if subtotal_amount is not none %}
+            ${{ "{:,.2f}".format(subtotal_amount) }}
+            {% else %}
+            &mdash;
+            {% endif %}
+          </p>
+        </div>
+        {% if discount_amount is not none %}
+        <div class="total-row">
+          <p class="total-label">Discount</p>
+          <p class="total-amount">-${{ "{:,.2f}".format(discount_amount) }}</p>
+        </div>
+        {% endif %}
+        {% if tax_amount is not none %}
+        <div class="total-row">
+          <p class="total-label">Tax</p>
+          <p class="total-amount">${{ "{:,.2f}".format(tax_amount) }}</p>
+        </div>
+        {% endif %}
+        <div class="total-row total-row--final">
+          <p class="total-label">Total</p>
+          <p class="total-amount">
+            {% if total_amount is not none %}
+            ${{ "{:,.2f}".format(total_amount) }}
+            {% else %}
+            &mdash;
+            {% endif %}
+          </p>
+        </div>
+        {% if deposit_amount is not none %}
+        <div class="total-row">
+          <p class="total-label">Deposit</p>
+          <p class="total-amount">${{ "{:,.2f}".format(deposit_amount) }}</p>
+        </div>
+        <div class="total-row total-row--balance">
+          <p class="total-label">Balance Due</p>
+          <p class="total-amount">
+            {% if balance_due is not none %}
+            ${{ "{:,.2f}".format(balance_due) }}
+            {% else %}
+            &mdash;
+            {% endif %}
+          </p>
+        </div>
+        {% endif %}
+        {% else %}
         <p class="total-label">Total</p>
         <p class="total-amount">
           {% if total_amount is not none %}
@@ -359,6 +431,7 @@
           &mdash;
           {% endif %}
         </p>
+        {% endif %}
       </section>
 
       {% if notes %}

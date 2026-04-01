@@ -43,6 +43,7 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
     last_name: "Stone",
     trade_type: "Landscaper",
     timezone: "America/New_York",
+    default_tax_rate: null,
     has_logo: false,
     ...overrides,
   };
@@ -200,10 +201,39 @@ describe("SettingsScreen", () => {
         last_name: "Reed",
         trade_type: "Builder",
         timezone: "UTC",
+        default_tax_rate: null,
       });
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("Saved")).toHaveClass("rounded-lg");
+  });
+
+  it("shows the saved default tax as a percent and persists edited values as fractions", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(
+      makeProfileResponse({ default_tax_rate: 0.0825 }),
+    );
+    mockedProfileService.updateProfile.mockResolvedValueOnce(
+      makeProfileResponse({ default_tax_rate: 0.075 }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByDisplayValue("8.25")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/default tax rate/i), {
+      target: { value: "7.5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockedProfileService.updateProfile).toHaveBeenCalledWith({
+        business_name: "Summit Exterior Care",
+        first_name: "Alex",
+        last_name: "Stone",
+        trade_type: "Landscaper",
+        timezone: "America/New_York",
+        default_tax_rate: 0.075,
+      });
+    });
   });
 
   it("keeps save success when refreshUser fails after successful profile update", async () => {

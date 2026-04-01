@@ -347,6 +347,11 @@ export function QuotePreview(): React.ReactElement {
             {quote ? (
               <QuoteDetailsCard
                 totalAmount={quote.total_amount}
+                taxRate={quote.tax_rate}
+                discountType={quote.discount_type}
+                discountValue={quote.discount_value}
+                depositAmount={quote.deposit_amount}
+                lineItemPrices={quote.line_items.map((lineItem) => lineItem.price)}
                 clientName={clientName}
                 clientContact={clientContact}
               />

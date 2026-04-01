@@ -239,6 +239,11 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
             <QuoteDetailsCard
               totalAmount={invoice.total_amount}
+              taxRate={invoice.tax_rate}
+              discountType={invoice.discount_type}
+              discountValue={invoice.discount_value}
+              depositAmount={invoice.deposit_amount}
+              lineItemPrices={invoice.line_items.map((lineItem) => lineItem.price)}
               clientName={invoice.customer.name}
               clientContact={clientContact}
             />

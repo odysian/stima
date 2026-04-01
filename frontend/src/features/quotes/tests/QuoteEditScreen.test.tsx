@@ -49,6 +49,10 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     source_type: "text",
     transcript: "5 yards brown mulch",
     total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "Thanks for your business",
     shared_at: null,
     share_token: null,
@@ -74,6 +78,10 @@ function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
     title: "",
     lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
     total: 120,
+    taxRate: null,
+    discountType: null,
+    discountValue: null,
+    depositAmount: null,
     notes: "Thanks for your business",
     ...overrides,
   };
@@ -100,6 +108,10 @@ beforeEach(() => {
     source_type: "text",
     transcript: "5 yards brown mulch",
     total_amount: 145,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "Updated note",
     shared_at: null,
     share_token: null,
@@ -127,6 +139,10 @@ describe("QuoteEditScreen", () => {
         title: "",
         lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total: 120,
+        taxRate: null,
+        discountType: null,
+        discountValue: null,
+        depositAmount: null,
         notes: "Thanks for your business",
       });
     });
@@ -180,6 +196,10 @@ describe("QuoteEditScreen", () => {
         title: "Patio Refresh",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total_amount: 145,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
         notes: "Updated note",
       });
     });
@@ -215,6 +235,10 @@ describe("QuoteEditScreen", () => {
         title: null,
         line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total_amount: 120,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
         notes: "Thanks for your business",
       });
     });

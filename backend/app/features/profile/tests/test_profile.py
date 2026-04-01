@@ -26,6 +26,7 @@ async def test_get_profile_returns_authenticated_user_profile(client: AsyncClien
     assert payload["business_name"] is None
     assert payload["trade_type"] is None
     assert payload["timezone"] is None
+    assert payload["default_tax_rate"] is None
     assert payload["has_logo"] is False
     assert payload["is_onboarded"] is False
 
@@ -50,6 +51,7 @@ async def test_patch_profile_updates_onboarding_fields(client: AsyncClient) -> N
         "last_name": "Doe",
         "trade_type": "Plumber",
         "timezone": "America/New_York",
+        "default_tax_rate": 0.0825,
     }
 
     response = await client.patch(
@@ -65,12 +67,14 @@ async def test_patch_profile_updates_onboarding_fields(client: AsyncClient) -> N
     assert body["last_name"] == payload["last_name"]
     assert body["trade_type"] == payload["trade_type"]
     assert body["timezone"] == payload["timezone"]
+    assert body["default_tax_rate"] == payload["default_tax_rate"]
     assert body["has_logo"] is False
     assert body["is_onboarded"] is True
 
     get_response = await client.get("/api/profile")
     assert get_response.status_code == 200
     assert get_response.json()["timezone"] == "America/New_York"
+    assert get_response.json()["default_tax_rate"] == 0.0825
 
 
 async def test_patch_profile_requires_business_name(client: AsyncClient) -> None:
@@ -151,6 +155,27 @@ async def test_patch_profile_rejects_invalid_timezone(client: AsyncClient) -> No
     assert any(error["loc"][-1] == "timezone" for error in response.json()["detail"])
 
 
+async def test_patch_profile_rejects_invalid_default_tax_rate(client: AsyncClient) -> None:
+    await _register_and_login(client, _credentials())
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token is not None
+
+    response = await client.patch(
+        "/api/profile",
+        json={
+            "business_name": "Summit Exterior Care",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "trade_type": "Landscaper",
+            "default_tax_rate": 1.25,
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+    assert any(error["loc"][-1] == "default_tax_rate" for error in response.json()["detail"])
+
+
 async def test_patch_profile_rejects_partial_update_and_preserves_existing_values(
     client: AsyncClient,
 ) -> None:
@@ -204,6 +229,7 @@ async def test_patch_profile_preserves_saved_timezone_when_field_is_omitted(
             "last_name": "Doe",
             "trade_type": "Landscaper",
             "timezone": "America/New_York",
+            "default_tax_rate": 0.0725,
         },
         headers={"X-CSRF-Token": csrf_token},
     )
@@ -222,6 +248,7 @@ async def test_patch_profile_preserves_saved_timezone_when_field_is_omitted(
 
     assert second_response.status_code == 200
     assert second_response.json()["timezone"] == "America/New_York"
+    assert second_response.json()["default_tax_rate"] == 0.0725
 
 
 async def test_patch_profile_requires_authentication(client: AsyncClient) -> None:

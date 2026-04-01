@@ -1,4 +1,5 @@
 import type { InvoiceStatus } from "@/features/invoices/types/invoice-status";
+import type { DiscountType } from "@/shared/lib/pricing";
 
 export interface LineItemDraft {
   description: string;
@@ -39,6 +40,15 @@ export type QuoteStatus =
   | "approved"
   | "declined";
 export type QuoteSourceType = "text" | "voice";
+
+export interface QuotePricingFields {
+  total_amount: number | null;
+  tax_rate: number | null;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  deposit_amount: number | null;
+}
+
 export interface Quote {
   id: string;
   customer_id: string;
@@ -48,6 +58,10 @@ export interface Quote {
   source_type: QuoteSourceType;
   transcript: string;
   total_amount: number | null;
+  tax_rate: number | null;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  deposit_amount: number | null;
   notes: string | null;
   shared_at: string | null;
   share_token: string | null;
@@ -90,6 +104,10 @@ export interface QuoteCreateRequest {
   transcript: string;
   line_items: LineItemDraft[];
   total_amount: number | null;
+  tax_rate: number | null;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+  deposit_amount: number | null;
   notes: string;
   source_type: QuoteSourceType;
 }
@@ -98,5 +116,9 @@ export interface QuoteUpdateRequest {
   title?: string | null;
   line_items?: LineItemDraft[];
   total_amount?: number | null;
+  tax_rate?: number | null;
+  discount_type?: DiscountType | null;
+  discount_value?: number | null;
+  deposit_amount?: number | null;
   notes?: string | null;
 }

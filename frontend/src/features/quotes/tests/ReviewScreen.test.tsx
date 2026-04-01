@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { invoiceService } from "@/features/invoices/services/invoiceService";
+import { profileService } from "@/features/profile/services/profileService";
 import { ReviewScreen } from "@/features/quotes/components/ReviewScreen";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -49,9 +50,16 @@ vi.mock("@/features/invoices/services/invoiceService", () => ({
   },
 }));
 
+vi.mock("@/features/profile/services/profileService", () => ({
+  profileService: {
+    getProfile: vi.fn(),
+  },
+}));
+
 const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedInvoiceService = vi.mocked(invoiceService);
+const mockedProfileService = vi.mocked(profileService);
 
 function createDeferredPromise<T>(): {
   promise: Promise<T>;
@@ -75,6 +83,10 @@ function makeDraft(overrides: Partial<QuoteDraft> = {}): QuoteDraft {
     transcript: "5 yards brown mulch and edge front beds",
     lineItems: [{ description: "Brown mulch", details: "5 yards", price: null }],
     total: 120,
+    taxRate: null,
+    discountType: null,
+    discountValue: null,
+    depositAmount: null,
     confidenceNotes: [],
     notes: "",
     sourceType: "text",
@@ -118,6 +130,10 @@ beforeEach(() => {
     source_type: "text",
     transcript: "5 yards brown mulch and edge front beds",
     total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "",
     shared_at: null,
     share_token: null,
@@ -132,6 +148,10 @@ beforeEach(() => {
     title: null,
     status: "draft",
     total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
     notes: "",
     due_date: "2026-04-19",
     shared_at: null,
@@ -154,6 +174,19 @@ beforeEach(() => {
     ],
     total: 275,
     confidence_notes: ["Verify soil depth before sending"],
+  });
+  mockedProfileService.getProfile.mockResolvedValue({
+    id: "user-1",
+    email: "owner@example.com",
+    first_name: "Jamie",
+    last_name: "Owner",
+    business_name: "North Star Lawn",
+    trade_type: "Landscaper",
+    timezone: "UTC",
+    default_tax_rate: null,
+    has_logo: false,
+    is_active: true,
+    is_onboarded: true,
   });
 });
 
@@ -445,6 +478,10 @@ describe("ReviewScreen", () => {
         { description: "", details: null, price: null },
       ],
       total: 120,
+      taxRate: null,
+      discountType: null,
+      discountValue: null,
+      depositAmount: null,
       confidenceNotes: [],
       notes: "",
       sourceType: "text",
@@ -463,6 +500,10 @@ describe("ReviewScreen", () => {
         transcript: "5 yards brown mulch and edge front beds",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
         total_amount: 120,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
         notes: "Thanks for your business",
         source_type: "text",
       });
@@ -487,6 +528,10 @@ describe("ReviewScreen", () => {
         transcript: "5 yards brown mulch and edge front beds",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
         total_amount: 120,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
         notes: "Thanks for your business",
         source_type: "text",
       });

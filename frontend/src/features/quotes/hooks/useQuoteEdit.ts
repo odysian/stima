@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import type { DiscountType } from "@/shared/lib/pricing";
 
 const EDIT_STORAGE_KEY = "stima_quote_edit";
 
@@ -9,6 +10,10 @@ export interface QuoteEditDraft {
   title: string;
   lineItems: LineItemDraftWithFlags[];
   total: number | null;
+  taxRate: number | null;
+  discountType: DiscountType | null;
+  discountValue: number | null;
+  depositAmount: number | null;
   notes: string;
 }
 
@@ -62,6 +67,10 @@ function parseStoredDraft(raw: string | null): QuoteEditDraft | null {
       title,
       lineItems,
       total,
+      taxRate,
+      discountType,
+      discountValue,
+      depositAmount,
       notes,
     } = parsed;
 
@@ -77,6 +86,23 @@ function parseStoredDraft(raw: string | null): QuoteEditDraft | null {
     if (total !== null && typeof total !== "number") {
       return null;
     }
+    if (taxRate !== undefined && taxRate !== null && typeof taxRate !== "number") {
+      return null;
+    }
+    if (
+      discountType !== undefined
+      && discountType !== null
+      && discountType !== "fixed"
+      && discountType !== "percent"
+    ) {
+      return null;
+    }
+    if (discountValue !== undefined && discountValue !== null && typeof discountValue !== "number") {
+      return null;
+    }
+    if (depositAmount !== undefined && depositAmount !== null && typeof depositAmount !== "number") {
+      return null;
+    }
 
     if (!lineItems.every(isValidLineItemDraft)) {
       return null;
@@ -87,6 +113,10 @@ function parseStoredDraft(raw: string | null): QuoteEditDraft | null {
       title: typeof title === "string" ? title : "",
       lineItems,
       total,
+      taxRate: typeof taxRate === "number" ? taxRate : null,
+      discountType: discountType === "fixed" || discountType === "percent" ? discountType : null,
+      discountValue: typeof discountValue === "number" ? discountValue : null,
+      depositAmount: typeof depositAmount === "number" ? depositAmount : null,
       notes,
     };
   } catch {

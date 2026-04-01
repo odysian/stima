@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+from collections.abc import Sequence
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Protocol, cast
 from uuid import UUID, uuid4
 
@@ -33,6 +35,15 @@ from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageReaderProtocol
 from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
+from app.shared.pricing import (
+    DiscountType,
+    PricingInput,
+    PricingValidationError,
+    calculate_breakdown_from_persisted,
+    calculate_line_item_sum,
+    to_decimal,
+    validate_and_calculate_from_input,
+)
 
 LOGGER = logging.getLogger(__name__)
 _EDITABLE_INVOICE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY, QuoteStatus.SENT})
@@ -91,6 +102,10 @@ class InvoiceRepositoryProtocol(Protocol):
         transcript: str,
         line_items: list[LineItemDraft],
         total_amount: float | None,
+        tax_rate: float | None,
+        discount_type: str | None,
+        discount_value: float | None,
+        deposit_amount: float | None,
         notes: str | None,
         source_type: str,
         due_date: date,
@@ -104,6 +119,14 @@ class InvoiceRepositoryProtocol(Protocol):
         update_title: bool,
         total_amount: float | None,
         update_total_amount: bool,
+        tax_rate: float | None,
+        update_tax_rate: bool,
+        discount_type: str | None,
+        update_discount_type: bool,
+        discount_value: float | None,
+        update_discount_value: bool,
+        deposit_amount: float | None,
+        update_deposit_amount: bool,
         notes: str | None,
         update_notes: bool,
         line_items: list[LineItemDraft] | None,
@@ -153,6 +176,15 @@ class InvoiceService:
         if not customer_exists:
             raise QuoteServiceError(detail="Not found", status_code=404)
 
+        validated_pricing = _validate_document_pricing(
+            total_amount=data.total_amount,
+            line_items=data.line_items,
+            discount_type=data.discount_type,
+            discount_value=data.discount_value,
+            tax_rate=data.tax_rate,
+            deposit_amount=data.deposit_amount,
+        )
+
         for attempt in range(2):
             try:
                 invoice = await self._invoice_repository.create(
@@ -161,7 +193,11 @@ class InvoiceService:
                     title=data.title,
                     transcript=data.transcript,
                     line_items=data.line_items,
-                    total_amount=data.total_amount,
+                    total_amount=_to_float_or_none(validated_pricing.total_amount),
+                    tax_rate=_to_float_or_none(validated_pricing.tax_rate),
+                    discount_type=validated_pricing.discount_type,
+                    discount_value=_to_float_or_none(validated_pricing.discount_value),
+                    deposit_amount=_to_float_or_none(validated_pricing.deposit_amount),
                     notes=data.notes,
                     source_type=data.source_type,
                     due_date=build_default_due_date(),
@@ -284,12 +320,67 @@ class InvoiceService:
                 status_code=409,
             )
 
+        next_line_items = (
+            data.line_items if "line_items" in data.model_fields_set else invoice.line_items
+        )
+        current_subtotal = _resolve_document_subtotal(
+            total_amount=invoice.total_amount,
+            discount_type=invoice.discount_type,
+            discount_value=invoice.discount_value,
+            tax_rate=invoice.tax_rate,
+            deposit_amount=invoice.deposit_amount,
+            line_items=next_line_items,
+        )
+        current_pricing = _validate_document_pricing(
+            total_amount=(
+                data.total_amount if "total_amount" in data.model_fields_set else current_subtotal
+            ),
+            line_items=next_line_items,
+            discount_type=(
+                data.discount_type
+                if "discount_type" in data.model_fields_set
+                else invoice.discount_type
+            ),
+            discount_value=(
+                data.discount_value
+                if "discount_value" in data.model_fields_set
+                else _to_float_or_none(invoice.discount_value)
+            ),
+            tax_rate=(
+                data.tax_rate
+                if "tax_rate" in data.model_fields_set
+                else _to_float_or_none(invoice.tax_rate)
+            ),
+            deposit_amount=(
+                data.deposit_amount
+                if "deposit_amount" in data.model_fields_set
+                else _to_float_or_none(invoice.deposit_amount)
+            ),
+        )
+
         updated_invoice = await self._invoice_repository.update(
             invoice=invoice,
             title=data.title,
             update_title="title" in data.model_fields_set,
-            total_amount=data.total_amount,
-            update_total_amount="total_amount" in data.model_fields_set,
+            total_amount=_to_float_or_none(current_pricing.total_amount),
+            update_total_amount="total_amount" in data.model_fields_set
+            or "discount_type" in data.model_fields_set
+            or "discount_value" in data.model_fields_set
+            or "tax_rate" in data.model_fields_set,
+            tax_rate=_to_float_or_none(current_pricing.tax_rate),
+            update_tax_rate="tax_rate" in data.model_fields_set,
+            discount_type=current_pricing.discount_type,
+            update_discount_type=(
+                "discount_type" in data.model_fields_set
+                or (
+                    "discount_value" in data.model_fields_set
+                    and current_pricing.discount_type is None
+                )
+            ),
+            discount_value=_to_float_or_none(current_pricing.discount_value),
+            update_discount_value="discount_value" in data.model_fields_set,
+            deposit_amount=_to_float_or_none(current_pricing.deposit_amount),
+            update_deposit_amount="deposit_amount" in data.model_fields_set,
             notes=data.notes,
             update_notes="notes" in data.model_fields_set,
             line_items=data.line_items,
@@ -399,3 +490,64 @@ def _utcnow() -> datetime:
 def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
     """Return true when IntegrityError was caused by doc-sequence uniqueness collision."""
     return "uq_documents_user_type_sequence" in str(exc.orig)
+
+
+def _validate_document_pricing(
+    *,
+    total_amount: float | None,
+    line_items: Sequence[object] | None,
+    discount_type: str | None,
+    discount_value: float | None,
+    tax_rate: float | None,
+    deposit_amount: float | None,
+):
+    line_item_sum = calculate_line_item_sum(
+        [to_decimal(getattr(line_item, "price", None)) for line_item in (line_items or ())]
+    )
+    try:
+        pricing, _ = validate_and_calculate_from_input(
+            subtotal_input=to_decimal(total_amount),
+            line_item_sum=line_item_sum,
+            discount_type=discount_type,
+            discount_value=to_decimal(discount_value),
+            tax_rate=to_decimal(tax_rate),
+            deposit_amount=to_decimal(deposit_amount),
+        )
+        return pricing
+    except PricingValidationError as exc:
+        raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+
+
+def _resolve_document_subtotal(
+    *,
+    total_amount: object,
+    discount_type: str | None,
+    discount_value: object,
+    tax_rate: object,
+    deposit_amount: object,
+    line_items: Sequence[object] | None,
+) -> float | None:
+    line_item_sum = calculate_line_item_sum(
+        [to_decimal(getattr(line_item, "price", None)) for line_item in (line_items or ())]
+    )
+    breakdown = calculate_breakdown_from_persisted(
+        PricingInput(
+            total_amount=_to_decimal_or_none(total_amount),
+            discount_type=cast(DiscountType | None, discount_type),
+            discount_value=_to_decimal_or_none(discount_value),
+            tax_rate=_to_decimal_or_none(tax_rate),
+            deposit_amount=_to_decimal_or_none(deposit_amount),
+        ),
+        line_item_sum=line_item_sum,
+    )
+    return _to_float_or_none(breakdown.subtotal)
+
+
+def _to_float_or_none(value: object) -> float | None:
+    if value is None:
+        return None
+    return float(cast(Decimal | float | int | str, value))
+
+
+def _to_decimal_or_none(value: object) -> Decimal | None:
+    return to_decimal(_to_float_or_none(value))

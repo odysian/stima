@@ -15,6 +15,7 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { parseTaxPercentInput, toTaxPercentDisplay } from "@/shared/lib/pricing";
 
 export function SettingsScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export function SettingsScreen(): React.ReactElement {
   const [lastName, setLastName] = useState("");
   const [tradeType, setTradeType] = useState<TradeType>(TRADE_TYPES[0]);
   const [timezone, setTimezone] = useState("UTC");
+  const [defaultTaxRate, setDefaultTaxRate] = useState("");
   const [email, setEmail] = useState("");
   const [hasLogo, setHasLogo] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -45,6 +47,7 @@ export function SettingsScreen(): React.ReactElement {
     setLastName(profile.last_name ?? "");
     setTradeType(profile.trade_type ?? TRADE_TYPES[0]);
     setTimezone(profile.timezone ?? "UTC");
+    setDefaultTaxRate(toTaxPercentDisplay(profile.default_tax_rate));
     setEmail(profile.email);
     setHasLogo(profile.has_logo);
   }
@@ -141,6 +144,7 @@ export function SettingsScreen(): React.ReactElement {
         last_name: lastName,
         trade_type: tradeType,
         timezone,
+        default_tax_rate: parseTaxPercentInput(defaultTaxRate),
       });
       try {
         await refreshUser();
@@ -297,6 +301,23 @@ export function SettingsScreen(): React.ReactElement {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="settings-default-tax-rate" className="text-sm font-medium text-on-surface">
+                    Default tax rate (%)
+                  </label>
+                  <input
+                    id="settings-default-tax-rate"
+                    type="number"
+                    step="0.01"
+                    value={defaultTaxRate}
+                    onChange={(event) => setDefaultTaxRate(event.target.value)}
+                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="8.25"
+                  />
+                  <p className="text-xs text-on-surface-variant">
+                    Used as the suggested tax rate for new documents. Tax stays off until you enable it.
+                  </p>
                 </div>
               </div>
             </section>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
@@ -25,6 +26,7 @@ class User(Base):
     business_name: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
     trade_type: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
     timezone: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
+    default_tax_rate: Mapped[Decimal | None] = mapped_column(sa.Numeric(5, 4), nullable=True)
     logo_path: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(
         sa.Boolean,

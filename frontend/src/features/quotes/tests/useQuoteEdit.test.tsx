@@ -16,6 +16,10 @@ const draftFixture: QuoteEditDraft = {
     },
   ],
   total: 120,
+  taxRate: null,
+  discountType: null,
+  discountValue: null,
+  depositAmount: null,
   notes: "Thanks for your business",
 };
 
