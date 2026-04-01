@@ -32,6 +32,11 @@ describe("BottomNav", () => {
   it("applies active tab styling using the active prop", () => {
     render(<BottomNav active="customers" />);
 
+    expect(screen.getByRole("navigation")).toHaveClass(
+      "glass-surface-strong",
+      "glass-shadow-top",
+      "border-outline-variant/20",
+    );
     expect(screen.getByRole("button", { name: /customers/i })).toHaveClass("text-primary");
     expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-outline");
   });

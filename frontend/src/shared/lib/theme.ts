@@ -95,11 +95,16 @@ export function resolveEffectiveTheme(
 
 export function applyThemeToDocument(
   theme: EffectiveTheme,
+  preference: ThemePreference = theme,
   documentRef = document,
 ): void {
   const root = documentRef.documentElement;
 
-  root.dataset.theme = theme;
+  if (preference === "system") {
+    root.removeAttribute("data-theme");
+  } else {
+    root.dataset.theme = theme;
+  }
   root.style.colorScheme = theme;
   root.style.backgroundColor = THEME_BACKGROUND[theme];
   root.style.color = THEME_FOREGROUND[theme];

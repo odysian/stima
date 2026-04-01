@@ -40,13 +40,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
   const effectiveTheme = resolveEffectiveTheme(preference, systemTheme);
 
   useEffect(() => {
-    applyThemeToDocument(effectiveTheme);
-  }, [effectiveTheme]);
+    applyThemeToDocument(effectiveTheme, preference);
+  }, [effectiveTheme, preference]);
 
   const setPreference = useCallback((nextPreference: ThemePreference) => {
     persistThemePreference(nextPreference);
     setPreferenceState(nextPreference);
-    applyThemeToDocument(resolveEffectiveTheme(nextPreference, getSystemTheme()));
+    applyThemeToDocument(
+      resolveEffectiveTheme(nextPreference, getSystemTheme()),
+      nextPreference,
+    );
   }, []);
 
   const value = useMemo<ThemeContextValue>(

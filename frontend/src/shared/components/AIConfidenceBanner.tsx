@@ -4,7 +4,7 @@ interface AIConfidenceBannerProps {
 
 export function AIConfidenceBanner({ message }: AIConfidenceBannerProps): React.ReactElement {
   return (
-    <div className="rounded-lg border-l-4 border-warning-accent bg-warning-container p-4 backdrop-blur-md shadow-[0_0_24px_rgba(0,0,0,0.04)]">
+    <div className="ghost-shadow rounded-lg border-l-4 border-warning-accent bg-warning-container p-4 backdrop-blur-md">
       <div className="flex gap-3">
         <span
           className="material-symbols-outlined text-warning-accent"

@@ -29,7 +29,7 @@ export function BottomNav({ active }: BottomNavProps): React.ReactElement {
   const navigate = useNavigate();
 
   return (
-    <nav className="fixed bottom-0 w-full bg-white/80 backdrop-blur-md shadow-[0_0_24px_rgba(13,28,46,0.04)] flex justify-around py-3 z-50">
+    <nav className="glass-surface-strong glass-shadow-top fixed bottom-0 z-50 flex w-full justify-around border-t border-outline-variant/20 py-3 backdrop-blur-md">
       {tabs.map((tab) => (
         <button
           key={tab.key}

@@ -256,6 +256,12 @@ describe("SettingsScreen", () => {
     expect(document.documentElement.dataset.theme).toBe("light");
     expect(document.documentElement.style.colorScheme).toBe("light");
     expect(lightRadio).toBeChecked();
+
+    fireEvent.click(systemRadio);
+
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("system");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(systemRadio).toBeChecked();
   });
 
   it("shows the saved default tax as a percent and persists edited values as fractions", async () => {
