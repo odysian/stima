@@ -16,9 +16,9 @@ Then execute the full Task flow end-to-end:
 4. Run relevant verification once after implementation.
 5. Open PR with `Closes #<task-id>`.
 6. Return the standardized reviewer follow-up prompt from section 3 below.
-7. After review verdict is relayed back:
+7. After review verdict:
    - if verdict is `ACTIONABLE`: patch required fixes and rerun targeted verification only.
-   - if verdict is `APPROVED`: post the lightweight tutoring handoff directly in chat using section 4 below, then return the final completion summary.
+   - if verdict is `APPROVED`: finalize the Task and return the final completion summary; do not generate a second lightweight tutoring handoff after approval is relayed back.
 8. If the Task touches state transitions, frontend action availability, external provider side effects, or contract/error semantics, include a short Behavior Matrix before implementation.
 
 Behavior Matrix (required for stateful/cross-layer tasks):
@@ -162,10 +162,10 @@ Required Output:
 5. If verdict is `APPROVED`, end with the lightweight tutoring handoff from section 4 in the same chat response
 ```
 
-## 4) Required Lightweight Tutoring Handoff In Chat (After APPROVED)
+## 4) Required Lightweight Tutoring Handoff In Chat (Reviewer-Owned)
 
-Use this after explicit reviewer verdict `APPROVED`.
-If you are the reviewer returning `APPROVED`, include it at the end of that same response.
+The lightweight tutoring handoff is generated once, by the approving reviewer, in the same `APPROVED` response.
+Do not generate a second learning handoff after approval is relayed back.
 
 Post it directly in the same chat/thread.
 Do not create a separate markdown handoff unless explicitly requested.
@@ -211,5 +211,5 @@ Output (keep it short):
 2. Any code changes made (file + one-line summary).
 3. Final verdict: APPROVED / ACTIONABLE / NO_CHANGES_NEEDED
 
-This review step is for findings triage only. Do not generate a learning handoff here. Reserve the lightweight tutoring handoff for the final reviewer response when the change is explicitly approved.
+This review step is for findings triage only. Do not generate a learning handoff here. Reserve the lightweight tutoring handoff for the final approving reviewer response when the change is explicitly approved.
 ```

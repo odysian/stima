@@ -145,7 +145,7 @@ A Task is done when:
 - reviewer follow-up is complete with verdict and actionable findings addressed or deferred explicitly
 - boundary/layer guardrail checks pass when applicable
 - no-contract refactors include reported parity lock results (status/shape/error/side-effects), not just a prose claim
-- after explicit reviewer verdict `APPROVED`, the lightweight tutoring handoff is posted directly in chat; do not create a separate markdown artifact unless explicitly requested
+- after explicit reviewer verdict `APPROVED`, the lightweight tutoring handoff is generated once by the approving reviewer in that same chat response; do not create a separate markdown artifact unless explicitly requested
 
 ## Decision Records And ADRs
 
