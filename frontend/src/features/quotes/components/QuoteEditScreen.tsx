@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
 import { useQuoteEdit, type QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -11,7 +12,7 @@ import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptiona
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
-import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import {
   calculatePricingFromPersisted,
   getPricingValidationMessage,
@@ -172,10 +173,10 @@ export function QuoteEditScreen(): React.ReactElement {
     setShouldSkipSeeding(true);
     clearDraft();
     if (id) {
-      navigate(`/quotes/${id}/preview`);
+      navigate(`/quotes/${id}/preview`, { replace: true });
       return;
     }
-    navigate("/");
+    navigate(HOME_ROUTE, { replace: true });
   }
 
   function onLineItemAdd(): void {
@@ -231,7 +232,7 @@ export function QuoteEditScreen(): React.ReactElement {
       });
       setShouldSkipSeeding(true);
       clearDraft();
-      navigate(`/quotes/${id}/preview`);
+      navigate(`/quotes/${id}/preview`, { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save quote";
       setSaveError(message);
@@ -242,11 +243,12 @@ export function QuoteEditScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-28">
-      <ScreenHeader
+      <WorkflowScreenHeader
         title={headerTitle}
         subtitle={headerSubtitle}
         backLabel="Cancel edit"
         onBack={onCancel}
+        onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
 
       <form

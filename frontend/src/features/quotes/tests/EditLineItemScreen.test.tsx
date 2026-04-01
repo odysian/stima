@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditLineItemScreen } from "@/features/quotes/components/EditLineItemScreen";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 
 const navigateMock = vi.fn();
 const updateLineItemMock = vi.fn();
@@ -101,7 +102,7 @@ describe("EditLineItemScreen", () => {
       details: "6 yards",
       price: 140,
     });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/review", { replace: true });
   });
 
   it("shows error and blocks save when description is empty", () => {
@@ -134,7 +135,7 @@ describe("EditLineItemScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
 
     expect(removeLineItemMock).toHaveBeenCalledWith(0);
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/review", { replace: true });
   });
 
   it("shows AI banner when item is flagged", () => {
@@ -157,5 +158,13 @@ describe("EditLineItemScreen", () => {
   it("does not show AI banner when item is not flagged", () => {
     renderScreen(makeDraft());
     expect(screen.queryByText(/ai confidence note/i)).not.toBeInTheDocument();
+  });
+
+  it("exits home from the workflow header", () => {
+    renderScreen(makeDraft());
+
+    fireEvent.click(screen.getByRole("button", { name: /exit to home/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 });

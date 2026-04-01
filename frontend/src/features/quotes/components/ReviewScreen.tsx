@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { profileService } from "@/features/profile/services/profileService";
+import { createCaptureLocationState, HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
 import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewSubmitFooter } from "@/features/quotes/components/ReviewSubmitFooter";
@@ -21,7 +22,7 @@ import type { LineItemDraft } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
-import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { getPricingValidationMessage } from "@/shared/lib/pricing";
 
 export function ReviewScreen(): React.ReactElement | null {
@@ -101,7 +102,6 @@ export function ReviewScreen(): React.ReactElement | null {
       lineItems: [...nextDraft.lineItems, { ...EMPTY_LINE_ITEM }],
     }));
   }
-
   async function regenerateFromTranscript(): Promise<void> {
     setSaveError(null);
     setIsRegenerating(true);
@@ -143,10 +143,8 @@ export function ReviewScreen(): React.ReactElement | null {
       setShowRegenerateConfirm(true);
       return;
     }
-
     void regenerateFromTranscript();
   }
-
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setSaveError(null);
@@ -202,17 +200,20 @@ export function ReviewScreen(): React.ReactElement | null {
 
   return (
     <main className="min-h-screen bg-background pb-28">
-      <ScreenHeader
+      <WorkflowScreenHeader
         title="Review & Edit"
         backLabel="Back to capture"
         onBack={() => {
           if (isInteractionLocked) {
             return;
           }
-          navigate(`/quotes/capture/${currentDraft.customerId}`);
+          navigate(`/quotes/capture/${currentDraft.customerId}`, {
+            replace: true,
+            state: createCaptureLocationState(currentDraft.launchOrigin ?? HOME_ROUTE),
+          });
         }}
+        onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
-
       <form
         id="quote-review-form"
         className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-24 pt-20"
@@ -421,7 +422,6 @@ export function ReviewScreen(): React.ReactElement | null {
           onChange={setDocumentType}
         />
       </form>
-
       <ReviewSubmitFooter
         documentType={documentType}
         hasNullPrices={hasNullPrices}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -196,11 +196,14 @@ afterEach(() => {
 
 describe("ReviewScreen", () => {
   it("navigates back to customer capture route from header action", () => {
-    renderScreen(makeDraft({ customerId: "cust-42" }));
+    renderScreen(makeDraft({ customerId: "cust-42", launchOrigin: "/customers/cust-42" }));
 
     fireEvent.click(screen.getByRole("button", { name: /back to capture/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-42");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-42", {
+      replace: true,
+      state: { launchOrigin: "/customers/cust-42" },
+    });
   });
 
   it("renders line items as cards and navigates to edit route on click", () => {
@@ -483,7 +486,9 @@ describe("ReviewScreen", () => {
   it("adds a blank manual line item", () => {
     renderScreen(makeDraft());
 
-    fireEvent.click(screen.getByRole("button", { name: /add line item/i }));
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /add line item/i }));
+    });
 
     expect(setDraftMock).toHaveBeenCalledWith({
       customerId: "cust-1",

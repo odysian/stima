@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteEdit } from "@/features/quotes/hooks/useQuoteEdit";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
-import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
 function parsePrice(rawPrice: string): number | null {
   const trimmedPrice = rawPrice.trim();
@@ -71,21 +72,22 @@ export function EditLineItemForEditScreen(): React.ReactElement | null {
       details: details.trim().length > 0 ? details.trim() : null,
       price: parsedPrice,
     });
-    navigate(`/quotes/${id}/edit`);
+    navigate(`/quotes/${id}/edit`, { replace: true });
   }
 
   function onDelete(): void {
     removeLineItem(safeLineItemIndex);
-    navigate(`/quotes/${id}/edit`);
+    navigate(`/quotes/${id}/edit`, { replace: true });
   }
 
   return (
     <main className="min-h-screen bg-surface-container-low pb-28">
-      <ScreenHeader
+      <WorkflowScreenHeader
         title="Edit Line Item"
         eyebrow="QUOTE EDITOR"
         backLabel="Back to edit quote"
-        onBack={() => navigate(`/quotes/${id}/edit`)}
+        onBack={() => navigate(`/quotes/${id}/edit`, { replace: true })}
+        onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
 
       <section className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-6 pt-20">

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { invoiceService } from "@/features/invoices/services/invoiceService";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { useInvoiceEdit, type InvoiceEditDraft } from "@/features/invoices/hooks/useInvoiceEdit";
 import type { InvoiceDetail } from "@/features/invoices/types/invoice.types";
 import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
@@ -12,7 +13,7 @@ import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptiona
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
-import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import {
   calculatePricingFromPersisted,
   getPricingValidationMessage,
@@ -176,10 +177,10 @@ export function InvoiceEditScreen(): React.ReactElement {
     setShouldSkipSeeding(true);
     clearDraft();
     if (id) {
-      navigate(`/invoices/${id}`);
+      navigate(`/invoices/${id}`, { replace: true });
       return;
     }
-    navigate("/");
+    navigate(HOME_ROUTE, { replace: true });
   }
 
   function onLineItemAdd(): void {
@@ -237,7 +238,7 @@ export function InvoiceEditScreen(): React.ReactElement {
       await invoiceService.updateInvoice(id, updatePayload);
       setShouldSkipSeeding(true);
       clearDraft();
-      navigate(`/invoices/${id}`);
+      navigate(`/invoices/${id}`, { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save invoice";
       setSaveError(message);
@@ -248,11 +249,12 @@ export function InvoiceEditScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-28">
-      <ScreenHeader
+      <WorkflowScreenHeader
         title={headerTitle}
         subtitle={headerSubtitle}
         backLabel="Cancel edit"
         onBack={onCancel}
+        onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
 
       <form

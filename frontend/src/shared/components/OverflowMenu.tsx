@@ -91,12 +91,12 @@ export function OverflowMenu({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId : undefined}
-        className="rounded-full border border-outline-variant/30 bg-surface-container-lowest p-2 text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
         onClick={() => {
           setIsOpen((current) => !current);
         }}
       >
-        <span className="material-symbols-outlined text-[1.125rem]">more_horiz</span>
+        <span className="material-symbols-outlined block text-[1.125rem] leading-none">more_horiz</span>
       </button>
 
       {isOpen ? (

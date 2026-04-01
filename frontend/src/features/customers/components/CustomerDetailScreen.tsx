@@ -11,6 +11,7 @@ import type {
   CustomerUpdateRequest,
 } from "@/features/customers/types/customer.types";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
+import { createCaptureLocationState } from "@/features/quotes/utils/workflowNavigation";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
@@ -289,7 +290,9 @@ export function CustomerDetailScreen(): React.ReactElement {
                       type="button"
                       variant="primary"
                       className="flex-1"
-                      onClick={() => navigate(`/quotes/capture/${customer.id}`)}
+                      onClick={() => navigate(`/quotes/capture/${customer.id}`, {
+                        state: createCaptureLocationState(`/customers/${customer.id}`),
+                      })}
                     >
                       Create Quote
                     </Button>

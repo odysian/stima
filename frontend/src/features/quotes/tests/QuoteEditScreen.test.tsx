@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QuoteEditScreen } from "@/features/quotes/components/QuoteEditScreen";
 import type { QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 
@@ -260,7 +261,7 @@ describe("QuoteEditScreen", () => {
       });
     });
     expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).toBeNull();
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview", { replace: true });
   });
 
   it("uses token-backed surfaces for the edit notes field", async () => {
@@ -352,6 +353,18 @@ describe("QuoteEditScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
 
     expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).toBeNull();
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview", { replace: true });
+  });
+
+  it("exits home from the workflow header without clearing the draft", async () => {
+    window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Q-001" });
+    fireEvent.click(screen.getByRole("button", { name: /exit to home/i }));
+
+    expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).not.toBeNull();
+    expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 });

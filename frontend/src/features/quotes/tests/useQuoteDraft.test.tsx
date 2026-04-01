@@ -7,6 +7,7 @@ const DRAFT_STORAGE_KEY = "stima_quote_draft";
 
 const draftFixture: QuoteDraft = {
   customerId: "cust-1",
+  launchOrigin: "/",
   title: "Front Yard Refresh",
   transcript: "5 yards brown mulch",
   lineItems: [
@@ -118,6 +119,7 @@ describe("useQuoteDraft", () => {
       JSON.stringify({
         ...draftFixture,
         title: "",
+        launchOrigin: "/",
         lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
       }),
     );
