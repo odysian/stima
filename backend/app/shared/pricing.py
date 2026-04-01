@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, cast
@@ -264,6 +265,97 @@ def to_decimal(value: float | None) -> Decimal | None:
     return Decimal(str(value))
 
 
+def document_field_float_or_none(value: object) -> float | None:
+    """Coerce ORM/API numeric values to float for JSON and persistence round-trips."""
+    if value is None:
+        return None
+    return float(cast(Decimal | float | int | str, value))
+
+
+def document_field_decimal_or_none(value: object) -> Decimal | None:
+    """Parse persisted document numeric fields to Decimal without float drift."""
+    return to_decimal(document_field_float_or_none(value))
+
+
+def document_line_item_has_content(line_item: object) -> bool:
+    """Return true when a line item row is non-empty for subtotal derivation."""
+    description = getattr(line_item, "description", None)
+    details = getattr(line_item, "details", None)
+    return bool(
+        (isinstance(description, str) and description.strip())
+        or (isinstance(details, str) and details.strip())
+        or getattr(line_item, "price", None) is not None
+    )
+
+
+def derive_document_subtotal_from_line_items(
+    line_items: Sequence[object] | None,
+) -> tuple[bool, float | None]:
+    """Return whether priced line items fully define a subtotal and that float value."""
+    substantive_items = [
+        line_item for line_item in (line_items or ()) if document_line_item_has_content(line_item)
+    ]
+    if not substantive_items:
+        return True, None
+    if any(getattr(line_item, "price", None) is None for line_item in substantive_items):
+        return False, None
+
+    line_item_sum = calculate_line_item_sum(
+        [to_decimal(getattr(line_item, "price", None)) for line_item in substantive_items]
+    )
+    return True, document_field_float_or_none(line_item_sum)
+
+
+def resolve_document_subtotal_for_edit(
+    *,
+    total_amount: object,
+    discount_type: str | None,
+    discount_value: object,
+    tax_rate: object,
+    deposit_amount: object,
+    line_items: Sequence[object] | None,
+) -> float | None:
+    """Reverse-calculate subtotal from persisted totals for PATCH merge logic."""
+    line_item_sum = calculate_line_item_sum(
+        [to_decimal(getattr(line_item, "price", None)) for line_item in (line_items or ())]
+    )
+    breakdown = calculate_breakdown_from_persisted(
+        PricingInput(
+            total_amount=document_field_decimal_or_none(total_amount),
+            discount_type=cast(DiscountType | None, discount_type),
+            discount_value=document_field_decimal_or_none(discount_value),
+            tax_rate=document_field_decimal_or_none(tax_rate),
+            deposit_amount=document_field_decimal_or_none(deposit_amount),
+        ),
+        line_item_sum=line_item_sum,
+    )
+    return document_field_float_or_none(breakdown.subtotal)
+
+
+def validate_document_pricing_input(
+    *,
+    total_amount: float | None,
+    line_items: Sequence[object] | None,
+    discount_type: str | None,
+    discount_value: float | None,
+    tax_rate: float | None,
+    deposit_amount: float | None,
+) -> PricingInput:
+    """Validate API pricing fields; raises PricingValidationError on contract violations."""
+    line_item_sum = calculate_line_item_sum(
+        [to_decimal(getattr(line_item, "price", None)) for line_item in (line_items or ())]
+    )
+    pricing, _ = validate_and_calculate_from_input(
+        subtotal_input=to_decimal(total_amount),
+        line_item_sum=line_item_sum,
+        discount_type=discount_type,
+        discount_value=to_decimal(discount_value),
+        tax_rate=to_decimal(tax_rate),
+        deposit_amount=to_decimal(deposit_amount),
+    )
+    return pricing
+
+
 def _resolve_subtotal_from_persisted(
     pricing: PricingInput,
     *,
@@ -273,19 +365,19 @@ def _resolve_subtotal_from_persisted(
     if total_amount is None:
         return line_item_sum
     if pricing.discount_type is None and pricing.tax_rate is None:
-        return total_amount
+        return _quantize_money(total_amount)
     tax_multiplier = _ONE + (pricing.tax_rate or _ZERO)
     if pricing.discount_type == "fixed":
-        return (total_amount / tax_multiplier) + (pricing.discount_value or _ZERO)
+        return _quantize_money((total_amount / tax_multiplier) + (pricing.discount_value or _ZERO))
     if pricing.discount_type == "percent":
         percent_discount = pricing.discount_value or _ZERO
         if percent_discount == _HUNDRED:
             if line_item_sum is not None:
                 return line_item_sum
-            return _ZERO
+            return _quantize_money(_ZERO)
         percent_multiplier = _ONE - (percent_discount / _HUNDRED)
-        return total_amount / (tax_multiplier * percent_multiplier)
-    return total_amount / tax_multiplier
+        return _quantize_money(total_amount / (tax_multiplier * percent_multiplier))
+    return _quantize_money(total_amount / tax_multiplier)
 
 
 def _validate_discount_fields(
