@@ -18,7 +18,7 @@ export function ScreenHeader({
   backLabel = "Back",
 }: ScreenHeaderProps): React.ReactElement {
   return (
-    <header className="fixed top-0 z-50 h-16 w-full bg-white/80 backdrop-blur-md shadow-[0_0_24px_rgba(13,28,46,0.04)]">
+    <header className="glass-surface glass-shadow-top fixed top-0 z-50 h-16 w-full border-b border-outline-variant/20 backdrop-blur-md">
       <div className="flex h-16 items-center gap-3 px-4">
         {onBack ? (
           <button

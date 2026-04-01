@@ -103,6 +103,16 @@ describe("theme helpers", () => {
     expect(document.documentElement.style.colorScheme).toBe("dark");
     expect(document.documentElement.style.backgroundColor).toBe("rgb(11, 16, 19)");
   });
+
+  it("removes the explicit theme override for system preference", () => {
+    applyThemeToDocument("light", "light");
+    applyThemeToDocument("dark", "system");
+
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(document.documentElement.style.backgroundColor).toBe("rgb(11, 16, 19)");
+    expect(document.documentElement.style.color).toBe("rgb(238, 242, 239)");
+  });
 });
 
 describe("ThemeProvider", () => {
@@ -117,7 +127,7 @@ describe("ThemeProvider", () => {
 
     expect(screen.getByText("Preference: system")).toBeInTheDocument();
     expect(screen.getByText("Effective: light")).toBeInTheDocument();
-    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
 
     await act(async () => {
       matchMedia.setMatches(true);
@@ -126,7 +136,7 @@ describe("ThemeProvider", () => {
     await waitFor(() => {
       expect(screen.getByText("Effective: dark")).toBeInTheDocument();
     });
-    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 
   it("keeps an explicit preference even if the OS theme changes", async () => {
@@ -163,5 +173,6 @@ describe("ThemeProvider", () => {
       expect(screen.getByText("Preference: system")).toBeInTheDocument();
       expect(screen.getByText("Effective: light")).toBeInTheDocument();
     });
+    expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 });

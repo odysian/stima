@@ -33,7 +33,11 @@
         const effectiveTheme = savedPreference === "system" ? systemTheme : savedPreference;
         const root = document.documentElement;
 
-        root.dataset.theme = effectiveTheme;
+        if (savedPreference === "system") {
+          root.removeAttribute("data-theme");
+        } else {
+          root.dataset.theme = effectiveTheme;
+        }
         root.style.colorScheme = effectiveTheme;
         root.style.backgroundColor = effectiveTheme === "dark" ? darkBackground : lightBackground;
         root.style.color = effectiveTheme === "dark" ? darkForeground : lightForeground;

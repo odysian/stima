@@ -12,8 +12,8 @@ interface ConfirmModalProps {
 }
 
 const confirmButtonClasses = {
-  primary: "forest-gradient text-white",
-  destructive: "bg-secondary text-white",
+  primary: "forest-gradient text-on-primary",
+  destructive: "bg-secondary text-on-secondary",
 } as const;
 
 export function ConfirmModal({
@@ -54,11 +54,14 @@ export function ConfirmModal({
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay data-testid="confirm-modal-overlay" className="fixed inset-0 z-50 bg-black/35" />
+        <Dialog.Overlay
+          data-testid="confirm-modal-overlay"
+          className="modal-backdrop fixed inset-0 z-50"
+        />
         <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0">
           <Dialog.Content
             {...(!body ? { "aria-describedby": undefined } : {})}
-            className="pointer-events-auto w-full max-w-md rounded-[1.75rem] bg-white p-6 shadow-[0_24px_64px_rgba(13,28,46,0.24)]"
+            className="modal-shadow pointer-events-auto w-full max-w-md rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               cancelButtonRef.current?.focus();
@@ -81,7 +84,7 @@ export function ConfirmModal({
               <button
                 type="button"
                 ref={cancelButtonRef}
-                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
                 onClick={handleCancel}
               >
                 {cancelLabel}

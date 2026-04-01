@@ -73,7 +73,7 @@ describe("ConfirmModal", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Delete" })).toHaveClass("bg-secondary", "text-white");
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveClass("bg-secondary", "text-on-secondary");
   });
 
   it("renders primary confirm styling by default", () => {
@@ -87,7 +87,26 @@ describe("ConfirmModal", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Leave" })).toHaveClass("forest-gradient", "text-white");
+    expect(screen.getByRole("button", { name: "Leave" })).toHaveClass("forest-gradient", "text-on-primary");
+  });
+
+  it("uses shared modal surface classes for the dialog shell", () => {
+    render(
+      <ConfirmModal
+        title="Leave this screen?"
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("confirm-modal-overlay")).toHaveClass("modal-backdrop");
+    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toHaveClass(
+      "modal-shadow",
+      "bg-surface-container-lowest",
+      "border-outline-variant/20",
+    );
   });
 
   it("dismisses the modal when Escape is pressed", () => {

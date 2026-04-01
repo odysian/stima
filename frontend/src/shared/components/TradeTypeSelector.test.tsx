@@ -21,8 +21,17 @@ describe("TradeTypeSelector", () => {
     const onChange = vi.fn();
     render(<TradeTypeSelector options={options} value="Builder" onChange={onChange} />);
 
-    expect(screen.getByRole("button", { name: "Builder" })).toHaveClass("border-primary", "bg-primary/5", "text-primary");
-    expect(screen.getByRole("button", { name: "Plumber" })).toHaveClass("border-outline-variant/30", "text-on-surface-variant");
+    expect(screen.getByRole("button", { name: "Builder" })).toHaveClass(
+      "ghost-shadow",
+      "border-primary/30",
+      "bg-surface-container-lowest",
+      "text-on-surface",
+    );
+    expect(screen.getByRole("button", { name: "Plumber" })).toHaveClass(
+      "border-outline-variant/30",
+      "bg-surface-container-low",
+      "text-on-surface-variant",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Painter" }));
     expect(onChange).toHaveBeenCalledWith("Painter");
