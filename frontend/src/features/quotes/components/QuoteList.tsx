@@ -206,7 +206,7 @@ export function QuoteList(): React.ReactElement {
               aria-pressed={documentMode === "quotes"}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                 documentMode === "quotes"
-                  ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                  ? "ghost-shadow bg-surface-container-lowest text-primary"
                   : "text-on-surface-variant"
               }`}
               onClick={() => setDocumentMode("quotes")}
@@ -218,7 +218,7 @@ export function QuoteList(): React.ReactElement {
               aria-pressed={documentMode === "invoices"}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                 documentMode === "invoices"
-                  ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                  ? "ghost-shadow bg-surface-container-lowest text-primary"
                   : "text-on-surface-variant"
               }`}
               onClick={() => setDocumentMode("invoices")}
@@ -297,7 +297,7 @@ export function QuoteList(): React.ReactElement {
       <button
         type="button"
         aria-label="Create document"
-        className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full forest-gradient text-white shadow-[0_0_24px_rgba(0,0,0,0.12)] transition-all active:scale-95"
+        className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
         onClick={() => navigate("/quotes/new")}
       >
         <span className="material-symbols-outlined">add</span>

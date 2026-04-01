@@ -38,6 +38,10 @@ describe("TotalAmountSection", () => {
   it("shows editable inputs without seeding zero values and applies the suggested tax rate", () => {
     renderSection();
 
+    expect(screen.getByRole("spinbutton", { name: /total amount/i })).toHaveClass(
+      "bg-surface-container-lowest",
+    );
+
     fireEvent.click(screen.getByRole("checkbox", { name: "Discount" }));
     const discountInput = screen.getByPlaceholderText("25") as HTMLInputElement;
     expect(discountInput.value).toBe("");

@@ -176,6 +176,23 @@ describe("CaptureScreen", () => {
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
   });
 
+  it("uses token-backed styles for the recording controls", () => {
+    renderScreen();
+
+    const startButton = screen.getByText("mic").closest("button");
+    if (!startButton) {
+      throw new Error("Expected start recording button to render");
+    }
+
+    expect(startButton).toHaveClass("forest-gradient", "ghost-shadow", "text-on-primary");
+
+    mockVoiceCapture({ isRecording: true, elapsedSeconds: 3 });
+    renderScreen();
+
+    const stopButton = screen.getByRole("button", { name: /stop/i });
+    expect(stopButton).toHaveClass("ghost-shadow", "bg-secondary", "text-on-secondary");
+  });
+
   it("shows browser unsupported warning", () => {
     mockVoiceCapture({ isSupported: false });
     renderScreen();

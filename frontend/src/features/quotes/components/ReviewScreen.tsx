@@ -293,7 +293,7 @@ export function ReviewScreen(): React.ReactElement | null {
                       transcript: event.target.value,
                     }))
                   }
-                  className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:bg-surface-container-lowest focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="Correct the transcript notes before regenerating."
                 />
                 <p className="text-sm text-outline">
@@ -410,7 +410,7 @@ export function ReviewScreen(): React.ReactElement | null {
                 notes: event.target.value,
               }))
             }
-            className="w-full rounded-lg border border-outline-variant/30 bg-white p-4 text-sm text-on-surface-variant placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:bg-surface-container-lowest focus:border-primary focus:ring-2 focus:ring-primary/20"
             placeholder="Any notes to include for the customer."
           />
         </section>
