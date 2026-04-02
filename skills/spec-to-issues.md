@@ -40,7 +40,7 @@ apply these defaults automatically:
 - if `mode` is omitted, select `mode=single`; otherwise honor the explicitly requested mode
 - extract only the requested feature section from `<filename>`
 - planning-only kickoff by default (no code changes, no PR)
-- for `mode=single`: generate one Task issue body at `plans/task-<feature-slug>-01.md` and run `gh issue create`
+- for `mode=single`: generate one Task issue body at `plans/YYYY-MM-DD/<workstream-slug>/task-<feature-slug>-01.md` (or a flat `plans/YYYY-MM-DD/task-<feature-slug>-01.md` for a one-off) and run `gh issue create`
 - for `mode=gated`: generate Spec + Task issue bodies and run `gh issue create` commands
 - for `mode=fast`: generate quick-fix checklist only (no issue creation by default)
 - return a terse completion summary (created issue URL(s) when applicable, file path(s), concise implementation plan, command(s) used when applicable)

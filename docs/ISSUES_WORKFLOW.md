@@ -4,7 +4,7 @@ This repository uses GitHub issues as the execution control plane.
 
 ## Workflow Loop
 
-1. Whiteboard feature ideas in `plans/YYYY-MM-DD/*.md` or spec docs (scratch planning).
+1. Whiteboard feature ideas under `plans/YYYY-MM-DD/` or in spec docs (scratch planning). For a Spec plus multiple Task bodies (and optional Execution Briefs), prefer `plans/YYYY-MM-DD/<workstream-slug>/` with related markdown files co-located; for a single scratch file, `plans/YYYY-MM-DD/<type>-<slug>.md` is enough. See `AGENTS.md` (Agent Operating Loop) for the full convention.
 2. Document work as issues using one of the execution modes below.
 3. Implement and close Task issues via PRs (`Closes #...`).
 4. Finalize by updating docs only when behavior/contracts changed and close related Spec/tracker issues.
@@ -207,9 +207,11 @@ When a Task issue already exists, use the canonical execution kickoff prompt in 
 Expected behavior:
 
 - restate goal/non-goals/acceptance criteria/verification from the issue
+- if an Execution Brief exists, reference it alongside the Task and treat it as the working handoff for task-local deltas only; the Task issue remains authoritative
 - execute in `single` mode unless explicitly told otherwise
 - create/switch to dedicated branch `task-<id>-<slug>` before implementation
 - open PR with `Closes #<task-id>`
+- follow the brief-first / analog-aware execution flow and delta-only patch handoff in `docs/template/KICKOFF.md` instead of reprinting stable repo rules in task-local prompts
 - return the standardized robust reviewer follow-up prompt
 
 ### Resiliency Checkpoints (Lightweight)
@@ -237,7 +239,7 @@ Flow:
 3. Reviewer returns:
    - `APPROVED`, or
    - `ACTIONABLE` with concrete fixes.
-4. If `ACTIONABLE`, implementation agent patches and reruns relevant verification only.
+4. If `ACTIONABLE`, implementation agent uses the delta-only patch handoff from `docs/template/KICKOFF.md` and reruns relevant verification only unless scope expands.
 5. Run second review pass only if explicitly requested.
 
 Reviewer constraints:
@@ -256,8 +258,11 @@ Use the exact output contract in `docs/template/KICKOFF.md` (single source of tr
 This section is the canonical command snippet source for issue operations.
 
 ```bash
-gh issue create --title "Task: <feature> end-to-end" --label "type:task,area:frontend" --body-file plans/YYYY-MM-DD/task-<feature>-01.md
-gh issue create --title "Spec: <feature set>" --label "type:spec" --body-file plans/YYYY-MM-DD/spec-<feature-set>.md
+# Prefer a workstream folder when you have spec + tasks + briefs:
+gh issue create --title "Task: <feature> end-to-end" --label "type:task,area:frontend" --body-file plans/YYYY-MM-DD/<workstream-slug>/task-<feature>-01.md
+gh issue create --title "Spec: <feature set>" --label "type:spec" --body-file plans/YYYY-MM-DD/<workstream-slug>/spec-<feature-set>.md
+# One-off body file at the day root is still valid:
+# --body-file plans/YYYY-MM-DD/task-<feature>-01.md
 gh issue list --label type:task
 gh issue view <id>
 ```

@@ -5,19 +5,20 @@ Use these prompts to start an agent on already-scoped work with predictable outp
 ## 1) Execute Existing Task Issue
 
 ```text
-Run kickoff for existing Task # mode=single.
+Run kickoff for existing Task #<task-id> mode=single.
 
-Reference <filepath>
+Reference <execution-brief-filepath>  # when present
+Reference <analog-filepath>  # when relevant
 
 Then execute the full Task flow end-to-end:
-1. Restate goal, non-goals, acceptance criteria, and exact verification commands from the issue.
+1. Restate goal, non-goals, acceptance criteria, and exact verification commands from the Task issue. If an Execution Brief exists, use it as the working handoff for task-local deltas only; the Task issue remains the source of truth.
 2. Create/switch to branch `task-<id>-<slug>`.
 3. Implement minimally and surgically, preserving existing contracts unless issue scope says otherwise.
 4. Run relevant verification once after implementation.
 5. Open PR with `Closes #<task-id>`.
 6. Return the standardized reviewer follow-up prompt from section 3 below.
 7. After review verdict:
-   - if verdict is `ACTIONABLE`: patch required fixes and rerun targeted verification only.
+   - if verdict is `ACTIONABLE`: use the delta-only patch handoff below; patch listed findings only and rerun targeted verification unless scope expands.
    - if verdict is `APPROVED`: finalize the Task and return the final completion summary; do not generate a second lightweight tutoring handoff after approval is relayed back.
 8. If the Task touches state transitions, frontend action availability, external provider side effects, or contract/error semantics, include a short Behavior Matrix before implementation.
 
@@ -32,12 +33,44 @@ Open Product Decisions (required when applicable):
 - If unresolved, explicitly mark them as follow-up candidates rather than encoding them as "correct" behavior
 
 Constraints:
+- Apply stable repo defaults from `AGENTS.md`, `docs/ISSUES_WORKFLOW.md`, and `docs/WORKFLOW.md` by reference unless this Task introduces a task-specific exception.
 - Keep mode `single` unless explicitly requested otherwise.
-- Be strict about scope, contracts, acceptance criteria, verification, and layer boundaries. Be flexible about internal decomposition and helper structure as long as the implementation stays readable, testable, and consistent with repo patterns.
 - For bug fixes, backend business logic, contract-sensitive behavior, and stateful/cross-layer changes, identify the first test/assertion to add before implementation when practical.
 - No environment triage loops, no worktree setup, no broad verification reruns.
 - For live/provider-backed checks (for example `make extraction-live`), ask the human operator to run them manually and share output instead of running them in agent sessions.
 - Keep output concise and findings-first.
+```
+
+### Recommended Operator Flow
+
+- `Task issue`: authoritative scope, acceptance criteria, and verification.
+- `Execution Brief`: optional compressed working handoff for task-local deltas, file scope, blockers, and locked decisions; it never replaces the Task issue.
+- `Analog docs`: optional references such as `docs/analogs/*`; point to them when a repeated pattern applies instead of reprinting repo guidance.
+- `Kickoff`: reference the Task plus the brief and analogs that matter for this execution pass.
+- `Post-review patching`: if review returns `ACTIONABLE` and scope is unchanged, use the delta-only handoff below instead of rehydrating the full Task.
+
+### Delta-Only Patch Handoff (Post-Review)
+
+```text
+Patch Task #<task-id> / PR #<pr-id> on branch <task-branch> after review.
+
+Reference <execution-brief-filepath>  # when present
+Reference <analog-filepath>  # when relevant
+
+Inputs:
+- Review verdict: ACTIONABLE
+- Findings to address: <paste only the findings being patched>
+
+Deliver:
+1. Patch the listed findings only. If a finding requires scope expansion or exposes a product/contract ambiguity, stop and flag that before editing.
+2. Keep the Task issue authoritative; use the Execution Brief only for task-local deltas that still apply.
+3. Rerun targeted verification for the patched behavior only unless scope expansion invalidates the previous green results.
+4. Return a concise patch summary, the targeted verification run, and any follow-up needed.
+
+Constraints:
+- Do not restate the full Task scope, stable repo rules, or reviewer contract unless the findings change them.
+- No broad verification reruns or environment triage loops by default.
+- Preserve existing contracts unless a listed finding explicitly requires a contract correction.
 ```
 
 
@@ -99,11 +132,19 @@ Deliver:
    - main tradeoff
    - assumptions/contracts that must hold
 7. Recommended issue artifact markdown (Task/Spec as applicable) ready for `gh issue create --body-file` when applicable.
+8. Execution Brief decision:
+   - Decide whether the resulting Task warrants an Execution Brief.
+   - Create one when task-local deltas, analog references, locked decisions, blockers, or task complexity would make implementation handoff meaningfully smaller and clearer.
+   - If yes, generate a filled Execution Brief using `docs/template/EXECUTION_BRIEF.md`.
+   - If no, state briefly why the Task issue is already compact enough without one.
+
+After a Task issue is created, create an Execution Brief only when task-local deltas, analog references, or locked decisions would make implementation handoff meaningfully smaller and clearer.
 
 Constraints:
 - Keep it lean and concrete.
 - Default to one Task unless explicitly asked for split/gated mode.
 - No speculative architecture.
+- Reference stable repo rules from canonical docs instead of reprinting them in the issue artifact unless the task introduces an exception.
 - For bug fixes, backend business logic, contract-sensitive behavior, and stateful/cross-layer changes, identify the first test/assertion to add when practical.
 - UI polish, exploratory work, copy tweaks, and other low-risk changes can stay lighter.
 ```
