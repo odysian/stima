@@ -315,6 +315,14 @@ transition-all active:scale-[0.98] active:bg-surface-container-low
 
 Button variants have their own active states defined in the Button component. Ghost buttons use `active:scale-95` (stronger scale because they're smaller).
 
+### Cursor
+
+Desktop-hoverable interactive elements must advertise clickability:
+- All semantic `<button>` elements include `cursor-pointer`.
+- Disabled buttons keep `cursor-pointer` in the base class list and add `disabled:cursor-not-allowed` so the disabled state wins automatically.
+- `aria-disabled` elements should use `pointer-events-none` rather than `cursor-not-allowed`; they do not need `cursor-pointer` on the disabled path.
+- If a non-semantic element ever intentionally uses `role="button"`, it must also include `cursor-pointer`.
+
 ### Transitions
 
 Keep transitions subtle and fast:
@@ -332,9 +340,9 @@ Three variants. A screen should have at most **one** primary button visible at a
 
 | Variant | Classes | Usage |
 |---------|---------|-------|
-| **Primary** | `forest-gradient text-white font-semibold py-4 rounded-lg` | The single most important action. Submit, Continue, Generate. |
-| **Destructive** | `border border-secondary text-secondary font-semibold py-4 rounded-lg` | Irreversible actions. Delete, Sign Out. Outlined style (not filled) to reduce accidental taps. |
-| **Ghost** | `p-2 rounded-full hover:bg-surface-container-low active:scale-95` | Back buttons, trailing actions, icon-only buttons. Disappears into the background until hovered/pressed. |
+| **Primary** | `forest-gradient cursor-pointer text-white font-semibold py-4 rounded-lg disabled:cursor-not-allowed` | The single most important action. Submit, Continue, Generate. |
+| **Destructive** | `border border-secondary cursor-pointer text-secondary font-semibold py-4 rounded-lg disabled:cursor-not-allowed` | Irreversible actions. Delete, Sign Out. Outlined style (not filled) to reduce accidental taps. |
+| **Ghost** | `cursor-pointer p-2 rounded-full hover:bg-surface-container-low active:scale-95 disabled:cursor-not-allowed` | Back buttons, trailing actions, icon-only buttons. Disappears into the background until hovered/pressed. |
 
 ### FAB (Floating Action Button)
 
@@ -342,7 +350,7 @@ One per screen, positioned bottom-right above the nav:
 
 ```
 fixed bottom-20 right-4 z-50
-h-14 w-14 rounded-full forest-gradient text-white
+h-14 w-14 cursor-pointer rounded-full forest-gradient text-white
 shadow-[0_0_24px_rgba(0,0,0,0.12)]
 transition-all active:scale-95
 ```
@@ -501,4 +509,5 @@ These are hard failures in review:
 - **Multiple primary buttons** on one screen. One `forest-gradient` button maximum.
 - **Filled icons by default**. Use outlined. Fill only for specific semantic emphasis.
 - **`rounded-md`, `rounded-sm`** or other non-token radii on UI elements. Use `rounded-lg` (buttons/inputs), `rounded-xl` (cards/containers), or `rounded-full` (FABs/pills).
+- **Missing `cursor-pointer`** on clickable buttons. Desktop users should get the hand cursor on enabled interactive targets.
 - **Inline styles** for colors, spacing, or typography. Everything goes through Tailwind utility classes referencing the theme tokens.

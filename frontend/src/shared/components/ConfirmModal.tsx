@@ -76,7 +76,7 @@ export function ConfirmModal({
             <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
               <button
                 type="button"
-                className={`inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] ${confirmButtonClasses[variant]}`}
+                className={`inline-flex min-h-12 cursor-pointer flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] ${confirmButtonClasses[variant]}`}
                 onClick={handleConfirm}
               >
                 {confirmLabel}
@@ -84,7 +84,7 @@ export function ConfirmModal({
               <button
                 type="button"
                 ref={cancelButtonRef}
-                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
+                className="inline-flex min-h-12 cursor-pointer flex-1 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
                 onClick={handleCancel}
               >
                 {cancelLabel}

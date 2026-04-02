@@ -75,7 +75,7 @@ export function CustomerInfoForm({
               type="button"
               onClick={onCancel}
               disabled={isSaving}
-              className="w-full rounded-lg border border-outline/20 px-4 py-3 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              className="w-full cursor-pointer rounded-lg border border-outline/20 px-4 py-3 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               Cancel
             </button>

@@ -55,7 +55,7 @@ export function ReviewDocumentTypeSelector({
               aria-checked={isSelected}
               disabled={disabled}
               className={[
-                "rounded-xl p-4 text-left transition-all",
+                "cursor-pointer rounded-xl p-4 text-left transition-all",
                 "disabled:cursor-not-allowed disabled:opacity-60",
                 isSelected
                   ? "ghost-shadow bg-surface-container-lowest ring-2 ring-primary/30"

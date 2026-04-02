@@ -246,7 +246,7 @@ export function SettingsScreen(): React.ReactElement {
                       {hasLogo ? (
                         <button
                           type="button"
-                          className="inline-flex min-h-12 items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                           disabled={isLogoSubmitting}
                           onClick={() => setIsRemoveLogoOpen(true)}
                         >
@@ -393,7 +393,7 @@ export function SettingsScreen(): React.ReactElement {
                 {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
                 <button
                   type="button"
-                  className="shrink-0 rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-on-secondary transition-all active:scale-[0.98]"
+                  className="shrink-0 cursor-pointer rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-on-secondary transition-all active:scale-[0.98]"
                   onClick={() => setIsSignOutConfirmOpen(true)}
                 >
                   Sign Out

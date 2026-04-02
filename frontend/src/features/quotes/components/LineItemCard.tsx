@@ -19,7 +19,7 @@ export function LineItemCard({
     <button
       type="button"
       disabled={disabled}
-      className={`flex w-full items-start justify-between gap-3 rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low ${
+      className={`flex w-full cursor-pointer items-start justify-between gap-3 rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60 ${
         flagged ? "border border-warning-accent/20" : ""
       }`}
       onClick={onClick}

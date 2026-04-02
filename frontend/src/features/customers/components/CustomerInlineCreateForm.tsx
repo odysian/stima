@@ -70,7 +70,7 @@ export function CustomerInlineCreateForm({
         </Button>
         <button
           type="button"
-          className="text-sm font-semibold text-on-surface-variant transition-colors hover:text-on-surface"
+          className="cursor-pointer text-sm font-semibold text-on-surface-variant transition-colors hover:text-on-surface"
           onClick={onCancel}
         >
           Back to search

@@ -91,7 +91,7 @@ export function OverflowMenu({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={isOpen ? menuId : undefined}
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
+        className="inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
         onClick={() => {
           setIsOpen((current) => !current);
         }}
@@ -118,7 +118,7 @@ export function OverflowMenu({
                   target={item.openInNewTab ? "_blank" : undefined}
                   rel={item.openInNewTab ? "noopener noreferrer" : undefined}
                   aria-disabled={item.disabled ? "true" : undefined}
-                  className={`${itemClassName} ${toneClassName} ${item.disabled ? "pointer-events-none opacity-40" : ""}`}
+                  className={`${itemClassName} ${toneClassName} ${item.disabled ? "pointer-events-none opacity-40" : "cursor-pointer"}`}
                   onClick={() => {
                     setIsOpen(false);
                     queueFocusRestore(triggerRef.current);
@@ -136,7 +136,7 @@ export function OverflowMenu({
                 key={item.label}
                 type="button"
                 role="menuitem"
-                className={`${itemClassName} ${toneClassName}`}
+                className={`${itemClassName} cursor-pointer ${toneClassName}`}
                 disabled={item.disabled}
                 onClick={() => {
                   setIsOpen(false);

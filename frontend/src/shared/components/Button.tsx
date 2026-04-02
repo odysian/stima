@@ -30,7 +30,7 @@ export function Button({
   onClick,
 }: ButtonProps): React.ReactElement {
   const buttonClassName = [
-    "inline-flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60",
+    "inline-flex cursor-pointer items-center justify-center disabled:cursor-not-allowed disabled:opacity-60",
     variantClasses[variant],
     className,
   ]

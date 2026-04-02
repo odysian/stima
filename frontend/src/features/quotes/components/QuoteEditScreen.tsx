@@ -325,7 +325,7 @@ export function QuoteEditScreen(): React.ReactElement {
 
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low"
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low"
               onClick={onLineItemAdd}
             >
               <span className="material-symbols-outlined text-base">add</span>
@@ -403,7 +403,7 @@ export function QuoteEditScreen(): React.ReactElement {
             </Button>
             <button
               type="button"
-              className="w-full rounded-lg border border-outline-variant py-4 font-semibold text-on-surface-variant transition-all active:scale-[0.98]"
+              className="w-full cursor-pointer rounded-lg border border-outline-variant py-4 font-semibold text-on-surface-variant transition-all active:scale-[0.98]"
               onClick={onCancel}
             >
               Cancel
