@@ -19,7 +19,7 @@ export function LinkedInvoiceCard({
   onOpenInvoice,
   lowEmphasis = false,
 }: LinkedInvoiceCardProps): React.ReactElement | null {
-  const sectionClassName = lowEmphasis ? "mt-3 px-4" : "mt-3 px-4";
+  const sectionClassName = "mt-3 px-4";
   const cardClassName = lowEmphasis
     ? "ghost-shadow rounded-lg border border-outline-variant/30 bg-surface-container-low p-4"
     : "ghost-shadow rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-4";
