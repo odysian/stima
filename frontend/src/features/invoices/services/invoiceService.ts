@@ -42,6 +42,12 @@ function shareInvoice(id: string): Promise<Invoice> {
   });
 }
 
+function sendInvoiceEmail(id: string): Promise<Invoice> {
+  return request<Invoice>(`/api/invoices/${id}/send-email`, {
+    method: "POST",
+  });
+}
+
 export const invoiceService = {
   createInvoice,
   getInvoice,
@@ -49,4 +55,5 @@ export const invoiceService = {
   updateInvoice,
   generatePdf,
   shareInvoice,
+  sendInvoiceEmail,
 };

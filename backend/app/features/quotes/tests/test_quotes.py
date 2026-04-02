@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator, Sequence
+from datetime import date
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -17,6 +18,8 @@ from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.event_logs.models import EventLog
+from app.features.invoices import email_delivery_service as invoice_email_delivery_service
+from app.features.invoices.repository import InvoiceRepository
 from app.features.quotes import api as quote_api
 from app.features.quotes import email_delivery_service
 from app.features.quotes.extraction_service import ExtractionService
@@ -48,8 +51,10 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture(autouse=True)
 def _reset_email_delivery_fallback_cache() -> Iterator[None]:
     email_delivery_service._EMAIL_SENT_FALLBACK_TIMESTAMPS.clear()  # noqa: SLF001
+    invoice_email_delivery_service._EMAIL_SENT_FALLBACK_TIMESTAMPS.clear()  # noqa: SLF001
     yield
     email_delivery_service._EMAIL_SENT_FALLBACK_TIMESTAMPS.clear()  # noqa: SLF001
+    invoice_email_delivery_service._EMAIL_SENT_FALLBACK_TIMESTAMPS.clear()  # noqa: SLF001
 
 
 class _MockExtractionIntegration:
@@ -1388,6 +1393,464 @@ async def test_send_quote_email_surfaces_provider_failures_with_expected_status_
     assert detail_response.json()["status"] == "shared"
 
 
+async def test_send_invoice_email_shares_invoice_delivers_email_and_logs_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    await _set_user_phone_number(
+        db_session,
+        email=credentials["email"],
+        phone_number="+1-555-111-2222",
+    )
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        name="Alice Johnson",
+        email="alice@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "sent"
+    assert payload["share_token"]
+    assert len(mock_email_service.messages) == 1
+    message = mock_email_service.messages[0]
+    assert message.to_email == "alice@example.com"
+    assert message.subject == "Invoice I-001 from Summit Exterior Care"
+    assert "Summit Exterior Care" in message.html_content
+    assert "Jane Doe" in message.html_content
+    assert "I-001" in message.html_content
+    assert "$55.00" in message.html_content
+    assert _format_human_date(invoice["due_date"]) in message.html_content
+    assert f"/share/{payload['share_token']}" in message.html_content
+    assert "View Invoice PDF" in message.html_content
+    assert "Questions? Call or text +1-555-111-2222." in message.html_content
+    assert credentials["email"] in message.html_content
+    assert "Questions? Call or text +1-555-111-2222." in message.text_content
+    assert f"Reply to: {credentials['email']}" in message.text_content
+    assert message.reply_to_email == credentials["email"]
+
+    user = await _get_user_by_email(db_session, credentials["email"])
+    email_sent_count = await db_session.scalar(
+        select(func.count())
+        .select_from(EventLog)
+        .where(
+            EventLog.user_id == user.id,
+            EventLog.event_name == "email_sent",
+            EventLog.metadata_json["invoice_id"].as_string() == invoice["id"],
+        )
+    )
+    assert email_sent_count == 1
+
+
+async def test_send_invoice_email_returns_200_on_resend_when_already_sent(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    share_response = await client.post(
+        f"/api/invoices/{invoice['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    original_share_token = share_response.json()["share_token"]
+
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "sent"
+    assert payload["share_token"] == original_share_token
+    assert len(mock_email_service.messages) == 1
+
+
+async def test_send_invoice_email_returns_404_for_missing_invoice(
+    client: AsyncClient,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        f"/api/invoices/{uuid4()}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+    assert mock_email_service.messages == []
+
+
+async def test_send_invoice_email_returns_404_for_different_users_invoice(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    owner_credentials = _credentials()
+    owner_csrf_token = await _register_and_login(client, owner_credentials)
+    customer_id = await _create_customer(
+        client,
+        owner_csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        owner_csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    other_csrf_token = await _register_and_login(client, _credentials())
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": other_csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+    assert mock_email_service.messages == []
+
+
+async def test_send_invoice_email_returns_409_when_invoice_is_still_draft(
+    client: AsyncClient,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Generate the PDF before sending this invoice by email.",
+    }
+    assert mock_email_service.messages == []
+
+
+@pytest.mark.parametrize(
+    ("customer_email", "expected_detail"),
+    [
+        (None, "Add a customer email before sending this invoice."),
+        ("not-an-email", "Customer email address looks invalid."),
+    ],
+)
+async def test_send_invoice_email_returns_422_for_missing_or_invalid_customer_email(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    customer_email: str | None,
+    expected_detail: str,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email=customer_email,
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": expected_detail}
+    assert mock_email_service.messages == []
+
+
+async def test_send_invoice_email_returns_429_when_duplicate_send_guard_triggers(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+    user = await _get_user_by_email(db_session, credentials["email"])
+    db_session.add(
+        EventLog(
+            user_id=user.id,
+            event_name="email_sent",
+            metadata_json={"invoice_id": invoice["id"], "customer_id": customer_id},
+        )
+    )
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "detail": "This invoice was emailed recently. Please wait a few minutes before resending.",
+    }
+    assert mock_email_service.messages == []
+
+
+async def test_send_invoice_email_returns_429_on_immediate_retry_after_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.json() == {
+        "detail": "This invoice was emailed recently. Please wait a few minutes before resending.",
+    }
+    assert len(mock_email_service.messages) == 1
+
+
+async def test_send_invoice_email_returns_200_when_event_persist_fails_after_send(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+    rollback_calls = 0
+
+    async def _raise_persist_failure(
+        self: InvoiceRepository,
+        *,
+        user_id: UUID,
+        invoice_id: UUID,
+        customer_id: UUID,
+        event_name: str,
+    ) -> None:
+        del self, user_id, invoice_id, customer_id, event_name
+        raise RuntimeError("event log unavailable")
+
+    async def _record_rollback(self: InvoiceRepository) -> None:
+        nonlocal rollback_calls
+        del self
+        rollback_calls += 1
+
+    monkeypatch.setattr(InvoiceRepository, "persist_invoice_event", _raise_persist_failure)
+    monkeypatch.setattr(InvoiceRepository, "rollback", _record_rollback)
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.json() == {
+        "detail": "This invoice was emailed recently. Please wait a few minutes before resending.",
+    }
+    assert len(mock_email_service.messages) == 1
+    assert rollback_calls == 1
+
+
+async def test_send_invoice_email_allows_immediate_retry_after_provider_failure(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+    mock_email_service.raise_send_error = True
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    mock_email_service.raise_send_error = False
+    second_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 502
+    assert second_response.status_code == 200
+    assert len(mock_email_service.messages) == 1
+
+
+@pytest.mark.parametrize(
+    ("raise_configuration_error", "raise_send_error", "expected_status", "expected_detail"),
+    [
+        (True, False, 503, "Email delivery is not configured right now."),
+        (False, True, 502, "Email delivery failed. Please try again."),
+    ],
+)
+async def test_send_invoice_email_surfaces_provider_failures_with_expected_status_codes(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    raise_configuration_error: bool,
+    raise_send_error: bool,
+    expected_status: int,
+    expected_detail: str,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+    mock_email_service.raise_configuration_error = raise_configuration_error
+    mock_email_service.raise_send_error = raise_send_error
+
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == expected_status
+    assert response.json() == {"detail": expected_detail}
+
+    detail_response = await client.get(f"/api/invoices/{invoice['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["status"] == "sent"
+    assert detail_response.json()["share_token"] is not None
+
+
 async def test_convert_notes_returns_422_for_extraction_errors(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -1869,6 +2332,7 @@ async def test_all_quote_endpoints_require_authentication(
         ),
         ("post", "/api/invoices/00000000-0000-0000-0000-000000000000/pdf", None),
         ("post", "/api/invoices/00000000-0000-0000-0000-000000000000/share", None),
+        ("post", "/api/invoices/00000000-0000-0000-0000-000000000000/send-email", None),
     ],
 )
 async def test_all_invoice_endpoints_require_authentication(
@@ -2076,6 +2540,7 @@ async def test_mark_lost_quote_requires_csrf(client: AsyncClient) -> None:
         ("patch", "", {"due_date": "2026-05-01"}),
         ("post", "/pdf", None),
         ("post", "/share", None),
+        ("post", "/send-email", None),
     ],
 )
 async def test_invoice_mutations_require_csrf(
@@ -3660,6 +4125,23 @@ async def _set_quote_status(
     assert quote is not None
     quote.status = status
     await db_session.commit()
+
+
+async def _set_invoice_status(
+    db_session: AsyncSession,
+    invoice_id: object,
+    status: QuoteStatus,
+) -> None:
+    assert isinstance(invoice_id, str)
+    invoice = await db_session.scalar(select(Document).where(Document.id == UUID(invoice_id)))
+    assert invoice is not None
+    invoice.status = status
+    await db_session.commit()
+
+
+def _format_human_date(value: object) -> str:
+    assert isinstance(value, str)
+    return date.fromisoformat(value).strftime("%b %d, %Y").replace(" 0", " ")
 
 
 def _credentials() -> dict[str, str]:

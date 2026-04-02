@@ -123,7 +123,7 @@ Unique constraints:
 | id | UUID (PK) | |
 | user_id | UUID (FK → users) | cascade delete |
 | event_name | String(64) | pilot event name, underscore format |
-| metadata_json | JSON | lightweight `quote_id`, `customer_id`, `detail` payload |
+| metadata_json | JSON | lightweight `quote_id`, `invoice_id`, `customer_id`, `detail` payload |
 | created_at | DateTime(tz) | server default |
 
 Pilot event set:
@@ -233,6 +233,7 @@ Rules:
 | `/invoices/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, due_date?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
 | `/invoices/{id}/share` | POST | yes | cookie | — | `200 Invoice`; creates/reuses `share_token` and transitions invoice to `sent` |
+| `/invoices/{id}/send-email` | POST | yes | cookie | — | `200 Invoice` after ensuring the invoice is shared and emailing the customer PDF link, `404` when invoice is missing/not owned, `409` when still `draft`, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
 
 ### Public quote landing endpoints
 
@@ -260,6 +261,12 @@ Public landing-page rules:
 `POST /quotes/{id}/send-email` behavior:
 - The quote is shared before the provider call, so a `502` or `503` can still leave the quote in `shared` state on a subsequent `GET`.
 - Ready, shared, viewed, approved, and declined quotes can all send or resend email without rotating the existing share token.
+- The duplicate-send guard allows an immediate retry after provider failure because no `email_sent` throttle event is recorded on failed sends.
+
+`POST /invoices/{id}/send-email` behavior:
+- The invoice is shared before the provider call, so a `502` or `503` can still leave the invoice in `sent` state with a reusable `share_token` on a subsequent `GET`.
+- Ready and sent invoices can both send or resend email without rotating the existing share token; draft invoices are rejected until the PDF is generated.
+- Invoice email CTAs use the raw frontend `/share/{share_token}` PDF route because the public `/doc/{share_token}` landing page is currently quote-only.
 - The duplicate-send guard allows an immediate retry after provider failure because no `email_sent` throttle event is recorded on failed sends.
 
 `QuoteListItem` fields:

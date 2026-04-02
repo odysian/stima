@@ -8,6 +8,7 @@ import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard"
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -25,6 +26,10 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const [isSharing, setIsSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailMessage, setEmailMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -73,8 +78,17 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const rawShareUrl = invoice?.share_token ? `${apiBase}/share/${invoice.share_token}` : null;
   const openPdfUrl = pdfUrl ?? rawShareUrl;
   const hasSourceQuote = Boolean(invoice?.source_document_id && invoice.source_quote_number);
+  const hasCustomerEmail = Boolean(invoice?.customer.email?.trim());
   const canEdit = Boolean(invoice && id && isInvoiceEditableStatus(invoice.status));
-  const utilityGridClassName = hasSourceQuote ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2";
+  const emailActionLabel = (
+    invoice?.status === "ready" ? "Send by Email"
+      : invoice?.status === "sent" ? "Resend by Email"
+        : null
+  );
+  const utilityButtonCount = (hasSourceQuote ? 1 : 0) + 1 + (emailActionLabel ? 1 : 0);
+  const utilityGridClassName = (
+    utilityButtonCount >= 2 ? "grid grid-cols-1 gap-2 sm:grid-cols-2" : "grid grid-cols-1 gap-2"
+  );
   const clientContact =
     [invoice?.customer.email, invoice?.customer.phone]
       .map((value) => value?.trim())
@@ -112,6 +126,8 @@ export function InvoiceDetailScreen(): React.ReactElement {
     }
 
     setPdfError(null);
+    setEmailError(null);
+    setEmailMessage(null);
     setShareError(null);
     setShareMessage(null);
     setIsGeneratingPdf(true);
@@ -142,6 +158,8 @@ export function InvoiceDetailScreen(): React.ReactElement {
       return;
     }
 
+    setEmailError(null);
+    setEmailMessage(null);
     setShareError(null);
     setShareMessage(null);
     setIsSharing(true);
@@ -167,6 +185,40 @@ export function InvoiceDetailScreen(): React.ReactElement {
       setShareError(message);
     } finally {
       setIsSharing(false);
+    }
+  }
+
+  function onRequestSendEmail(): void {
+    if (!emailActionLabel || !hasCustomerEmail || isGeneratingPdf || isSharing || isSendingEmail) {
+      return;
+    }
+
+    setEmailError(null);
+    setEmailMessage(null);
+    setShowSendEmailConfirm(true);
+  }
+
+  async function onConfirmSendEmail(): Promise<void> {
+    if (!id) {
+      return;
+    }
+
+    setShowSendEmailConfirm(false);
+    setEmailError(null);
+    setEmailMessage(null);
+    setShareError(null);
+    setShareMessage(null);
+    setIsSendingEmail(true);
+
+    try {
+      const updatedInvoice = await invoiceService.sendInvoiceEmail(id);
+      applyInvoiceUpdate(updatedInvoice);
+      setEmailMessage("Invoice sent by email.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to send invoice email";
+      setEmailError(message);
+    } finally {
+      setIsSendingEmail(false);
     }
   }
 
@@ -275,6 +327,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   <Button
                     type="button"
                     className="w-full"
+                    disabled={isSharing || isSendingEmail}
                     onClick={() => {
                       void onGeneratePdf();
                     }}
@@ -285,6 +338,18 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 )}
 
                 <div role="group" aria-label="Invoice utilities" className={`mt-3 ${utilityGridClassName}`}>
+                  {emailActionLabel ? (
+                    <button
+                      type="button"
+                      className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={!hasCustomerEmail || isGeneratingPdf || isSharing || isSendingEmail}
+                      onClick={onRequestSendEmail}
+                    >
+                      <span className="material-symbols-outlined text-base">mail</span>
+                      {isSendingEmail ? "Sending..." : emailActionLabel}
+                    </button>
+                  ) : null}
+
                   {hasSourceQuote ? (
                     <button
                       type="button"
@@ -299,7 +364,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   <button
                     type="button"
                     className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-                    disabled={isSharing || isGeneratingPdf}
+                    disabled={isSharing || isGeneratingPdf || isSendingEmail}
                     onClick={() => {
                       void onCopyLink();
                     }}
@@ -311,15 +376,31 @@ export function InvoiceDetailScreen(): React.ReactElement {
               </div>
             </section>
 
+            {!hasCustomerEmail && emailActionLabel ? (
+              <p className="mx-4 mt-3 text-sm text-on-surface-variant">
+                Add a customer email to send this invoice by email. Copy Link still works.
+              </p>
+            ) : null}
+
             {pdfError ? (
               <div className="mx-4 mt-3">
                 <FeedbackMessage variant="error">{pdfError}</FeedbackMessage>
+              </div>
+            ) : null}
+            {emailError ? (
+              <div className="mx-4 mt-3">
+                <FeedbackMessage variant="error">{emailError}</FeedbackMessage>
               </div>
             ) : null}
             {shareError ? (
               <div className="mx-4 mt-3">
                 <FeedbackMessage variant="error">{shareError}</FeedbackMessage>
               </div>
+            ) : null}
+            {emailMessage ? (
+              <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">
+                {emailMessage}
+              </p>
             ) : null}
             {shareMessage ? (
               <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">
@@ -329,6 +410,19 @@ export function InvoiceDetailScreen(): React.ReactElement {
           </>
         ) : null}
       </section>
+
+      {showSendEmailConfirm && emailActionLabel ? (
+        <ConfirmModal
+          title={`${emailActionLabel}?`}
+          body="This sends the latest invoice to the customer email on file."
+          confirmLabel={emailActionLabel}
+          cancelLabel="Cancel"
+          onConfirm={() => {
+            void onConfirmSendEmail();
+          }}
+          onCancel={() => setShowSendEmailConfirm(false)}
+        />
+      ) : null}
 
       <BottomNav active="quotes" />
     </main>
