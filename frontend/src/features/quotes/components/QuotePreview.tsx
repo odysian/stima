@@ -68,11 +68,9 @@ export function QuotePreview(): React.ReactElement {
   const quoteTitle = readOptionalQuoteText(quote, "title");
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
-  const clientContact =
-    [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]
-      .map((value) => value?.trim())
-      .filter((value): value is string => Boolean(value))
-      .join(" \u00b7 ") || "No contact details";
+  const clientContact = readOptionalQuoteText(quote, "customer_phone")
+    ?? readOptionalQuoteText(quote, "customer_email")
+    ?? "No contact details";
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
   const showDraftInvoicePromptBelowActions = Boolean(
     quote && actionState === "draft" && !quote.linked_invoice,
@@ -354,6 +352,7 @@ export function QuotePreview(): React.ReactElement {
           <>
             {quote ? (
               <QuoteDetailsCard
+                documentLabel="QUOTE"
                 totalAmount={quote.total_amount}
                 taxRate={quote.tax_rate}
                 discountType={quote.discount_type}

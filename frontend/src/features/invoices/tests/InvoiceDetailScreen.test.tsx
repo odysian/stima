@@ -158,6 +158,9 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.getByRole("button", { name: /edit invoice/i })).toBeInTheDocument();
     expect(screen.getByText("Thanks for your business")).toBeInTheDocument();
     expect(screen.getByText("Apr 19, 2026")).toBeInTheDocument();
+    expect(screen.getByText("INVOICE")).toBeInTheDocument();
+    expect(screen.getByText("+1-555-0100")).toBeInTheDocument();
+    expect(screen.queryByText("alice@example.com")).not.toBeInTheDocument();
   });
 
   it("hides source quote UI for direct invoices", async () => {
@@ -273,6 +276,24 @@ describe("InvoiceDetailScreen", () => {
     await screen.findByRole("heading", { name: "Spring cleanup" });
     expect(screen.queryByText("Customer Notes")).not.toBeInTheDocument();
     expect(screen.queryByText("No customer notes")).not.toBeInTheDocument();
+  });
+
+  it("falls back to email in the client card when the phone number is missing", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        customer: {
+          id: "cust-1",
+          name: "Alice Johnson",
+          email: "alice@example.com",
+          phone: null,
+        },
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Spring cleanup" });
+    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
   });
 
   it("navigates to the invoice editor when edit is clicked", async () => {

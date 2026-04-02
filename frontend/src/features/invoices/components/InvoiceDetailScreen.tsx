@@ -90,11 +90,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
   );
   const utilityGridClassName = emailActionLabel ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2";
   const shouldRenderNotes = Boolean(invoice?.notes?.trim());
-  const clientContact =
-    [invoice?.customer.email, invoice?.customer.phone]
-      .map((value) => value?.trim())
-      .filter((value): value is string => Boolean(value))
-      .join(" · ") || "No contact details";
+  const clientContact = invoice?.customer.phone?.trim()
+    || invoice?.customer.email?.trim()
+    || "No contact details";
   function invalidateLocalPdf(): void {
     setPdfUrl(null);
   }
@@ -262,6 +260,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
         {!isLoadingInvoice && !loadError && invoice ? (
           <>
             <QuoteDetailsCard
+              documentLabel="INVOICE"
               totalAmount={invoice.total_amount}
               taxRate={invoice.tax_rate}
               discountType={invoice.discount_type}

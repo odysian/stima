@@ -201,6 +201,7 @@ describe("QuotePreview", () => {
     expect(screen.queryByRole("button", { name: /share quote/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/doc\/share-token/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
+    expect(screen.getByText("QUOTE")).toBeInTheDocument();
   });
 
   it.each(["approved", "declined"] as const)(
@@ -569,6 +570,21 @@ describe("QuotePreview", () => {
     expect(screen.getByText("No contact details")).toBeInTheDocument();
   });
 
+  it("prefers the customer phone over email in the client card contact line", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        customer_email: "customer@example.com",
+        customer_phone: "+1-555-0199",
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    expect(screen.getByText("+1-555-0199")).toBeInTheDocument();
+    expect(screen.queryByText("customer@example.com")).not.toBeInTheDocument();
+  });
+
   it("renders the pricing breakdown when optional pricing controls are present", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({
@@ -754,7 +770,8 @@ describe("QuotePreview", () => {
       expect(mockedQuoteService.sendQuoteEmail).toHaveBeenCalledWith("quote-1");
     });
     expect(await screen.findAllByText("Preserved Customer")).toHaveLength(2);
-    expect(screen.getByText(/preserved@example.com/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+1-555-0199/i)).toBeInTheDocument();
+    expect(screen.queryByText(/preserved@example.com/i)).not.toBeInTheDocument();
   });
 
   it("copies the share link from ready state without requiring prior local PDF generation", async () => {
