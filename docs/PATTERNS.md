@@ -100,6 +100,13 @@ Record conventions that already exist in code.
   - A LOC warning is a review flag, not an automatic split mandate.
   - Split only when the two candidate halves have different collaborators/dependencies or different reasons to change.
 
+## Implementation Analogs (Reference)
+- `docs/analogs/*` is the home for repeatable implementation shapes that point at real repo examples without redefining repo-wide conventions.
+- Start with:
+  - `docs/analogs/transactional-email-flow.md`
+  - `docs/analogs/stateful-action-matrix.md`
+- Keep this file conventions-first. Add new analogs there only when a pattern is already repeated in code and worth reusing.
+
 ## Verification Reference
 Canonical targets:
 ```bash
