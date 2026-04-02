@@ -184,7 +184,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 type="button"
                 onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
                 aria-label="Edit invoice"
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
+                className="inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
               >
                 <span className="material-symbols-outlined block text-[1.125rem] leading-none">edit</span>
               </button>
@@ -288,7 +288,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   {hasSourceQuote ? (
                     <button
                       type="button"
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98]"
+                      className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98]"
                       onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
                     >
                       <span className="material-symbols-outlined text-base">arrow_back</span>
@@ -298,7 +298,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
                   <button
                     type="button"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                     disabled={isSharing || isGeneratingPdf}
                     onClick={() => {
                       void onCopyLink();

@@ -102,7 +102,7 @@ export function CustomerListScreen(): React.ReactElement {
                 <li key={customer.id}>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low"
+                    className="flex w-full cursor-pointer items-center justify-between rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low"
                     onClick={() => navigate(`/customers/${customer.id}`)}
                   >
                     <div>
@@ -135,7 +135,7 @@ export function CustomerListScreen(): React.ReactElement {
       <button
         type="button"
         aria-label="New customer"
-        className="fixed right-4 bottom-20 z-50 flex h-14 w-14 items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
+        className="fixed right-4 bottom-20 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
         onClick={() => navigate("/customers/new")}
       >
         <span className="material-symbols-outlined">person_add</span>

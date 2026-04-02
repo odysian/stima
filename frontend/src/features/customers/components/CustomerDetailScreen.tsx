@@ -299,7 +299,7 @@ export function CustomerDetailScreen(): React.ReactElement {
                     <button
                       type="button"
                       onClick={openEditMode}
-                      className="rounded-lg border border-outline/20 px-4 py-4 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low active:scale-[0.98]"
+                      className="cursor-pointer rounded-lg border border-outline/20 px-4 py-4 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low active:scale-[0.98]"
                     >
                       Edit
                     </button>
@@ -332,7 +332,7 @@ export function CustomerDetailScreen(): React.ReactElement {
                   <button
                     type="button"
                     aria-pressed={historyMode === "quotes"}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
                       historyMode === "quotes"
                         ? "bg-surface-container-lowest text-on-surface shadow-sm"
                         : "text-on-surface-variant"
@@ -344,7 +344,7 @@ export function CustomerDetailScreen(): React.ReactElement {
                   <button
                     type="button"
                     aria-pressed={historyMode === "invoices"}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
                       historyMode === "invoices"
                         ? "bg-surface-container-lowest text-on-surface shadow-sm"
                         : "text-on-surface-variant"

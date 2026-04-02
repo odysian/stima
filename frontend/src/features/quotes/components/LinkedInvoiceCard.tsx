@@ -23,7 +23,7 @@ export function LinkedInvoiceCard({
   const cardClassName = lowEmphasis
     ? "ghost-shadow rounded-lg border border-outline-variant/30 bg-surface-container-low p-4"
     : "ghost-shadow rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-4";
-  const convertButtonClassName = "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-3 text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+  const convertButtonClassName = "mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-3 text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
 
   return (
     <section className={sectionClassName}>
@@ -55,7 +55,7 @@ export function LinkedInvoiceCard({
         {linkedInvoice ? (
           <button
             type="button"
-            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary"
+            className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary"
             onClick={() => onOpenInvoice(linkedInvoice.id)}
           >
             Open invoice

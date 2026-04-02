@@ -124,7 +124,7 @@ export function TotalAmountSection({
             type="button"
             aria-expanded={isOptionalPricingOpen}
             aria-controls="optional-pricing-panel"
-            className="flex w-full items-center justify-between gap-4 rounded-lg bg-surface-container-lowest px-4 py-3 text-left transition-colors hover:bg-surface-container"
+            className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-lg bg-surface-container-lowest px-4 py-3 text-left transition-colors hover:bg-surface-container"
             onClick={() => setIsOptionalPricingOpen((current) => !current)}
           >
             <div>

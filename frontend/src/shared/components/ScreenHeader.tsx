@@ -25,7 +25,7 @@ export function ScreenHeader({
             type="button"
             onClick={onBack}
             aria-label={backLabel}
-            className="rounded-full p-2 text-primary transition-all hover:bg-surface-container-low active:scale-95"
+            className="cursor-pointer rounded-full p-2 text-primary transition-all hover:bg-surface-container-low active:scale-95"
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>

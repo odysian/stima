@@ -89,7 +89,7 @@ export function LineItemRow({
         <button
           type="button"
           onClick={onDelete}
-          className="rounded-md border border-outline-variant px-3 py-2 text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
+          className="cursor-pointer rounded-md border border-outline-variant px-3 py-2 text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
         >
           Delete
         </button>

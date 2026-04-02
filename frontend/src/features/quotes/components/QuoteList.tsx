@@ -204,7 +204,7 @@ export function QuoteList(): React.ReactElement {
             <button
               type="button"
               aria-pressed={documentMode === "quotes"}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
                 documentMode === "quotes"
                   ? "ghost-shadow bg-surface-container-lowest text-primary"
                   : "text-on-surface-variant"
@@ -216,7 +216,7 @@ export function QuoteList(): React.ReactElement {
             <button
               type="button"
               aria-pressed={documentMode === "invoices"}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
                 documentMode === "invoices"
                   ? "ghost-shadow bg-surface-container-lowest text-primary"
                   : "text-on-surface-variant"
@@ -269,7 +269,7 @@ export function QuoteList(): React.ReactElement {
                     <button
                       type="button"
                       onClick={() => navigate(row.destination)}
-                      className="w-full rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
+                      className="w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
                     >
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="font-headline font-bold text-on-surface">
@@ -297,7 +297,7 @@ export function QuoteList(): React.ReactElement {
       <button
         type="button"
         aria-label="Create document"
-        className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
+        className="fixed bottom-20 right-4 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
         onClick={() => navigate("/quotes/new")}
       >
         <span className="material-symbols-outlined">add</span>

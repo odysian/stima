@@ -35,7 +35,7 @@ export function BottomNav({ active }: BottomNavProps): React.ReactElement {
           key={tab.key}
           type="button"
           onClick={() => navigate(tab.path)}
-          className={`flex flex-col items-center gap-0.5 text-xs font-medium ${
+          className={`cursor-pointer flex flex-col items-center gap-0.5 text-xs font-medium ${
             active === tab.key ? "text-primary" : "text-outline"
           }`}
         >

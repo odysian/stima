@@ -57,7 +57,7 @@ export function InvoiceHistoryList({
                 <li key={invoice.id}>
                   <button
                     type="button"
-                    className="w-full rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
+                    className="w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
                     onClick={() => onInvoiceClick(invoice.id)}
                   >
                     <div className="flex items-baseline justify-between gap-3">
