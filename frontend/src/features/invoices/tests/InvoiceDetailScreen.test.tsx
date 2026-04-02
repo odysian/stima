@@ -151,9 +151,10 @@ describe("InvoiceDetailScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
     expect(screen.getByText(/created from quote q-001/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open quote q-001/i })).toBeInTheDocument();
     const utilities = screen.getByRole("group", { name: /invoice utilities/i });
     expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(within(utilities).getByRole("button", { name: /back to q-001/i })).toBeInTheDocument();
+    expect(within(utilities).queryByRole("button", { name: /back to q-001/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit invoice/i })).toBeInTheDocument();
     expect(screen.getByText("Thanks for your business")).toBeInTheDocument();
     expect(screen.getByText("Apr 19, 2026")).toBeInTheDocument();
@@ -172,7 +173,7 @@ describe("InvoiceDetailScreen", () => {
     expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
     expect(screen.getByText(/created on mar 20, 2026/i)).toBeInTheDocument();
     expect(screen.queryByText(/created from quote/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /back to/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open quote/i })).not.toBeInTheDocument();
   });
 
   it("keeps sent invoices editable by leaving the edit action available", async () => {
@@ -191,7 +192,7 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.queryByText(/sent invoices are read-only/i)).not.toBeInTheDocument();
   });
 
-  it("shows Send by Email for ready invoices", async () => {
+  it("shows Send Email for ready invoices", async () => {
     mockedInvoiceService.getInvoice.mockResolvedValueOnce(
       makeInvoiceDetail({
         status: "ready",
@@ -200,12 +201,12 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByRole("button", { name: /send by email/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /send email/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /resend by email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /resend email/i })).not.toBeInTheDocument();
   });
 
-  it("shows Resend by Email for sent invoices", async () => {
+  it("shows Resend Email for sent invoices", async () => {
     mockedInvoiceService.getInvoice.mockResolvedValueOnce(
       makeInvoiceDetail({
         status: "sent",
@@ -216,15 +217,15 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByRole("button", { name: /resend by email/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /resend email/i })).toBeInTheDocument();
   });
 
   it("hides the email action for draft invoices", async () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /resend by email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /send email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /resend email/i })).not.toBeInTheDocument();
   });
 
   it("disables the email action and shows a hint when the customer email is missing", async () => {
@@ -242,11 +243,36 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    const sendButton = await screen.findByRole("button", { name: /send by email/i });
+    const sendButton = await screen.findByRole("button", { name: /send email/i });
     expect(sendButton).toBeDisabled();
     expect(
-      screen.getByText("Add a customer email to send this invoice by email. Copy Link still works."),
+      screen.getByText("Add a customer email to send this invoice via email. Copy Link still works."),
     ).toBeInTheDocument();
+  });
+
+  it("renders the client card before the invoice status card", async () => {
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Spring cleanup" });
+
+    const clientHeading = screen.getByText("CLIENT");
+    const statusHeading = screen.getByText("Invoice Status");
+
+    expect(clientHeading.compareDocumentPosition(statusHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("hides customer notes when the invoice notes are blank", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        notes: "   ",
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Spring cleanup" });
+    expect(screen.queryByText("Customer Notes")).not.toBeInTheDocument();
+    expect(screen.queryByText("No customer notes")).not.toBeInTheDocument();
   });
 
   it("navigates to the invoice editor when edit is clicked", async () => {
@@ -299,7 +325,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /send by email/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /send email/i }));
 
     expect(screen.getByText("This sends the latest invoice to the customer email on file.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -327,8 +353,8 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /send by email/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Send by Email$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /send email/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send Email$/i }));
 
     expect(
       await screen.findByRole("button", { name: /sending/i }),
@@ -348,7 +374,7 @@ describe("InvoiceDetailScreen", () => {
       expect(mockedInvoiceService.sendInvoiceEmail).toHaveBeenCalledWith("invoice-1");
     });
     expect(await screen.findByText("Invoice sent by email.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /resend by email/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
   });
 
   it("dismisses the confirmation modal and shows the backend detail when sending fails", async () => {
@@ -363,8 +389,8 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /send by email/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Send by Email$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /send email/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send Email$/i }));
 
     expect(await screen.findByText("Email delivery failed. Please try again.")).toBeInTheDocument();
     expect(screen.queryByText("This sends the latest invoice to the customer email on file.")).not.toBeInTheDocument();

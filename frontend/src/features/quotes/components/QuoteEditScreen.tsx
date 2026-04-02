@@ -11,6 +11,7 @@ import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { OptionalPricingBanner } from "@/shared/components/OptionalPricingBanner";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import {
@@ -83,6 +84,7 @@ export function QuoteEditScreen(): React.ReactElement {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [shouldSkipSeeding, setShouldSkipSeeding] = useState(false);
+  const [isTbdHintDismissed, setIsTbdHintDismissed] = useState(false);
 
   useEffect(() => {
     setShouldSkipSeeding(false);
@@ -161,6 +163,12 @@ export function QuoteEditScreen(): React.ReactElement {
       ? `${quote.doc_number} · QUOTE EDITOR`
       : "QUOTE EDITOR"
     : undefined;
+
+  useEffect(() => {
+    if (!hasNullPrices) {
+      setIsTbdHintDismissed(false);
+    }
+  }, [hasNullPrices]);
 
   function updateDraft(updater: (current: QuoteEditDraft) => QuoteEditDraft): void {
     if (!currentDraft) {
@@ -248,7 +256,6 @@ export function QuoteEditScreen(): React.ReactElement {
         subtitle={headerSubtitle}
         backLabel="Cancel edit"
         onBack={onCancel}
-        onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
 
       <form
@@ -303,6 +310,13 @@ export function QuoteEditScreen(): React.ReactElement {
                 {currentDraft.lineItems.length} ITEMS
               </span>
             </div>
+
+            {hasNullPrices && !isTbdHintDismissed ? (
+              <OptionalPricingBanner
+                message={"Some line items have no price — the quote will show \"TBD\" for those items."}
+                onDismiss={() => setIsTbdHintDismissed(true)}
+              />
+            ) : null}
 
             <div className="space-y-2.5">
               {currentDraft.lineItems.length > 0 ? (
@@ -385,11 +399,6 @@ export function QuoteEditScreen(): React.ReactElement {
 
       <ScreenFooter>
         <div className="mx-auto w-full max-w-2xl">
-          {hasNullPrices ? (
-            <p className="mb-2 rounded-lg bg-warning-container px-3 py-2 text-center text-xs text-warning">
-              Some line items have no price — the quote will show "TBD" for those items.
-            </p>
-          ) : null}
           <div className="flex flex-col gap-3">
             <Button
               type="submit"

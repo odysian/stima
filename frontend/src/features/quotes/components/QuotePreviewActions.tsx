@@ -20,9 +20,9 @@ interface QuotePreviewActionsProps {
   shareMessage: string | null;
 }
 
-const secondaryButtonClasses = "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
-const primaryButtonClasses = "forest-gradient inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60";
-const primaryLinkClasses = "forest-gradient inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
+const secondaryButtonClasses = "inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+const primaryButtonClasses = "forest-gradient inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60";
+const primaryLinkClasses = "forest-gradient inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
 
 export function QuotePreviewActions({
   emailActionLabel,
@@ -59,7 +59,7 @@ export function QuotePreviewActions({
   const openPdfHref = openPdfUrl ?? shareUrl;
   const showEmailAction = emailActionLabel !== null;
   const showUtilities = showEmailAction || Boolean(openPdfHref);
-  const utilityGridClassName = "grid grid-cols-2 gap-2";
+  const utilityGridClassName = "grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2";
 
   function renderOpenPdfAction(): React.ReactElement {
     if (openPdfHref) {
@@ -151,7 +151,7 @@ export function QuotePreviewActions({
 
       {!hasCustomerEmail && showEmailAction ? (
         <p className="mx-4 mt-3 text-sm text-on-surface-variant">
-          Add a customer email to send this quote by email. Copy Link still works.
+          Add a customer email to send this quote via email. Copy Link still works.
         </p>
       ) : null}
 
