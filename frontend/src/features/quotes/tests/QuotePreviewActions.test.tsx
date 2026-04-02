@@ -13,6 +13,7 @@ function makeProps(overrides: Partial<ComponentProps<typeof QuotePreviewActions>
     onCopyLink: vi.fn().mockResolvedValue(undefined),
     openPdfUrl: "blob:quote-preview",
     shareUrl: "http://localhost:3000/doc/share-token-1",
+    manualCopyUrl: null,
     isGeneratingPdf: false,
     isSendingEmail: false,
     isCopyingLink: false,
@@ -178,5 +179,19 @@ describe("QuotePreviewActions", () => {
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     expect(onCopyLink).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the manual-copy field when a share URL must be copied inline", () => {
+    render(
+      <QuotePreviewActions
+        {...makeProps({
+          manualCopyUrl: "http://localhost:3000/doc/share-token-1",
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText("Share URL")).toHaveValue(
+      "http://localhost:3000/doc/share-token-1",
+    );
   });
 });

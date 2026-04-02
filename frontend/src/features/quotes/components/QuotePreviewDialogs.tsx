@@ -1,8 +1,11 @@
+import type { ReactNode } from "react";
+
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 
 interface QuotePreviewDialogsProps {
   quoteLabel: string;
   emailActionLabel: string | null;
+  customerEmail: string | null;
   showDeleteConfirm: boolean;
   showMarkWonConfirm: boolean;
   showMarkLostConfirm: boolean;
@@ -20,6 +23,7 @@ interface QuotePreviewDialogsProps {
 export function QuotePreviewDialogs({
   quoteLabel,
   emailActionLabel,
+  customerEmail,
   showDeleteConfirm,
   showMarkWonConfirm,
   showMarkLostConfirm,
@@ -33,6 +37,13 @@ export function QuotePreviewDialogs({
   onSendEmailConfirm,
   onSendEmailCancel,
 }: QuotePreviewDialogsProps): React.ReactElement {
+  const sendEmailBody: ReactNode = customerEmail ? (
+    <>
+      This sends the latest quote to{" "}
+      <span className="break-all font-medium text-on-surface">{customerEmail}</span>.
+    </>
+  ) : "This sends the latest quote to the customer email on file.";
+
   return (
     <>
       {showDeleteConfirm ? (
@@ -73,7 +84,7 @@ export function QuotePreviewDialogs({
       {showSendEmailConfirm && emailActionLabel ? (
         <ConfirmModal
           title={`${emailActionLabel}?`}
-          body="This sends the latest quote to the customer email on file."
+          body={sendEmailBody}
           confirmLabel={emailActionLabel}
           cancelLabel="Cancel"
           onConfirm={onSendEmailConfirm}

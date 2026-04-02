@@ -26,6 +26,11 @@ interface MessageProps {
   children: ReactNode;
 }
 
+interface ManualCopyFieldProps {
+  url: string;
+  label?: string;
+}
+
 export function DocumentActionSurface({
   sectionLabel,
   primaryAction,
@@ -89,5 +94,26 @@ export function DocumentActionSuccessMessage({ children }: MessageProps): React.
     <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">
       {children}
     </p>
+  );
+}
+
+export function DocumentActionManualCopyField({
+  url,
+  label = "Share URL",
+}: ManualCopyFieldProps): React.ReactElement {
+  return (
+    <div className="mx-4 mt-3">
+      <label className="block text-sm font-medium text-on-surface" htmlFor="manual-share-url">
+        {label}
+      </label>
+      <input
+        id="manual-share-url"
+        type="text"
+        readOnly
+        value={url}
+        onFocus={(event) => event.currentTarget.select()}
+        className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
+    </div>
   );
 }

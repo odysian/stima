@@ -12,6 +12,7 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import {
   DocumentActionError,
   DocumentActionHint,
+  DocumentActionManualCopyField,
   DocumentActionSuccessMessage,
   DocumentActionSurface,
   documentActionPrimaryButtonClassName,
@@ -22,6 +23,7 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatDate } from "@/shared/lib/formatters";
+import { canNavigateBack } from "@/shared/lib/navigation";
 
 export function InvoiceDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -35,6 +37,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const [isSharing, setIsSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -88,18 +91,22 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const openPdfUrl = pdfUrl ?? rawShareUrl;
   const hasSourceQuote = Boolean(invoice?.source_document_id && invoice.source_quote_number);
   const hasCustomerEmail = Boolean(invoice?.customer.email?.trim());
+  const customerEmail = invoice?.customer.email?.trim() || null;
   const canEdit = Boolean(invoice && id && isInvoiceEditableStatus(invoice.status));
-  const emailActionLabel = (
-    invoice?.status === "ready" ? "Send Email"
-      : invoice?.status === "sent" ? "Resend Email"
-        : null
-  );
+  const emailActionLabel = invoice?.status === "ready"
+    ? "Send Email"
+    : invoice?.status === "sent" ? "Resend Email" : null;
   const shouldRenderNotes = Boolean(invoice?.notes?.trim());
   const clientContact = invoice?.customer.phone?.trim()
     || invoice?.customer.email?.trim()
     || "No contact details";
   function invalidateLocalPdf(): void {
     setPdfUrl(null);
+  }
+
+  function handleBack(): void {
+    if (canNavigateBack()) return void navigate(-1);
+    navigate("/", { replace: true });
   }
 
   function applyInvoiceUpdate(updatedInvoice: Invoice): void {
@@ -134,6 +141,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
     setEmailMessage(null);
     setShareError(null);
     setShareMessage(null);
+    setManualCopyUrl(null);
     setIsGeneratingPdf(true);
     try {
       const blob = await invoiceService.generatePdf(id);
@@ -166,6 +174,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
     setEmailMessage(null);
     setShareError(null);
     setShareMessage(null);
+    setManualCopyUrl(null);
     setIsSharing(true);
     try {
       const updatedInvoice = invoice?.share_token ? invoice : await invoiceService.shareInvoice(id);
@@ -178,13 +187,16 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
       const nextShareUrl = `${apiBase}/share/${updatedInvoice.share_token}`;
       if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        setManualCopyUrl(nextShareUrl);
         setShareMessage("Copy this share link manually.");
         return;
       }
 
       await navigator.clipboard.writeText(nextShareUrl);
+      setManualCopyUrl(null);
       setShareMessage("Invoice link copied to clipboard.");
     } catch (error) {
+      setManualCopyUrl(null);
       const message = error instanceof Error ? error.message : "Unable to copy invoice link";
       setShareError(message);
     } finally {
@@ -212,6 +224,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
     setEmailMessage(null);
     setShareError(null);
     setShareMessage(null);
+    setManualCopyUrl(null);
     setIsSendingEmail(true);
 
     try {
@@ -231,7 +244,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
       <ScreenHeader
         title={invoice?.title ?? invoice?.doc_number ?? "Invoice"}
         subtitle={invoice?.title ? invoice.doc_number : undefined}
-        onBack={() => navigate(-1)}
+        onBack={handleBack}
         trailing={invoice ? (
           <div className="flex items-center gap-2">
             <StatusBadge variant={invoice.status} />
@@ -393,6 +406,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   {pdfError ? <DocumentActionError>{pdfError}</DocumentActionError> : null}
                   {emailError ? <DocumentActionError>{emailError}</DocumentActionError> : null}
                   {shareError ? <DocumentActionError>{shareError}</DocumentActionError> : null}
+                  {manualCopyUrl ? (
+                    <DocumentActionManualCopyField url={manualCopyUrl} />
+                  ) : null}
                   {emailMessage ? (
                     <DocumentActionSuccessMessage>{emailMessage}</DocumentActionSuccessMessage>
                   ) : null}
@@ -409,7 +425,12 @@ export function InvoiceDetailScreen(): React.ReactElement {
       {showSendEmailConfirm && emailActionLabel ? (
         <ConfirmModal
           title={`${emailActionLabel}?`}
-          body="This sends the latest invoice to the customer email on file."
+          body={customerEmail ? (
+            <>
+              This sends the latest invoice to{" "}
+              <span className="break-all font-medium text-on-surface">{customerEmail}</span>.
+            </>
+          ) : "This sends the latest invoice to the customer email on file."}
           confirmLabel={emailActionLabel}
           cancelLabel="Cancel"
           onConfirm={() => {

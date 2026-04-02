@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 
 interface ConfirmModalProps {
   title: string;
-  body?: string;
+  body?: ReactNode;
   confirmLabel: string;
   cancelLabel: string;
   onConfirm: () => void;
@@ -69,7 +70,7 @@ export function ConfirmModal({
           >
             <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">{title}</Dialog.Title>
             {body ? (
-              <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
+              <Dialog.Description className="mt-2 break-words text-sm leading-6 text-on-surface-variant">
                 {body}
               </Dialog.Description>
             ) : null}
