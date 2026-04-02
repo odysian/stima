@@ -7,6 +7,7 @@ interface ScreenHeaderProps {
   onBack?: () => void;
   trailing?: ReactNode;
   backLabel?: string;
+  layout?: "default" | "top-level";
 }
 
 export function ScreenHeader({
@@ -16,10 +17,18 @@ export function ScreenHeader({
   onBack,
   trailing,
   backLabel = "Back",
+  layout = "default",
 }: ScreenHeaderProps): React.ReactElement {
+  const isTopLevelLayout = layout === "top-level";
+
   return (
     <header className="glass-surface glass-shadow-top fixed top-0 z-50 h-16 w-full border-b border-outline-variant/20 backdrop-blur-md">
-      <div className="flex h-16 items-center gap-3 px-4">
+      <div
+        className={[
+          "flex h-16 w-full items-center gap-3 px-4",
+          isTopLevelLayout ? "mx-auto max-w-3xl" : "",
+        ].join(" ")}
+      >
         {onBack ? (
           <button
             type="button"
@@ -30,7 +39,10 @@ export function ScreenHeader({
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
         ) : null}
-        <div className="min-w-0 flex-1">
+        {isTopLevelLayout ? (
+          <p className="shrink-0 font-headline text-[2rem] font-bold leading-none text-primary">Stima</p>
+        ) : null}
+        <div className={["min-w-0 flex-1", isTopLevelLayout ? "text-right" : ""].join(" ")}>
           {eyebrow ? (
             <p className="truncate text-[0.6875rem] font-bold uppercase tracking-wider text-outline">{eyebrow}</p>
           ) : null}

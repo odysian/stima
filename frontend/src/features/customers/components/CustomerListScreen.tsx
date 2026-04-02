@@ -69,7 +69,7 @@ export function CustomerListScreen(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-24">
-      <ScreenHeader title="Customers" subtitle={customerSubtitle} />
+      <ScreenHeader title="Customers" subtitle={customerSubtitle} layout="top-level" />
       <section className="mx-auto w-full max-w-3xl pb-2 pt-20">
 
         <div className="mb-4 px-4">
