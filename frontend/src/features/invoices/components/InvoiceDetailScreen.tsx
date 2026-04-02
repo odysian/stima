@@ -9,13 +9,19 @@ import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineIte
 import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import {
+  DocumentActionError,
+  DocumentActionHint,
+  DocumentActionSuccessMessage,
+  DocumentActionSurface,
+  documentActionPrimaryButtonClassName,
+  documentActionPrimaryLinkClassName,
+  documentActionUtilityButtonClassName,
+} from "@/shared/components/DocumentActionSurface";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatDate } from "@/shared/lib/formatters";
-
-const primaryActionClassName = "forest-gradient inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
-const utilityButtonClassName = "inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
 
 export function InvoiceDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -88,7 +94,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
       : invoice?.status === "sent" ? "Resend Email"
         : null
   );
-  const utilityGridClassName = emailActionLabel ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2";
   const shouldRenderNotes = Boolean(invoice?.notes?.trim());
   const clientContact = invoice?.customer.phone?.trim()
     || invoice?.customer.email?.trim()
@@ -324,37 +329,37 @@ export function InvoiceDetailScreen(): React.ReactElement {
               </section>
             ) : null}
 
-            <section className="mt-4 px-4" aria-label="Invoice actions">
-              <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
-                {openPdfUrl ? (
-                  <a
-                    href={openPdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={primaryActionClassName}
-                  >
-                    <span className="material-symbols-outlined text-base">open_in_new</span>
-                    Open PDF
-                  </a>
-                ) : (
-                  <Button
-                    type="button"
-                    className="min-h-14 w-full"
-                    disabled={isSharing || isSendingEmail}
-                    onClick={() => {
-                      void onGeneratePdf();
-                    }}
-                    isLoading={isGeneratingPdf}
-                  >
-                    Generate PDF
-                  </Button>
-                )}
-
-                <div role="group" aria-label="Invoice utilities" className={`mt-3 ${utilityGridClassName}`}>
+            <DocumentActionSurface
+              sectionLabel="Invoice actions"
+              primaryAction={openPdfUrl ? (
+                <a
+                  href={openPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={documentActionPrimaryLinkClassName}
+                >
+                  <span className="material-symbols-outlined text-base">open_in_new</span>
+                  Open PDF
+                </a>
+              ) : (
+                <Button
+                  type="button"
+                  className={documentActionPrimaryButtonClassName}
+                  disabled={isSharing || isSendingEmail}
+                  onClick={() => {
+                    void onGeneratePdf();
+                  }}
+                  isLoading={isGeneratingPdf}
+                >
+                  Generate PDF
+                </Button>
+              )}
+              utilityActions={(
+                <>
                   {emailActionLabel ? (
                     <button
                       type="button"
-                      className={utilityButtonClassName}
+                      className={documentActionUtilityButtonClassName}
                       disabled={!hasCustomerEmail || isGeneratingPdf || isSharing || isSendingEmail}
                       onClick={onRequestSendEmail}
                     >
@@ -365,7 +370,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
                   <button
                     type="button"
-                    className={utilityButtonClassName}
+                    className={documentActionUtilityButtonClassName}
                     disabled={isSharing || isGeneratingPdf || isSendingEmail}
                     onClick={() => {
                       void onCopyLink();
@@ -374,41 +379,29 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     <span className="material-symbols-outlined text-base">content_copy</span>
                     Copy Link
                   </button>
-                </div>
-              </div>
-            </section>
-
-            {!hasCustomerEmail && emailActionLabel ? (
-              <p className="mx-4 mt-3 text-sm text-on-surface-variant">
-                Add a customer email to send this invoice via email. Copy Link still works.
-              </p>
-            ) : null}
-
-            {pdfError ? (
-              <div className="mx-4 mt-3">
-                <FeedbackMessage variant="error">{pdfError}</FeedbackMessage>
-              </div>
-            ) : null}
-            {emailError ? (
-              <div className="mx-4 mt-3">
-                <FeedbackMessage variant="error">{emailError}</FeedbackMessage>
-              </div>
-            ) : null}
-            {shareError ? (
-              <div className="mx-4 mt-3">
-                <FeedbackMessage variant="error">{shareError}</FeedbackMessage>
-              </div>
-            ) : null}
-            {emailMessage ? (
-              <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">
-                {emailMessage}
-              </p>
-            ) : null}
-            {shareMessage ? (
-              <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">
-                {shareMessage}
-              </p>
-            ) : null}
+                </>
+              )}
+              utilityLabel="Invoice utilities"
+              utilityColumns={emailActionLabel ? 2 : 1}
+              hint={!hasCustomerEmail && emailActionLabel ? (
+                <DocumentActionHint>
+                  Add a customer email to send this invoice via email. Copy Link still works.
+                </DocumentActionHint>
+              ) : null}
+              feedback={(
+                <>
+                  {pdfError ? <DocumentActionError>{pdfError}</DocumentActionError> : null}
+                  {emailError ? <DocumentActionError>{emailError}</DocumentActionError> : null}
+                  {shareError ? <DocumentActionError>{shareError}</DocumentActionError> : null}
+                  {emailMessage ? (
+                    <DocumentActionSuccessMessage>{emailMessage}</DocumentActionSuccessMessage>
+                  ) : null}
+                  {shareMessage ? (
+                    <DocumentActionSuccessMessage>{shareMessage}</DocumentActionSuccessMessage>
+                  ) : null}
+                </>
+              )}
+            />
           </>
         ) : null}
       </section>
