@@ -58,6 +58,7 @@ export function QuotePreviewActions({
 
   const openPdfHref = openPdfUrl ?? shareUrl;
   const showEmailAction = emailActionLabel !== null;
+  const showUtilities = showEmailAction || Boolean(openPdfHref);
   const canCopyLink = !disabled;
   const utilityGridClassName = "grid grid-cols-2 gap-2";
 
@@ -104,49 +105,49 @@ export function QuotePreviewActions({
         <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
           {renderOpenPdfAction()}
 
-          <div role="group" aria-label="Quote utilities" className={`mt-3 ${utilityGridClassName}`}>
-            {showEmailAction ? (
+          {showUtilities ? (
+            <div role="group" aria-label="Quote utilities" className={`mt-3 ${utilityGridClassName}`}>
+              {showEmailAction ? (
+                <button
+                  type="button"
+                  className={secondaryButtonClasses}
+                  disabled={
+                    disabled
+                    || !hasCustomerEmail
+                    || isGeneratingPdf
+                    || isSendingEmail
+                    || isCopyingLink
+                    || isMarkingWon
+                    || isMarkingLost
+                  }
+                  onClick={onRequestSendEmail}
+                >
+                  <span className="material-symbols-outlined text-base">mail</span>
+                  {isSendingEmail ? "Sending..." : emailActionLabel}
+                </button>
+              ) : null}
+
               <button
                 type="button"
                 className={secondaryButtonClasses}
                 disabled={
                   disabled
-                  || !hasCustomerEmail
+                  || !canCopyLink
                   || isGeneratingPdf
                   || isSendingEmail
                   || isCopyingLink
                   || isMarkingWon
                   || isMarkingLost
                 }
-                onClick={onRequestSendEmail}
+                onClick={() => {
+                  void onCopyLink();
+                }}
               >
-                <span className="material-symbols-outlined text-base">mail</span>
-                {isSendingEmail ? "Sending..." : emailActionLabel}
+                <span className="material-symbols-outlined text-base">content_copy</span>
+                Copy Link
               </button>
-            ) : (
-              <div aria-hidden="true" />
-            )}
-
-            <button
-              type="button"
-              className={secondaryButtonClasses}
-              disabled={
-                disabled
-                || !canCopyLink
-                || isGeneratingPdf
-                || isSendingEmail
-                || isCopyingLink
-                || isMarkingWon
-                || isMarkingLost
-              }
-              onClick={() => {
-                void onCopyLink();
-              }}
-            >
-              <span className="material-symbols-outlined text-base">content_copy</span>
-              Copy Link
-            </button>
-          </div>
+            </div>
+          ) : null}
         </div>
       </section>
 

@@ -28,7 +28,7 @@ function makeProps(overrides: Partial<ComponentProps<typeof QuotePreviewActions>
 }
 
 describe("QuotePreviewActions", () => {
-  it("renders a primary generate action with copy-link only for draft quotes", () => {
+  it("renders only the primary generate action for draft quotes", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
@@ -40,9 +40,7 @@ describe("QuotePreviewActions", () => {
     );
 
     expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
-    const utilities = screen.getByRole("group", { name: /quote utilities/i });
-    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(within(utilities).queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: /quote utilities/i })).not.toBeInTheDocument();
   });
 
   it("renders generate pdf as primary with send and copy utilities for ready quotes", () => {

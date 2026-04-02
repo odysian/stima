@@ -635,7 +635,7 @@ describe("QuotePreview", () => {
 
     await screen.findByRole("heading", { name: "Test Customer" });
     expect(screen.queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy link/i })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /copy link/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
@@ -735,7 +735,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText(/preserved@example.com/i)).toBeInTheDocument();
   });
 
-  it("copies the share link from draft state without requiring prior PDF generation", async () => {
+  it("copies the share link from ready state without requiring prior local PDF generation", async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -743,7 +743,7 @@ describe("QuotePreview", () => {
       value: { writeText: writeTextMock },
     });
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ customer_email: "customer@example.com" }),
+      makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
     );
 
     renderScreen();
