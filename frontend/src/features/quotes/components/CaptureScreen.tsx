@@ -249,7 +249,7 @@ export function CaptureScreen(): React.ReactElement {
                   <button
                     type="button"
                     aria-label={`Delete clip ${index + 1}`}
-                    className="cursor-pointer rounded-full p-1 text-outline transition-colors hover:bg-surface-container-low active:scale-95"
+                    className="cursor-pointer rounded-full p-1 text-outline transition-colors hover:bg-surface-container-low active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={() => removeClip(clip.id)}
                     disabled={isExtracting}
                   >
@@ -297,7 +297,7 @@ export function CaptureScreen(): React.ReactElement {
             <p className="text-xs uppercase tracking-widest text-outline">TAP TO START</p>
             <button
               type="button"
-              className="forest-gradient ghost-shadow flex h-20 w-20 cursor-pointer items-center justify-center rounded-full text-on-primary transition-all active:scale-95"
+              className="forest-gradient ghost-shadow flex h-20 w-20 cursor-pointer items-center justify-center rounded-full text-on-primary transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => void startRecording()}
               disabled={!isSupported}
             >

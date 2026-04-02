@@ -255,7 +255,7 @@ export function ReviewScreen(): React.ReactElement | null {
               <button
                 type="button"
                 disabled={isInteractionLocked}
-                className="cursor-pointer text-left text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                className="cursor-pointer text-left text-sm font-semibold text-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => setIsTranscriptEditorVisible((isVisible) => !isVisible)}
               >
                 {isTranscriptEditorVisible ? "Hide Transcript Editor" : "Edit Transcript Notes"}
@@ -359,7 +359,7 @@ export function ReviewScreen(): React.ReactElement | null {
         <button
           type="button"
           disabled={isInteractionLocked}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onLineItemAdd}
         >
           <span className="material-symbols-outlined text-base">add</span>
