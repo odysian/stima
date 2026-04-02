@@ -1,18 +1,15 @@
 import type { ComponentProps } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
 
-type ActionState = "draft" | "ready" | "shared" | "viewed" | "approved" | "declined";
-
 function makeProps(overrides: Partial<ComponentProps<typeof QuotePreviewActions>> = {}) {
   return {
-    actionState: "draft" as ActionState,
-    emailActionLabel: null,
+    emailActionLabel: "Send by Email",
     hasCustomerEmail: true,
     onGeneratePdf: vi.fn().mockResolvedValue(undefined),
-    onSendEmail: vi.fn().mockResolvedValue(undefined),
+    onRequestSendEmail: vi.fn(),
     onCopyLink: vi.fn().mockResolvedValue(undefined),
     openPdfUrl: "blob:quote-preview",
     shareUrl: "http://localhost:3000/doc/share-token-1",
@@ -31,20 +28,27 @@ function makeProps(overrides: Partial<ComponentProps<typeof QuotePreviewActions>
 }
 
 describe("QuotePreviewActions", () => {
-  it("renders the draft generate-pdf action", () => {
-    render(<QuotePreviewActions {...makeProps()} />);
+  it("renders a primary send action with compact quote utilities for draft quotes", () => {
+    render(
+      <QuotePreviewActions
+        {...makeProps({
+          openPdfUrl: null,
+          shareUrl: null,
+        })}
+      />,
+    );
 
-    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /copy link/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send by email/i })).toBeInTheDocument();
+    const utilities = screen.getByRole("group", { name: /quote utilities/i });
+    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+    expect(within(utilities).getByRole("button", { name: /open pdf/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
   });
 
   it("renders send by email, copy link, and open pdf for ready quotes", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
-          actionState: "ready",
-          emailActionLabel: "Send by Email",
           openPdfUrl: null,
           shareUrl: null,
         })}
@@ -60,7 +64,6 @@ describe("QuotePreviewActions", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
-          actionState: "shared",
           emailActionLabel: "Resend Email",
         })}
       />,
@@ -74,30 +77,24 @@ describe("QuotePreviewActions", () => {
     );
   });
 
-  it.each(["approved", "declined"] as const)(
-    "renders resend email, copy link, and open pdf for %s quotes",
-    (actionState) => {
-      render(
-        <QuotePreviewActions
-          {...makeProps({
-            actionState,
-            emailActionLabel: "Resend Email",
-          })}
-        />,
-      );
+  it("renders resend email, copy link, and open pdf for closed quotes", () => {
+    render(
+      <QuotePreviewActions
+        {...makeProps({
+          emailActionLabel: "Resend Email",
+        })}
+      />,
+    );
 
-      expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
-    },
-  );
+    expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
+  });
 
   it("disables the email action and shows help text when customer email is missing", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
-          actionState: "ready",
-          emailActionLabel: "Send by Email",
           hasCustomerEmail: false,
         })}
       />,
@@ -111,7 +108,6 @@ describe("QuotePreviewActions", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
-          actionState: "shared",
           emailActionLabel: "Resend Email",
           isMarkingWon: true,
         })}
@@ -125,7 +121,6 @@ describe("QuotePreviewActions", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
-          actionState: "shared",
           emailActionLabel: "Resend Email",
           isMarkingLost: true,
         })}
@@ -139,7 +134,6 @@ describe("QuotePreviewActions", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
-          actionState: "shared",
           emailActionLabel: "Resend Email",
           isSendingEmail: true,
         })}
@@ -149,12 +143,26 @@ describe("QuotePreviewActions", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Sending quote email...");
   });
 
+  it("calls the request-send-email handler when the primary action is pressed", () => {
+    const onRequestSendEmail = vi.fn();
+    render(
+      <QuotePreviewActions
+        {...makeProps({
+          onRequestSendEmail,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /send by email/i }));
+
+    expect(onRequestSendEmail).toHaveBeenCalledTimes(1);
+  });
+
   it("calls copy-link handler when copy link is pressed", () => {
     const onCopyLink = vi.fn().mockResolvedValue(undefined);
     render(
       <QuotePreviewActions
         {...makeProps({
-          actionState: "shared",
           emailActionLabel: "Resend Email",
           onCopyLink,
         })}

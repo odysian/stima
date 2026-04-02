@@ -619,17 +619,20 @@ describe("QuotePreview", () => {
 
     const detailsHeading = screen.getByText("CLIENT");
     const lineItemsHeading = screen.getByRole("heading", { name: "LINE ITEMS" });
-    const primaryAction = screen.getByRole("button", { name: /generate pdf/i });
+    const primaryAction = screen.getByRole("button", { name: /send by email/i });
 
     expect(detailsHeading.compareDocumentPosition(primaryAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(lineItemsHeading.compareDocumentPosition(primaryAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("generates PDF and promotes email/copy actions into the action area", async () => {
+  it("keeps copy/open utilities available while generating a PDF from draft", async () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
+    expect(screen.getByRole("button", { name: /send by email/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /copy link/i })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /open pdf/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
@@ -637,7 +640,6 @@ describe("QuotePreview", () => {
     });
 
     expect(screen.getByText("PDF generated on this device")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /send by email/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /copy link/i })).toBeEnabled();
     expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
       "href",
@@ -655,7 +657,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open pdf/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
@@ -674,7 +676,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open pdf/i }));
 
     expect(screen.getByRole("status")).toHaveTextContent("Generating PDF preview. This can take a few moments.");
 
@@ -711,6 +713,10 @@ describe("QuotePreview", () => {
     await screen.findByRole("heading", { name: "Preserved Customer" });
     fireEvent.click(screen.getByRole("button", { name: /send by email/i }));
 
+    const dialog = screen.getByRole("dialog", { name: /send by email\?/i });
+    expect(mockedQuoteService.sendQuoteEmail).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: /send by email/i }));
+
     await waitFor(() => {
       expect(mockedQuoteService.sendQuoteEmail).toHaveBeenCalledWith("quote-1");
     });
@@ -718,7 +724,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText(/preserved@example.com/i)).toBeInTheDocument();
   });
 
-  it("copies the share link from ready state by triggering the share transition first", async () => {
+  it("copies the share link from draft state without requiring prior PDF generation", async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -726,7 +732,7 @@ describe("QuotePreview", () => {
       value: { writeText: writeTextMock },
     });
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
+      makeQuoteDetail({ customer_email: "customer@example.com" }),
     );
 
     renderScreen();
@@ -922,15 +928,20 @@ describe("QuotePreview", () => {
     expect(await screen.findByText("Clipboard denied")).toBeInTheDocument();
   });
 
-  it("sends quote email and shows confirmation", async () => {
+  it("requires confirmation before sending quote email", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
+      makeQuoteDetail({ customer_email: "customer@example.com" }),
     );
 
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
     fireEvent.click(screen.getByRole("button", { name: /send by email/i }));
+
+    const dialog = screen.getByRole("dialog", { name: /send by email\?/i });
+    expect(mockedQuoteService.sendQuoteEmail).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /send by email/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.sendQuoteEmail).toHaveBeenCalledWith("quote-1");
@@ -951,7 +962,7 @@ describe("QuotePreview", () => {
 
   it("maps send-email API errors to user-friendly inline messages", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
+      makeQuoteDetail({ customer_email: "customer@example.com" }),
     );
     mockedQuoteService.sendQuoteEmail.mockRejectedValueOnce(
       new HttpRequestError("provider failure", 429, { detail: "provider failure" }),
@@ -961,6 +972,11 @@ describe("QuotePreview", () => {
 
     await screen.findByRole("heading", { name: "Test Customer" });
     fireEvent.click(screen.getByRole("button", { name: /send by email/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /send by email\?/i })).getByRole("button", {
+        name: /send by email/i,
+      }),
+    );
 
     expect(
       await screen.findByText(
