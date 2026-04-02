@@ -88,10 +88,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
       : invoice?.status === "sent" ? "Resend Email"
         : null
   );
-  const utilityButtonCount = 1 + (emailActionLabel ? 1 : 0);
-  const utilityGridClassName = (
-    utilityButtonCount >= 2 ? "grid grid-cols-1 gap-2 sm:grid-cols-2" : "grid grid-cols-1 gap-2"
-  );
+  const utilityGridClassName = emailActionLabel ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2";
   const shouldRenderNotes = Boolean(invoice?.notes?.trim());
   const clientContact =
     [invoice?.customer.email, invoice?.customer.phone]

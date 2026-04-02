@@ -59,7 +59,7 @@ export function QuotePreviewActions({
   const openPdfHref = openPdfUrl ?? shareUrl;
   const showEmailAction = emailActionLabel !== null;
   const showUtilities = showEmailAction || Boolean(openPdfHref);
-  const utilityGridClassName = "grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2";
+  const utilityGridClassName = "grid grid-cols-2 items-stretch gap-2";
 
   function renderOpenPdfAction(): React.ReactElement {
     if (openPdfHref) {

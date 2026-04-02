@@ -57,7 +57,7 @@ describe("QuotePreviewActions", () => {
     const utilities = screen.getByRole("group", { name: /quote utilities/i });
     expect(within(utilities).getByRole("button", { name: /send email/i })).toBeInTheDocument();
     expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(utilities).toHaveClass("sm:grid-cols-2");
+    expect(utilities).toHaveClass("grid-cols-2");
   });
 
   it("renders open pdf as primary with resend and copy utilities for shared quotes", () => {
