@@ -17,9 +17,11 @@ export interface QuoteEditDraft {
   notes: string;
 }
 
+type QuoteEditDraftUpdater = QuoteEditDraft | ((current: QuoteEditDraft) => QuoteEditDraft);
+
 interface UseQuoteEditResult {
   draft: QuoteEditDraft | null;
-  setDraft: (nextDraft: QuoteEditDraft) => void;
+  setDraft: (nextDraft: QuoteEditDraftUpdater) => void;
   updateLineItem: (index: number, item: LineItemDraftWithFlags) => void;
   removeLineItem: (index: number) => void;
   clearDraft: () => void;
@@ -151,9 +153,20 @@ function removeDraftFromStorage(): void {
 export function useQuoteEdit(): UseQuoteEditResult {
   const [draft, setDraftState] = useState<QuoteEditDraft | null>(() => readDraftFromStorage());
 
-  const setDraft = useCallback((nextDraft: QuoteEditDraft) => {
-    persistDraftToStorage(nextDraft);
-    setDraftState(nextDraft);
+  const setDraft = useCallback((nextDraft: QuoteEditDraftUpdater) => {
+    setDraftState((currentDraft) => {
+      const resolvedDraft =
+        typeof nextDraft === "function"
+          ? (currentDraft ? nextDraft(currentDraft) : currentDraft)
+          : nextDraft;
+
+      if (!resolvedDraft) {
+        return currentDraft;
+      }
+
+      persistDraftToStorage(resolvedDraft);
+      return resolvedDraft;
+    });
   }, []);
 
   const clearDraft = useCallback(() => {

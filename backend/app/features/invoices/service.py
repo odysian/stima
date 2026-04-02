@@ -231,16 +231,11 @@ class InvoiceService:
         )
 
     async def convert_quote_to_invoice(self, user: User, quote_id: UUID) -> Document:
-        """Create one invoice from an approved quote."""
+        """Create one invoice from a quote unless a linked invoice already exists."""
         user_id = _resolve_user_id(user)
         quote = await self._quote_repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status != QuoteStatus.APPROVED:
-            raise QuoteServiceError(
-                detail="Only approved quotes can be converted to invoices",
-                status_code=409,
-            )
 
         existing_invoice = await self._invoice_repository.get_by_source_document_id(
             source_document_id=quote.id,

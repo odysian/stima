@@ -2453,10 +2453,16 @@ async def test_delete_shared_quote_returns_409(client: AsyncClient) -> None:
 @pytest.mark.parametrize(
     ("starting_status", "endpoint", "expected_status", "expected_event"),
     [
+        (QuoteStatus.DRAFT, "mark-won", "approved", "quote_approved"),
+        (QuoteStatus.READY, "mark-won", "approved", "quote_approved"),
         (QuoteStatus.SHARED, "mark-won", "approved", "quote_approved"),
         (QuoteStatus.VIEWED, "mark-won", "approved", "quote_approved"),
+        (QuoteStatus.DRAFT, "mark-lost", "declined", "quote_marked_lost"),
+        (QuoteStatus.READY, "mark-lost", "declined", "quote_marked_lost"),
         (QuoteStatus.SHARED, "mark-lost", "declined", "quote_marked_lost"),
         (QuoteStatus.VIEWED, "mark-lost", "declined", "quote_marked_lost"),
+        (QuoteStatus.APPROVED, "mark-lost", "declined", "quote_marked_lost"),
+        (QuoteStatus.DECLINED, "mark-won", "approved", "quote_approved"),
     ],
 )
 async def test_mark_quote_outcome_updates_status_and_persists_event_log(
@@ -2479,13 +2485,25 @@ async def test_mark_quote_outcome_updates_status_and_persists_event_log(
     quote = await _create_quote(client, csrf_token, customer_id)
     quote_id = quote["id"]
 
-    share_response = await client.post(
-        f"/api/quotes/{quote_id}/share",
-        headers={"X-CSRF-Token": csrf_token},
-    )
-    assert share_response.status_code == 200
+    if starting_status in {
+        QuoteStatus.SHARED,
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    }:
+        share_response = await client.post(
+            f"/api/quotes/{quote_id}/share",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert share_response.status_code == 200
 
-    if starting_status is not QuoteStatus.SHARED:
+    if starting_status is QuoteStatus.READY:
+        pdf_response = await client.post(
+            f"/api/quotes/{quote_id}/pdf",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert pdf_response.status_code == 200
+    elif starting_status is not QuoteStatus.DRAFT and starting_status is not QuoteStatus.SHARED:
         await _set_quote_status(db_session, quote_id, starting_status)
 
     response = await client.post(
@@ -2520,64 +2538,51 @@ async def test_mark_quote_outcome_updates_status_and_persists_event_log(
     assert [event["event"] for event in emitted_events][-1] == expected_event
 
 
-@pytest.mark.parametrize("endpoint", ["mark-won", "mark-lost"])
-@pytest.mark.parametrize("starting_status", [QuoteStatus.DRAFT, QuoteStatus.READY])
-async def test_mark_quote_outcome_returns_409_when_quote_not_shared_yet(
+@pytest.mark.parametrize(
+    ("starting_status", "endpoint", "expected_status"),
+    [
+        (QuoteStatus.APPROVED, "mark-won", "approved"),
+        (QuoteStatus.DECLINED, "mark-lost", "declined"),
+    ],
+)
+async def test_mark_quote_outcome_is_idempotent_when_reapplying_same_terminal_status(
     client: AsyncClient,
     db_session: AsyncSession,
     starting_status: QuoteStatus,
     endpoint: str,
+    expected_status: str,
 ) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-    customer_id = await _create_customer(client, csrf_token)
-    quote = await _create_quote(client, csrf_token, customer_id)
-    quote_id = quote["id"]
+    emitted_events: list[dict[str, str]] = []
 
-    if starting_status is QuoteStatus.READY:
-        pdf_response = await client.post(
-            f"/api/quotes/{quote_id}/pdf",
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token)
+        quote = await _create_quote(client, csrf_token, customer_id)
+        quote_id = quote["id"]
+
+        share_response = await client.post(
+            f"/api/quotes/{quote_id}/share",
             headers={"X-CSRF-Token": csrf_token},
         )
-        assert pdf_response.status_code == 200
-    else:
+        assert share_response.status_code == 200
         await _set_quote_status(db_session, quote_id, starting_status)
+        event_count_before_reapply = len(emitted_events)
 
-    response = await client.post(
-        f"/api/quotes/{quote_id}/{endpoint}",
-        headers={"X-CSRF-Token": csrf_token},
-    )
+        response = await client.post(
+            f"/api/quotes/{quote_id}/{endpoint}",
+            headers={"X-CSRF-Token": csrf_token},
+        )
 
-    assert response.status_code == 409
-    assert response.json() == {"detail": "Quote has not been shared yet"}
-
-
-@pytest.mark.parametrize("endpoint", ["mark-won", "mark-lost"])
-@pytest.mark.parametrize("starting_status", [QuoteStatus.APPROVED, QuoteStatus.DECLINED])
-async def test_mark_quote_outcome_returns_409_when_already_recorded(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    starting_status: QuoteStatus,
-    endpoint: str,
-) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-    customer_id = await _create_customer(client, csrf_token)
-    quote = await _create_quote(client, csrf_token, customer_id)
-    quote_id = quote["id"]
-
-    share_response = await client.post(
-        f"/api/quotes/{quote_id}/share",
-        headers={"X-CSRF-Token": csrf_token},
-    )
-    assert share_response.status_code == 200
-    await _set_quote_status(db_session, quote_id, starting_status)
-
-    response = await client.post(
-        f"/api/quotes/{quote_id}/{endpoint}",
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 409
-    assert response.json() == {"detail": "Quote outcome has already been recorded"}
+        assert response.status_code == 200
+        assert response.json()["status"] == expected_status
+        assert len(emitted_events) == event_count_before_reapply
+    finally:
+        monkeypatch.undo()
 
 
 async def test_mark_quote_outcome_returns_409_when_atomic_write_loses_race(
@@ -2613,7 +2618,7 @@ async def test_mark_quote_outcome_returns_409_when_atomic_write_loses_race(
     )
 
     assert response.status_code == 409
-    assert response.json() == {"detail": "Quote outcome has already been recorded"}
+    assert response.json() == {"detail": "Unable to update quote outcome"}
 
 
 @pytest.mark.parametrize(
@@ -2702,9 +2707,21 @@ async def test_create_quote_persists_voice_source_type(client: AsyncClient) -> N
     assert response.json()["source_type"] == "voice"
 
 
+@pytest.mark.parametrize(
+    "starting_status",
+    [
+        QuoteStatus.DRAFT,
+        QuoteStatus.READY,
+        QuoteStatus.SHARED,
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    ],
+)
 async def test_convert_quote_to_invoice_creates_linked_invoice_and_keeps_quote_list_clean(
     client: AsyncClient,
     db_session: AsyncSession,
+    starting_status: QuoteStatus,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(
@@ -2716,7 +2733,26 @@ async def test_convert_quote_to_invoice_creates_linked_invoice_and_keeps_quote_l
     quote = await _create_quote(client, csrf_token, customer_id)
     quote_id = quote["id"]
 
-    await _set_quote_status(db_session, quote_id, QuoteStatus.APPROVED)
+    if starting_status in {
+        QuoteStatus.SHARED,
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    }:
+        share_response = await client.post(
+            f"/api/quotes/{quote_id}/share",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert share_response.status_code == 200
+
+    if starting_status is QuoteStatus.READY:
+        pdf_response = await client.post(
+            f"/api/quotes/{quote_id}/pdf",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert pdf_response.status_code == 200
+    elif starting_status is not QuoteStatus.DRAFT and starting_status is not QuoteStatus.SHARED:
+        await _set_quote_status(db_session, quote_id, starting_status)
 
     convert_response = await client.post(
         f"/api/quotes/{quote_id}/convert-to-invoice",
@@ -3338,16 +3374,47 @@ async def test_invoice_patch_tax_rate_only_recomputes_total_from_reverse_subtota
     assert patched["total_amount"] == 120
 
 
+@pytest.mark.parametrize(
+    "starting_status",
+    [
+        QuoteStatus.DRAFT,
+        QuoteStatus.READY,
+        QuoteStatus.SHARED,
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    ],
+)
 async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_preserves_sent_invoice_status(
     client: AsyncClient,
     db_session: AsyncSession,
+    starting_status: QuoteStatus,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
     quote = await _create_quote(client, csrf_token, customer_id)
     quote_id = quote["id"]
 
-    await _set_quote_status(db_session, quote_id, QuoteStatus.APPROVED)
+    if starting_status in {
+        QuoteStatus.SHARED,
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    }:
+        share_response = await client.post(
+            f"/api/quotes/{quote_id}/share",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert share_response.status_code == 200
+
+    if starting_status is QuoteStatus.READY:
+        pdf_response = await client.post(
+            f"/api/quotes/{quote_id}/pdf",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert pdf_response.status_code == 200
+    elif starting_status is not QuoteStatus.DRAFT and starting_status is not QuoteStatus.SHARED:
+        await _set_quote_status(db_session, quote_id, starting_status)
 
     first_convert = await client.post(
         f"/api/quotes/{quote_id}/convert-to-invoice",

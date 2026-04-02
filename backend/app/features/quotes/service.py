@@ -48,6 +48,14 @@ _NON_DELETABLE_QUOTE_STATUSES = frozenset(
     }
 )
 _TERMINAL_QUOTE_STATUSES = frozenset({QuoteStatus.APPROVED, QuoteStatus.DECLINED})
+_QUOTE_OUTCOME_ELIGIBLE_STATUSES = (
+    QuoteStatus.DRAFT,
+    QuoteStatus.READY,
+    QuoteStatus.SHARED,
+    QuoteStatus.VIEWED,
+    QuoteStatus.APPROVED,
+    QuoteStatus.DECLINED,
+)
 _POST_SHARE_NON_REGRESSION_STATUSES = frozenset(
     {
         QuoteStatus.VIEWED,
@@ -495,33 +503,30 @@ class QuoteService:
         quote_id: UUID,
         outcome: Literal["approved", "declined"],
     ) -> Document:
-        """Record a contractor-confirmed quote outcome for a shared/viewed quote."""
+        """Record a contractor-controlled quote outcome without changing share state."""
         user_id = _resolve_user_id(user)
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status in _TERMINAL_QUOTE_STATUSES:
-            raise QuoteServiceError(
-                detail="Quote outcome has already been recorded",
-                status_code=409,
-            )
-        if quote.status in {QuoteStatus.DRAFT, QuoteStatus.READY}:
-            raise QuoteServiceError(
-                detail="Quote has not been shared yet",
-                status_code=409,
-            )
-
         next_status = QuoteStatus.APPROVED if outcome == "approved" else QuoteStatus.DECLINED
+        if quote.status == next_status:
+            return quote
+
         event_name = "quote_approved" if outcome == "approved" else "quote_marked_lost"
         updated_quote = await self._repository.set_quote_outcome(
             quote_id=quote_id,
             user_id=user_id,
             status=next_status,
-            allowed_current_statuses=(QuoteStatus.SHARED, QuoteStatus.VIEWED),
+            allowed_current_statuses=tuple(
+                status for status in _QUOTE_OUTCOME_ELIGIBLE_STATUSES if status != next_status
+            ),
         )
         if updated_quote is None:
+            current_quote = await self._repository.get_by_id(quote_id, user_id)
+            if current_quote is not None and current_quote.status == next_status:
+                return current_quote
             raise QuoteServiceError(
-                detail="Quote outcome has already been recorded",
+                detail="Unable to update quote outcome",
                 status_code=409,
             )
 

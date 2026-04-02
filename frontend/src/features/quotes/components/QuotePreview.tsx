@@ -358,7 +358,6 @@ export function QuotePreview(): React.ReactElement {
             ) : null}
             {quote ? (
               <LinkedInvoiceCard
-                quoteStatus={quote.status}
                 linkedInvoice={quote.linked_invoice}
                 isConverting={isConvertingInvoice}
                 onConvert={onConvertToInvoice}

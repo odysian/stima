@@ -89,6 +89,48 @@ describe("useQuoteDraft", () => {
     });
   });
 
+  it("supports functional draft updates against the latest stored state", () => {
+    function FunctionalHarness(): React.ReactElement {
+      const { draft, setDraft } = useQuoteDraft();
+
+      return (
+        <div>
+          <button type="button" onClick={() => setDraft(draftFixture)}>
+            Seed Draft
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setDraft((currentDraft) => ({
+                ...currentDraft,
+                discountType: null,
+                discountValue: null,
+              }))
+            }
+          >
+            Clear Discount
+          </button>
+          <output data-testid="functional-draft-state">{draft ? JSON.stringify(draft) : "null"}</output>
+        </div>
+      );
+    }
+
+    render(<FunctionalHarness />);
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Seed Draft" }));
+      fireEvent.click(screen.getByRole("button", { name: "Clear Discount" }));
+    });
+
+    expect(screen.getByTestId("functional-draft-state")).toHaveTextContent(
+      JSON.stringify({
+        ...draftFixture,
+        discountType: null,
+        discountValue: null,
+      }),
+    );
+  });
+
   it("removes draft from state and storage when clearDraft is called", () => {
     render(<HookHarness />);
 
