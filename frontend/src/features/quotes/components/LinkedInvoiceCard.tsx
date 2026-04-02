@@ -1,5 +1,4 @@
 import type { LinkedInvoiceSummary } from "@/features/quotes/types/quote.types";
-import { Button } from "@/shared/components/Button";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
@@ -9,6 +8,7 @@ interface LinkedInvoiceCardProps {
   isConverting: boolean;
   onConvert: () => Promise<void>;
   onOpenInvoice: (invoiceId: string) => void;
+  lowEmphasis?: boolean;
 }
 
 export function LinkedInvoiceCard({
@@ -17,29 +17,36 @@ export function LinkedInvoiceCard({
   isConverting,
   onConvert,
   onOpenInvoice,
+  lowEmphasis = false,
 }: LinkedInvoiceCardProps): React.ReactElement | null {
+  const sectionClassName = lowEmphasis ? "mt-3 px-4" : "mt-3 px-4";
+  const cardClassName = lowEmphasis
+    ? "ghost-shadow rounded-lg border border-outline-variant/30 bg-surface-container-low p-4"
+    : "ghost-shadow rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-4";
+  const convertButtonClassName = "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-3 text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+
   return (
-    <section className="mt-4 px-4 pb-2">
-      <div className="ghost-shadow rounded-lg border border-success/20 bg-surface-container-lowest p-4">
+    <section className={sectionClassName}>
+      <div className={cardClassName}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
               Linked Invoice
             </p>
-            <p className="mt-2 font-bold text-on-surface">
+            <p className="mt-1.5 font-semibold text-on-surface">
               {linkedInvoice ? linkedInvoice.doc_number : "No invoice yet"}
             </p>
-            <p className="mt-1 text-sm text-on-surface-variant">
-              {linkedInvoice
-                ? [
-                    linkedInvoice.due_date
-                      ? `Due ${formatDate(`${linkedInvoice.due_date}T00:00:00.000Z`, timezone)}`
-                      : "No due date",
-                    formatCurrency(linkedInvoice.total_amount),
-                    `Created ${formatDate(linkedInvoice.created_at, timezone)}`,
-                  ].join(" · ")
-                : "Create the invoice from this quote, then fine-tune the due date before sharing."}
-            </p>
+            {linkedInvoice ? (
+              <p className="mt-1 text-sm text-on-surface-variant">
+                {[
+                  linkedInvoice.due_date
+                    ? `Due ${formatDate(`${linkedInvoice.due_date}T00:00:00.000Z`, timezone)}`
+                    : "No due date",
+                  formatCurrency(linkedInvoice.total_amount),
+                  `Created ${formatDate(linkedInvoice.created_at, timezone)}`,
+                ].join(" · ")}
+              </p>
+            ) : null}
           </div>
 
           {linkedInvoice ? <StatusBadge variant={linkedInvoice.status} /> : null}
@@ -55,16 +62,16 @@ export function LinkedInvoiceCard({
             <span className="material-symbols-outlined text-base">arrow_forward</span>
           </button>
         ) : (
-          <Button
+          <button
             type="button"
-            className="mt-4 w-full"
+            className={convertButtonClassName}
             onClick={() => {
               void onConvert();
             }}
-            isLoading={isConverting}
+            disabled={isConverting}
           >
-            Convert to Invoice
-          </Button>
+            {isConverting ? "Loading..." : "Convert to Invoice"}
+          </button>
         )}
       </div>
     </section>

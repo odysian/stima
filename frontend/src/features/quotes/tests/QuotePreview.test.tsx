@@ -224,7 +224,7 @@ describe("QuotePreview", () => {
     },
   );
 
-  it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
+  it.each(["ready", "shared", "viewed", "approved", "declined"] as const)(
     "shows convert to invoice for %s quotes without a linked invoice",
     async (status) => {
       mockedQuoteService.getQuote.mockResolvedValueOnce(
@@ -238,6 +238,40 @@ describe("QuotePreview", () => {
       expect(screen.getByText("No invoice yet")).toBeInTheDocument();
     },
   );
+
+  it("demotes draft convert-to-invoice UI below the quote actions", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "draft", share_token: null }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    const generatePdfButton = screen.getByRole("button", { name: /generate pdf/i });
+    const convertButton = screen.getByRole("button", { name: /convert to invoice/i });
+
+    expect(generatePdfButton.compareDocumentPosition(convertButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(generatePdfButton).toHaveClass("forest-gradient");
+    expect(convertButton).not.toHaveClass("forest-gradient");
+    expect(convertButton).toHaveClass("border");
+    expect(screen.getByText("No invoice yet")).toBeInTheDocument();
+    expect(screen.queryByText(/fine-tune the due date before sharing/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps convert to invoice secondary when the quote is ready", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "ready", share_token: "share-token-1" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    const convertButton = screen.getByRole("button", { name: /convert to invoice/i });
+
+    expect(convertButton).not.toHaveClass("forest-gradient");
+    expect(convertButton).toHaveClass("border");
+    expect(screen.queryByText(/fine-tune the due date before sharing/i)).not.toBeInTheDocument();
+  });
 
   it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
     "shows the linked invoice summary when a %s quote already has one",

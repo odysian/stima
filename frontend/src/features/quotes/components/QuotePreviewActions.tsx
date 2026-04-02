@@ -1,4 +1,3 @@
-import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 
 interface QuotePreviewActionsProps {
@@ -22,6 +21,7 @@ interface QuotePreviewActionsProps {
 }
 
 const secondaryButtonClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+const primaryButtonClasses = "forest-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60";
 const primaryLinkClasses = "forest-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
 
 export function QuotePreviewActions({
@@ -80,7 +80,7 @@ export function QuotePreviewActions({
     return (
       <button
         type="button"
-        className={secondaryButtonClasses}
+        className={primaryButtonClasses}
         disabled={
           disabled
           || isGeneratingPdf

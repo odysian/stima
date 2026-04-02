@@ -77,6 +77,9 @@ export function QuotePreview(): React.ReactElement {
       .join(" \u00b7 ") || "No contact details";
   const compactStatusRow = getCompactStatusRow(actionState, quote, hasLocalPdf);
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
+  const showDraftInvoicePromptBelowActions = Boolean(
+    quote && actionState === "draft" && !quote.linked_invoice,
+  );
   const {
     invoiceError,
     isConvertingInvoice,
@@ -366,7 +369,7 @@ export function QuotePreview(): React.ReactElement {
                 clientContact={clientContact}
               />
             ) : null}
-            {quote ? (
+            {quote && !showDraftInvoicePromptBelowActions ? (
               <LinkedInvoiceCard
                 linkedInvoice={quote.linked_invoice}
                 isConverting={isConvertingInvoice}
@@ -395,6 +398,16 @@ export function QuotePreview(): React.ReactElement {
               outcomeError={outcomeError}
               shareMessage={shareMessage}
             />
+
+            {quote && showDraftInvoicePromptBelowActions ? (
+              <LinkedInvoiceCard
+                linkedInvoice={quote.linked_invoice}
+                isConverting={isConvertingInvoice}
+                onConvert={onConvertToInvoice}
+                onOpenInvoice={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
+                lowEmphasis
+              />
+            ) : null}
 
             {deleteError ? (
               <div className="mx-4 mt-3">
