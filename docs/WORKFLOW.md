@@ -42,10 +42,10 @@ Every feature follows:
 Use this as the default human-in-the-loop sequence to reduce handoff overhead:
 
 1. Plan scope and choose mode (`single` by default; `gated`/`fast` only when explicitly requested).
-2. For issue-backed work (`single`/`gated`), run execution kickoff from `docs/template/KICKOFF.md` on the planned Task.
+2. For issue-backed work (`single`/`gated`), use the brief-first execution flow in `docs/template/KICKOFF.md`: keep the Task issue authoritative, add an Execution Brief only for task-local deltas, and reference analog docs when relevant.
 3. Open PR with `Closes #<task-id>`.
 4. Run one reviewer pass using the standardized prompt from `docs/template/KICKOFF.md`.
-5. If verdict is `ACTIONABLE`, patch in the implementation branch and rerun targeted verification only.
+5. If verdict is `ACTIONABLE`, use the delta-only patch handoff from `docs/template/KICKOFF.md` and rerun targeted verification only unless scope expands.
 6. When verdict is `APPROVED`, the approving reviewer includes the lightweight tutoring handoff in that same response; the implementation agent then finalizes without generating a second handoff.
 7. Merge PR and sync local branch.
 8. If this Task belongs to a Spec, check whether all sibling Tasks are now done or deferred; if so, close the Spec issue.

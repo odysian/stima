@@ -30,14 +30,18 @@ Read conditionally (only when relevant):
 - Canonical kickoff types:
   - Planning kickoff (issue planning only): `Run kickoff for feature <feature-id> from <filename> mode=<single|gated|fast>, planning-only (no code changes, no PR).`
   - Execution kickoff (implementation): `Run kickoff for existing Task #<task-id> mode=single.`
+  - If an Execution Brief exists, reference it after the Task prompt and use it as the working handoff; the GitHub Task issue remains authoritative.
   - If `mode` is omitted, default to `single`.
   - Do not switch to `gated` or `fast` unless explicitly requested.
   - Planning kickoff output: issue body file(s), `gh issue create` command(s) when applicable, created issue link(s), and a 3-5 step implementation plan.
   - Execution kickoff output: implementation + verification + PR + standardized reviewer follow-up prompt + final completion after explicit `APPROVED`, with the lightweight tutoring handoff generated once by the approving reviewer in that same response.
+  - Use `docs/template/KICKOFF.md` for the exact brief-first execution, delta-only patch, and reviewer prompt wording instead of restating stable repo rules in task-local prompts.
 
 ## Agent Operating Loop
 
-1. Whiteboard scope in `plans/YYYY-MM-DD/*.md` or spec docs (scratch only). New planning files should follow `plans/YYYY-MM-DD/<type>-<slug>.md`.
+1. Whiteboard scope under `plans/YYYY-MM-DD/` or in spec docs (scratch only). Many operators keep `plans/` uncommitted or sparse-commit to avoid bloating the remote; treat paths as local working artifacts unless you explicitly commit them.
+   - **Multi-artifact workstreams** (Spec + child Task bodies + optional Execution Briefs / kickoff scratch): use one folder per workstream, e.g. `plans/YYYY-MM-DD/<workstream-slug>/`, and keep `spec-*.md`, `task-*.md`, and brief files (e.g. `brief-<task-slug>.md` or `execution-brief-<task-slug>.md`) together. Use a stable hyphenated `workstream-slug` so `--body-file` paths stay copy-pasteable.
+   - **One-off scratch** (single note or one draft task body): a flat file `plans/YYYY-MM-DD/<type>-<slug>.md` is fine.
 2. Choose execution mode and create required issue(s) (`single` unless explicitly asked for `gated`/`fast`; `fast` can skip issue creation).
 3. Restate goal and acceptance criteria.
 4. Plan minimal files and scope.
