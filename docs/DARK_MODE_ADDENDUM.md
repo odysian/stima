@@ -41,13 +41,14 @@ These decisions are locked for implementation. Do not reopen them during executi
 - **Theme model:** `System / Light / Dark`
 - **Theme mechanism:** Option B, attribute toggle with OS fallback
 - **Theme application target:** set theme on the `<html>` element
-- **Toggle UI scope:** in scope for this task, implemented in Settings
-- **Toggle UI pattern:** use the segmented control pattern
+- **Theme control scope:** in scope for this task, implemented in Settings
+- **Theme control UI:** use a select/dropdown with `System default`, `Light`, and `Dark`
 - **Default behavior:** if no saved preference exists, follow `prefers-color-scheme`
 - **Persistence behavior:** store the user preference in `localStorage` under `stima-theme`; no server-side theme preference storage is used in this spec
 - **Invalid preference behavior:** missing, corrupted, or unexpected values in `stima-theme` are treated as `system`; implementations may also clear the invalid key after fallback
 - **System-mode live behavior:** while preference is `System`, the app should update live if the OS theme changes during an open session
 - **Boot behavior:** apply the effective theme before React mounts so the first paint uses the correct theme
+- **Settings mobile layout:** `First name` / `Last name` stays two columns on mobile; `Trade type` / `Tax rate` stays two columns on mobile
 - **Coverage boundary:** full shipped frontend surface, not Quotes-only
 - **Contrast rule:** dark `primary` may be brightened as needed so active text/icon use remains accessible on dark surfaces, subject to manual review
 
@@ -496,12 +497,12 @@ Rule:
 Dark mode is not complete without a user-facing way to switch themes.
 
 Rule:
-- add a theme preference control to Settings
-- use the segmented control pattern
-- offer exactly three options: `System`, `Light`, `Dark`
+- add a theme preference select to Settings
+- offer exactly three options: `System default`, `Light`, `Dark`
 - the control updates the saved preference and effective theme immediately
-- `System` clears the explicit override and returns control to `prefers-color-scheme`
-- the toggle UI is part of this task, not a follow-up
+- `System default` clears the explicit override and returns control to `prefers-color-scheme`
+- the Settings form keeps `First name` / `Last name` and `Trade type` / `Tax rate` as two-column mobile rows
+- the select UI is part of this task, not a follow-up
 
 Recommended neutral label:
 - `Theme`
@@ -535,7 +536,7 @@ A dark-mode pass should explicitly avoid these failure modes:
 
 ## 5.3 Quotes Screen Acceptance Snapshot
 For the Quotes screen to be accepted:
-- the segmented control active state is obvious within 1 second
+- the tab switcher active state is obvious within 1 second
 - the search field reads as a lower surface than the cards
 - each quote card is individually readable without borders
 - title/customer and amount dominate the first scan line
@@ -713,7 +714,7 @@ The reviewer should reject any implementation that:
 
 1. Add all dark token overrides in `frontend/src/index.css` under the chosen theme selector.
 2. Apply dark shadow overrides for `--shadow-ghost`, `--shadow-glass-top`, `--shadow-glass-bottom` in the same block.
-3. Add the Settings theme preference control with `System`, `Light`, and `Dark`, wired to persisted preference and immediate theme application.
+3. Add the Settings theme preference select with `System default`, `Light`, and `Dark`, wired to persisted preference and immediate theme application.
 4. Update shared primitives (`ScreenHeader`, `ScreenFooter`, `BottomNav`, shared buttons, shared feedback, shared modal shell, shared inputs/surfaces) to reference the new CSS shadow classes and token-safe fills.
 5. Calibrate the Quotes screen until the surface ladder is clearly readable.
 6. Propagate token-correct fixes across the full coverage matrix in §7.7, including public/auth surfaces and state variants.
@@ -744,17 +745,17 @@ Dark mode is ready for review when all of the following are true:
 - neutral surfaces remain neutral
 
 ## 9.4 Quotes Screen Readability
-- segmented control active state is obvious
+- tab switcher active state is obvious
 - search field reads as recessed
 - cards are readable at a glance
 - metadata remains legible
 - FAB is strongest action cue
 
 ## 9.5 Theme Preference Behavior
-- Settings includes a `Theme` control with `System`, `Light`, and `Dark`
+- Settings includes a `Theme` select with `System default`, `Light`, and `Dark`
 - changing the preference updates the effective theme immediately
 - saved preference is reapplied on reload
-- `System` follows `prefers-color-scheme`
+- `System default` follows `prefers-color-scheme`
 - first paint uses the correct effective theme with no visible flash
 - `color-scheme` matches the effective theme
 
