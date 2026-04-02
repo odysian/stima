@@ -231,6 +231,17 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.queryByRole("button", { name: /resend email/i })).not.toBeInTheDocument();
   });
 
+  it("keeps the utility row single-column when email actions are unavailable", async () => {
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Spring cleanup" });
+
+    const utilities = screen.getByRole("group", { name: /invoice utilities/i });
+    expect(utilities).toHaveClass("grid-cols-1");
+    expect(utilities).not.toHaveClass("grid-cols-2");
+    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+  });
+
   it("disables the email action and shows a hint when the customer email is missing", async () => {
     mockedInvoiceService.getInvoice.mockResolvedValueOnce(
       makeInvoiceDetail({
