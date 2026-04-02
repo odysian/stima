@@ -409,22 +409,16 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Business Profile")).toBeInTheDocument();
-    expect(screen.getByTestId("settings-logo-row")).toHaveClass(
+    expect(screen.getByTestId("settings-logo-block")).toHaveClass(
       "rounded-xl",
       "bg-surface-container-low",
       "p-4",
     );
-    expect(screen.getByTestId("settings-logo-row-grid")).toHaveClass(
-      "grid",
-      "grid-cols-[minmax(0,1fr)_120px]",
-      "items-start",
-      "gap-4",
-    );
-    const previewFrame = await screen.findByTestId("settings-logo-preview-frame");
-    expect(previewFrame).toHaveClass(
-      "h-[84px]",
-      "w-[120px]",
-      "rounded-lg",
+    const previewTile = await screen.findByTestId("settings-logo-preview-tile");
+    expect(previewTile).toHaveClass(
+      "h-[136px]",
+      "w-[136px]",
+      "rounded-xl",
       "bg-surface-container-lowest",
     );
     expect(await screen.findByAltText(/business logo preview/i)).toHaveClass(
@@ -443,25 +437,19 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Business Profile")).toBeInTheDocument();
-    expect(screen.getByTestId("settings-logo-row")).toHaveClass(
+    expect(screen.getByTestId("settings-logo-block")).toHaveClass(
       "rounded-xl",
       "bg-surface-container-low",
       "p-4",
     );
-    expect(screen.getByTestId("settings-logo-row-grid")).toHaveClass(
-      "grid",
-      "grid-cols-[minmax(0,1fr)_120px]",
-      "items-start",
-      "gap-4",
-    );
-    const previewFrame = await screen.findByTestId("settings-logo-preview-frame");
-    expect(previewFrame).toHaveClass(
-      "h-[84px]",
-      "w-[120px]",
-      "rounded-lg",
+    const previewTile = await screen.findByTestId("settings-logo-preview-tile");
+    expect(previewTile).toHaveClass(
+      "h-[136px]",
+      "w-[136px]",
+      "rounded-xl",
       "bg-surface-container-lowest",
     );
-    expect(within(previewFrame).getByText("No logo")).toBeInTheDocument();
+    expect(within(previewTile).getByText("No logo")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
@@ -517,10 +505,10 @@ describe("SettingsScreen", () => {
     await waitFor(() => expect(mockedProfileService.deleteLogo).toHaveBeenCalledTimes(1));
     await waitFor(() => {
       expect(screen.queryByAltText(/business logo preview/i)).not.toBeInTheDocument();
-      expect(screen.getByTestId("settings-logo-preview-frame")).toHaveClass(
-        "h-[84px]",
-        "w-[120px]",
-        "rounded-lg",
+      expect(screen.getByTestId("settings-logo-preview-tile")).toHaveClass(
+        "h-[136px]",
+        "w-[136px]",
+        "rounded-xl",
         "bg-surface-container-lowest",
       );
       expect(screen.getByText("No logo")).toBeInTheDocument();

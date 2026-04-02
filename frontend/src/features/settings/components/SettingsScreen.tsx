@@ -201,76 +201,65 @@ export function SettingsScreen(): React.ReactElement {
 
               <div className="mt-4 flex flex-col gap-4">
                 <div
-                  data-testid="settings-logo-row"
+                  data-testid="settings-logo-block"
                   className="rounded-xl bg-surface-container-low p-4"
                 >
-                  <div
-                    data-testid="settings-logo-row-grid"
-                    className="grid grid-cols-[minmax(0,1fr)_120px] items-start gap-4"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-col gap-3">
-                        <div className="space-y-1">
-                          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                            Logo
-                          </p>
-                          <p className="text-xs text-on-surface-variant">
-                            JPEG or PNG, up to 2 MB. Appears on quote PDFs.
-                          </p>
-                        </div>
-
-                        <div className="flex flex-col items-start gap-3">
-                          <label
-                            htmlFor="settings-logo-upload"
-                            className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
-                          >
-                            Upload Logo
-                          </label>
-                          <input
-                            id="settings-logo-upload"
-                            type="file"
-                            accept="image/jpeg,image/png"
-                            className="sr-only"
-                            disabled={isLogoSubmitting}
-                            onChange={onLogoUpload}
-                          />
-                          {hasLogo ? (
-                            <button
-                              type="button"
-                              className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                              disabled={isLogoSubmitting}
-                              onClick={() => setIsRemoveLogoOpen(true)}
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </div>
-
-                        {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
-                      </div>
+                  <div className="flex flex-col gap-3">
+                    <div className="space-y-1">
+                      <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                        Logo
+                      </p>
+                      <p className="text-xs text-on-surface-variant">
+                        JPEG or PNG, up to 2 MB. Appears on quote PDFs.
+                      </p>
                     </div>
 
-                    <div className="flex justify-end">
-                      <div
-                        data-testid="settings-logo-preview-frame"
-                        className="h-[84px] w-[120px] rounded-lg bg-surface-container-lowest"
-                      >
+                    <div
+                      data-testid="settings-logo-preview-tile"
+                      className="flex h-[136px] w-[136px] rounded-xl bg-surface-container-lowest p-2"
+                    >
+                      <div className="flex h-full w-full items-center justify-center rounded-lg bg-surface-container p-2">
                         {hasLogo ? (
-                          <div className="flex h-full items-center justify-center p-3">
-                            <img
-                              key={logoPreviewVersion}
-                              src={logoPreviewSrc}
-                              alt="Business logo preview"
-                              className="max-h-full max-w-full object-contain"
-                            />
-                          </div>
+                          <img
+                            key={logoPreviewVersion}
+                            src={logoPreviewSrc}
+                            alt="Business logo preview"
+                            className="max-h-full max-w-full object-contain"
+                          />
                         ) : (
-                          <div className="flex h-full items-center justify-center p-3">
-                            <p className="text-xs text-on-surface-variant">No logo</p>
-                          </div>
+                          <p className="text-xs text-on-surface-variant">No logo</p>
                         )}
                       </div>
                     </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      <label
+                        htmlFor="settings-logo-upload"
+                        className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+                      >
+                        Upload Logo
+                      </label>
+                      <input
+                        id="settings-logo-upload"
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        className="sr-only"
+                        disabled={isLogoSubmitting}
+                        onChange={onLogoUpload}
+                      />
+                      {hasLogo ? (
+                        <button
+                          type="button"
+                          className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={isLogoSubmitting}
+                          onClick={() => setIsRemoveLogoOpen(true)}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
                   </div>
                 </div>
 
