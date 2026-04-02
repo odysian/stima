@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { InvoiceEditScreen } from "@/features/invoices/components/InvoiceEditScreen";
 import type { InvoiceEditDraft } from "@/features/invoices/hooks/useInvoiceEdit";
-import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { Invoice, InvoiceDetail } from "@/features/invoices/types/invoice.types";
 
@@ -424,15 +423,24 @@ describe("InvoiceEditScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1", { replace: true });
   });
 
-  it("exits home from the workflow header without clearing the draft", async () => {
-    window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
+  it("shows and dismisses the TBD pricing banner near line items without rendering the header exit button", async () => {
+    window.sessionStorage.setItem(
+      EDIT_STORAGE_KEY,
+      JSON.stringify(
+        makeDraft({
+          lineItems: [{ description: "Brown mulch", details: "5 yards", price: null }],
+        }),
+      ),
+    );
 
     renderScreen();
 
     await screen.findByRole("heading", { name: "I-001" });
-    fireEvent.click(screen.getByRole("button", { name: /exit to home/i }));
+    expect(screen.getByText(/the invoice will show "TBD" for those items/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /exit to home/i })).not.toBeInTheDocument();
 
-    expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).not.toBeNull();
-    expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
+    fireEvent.click(screen.getByRole("button", { name: /dismiss tbd pricing hint/i }));
+
+    expect(screen.queryByText(/the invoice will show "TBD" for those items/i)).not.toBeInTheDocument();
   });
 });

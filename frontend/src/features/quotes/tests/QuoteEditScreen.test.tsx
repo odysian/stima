@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QuoteEditScreen } from "@/features/quotes/components/QuoteEditScreen";
 import type { QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
-import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 
@@ -356,15 +355,24 @@ describe("QuoteEditScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview", { replace: true });
   });
 
-  it("exits home from the workflow header without clearing the draft", async () => {
-    window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
+  it("shows and dismisses the TBD pricing banner near line items without rendering the header exit button", async () => {
+    window.sessionStorage.setItem(
+      EDIT_STORAGE_KEY,
+      JSON.stringify(
+        makeDraft({
+          lineItems: [{ description: "Brown mulch", details: "5 yards", price: null }],
+        }),
+      ),
+    );
 
     renderScreen();
 
     await screen.findByRole("heading", { name: "Q-001" });
-    fireEvent.click(screen.getByRole("button", { name: /exit to home/i }));
+    expect(screen.getByText(/the quote will show "TBD" for those items/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /exit to home/i })).not.toBeInTheDocument();
 
-    expect(window.sessionStorage.getItem(EDIT_STORAGE_KEY)).not.toBeNull();
-    expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
+    fireEvent.click(screen.getByRole("button", { name: /dismiss tbd pricing hint/i }));
+
+    expect(screen.queryByText(/the quote will show "TBD" for those items/i)).not.toBeInTheDocument();
   });
 });

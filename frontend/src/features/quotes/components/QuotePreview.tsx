@@ -7,12 +7,10 @@ import { QuotePreviewHeaderActions } from "@/features/quotes/components/QuotePre
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
 import { QuotePreviewDialogs } from "@/features/quotes/components/QuotePreviewDialogs";
-import { QuotePreviewStatusRow } from "@/features/quotes/components/QuotePreviewStatusRow";
 import {
   buildOverflowItems,
   canNavigateBack,
   getEmailActionLabel,
-  getCompactStatusRow,
   getSendEmailErrorMessage,
   isShareAbortError,
   readOptionalQuoteText,
@@ -70,12 +68,9 @@ export function QuotePreview(): React.ReactElement {
   const quoteTitle = readOptionalQuoteText(quote, "title");
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
-  const clientContact =
-    [readOptionalQuoteText(quote, "customer_email"), readOptionalQuoteText(quote, "customer_phone")]
-      .map((value) => value?.trim())
-      .filter((value): value is string => Boolean(value))
-      .join(" \u00b7 ") || "No contact details";
-  const compactStatusRow = getCompactStatusRow(actionState, quote, hasLocalPdf);
+  const clientContact = readOptionalQuoteText(quote, "customer_phone")
+    ?? readOptionalQuoteText(quote, "customer_email")
+    ?? "No contact details";
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
   const showDraftInvoicePromptBelowActions = Boolean(
     quote && actionState === "draft" && !quote.linked_invoice,
@@ -355,10 +350,9 @@ export function QuotePreview(): React.ReactElement {
 
         {!isLoadingQuote && !loadError ? (
           <>
-            {compactStatusRow ? <QuotePreviewStatusRow row={compactStatusRow} /> : null}
-
             {quote ? (
               <QuoteDetailsCard
+                documentLabel="QUOTE"
                 totalAmount={quote.total_amount}
                 taxRate={quote.tax_rate}
                 discountType={quote.discount_type}

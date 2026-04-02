@@ -1,18 +1,8 @@
 import type { QuoteDetail, QuoteStatus } from "@/features/quotes/types/quote.types";
 import type { OverflowMenuItem } from "@/shared/components/OverflowMenu";
 import { isHttpRequestError } from "@/shared/lib/http";
-import { formatDate } from "@/shared/lib/formatters";
 
 export type QuotePreviewActionState = QuoteStatus;
-
-export interface QuotePreviewStatusRowModel {
-  icon: string;
-  iconClasses: string;
-  text: string;
-  timestamp: string | null;
-  timestampLabel?: string;
-  timestampValue?: string;
-}
 
 export function isShareAbortError(error: unknown): boolean {
   return (
@@ -67,7 +57,7 @@ export function resolveActionState(
 
 export function getEmailActionLabel(actionState: QuotePreviewActionState): string | null {
   if (actionState === "ready") {
-    return "Send by Email";
+    return "Send Email";
   }
   if (
     actionState === "shared"
@@ -102,62 +92,6 @@ export function getSendEmailErrorMessage(error: unknown): string {
   }
 
   return error instanceof Error ? error.message : "Unable to send quote email";
-}
-
-export function getCompactStatusRow(
-  actionState: QuotePreviewActionState,
-  quote: QuoteDetail | null,
-  hasLocalPdf: boolean,
-): QuotePreviewStatusRowModel | null {
-  if (actionState === "draft" || !quote) {
-    return null;
-  }
-
-  if (actionState === "ready") {
-    return {
-      icon: "description",
-      iconClasses: "bg-success-container text-success",
-      text: hasLocalPdf ? "PDF generated on this device" : "Quote ready to share",
-      timestamp: null,
-    };
-  }
-
-  if (actionState === "shared") {
-    const timestampValue = quote.shared_at ?? quote.updated_at;
-    return {
-      icon: "ios_share",
-      iconClasses: "bg-info-container text-info",
-      text: "Quote shared",
-      timestamp: formatDate(timestampValue),
-      timestampLabel: "Shared",
-      timestampValue,
-    };
-  }
-
-  if (actionState === "viewed") {
-    return {
-      icon: "visibility",
-      iconClasses: "bg-warning-container text-warning",
-      text: "Customer viewed this quote",
-      timestamp: null,
-    };
-  }
-
-  if (actionState === "approved") {
-    return {
-      icon: "check_circle",
-      iconClasses: "bg-success-container text-success",
-      text: "Quote marked as won",
-      timestamp: null,
-    };
-  }
-
-  return {
-    icon: "cancel",
-    iconClasses: "bg-error-container text-error",
-    text: "Quote marked as lost",
-    timestamp: null,
-  };
 }
 
 interface BuildOverflowItemsArgs {

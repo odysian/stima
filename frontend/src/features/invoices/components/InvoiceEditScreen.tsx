@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { useInvoiceEdit, type InvoiceEditDraft } from "@/features/invoices/hooks/useInvoiceEdit";
@@ -12,6 +11,7 @@ import type { LineItemDraft, LineItemDraftWithFlags } from "@/features/quotes/ty
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { OptionalPricingBanner } from "@/shared/components/OptionalPricingBanner";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import {
@@ -85,6 +85,7 @@ export function InvoiceEditScreen(): React.ReactElement {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [shouldSkipSeeding, setShouldSkipSeeding] = useState(false);
+  const [isTbdHintDismissed, setIsTbdHintDismissed] = useState(false);
 
   useEffect(() => {
     setShouldSkipSeeding(false);
@@ -165,6 +166,12 @@ export function InvoiceEditScreen(): React.ReactElement {
       ? `${invoice.doc_number} · INVOICE EDITOR`
       : "INVOICE EDITOR"
     : undefined;
+
+  useEffect(() => {
+    if (!hasNullPrices) {
+      setIsTbdHintDismissed(false);
+    }
+  }, [hasNullPrices]);
 
   function updateDraft(updater: (current: InvoiceEditDraft) => InvoiceEditDraft): void {
     if (!currentDraft) {
@@ -254,7 +261,6 @@ export function InvoiceEditScreen(): React.ReactElement {
         subtitle={headerSubtitle}
         backLabel="Cancel edit"
         onBack={onCancel}
-        onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
 
       <form
@@ -330,6 +336,13 @@ export function InvoiceEditScreen(): React.ReactElement {
                 {currentDraft.lineItems.length} ITEMS
               </span>
             </div>
+
+            {hasNullPrices && !isTbdHintDismissed ? (
+              <OptionalPricingBanner
+                message={"Some line items have no price — the invoice will show \"TBD\" for those items."}
+                onDismiss={() => setIsTbdHintDismissed(true)}
+              />
+            ) : null}
 
             <div className="space-y-2.5">
               {currentDraft.lineItems.length > 0 ? (
@@ -411,11 +424,6 @@ export function InvoiceEditScreen(): React.ReactElement {
 
       <ScreenFooter>
         <div className="mx-auto w-full max-w-2xl">
-          {hasNullPrices ? (
-            <p className="mb-2 rounded-lg bg-warning-container px-3 py-2 text-center text-xs text-warning">
-              Some line items have no price — the invoice will show "TBD" for those items.
-            </p>
-          ) : null}
           <div className="flex flex-col gap-3">
             <Button
               type="submit"

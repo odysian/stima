@@ -6,7 +6,7 @@ import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewAc
 
 function makeProps(overrides: Partial<ComponentProps<typeof QuotePreviewActions>> = {}) {
   return {
-    emailActionLabel: "Send by Email",
+    emailActionLabel: "Send Email",
     hasCustomerEmail: true,
     onGeneratePdf: vi.fn().mockResolvedValue(undefined),
     onRequestSendEmail: vi.fn(),
@@ -55,8 +55,9 @@ describe("QuotePreviewActions", () => {
 
     expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
     const utilities = screen.getByRole("group", { name: /quote utilities/i });
-    expect(within(utilities).getByRole("button", { name: /send by email/i })).toBeInTheDocument();
+    expect(within(utilities).getByRole("button", { name: /send email/i })).toBeInTheDocument();
     expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+    expect(utilities).toHaveClass("grid-cols-2");
   });
 
   it("renders open pdf as primary with resend and copy utilities for shared quotes", () => {
@@ -101,7 +102,7 @@ describe("QuotePreviewActions", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /send by email/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /send email/i })).toBeDisabled();
     expect(screen.getByText(/add a customer email/i)).toBeInTheDocument();
   });
 
@@ -156,7 +157,7 @@ describe("QuotePreviewActions", () => {
 
     fireEvent.click(
       within(screen.getByRole("group", { name: /quote utilities/i })).getByRole("button", {
-        name: /send by email/i,
+        name: /send email/i,
       }),
     );
 

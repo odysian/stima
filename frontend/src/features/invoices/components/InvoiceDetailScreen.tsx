@@ -14,6 +14,9 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatDate } from "@/shared/lib/formatters";
 
+const primaryActionClassName = "forest-gradient inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
+const utilityButtonClassName = "inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+
 export function InvoiceDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -81,19 +84,15 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const hasCustomerEmail = Boolean(invoice?.customer.email?.trim());
   const canEdit = Boolean(invoice && id && isInvoiceEditableStatus(invoice.status));
   const emailActionLabel = (
-    invoice?.status === "ready" ? "Send by Email"
-      : invoice?.status === "sent" ? "Resend by Email"
+    invoice?.status === "ready" ? "Send Email"
+      : invoice?.status === "sent" ? "Resend Email"
         : null
   );
-  const utilityButtonCount = (hasSourceQuote ? 1 : 0) + 1 + (emailActionLabel ? 1 : 0);
-  const utilityGridClassName = (
-    utilityButtonCount >= 2 ? "grid grid-cols-1 gap-2 sm:grid-cols-2" : "grid grid-cols-1 gap-2"
-  );
-  const clientContact =
-    [invoice?.customer.email, invoice?.customer.phone]
-      .map((value) => value?.trim())
-      .filter((value): value is string => Boolean(value))
-      .join(" · ") || "No contact details";
+  const utilityGridClassName = emailActionLabel ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2";
+  const shouldRenderNotes = Boolean(invoice?.notes?.trim());
+  const clientContact = invoice?.customer.phone?.trim()
+    || invoice?.customer.email?.trim()
+    || "No contact details";
   function invalidateLocalPdf(): void {
     setPdfUrl(null);
   }
@@ -260,6 +259,18 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
         {!isLoadingInvoice && !loadError && invoice ? (
           <>
+            <QuoteDetailsCard
+              documentLabel="INVOICE"
+              totalAmount={invoice.total_amount}
+              taxRate={invoice.tax_rate}
+              discountType={invoice.discount_type}
+              discountValue={invoice.discount_value}
+              depositAmount={invoice.deposit_amount}
+              lineItemPrices={invoice.line_items.map((lineItem) => lineItem.price)}
+              clientName={invoice.customer.name}
+              clientContact={clientContact}
+            />
+
             <section className="mt-4 px-4">
               <div className="ghost-shadow rounded-lg border border-outline/40 bg-surface-container-lowest p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -272,21 +283,21 @@ export function InvoiceDetailScreen(): React.ReactElement {
                         ? `Created from quote ${invoice.source_quote_number} on ${formatDate(invoice.created_at)}`
                         : `Created on ${formatDate(invoice.created_at)}`}
                     </p>
+                    {hasSourceQuote ? (
+                      <button
+                        type="button"
+                        className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary"
+                        aria-label={`Open quote ${invoice.source_quote_number}`}
+                        onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
+                      >
+                        Open quote
+                        <span className="material-symbols-outlined text-base">arrow_forward</span>
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>
             </section>
-
-            <QuoteDetailsCard
-              totalAmount={invoice.total_amount}
-              taxRate={invoice.tax_rate}
-              discountType={invoice.discount_type}
-              discountValue={invoice.discount_value}
-              depositAmount={invoice.deposit_amount}
-              lineItemPrices={invoice.line_items.map((lineItem) => lineItem.price)}
-              clientName={invoice.customer.name}
-              clientContact={clientContact}
-            />
             <QuoteLineItemsSection lineItems={invoice.line_items} />
 
             <section className="px-4 pb-2">
@@ -300,16 +311,18 @@ export function InvoiceDetailScreen(): React.ReactElement {
               </div>
             </section>
 
-            <section className="px-4 pb-2">
-              <div className="rounded-lg bg-surface-container-low p-4">
-                <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                  Customer Notes
-                </p>
-                <p className="mt-3 whitespace-pre-wrap text-sm text-on-surface-variant">
-                  {invoice.notes?.trim() ? invoice.notes : "No customer notes"}
-                </p>
-              </div>
-            </section>
+            {shouldRenderNotes ? (
+              <section className="px-4 pb-2">
+                <div className="rounded-lg bg-surface-container-low p-4">
+                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                    Customer Notes
+                  </p>
+                  <p className="mt-3 whitespace-pre-wrap text-sm text-on-surface-variant">
+                    {invoice.notes}
+                  </p>
+                </div>
+              </section>
+            ) : null}
 
             <section className="mt-4 px-4" aria-label="Invoice actions">
               <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
@@ -318,7 +331,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     href={openPdfUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="forest-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]"
+                    className={primaryActionClassName}
                   >
                     <span className="material-symbols-outlined text-base">open_in_new</span>
                     Open PDF
@@ -326,7 +339,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 ) : (
                   <Button
                     type="button"
-                    className="w-full"
+                    className="min-h-14 w-full"
                     disabled={isSharing || isSendingEmail}
                     onClick={() => {
                       void onGeneratePdf();
@@ -341,7 +354,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   {emailActionLabel ? (
                     <button
                       type="button"
-                      className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                      className={utilityButtonClassName}
                       disabled={!hasCustomerEmail || isGeneratingPdf || isSharing || isSendingEmail}
                       onClick={onRequestSendEmail}
                     >
@@ -350,20 +363,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     </button>
                   ) : null}
 
-                  {hasSourceQuote ? (
-                    <button
-                      type="button"
-                      className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98]"
-                      onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
-                    >
-                      <span className="material-symbols-outlined text-base">arrow_back</span>
-                      Back to {invoice.source_quote_number}
-                    </button>
-                  ) : null}
-
                   <button
                     type="button"
-                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                    className={utilityButtonClassName}
                     disabled={isSharing || isGeneratingPdf || isSendingEmail}
                     onClick={() => {
                       void onCopyLink();
@@ -378,7 +380,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
             {!hasCustomerEmail && emailActionLabel ? (
               <p className="mx-4 mt-3 text-sm text-on-surface-variant">
-                Add a customer email to send this invoice by email. Copy Link still works.
+                Add a customer email to send this invoice via email. Copy Link still works.
               </p>
             ) : null}
 

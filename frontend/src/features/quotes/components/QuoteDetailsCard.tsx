@@ -3,6 +3,7 @@ import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum, type DiscountType } from "@/shared/lib/pricing";
 
 interface QuoteDetailsCardProps {
+  documentLabel: "QUOTE" | "INVOICE";
   totalAmount: number | null;
   taxRate: number | null;
   discountType: DiscountType | null;
@@ -14,6 +15,7 @@ interface QuoteDetailsCardProps {
 }
 
 export function QuoteDetailsCard({
+  documentLabel,
   totalAmount,
   taxRate,
   discountType,
@@ -37,18 +39,27 @@ export function QuoteDetailsCard({
   return (
     <div className="mt-4 px-4 pb-6">
       <section className="ghost-shadow rounded-lg border-l-4 border-primary bg-surface-container-lowest p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3">
+          <div className="min-w-0">
             <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">CLIENT</h2>
-            <p className="mt-2 font-bold text-on-surface">{clientName}</p>
+          </div>
+
+          <div className="justify-self-end text-right">
+            <p className="font-headline text-[1.625rem] font-bold leading-none tracking-[0.12em] text-on-surface sm:text-[1.75rem]">
+              {documentLabel}
+            </p>
+          </div>
+
+          <div className="min-w-0">
+            <p className="font-bold text-on-surface">{clientName}</p>
             <p className="mt-1 text-sm text-on-surface-variant">{clientContact}</p>
           </div>
 
-          <div className="shrink-0 text-right">
+          <div className="self-end justify-self-end text-right">
             <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
               {pricingBreakdown.hasPricingBreakdown ? "TOTAL" : "TOTAL AMOUNT"}
             </h2>
-            <p className="mt-2 font-headline text-2xl font-bold text-primary">
+            <p className="mt-1 font-headline text-2xl font-bold text-primary">
               {formatCurrency(totalAmount)}
             </p>
           </div>
