@@ -79,7 +79,7 @@ export function QuotePreviewActions({
     return (
       <button
         type="button"
-        className={utilityButtonClasses}
+        className={secondaryButtonClasses}
         disabled={
           disabled
           || isGeneratingPdf
@@ -92,8 +92,8 @@ export function QuotePreviewActions({
           void onGeneratePdf();
         }}
       >
-        <span className="material-symbols-outlined text-base">open_in_new</span>
-        Open PDF
+        <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+        Generate PDF
       </button>
     );
   }

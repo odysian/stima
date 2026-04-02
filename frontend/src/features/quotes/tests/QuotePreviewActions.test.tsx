@@ -41,8 +41,7 @@ describe("QuotePreviewActions", () => {
     expect(screen.getByRole("button", { name: /send by email/i })).toBeInTheDocument();
     const utilities = screen.getByRole("group", { name: /quote utilities/i });
     expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(within(utilities).getByRole("button", { name: /open pdf/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
+    expect(within(utilities).getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
   });
 
   it("renders send by email, copy link, and open pdf for ready quotes", () => {
@@ -57,7 +56,7 @@ describe("QuotePreviewActions", () => {
 
     expect(screen.getByRole("button", { name: /send by email/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /open pdf/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
   });
 
   it("renders resend email, copy link, and open pdf for shared quotes", () => {

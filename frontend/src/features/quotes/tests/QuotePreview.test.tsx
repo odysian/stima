@@ -391,8 +391,8 @@ describe("QuotePreview", () => {
     expect(screen.getByText("Quote ready to share")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send by email/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /open pdf/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open pdf/i })).not.toBeInTheDocument();
   });
 
   it("renders quote title as the primary header when present", async () => {
@@ -625,14 +625,14 @@ describe("QuotePreview", () => {
     expect(lineItemsHeading.compareDocumentPosition(primaryAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("keeps copy/open utilities available while generating a PDF from draft", async () => {
+  it("keeps copy/generate utilities available while generating a PDF from draft", async () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
     expect(screen.getByRole("button", { name: /send by email/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /copy link/i })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /open pdf/i }));
+    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
@@ -657,7 +657,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    fireEvent.click(screen.getByRole("button", { name: /open pdf/i }));
+    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
@@ -676,7 +676,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    fireEvent.click(screen.getByRole("button", { name: /open pdf/i }));
+    fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     expect(screen.getByRole("status")).toHaveTextContent("Generating PDF preview. This can take a few moments.");
 
