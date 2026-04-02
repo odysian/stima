@@ -37,6 +37,7 @@ export function DocumentActionSurface({
   feedback,
 }: DocumentActionSurfaceProps): React.ReactElement {
   const shouldRenderUtilities = utilityActions !== null && utilityActions !== undefined;
+  const utilityAccessibilityProps = utilityLabel ? { "aria-label": utilityLabel } : {};
 
   return (
     <>
@@ -44,10 +45,10 @@ export function DocumentActionSurface({
         <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
           {primaryAction}
 
-          {shouldRenderUtilities && utilityLabel ? (
+          {shouldRenderUtilities ? (
             <div
               role="group"
-              aria-label={utilityLabel}
+              {...utilityAccessibilityProps}
               className={`mt-3 ${utilityGridClassNames[utilityColumns]}`}
             >
               {utilityActions}
