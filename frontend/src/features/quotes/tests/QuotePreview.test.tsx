@@ -204,7 +204,7 @@ describe("QuotePreview", () => {
   });
 
   it.each(["approved", "declined"] as const)(
-    "keeps edit available and shows resend actions when the quote is %s",
+    "keeps edit, outcome actions, and resend actions available when the quote is %s",
     async (status) => {
       mockedQuoteService.getQuote.mockResolvedValueOnce(
         makeQuoteDetail({
@@ -218,52 +218,58 @@ describe("QuotePreview", () => {
 
       await screen.findByRole("heading", { name: "Test Customer" });
       expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /more actions/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
     },
   );
 
-  it("shows convert to invoice only for approved quotes without a linked invoice", async () => {
+  it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
+    "shows convert to invoice for %s quotes without a linked invoice",
+    async (status) => {
+      mockedQuoteService.getQuote.mockResolvedValueOnce(
+        makeQuoteDetail({ status, share_token: "share-token-1" }),
+      );
+
+      renderScreen();
+
+      await screen.findByRole("heading", { name: "Test Customer" });
+      expect(screen.getByRole("button", { name: /convert to invoice/i })).toBeInTheDocument();
+      expect(screen.getByText("No invoice yet")).toBeInTheDocument();
+    },
+  );
+
+  it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
+    "shows the linked invoice summary when a %s quote already has one",
+    async (status) => {
+      mockedQuoteService.getQuote.mockResolvedValueOnce(
+        makeQuoteDetail({
+          status,
+          share_token: "share-token-1",
+          linked_invoice: {
+            id: "invoice-1",
+            doc_number: "I-001",
+            status: "sent",
+            due_date: "2026-04-19",
+            total_amount: 120,
+            created_at: "2026-03-20T00:00:00.000Z",
+          },
+        }),
+      );
+
+      renderScreen();
+
+      await screen.findByRole("heading", { name: "Test Customer" });
+      expect(screen.getByText("I-001")).toBeInTheDocument();
+      expect(screen.getByText("Sent")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /open invoice/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /convert to invoice/i })).not.toBeInTheDocument();
+    },
+  );
+
+  it("converts a draft quote to an invoice and navigates to the invoice detail screen", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "approved", share_token: "share-token-1" }),
-    );
-
-    renderScreen();
-
-    await screen.findByRole("heading", { name: "Test Customer" });
-    expect(screen.getByRole("button", { name: /convert to invoice/i })).toBeInTheDocument();
-    expect(screen.getByText("No invoice yet")).toBeInTheDocument();
-  });
-
-  it("shows the linked invoice summary when the approved quote already has one", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({
-        status: "approved",
-        share_token: "share-token-1",
-        linked_invoice: {
-          id: "invoice-1",
-          doc_number: "I-001",
-          status: "sent",
-          due_date: "2026-04-19",
-          total_amount: 120,
-          created_at: "2026-03-20T00:00:00.000Z",
-        },
-      }),
-    );
-
-    renderScreen();
-
-    await screen.findByRole("heading", { name: "Test Customer" });
-    expect(screen.getByText("I-001")).toBeInTheDocument();
-    expect(screen.getByText("Sent")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /open invoice/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /convert to invoice/i })).not.toBeInTheDocument();
-  });
-
-  it("converts an approved quote to an invoice and navigates to the invoice detail screen", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "approved", share_token: "share-token-1" }),
+      makeQuoteDetail({ status: "draft", share_token: "share-token-1" }),
     );
 
     renderScreen();
@@ -279,10 +285,10 @@ describe("QuotePreview", () => {
 
   it("recovers from duplicate invoice conflicts using structured HTTP errors", async () => {
     mockedQuoteService.getQuote
-      .mockResolvedValueOnce(makeQuoteDetail({ status: "approved", share_token: "share-token-1" }))
+      .mockResolvedValueOnce(makeQuoteDetail({ status: "declined", share_token: "share-token-1" }))
       .mockResolvedValueOnce(
         makeQuoteDetail({
-          status: "approved",
+          status: "declined",
           linked_invoice: {
             id: "invoice-1",
             doc_number: "I-001",
@@ -459,7 +465,7 @@ describe("QuotePreview", () => {
     });
 
     expect(await screen.findByText("Quote marked as won")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /more actions/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
   });
 
@@ -493,7 +499,7 @@ describe("QuotePreview", () => {
     });
 
     expect(await screen.findByText("Quote marked as lost")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /more actions/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
   });
 

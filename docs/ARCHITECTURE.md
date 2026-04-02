@@ -219,9 +219,9 @@ Rules:
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes, or `404 { detail: "Not found" }` |
 | `/quotes/{id}/share` | POST | yes | cookie | — | `200 Quote`; returns existing quote unchanged when status is already `viewed`, `approved`, or `declined` |
 | `/quotes/{id}/send-email` | POST | yes | cookie | — | `200 Quote` after ensuring the quote is shared and emailing the customer link, `404` when quote is missing/not owned, `409` when still `draft`, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
-| `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
-| `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409` when quote is still `draft`/`ready` or already finalized |
-| `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "Only approved quotes can be converted to invoices" \| "An invoice already exists for this quote" }` |
+| `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
+| `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
+| `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "An invoice already exists for this quote" }` |
 
 ### Invoice endpoints (`/api/invoices`)
 

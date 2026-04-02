@@ -190,6 +190,19 @@ export function buildOverflowItems({
         disabled: isBusy,
         onSelect: onDeleteRequest,
       },
+      {
+        label: "Mark as Won",
+        icon: "check_circle",
+        disabled: isBusy,
+        onSelect: onMarkWonRequest,
+      },
+      {
+        label: "Mark as Lost",
+        icon: "cancel",
+        tone: "destructive",
+        disabled: isBusy,
+        onSelect: onMarkLostRequest,
+      },
     ];
   }
 
@@ -202,10 +215,28 @@ export function buildOverflowItems({
         disabled: isBusy,
         onSelect: onDeleteRequest,
       },
+      {
+        label: "Mark as Won",
+        icon: "check_circle",
+        disabled: isBusy,
+        onSelect: onMarkWonRequest,
+      },
+      {
+        label: "Mark as Lost",
+        icon: "cancel",
+        tone: "destructive",
+        disabled: isBusy,
+        onSelect: onMarkLostRequest,
+      },
     ];
   }
 
-  if (actionState === "shared" || actionState === "viewed") {
+  if (
+    actionState === "shared"
+    || actionState === "viewed"
+    || actionState === "approved"
+    || actionState === "declined"
+  ) {
     return [
       {
         label: "Mark as Won",

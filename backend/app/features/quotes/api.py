@@ -243,7 +243,7 @@ async def convert_quote_to_invoice(
     user: Annotated[User, Depends(get_current_user)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
 ) -> InvoiceResponse:
-    """Convert an approved quote into a linked invoice."""
+    """Convert a quote into a linked invoice unless one already exists."""
     try:
         invoice = await invoice_service.convert_quote_to_invoice(user, quote_id)
     except QuoteServiceError as exc:
@@ -324,7 +324,7 @@ async def mark_quote_won(
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
 ) -> QuoteResponse:
-    """Record a contractor-confirmed won quote outcome."""
+    """Record a contractor-controlled won quote outcome."""
     try:
         quote = await quote_service.mark_quote_outcome(
             user,
@@ -346,7 +346,7 @@ async def mark_quote_lost(
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
 ) -> QuoteResponse:
-    """Record a contractor-confirmed lost quote outcome."""
+    """Record a contractor-controlled lost quote outcome."""
     try:
         quote = await quote_service.mark_quote_outcome(
             user,

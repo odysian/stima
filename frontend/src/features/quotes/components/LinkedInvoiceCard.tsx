@@ -1,10 +1,9 @@
-import type { LinkedInvoiceSummary, QuoteStatus } from "@/features/quotes/types/quote.types";
+import type { LinkedInvoiceSummary } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 interface LinkedInvoiceCardProps {
-  quoteStatus: QuoteStatus;
   linkedInvoice: LinkedInvoiceSummary | null;
   timezone?: string | null;
   isConverting: boolean;
@@ -13,17 +12,12 @@ interface LinkedInvoiceCardProps {
 }
 
 export function LinkedInvoiceCard({
-  quoteStatus,
   linkedInvoice,
   timezone,
   isConverting,
   onConvert,
   onOpenInvoice,
 }: LinkedInvoiceCardProps): React.ReactElement | null {
-  if (quoteStatus !== "approved") {
-    return null;
-  }
-
   return (
     <section className="mt-4 px-4 pb-2">
       <div className="ghost-shadow rounded-lg border border-success/20 bg-surface-container-lowest p-4">
@@ -44,7 +38,7 @@ export function LinkedInvoiceCard({
                     formatCurrency(linkedInvoice.total_amount),
                     `Created ${formatDate(linkedInvoice.created_at, timezone)}`,
                   ].join(" · ")
-                : "Create the invoice from this won quote, then fine-tune the due date before sharing."}
+                : "Create the invoice from this quote, then fine-tune the due date before sharing."}
             </p>
           </div>
 
