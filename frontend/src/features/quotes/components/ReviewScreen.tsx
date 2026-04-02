@@ -94,7 +94,7 @@ export function ReviewScreen(): React.ReactElement | null {
   const isInteractionLocked = isSaving || isRegenerating;
 
   function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void {
-    setDraft(updater(currentDraft));
+    setDraft(updater);
   }
 
   function onLineItemAdd(): void {

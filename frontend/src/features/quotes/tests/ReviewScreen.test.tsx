@@ -100,9 +100,16 @@ function renderScreen(initialDraft: QuoteDraft | null): void {
 
     return {
       draft,
-      setDraft: (nextDraft: QuoteDraft) => {
-        setDraftMock(nextDraft);
-        setDraftState(nextDraft);
+      setDraft: (nextDraft: QuoteDraft | ((current: QuoteDraft) => QuoteDraft)) => {
+        setDraftState((currentDraft) => {
+          if (!currentDraft && typeof nextDraft === "function") {
+            return currentDraft;
+          }
+          const resolvedDraft =
+            typeof nextDraft === "function" ? nextDraft(currentDraft as QuoteDraft) : nextDraft;
+          setDraftMock(resolvedDraft);
+          return resolvedDraft;
+        });
       },
       updateLineItem: vi.fn(),
       removeLineItem: vi.fn(),
@@ -536,6 +543,30 @@ describe("ReviewScreen", () => {
     });
     expect(clearDraftMock).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
+  });
+
+  it("allows quote creation after discount is toggled back off", async () => {
+    const user = userEvent.setup();
+    renderScreen(
+      makeDraft({
+        lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        discountType: "fixed",
+        discountValue: null,
+      }),
+    );
+
+    await user.click(screen.getByRole("checkbox", { name: /discount/i }));
+    await user.click(screen.getByRole("button", { name: /^generate quote$/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.createQuote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          discount_type: null,
+          discount_value: null,
+        }),
+      );
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("creates a direct invoice when invoice is selected", async () => {

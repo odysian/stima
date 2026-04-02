@@ -170,7 +170,7 @@ export function InvoiceEditScreen(): React.ReactElement {
     if (!currentDraft) {
       return;
     }
-    setDraft(updater(currentDraft));
+    setDraft(updater);
   }
 
   function onCancel(): void {

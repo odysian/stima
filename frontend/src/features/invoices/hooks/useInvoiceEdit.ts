@@ -18,9 +18,11 @@ export interface InvoiceEditDraft {
   dueDate: string;
 }
 
+type InvoiceEditDraftUpdater = InvoiceEditDraft | ((current: InvoiceEditDraft) => InvoiceEditDraft);
+
 interface UseInvoiceEditResult {
   draft: InvoiceEditDraft | null;
-  setDraft: (nextDraft: InvoiceEditDraft) => void;
+  setDraft: (nextDraft: InvoiceEditDraftUpdater) => void;
   updateLineItem: (index: number, item: LineItemDraftWithFlags) => void;
   removeLineItem: (index: number) => void;
   clearDraft: () => void;
@@ -155,9 +157,20 @@ function removeDraftFromStorage(): void {
 export function useInvoiceEdit(): UseInvoiceEditResult {
   const [draft, setDraftState] = useState<InvoiceEditDraft | null>(() => readDraftFromStorage());
 
-  const setDraft = useCallback((nextDraft: InvoiceEditDraft) => {
-    persistDraftToStorage(nextDraft);
-    setDraftState(nextDraft);
+  const setDraft = useCallback((nextDraft: InvoiceEditDraftUpdater) => {
+    setDraftState((currentDraft) => {
+      const resolvedDraft =
+        typeof nextDraft === "function"
+          ? (currentDraft ? nextDraft(currentDraft) : currentDraft)
+          : nextDraft;
+
+      if (!resolvedDraft) {
+        return currentDraft;
+      }
+
+      persistDraftToStorage(resolvedDraft);
+      return resolvedDraft;
+    });
   }, []);
 
   const clearDraft = useCallback(() => {
