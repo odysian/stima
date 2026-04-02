@@ -141,6 +141,7 @@ describe("QuoteList", () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "Quotes" })).toBeInTheDocument();
+    expect(screen.getByText("Stima")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
     expect(screen.queryByText("Sorted by: Most Recent")).not.toBeInTheDocument();
     expect(await screen.findByText("Q-001")).toBeInTheDocument();

@@ -16,6 +16,14 @@ describe("ScreenHeader", () => {
     );
   });
 
+  it("renders the branded top-level shell layout when requested", () => {
+    const { container } = render(<ScreenHeader title="Quotes" subtitle="2 active" layout="top-level" />);
+
+    expect(screen.getByText("Stima")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Quotes" })).toBeInTheDocument();
+    expect(container.querySelector("header > div")).toHaveClass("mx-auto", "max-w-3xl");
+  });
+
   it("renders and wires the back button when onBack is provided", () => {
     const onBack = vi.fn();
     render(<ScreenHeader title="Quote Preview" onBack={onBack} />);

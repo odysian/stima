@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getTimezoneOptions } from "@/features/profile/lib/timezones";
@@ -9,24 +8,23 @@ import {
   type ProfileResponse,
   type TradeType,
 } from "@/features/profile/types/profile.types";
+import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
-import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { useTheme } from "@/shared/hooks/useTheme";
 import { parseTaxPercentInput, toTaxPercentDisplay } from "@/shared/lib/pricing";
 import type { ThemePreference } from "@/shared/lib/theme";
 
 const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = [
-  { label: "System", value: "system" },
+  { label: "System default", value: "system" },
   { label: "Light", value: "light" },
   { label: "Dark", value: "dark" },
 ];
 
 export function SettingsScreen(): React.ReactElement {
-  const navigate = useNavigate();
   const { logout, refreshUser } = useAuth();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const logoPreviewSrc = `${import.meta.env.VITE_API_URL ?? ""}/api/profile/logo`;
@@ -170,10 +168,10 @@ export function SettingsScreen(): React.ReactElement {
   };
 
   return (
-    <main className="min-h-screen bg-background pb-32 pt-16">
-      <ScreenHeader title="Settings" onBack={() => navigate(-1)} />
+    <main className="min-h-screen bg-background pb-24 pt-16">
+      <ScreenHeader title="Settings" layout="top-level" />
 
-      <section className="mx-auto w-full max-w-2xl space-y-4 px-4 pt-4">
+      <section className="mx-auto w-full max-w-3xl space-y-4 px-4 pt-4">
         {isLoadingProfile ? (
           <p role="status" className="text-sm text-on-surface-variant">
             Loading settings...
@@ -185,7 +183,7 @@ export function SettingsScreen(): React.ReactElement {
         ) : null}
 
         {!isLoadingProfile && !loadError ? (
-          <form className="space-y-4 pb-28" onSubmit={onSubmit}>
+          <form className="space-y-4 pb-8" onSubmit={onSubmit}>
             {saveSuccess ? (
               <p role="status" className="rounded-lg bg-success-container p-3 text-sm text-success">
                 {saveSuccess}
@@ -265,35 +263,57 @@ export function SettingsScreen(): React.ReactElement {
                   value={businessName}
                   onChange={(event) => setBusinessName(event.target.value)}
                 />
-                <Input
-                  id="settings-first-name"
-                  label="First name"
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                />
-                <Input
-                  id="settings-last-name"
-                  label="Last name"
-                  value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
-                />
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="settings-trade-type" className="text-sm font-medium text-on-surface">
-                    Trade type
-                  </label>
-                  <select
-                    id="settings-trade-type"
-                    value={tradeType}
-                    onChange={(event) => setTradeType(event.target.value as TradeType)}
-                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  >
-                    {TRADE_TYPES.map((tradeTypeOption) => (
-                      <option key={tradeTypeOption} value={tradeTypeOption}>
-                        {tradeTypeOption}
-                      </option>
-                    ))}
-                  </select>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    id="settings-first-name"
+                    label="First name"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                  />
+                  <Input
+                    id="settings-last-name"
+                    label="Last name"
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                  />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="settings-trade-type" className="text-sm font-medium text-on-surface">
+                      Trade type
+                    </label>
+                    <select
+                      id="settings-trade-type"
+                      value={tradeType}
+                      onChange={(event) => setTradeType(event.target.value as TradeType)}
+                      className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      {TRADE_TYPES.map((tradeTypeOption) => (
+                        <option key={tradeTypeOption} value={tradeTypeOption}>
+                          {tradeTypeOption}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="settings-default-tax-rate" className="text-sm font-medium text-on-surface">
+                      Tax rate (%)
+                    </label>
+                    <input
+                      id="settings-default-tax-rate"
+                      type="number"
+                      step="0.01"
+                      value={defaultTaxRate}
+                      onChange={(event) => setDefaultTaxRate(event.target.value)}
+                      className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="8.25"
+                    />
+                  </div>
+                </div>
+
                 <div className="flex flex-col gap-1">
                   <label htmlFor="settings-timezone" className="text-sm font-medium text-on-surface">
                     Timezone
@@ -311,69 +331,23 @@ export function SettingsScreen(): React.ReactElement {
                     ))}
                   </select>
                 </div>
+
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="settings-default-tax-rate" className="text-sm font-medium text-on-surface">
-                    Default tax rate (%)
-                  </label>
-                  <input
-                    id="settings-default-tax-rate"
-                    type="number"
-                    step="0.01"
-                    value={defaultTaxRate}
-                    onChange={(event) => setDefaultTaxRate(event.target.value)}
-                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    placeholder="8.25"
-                  />
-                  <p className="text-xs text-on-surface-variant">
-                    Used as the suggested tax rate for new documents. Tax stays off until you enable it.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-xl bg-surface-container-low p-4">
-              <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                Appearance
-              </h2>
-              <div className="mt-3 rounded-xl bg-surface-container-lowest p-4">
-                <div className="space-y-1">
-                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="settings-theme" className="text-sm font-medium text-on-surface">
                     Theme
-                  </p>
-                  <p className="text-sm text-on-surface">
-                    Choose how Stima looks across the app.
-                  </p>
-                  <p className="text-xs text-on-surface-variant">
-                    System follows your device. Light and Dark override it immediately.
-                  </p>
-                </div>
-
-                <div role="radiogroup" aria-label="Theme" className="mt-4 grid grid-cols-3 gap-2">
-                  {THEME_OPTIONS.map((option) => {
-                    const isSelected = option.value === themePreference;
-
-                    return (
-                      <label
-                        key={option.value}
-                        className={[
-                          "cursor-pointer rounded-lg border-2 py-3 font-label text-sm transition-all",
-                          isSelected
-                            ? "border-primary bg-primary/5 font-semibold text-primary"
-                            : "border-transparent bg-surface-container-low text-on-surface-variant",
-                        ].join(" ")}
-                      >
-                        <input
-                          type="radio"
-                          name="settings-theme"
-                          value={option.value}
-                          checked={isSelected}
-                          onChange={() => setThemePreference(option.value)}
-                          className="sr-only"
-                        />
-                        <span className="block">{option.label}</span>
-                      </label>
-                    );
-                  })}
+                  </label>
+                  <select
+                    id="settings-theme"
+                    value={themePreference}
+                    onChange={(event) => setThemePreference(event.target.value as ThemePreference)}
+                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {THEME_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </section>
@@ -401,17 +375,21 @@ export function SettingsScreen(): React.ReactElement {
               </div>
             </section>
 
-            {/* Keep the footer inside the form so the fixed primary action submits natively. */}
-            <ScreenFooter>
-              <div className="mx-auto w-full max-w-2xl">
-                <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
-                  Save Changes
-                </Button>
-              </div>
-            </ScreenFooter>
+            <div className="pt-2">
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full md:min-w-[13rem] md:w-auto md:px-8"
+                isLoading={isSubmitting}
+              >
+                Save Changes
+              </Button>
+            </div>
           </form>
         ) : null}
       </section>
+
+      <BottomNav active="settings" />
 
       {isRemoveLogoOpen ? (
         <ConfirmModal

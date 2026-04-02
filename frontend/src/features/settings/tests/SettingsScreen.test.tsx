@@ -105,7 +105,7 @@ afterEach(() => {
 });
 
 describe("SettingsScreen", () => {
-  it("renders pre-filled form fields in the tightened layout with compact selects", async () => {
+  it("renders the top-level settings shell with grouped fields and inline save", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({
         email: "owner@example.com",
@@ -131,13 +131,16 @@ describe("SettingsScreen", () => {
       "tracking-widest",
       "text-outline",
     );
+    expect(screen.getByText("Stima")).toBeInTheDocument();
     expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).not.toBeNull();
+    expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).toBeNull();
     expect(screen.getByText("Account").closest("section")).toHaveClass("bg-surface-container-low");
     expect(screen.queryByText("Session")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /back/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /settings/i })).toHaveClass("text-primary");
+    expect(screen.queryByText("Appearance")).not.toBeInTheDocument();
   });
 
   it("normalizes null profile values before binding to controlled inputs", async () => {
@@ -226,42 +229,39 @@ describe("SettingsScreen", () => {
     expect(await screen.findByText("Saved")).toHaveClass("rounded-lg");
   });
 
-  it("updates the theme preference immediately from the segmented control", async () => {
+  it("updates the theme preference immediately from the dropdown", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
 
     renderScreen();
 
     await screen.findByLabelText(/business name/i);
 
-    expect(screen.getByRole("radiogroup", { name: "Theme" })).toBeInTheDocument();
+    const themeSelect = screen.getByRole("combobox", { name: "Theme" });
 
-    const systemRadio = screen.getByRole("radio", { name: "System" });
-    const lightRadio = screen.getByRole("radio", { name: "Light" });
-    const darkRadio = screen.getByRole("radio", { name: "Dark" });
+    expect(themeSelect).toHaveValue("system");
+    expect(screen.getByRole("option", { name: "System default" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Light" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Dark" })).toBeInTheDocument();
 
-    expect(systemRadio).toBeChecked();
-    expect(lightRadio).not.toBeChecked();
-    expect(darkRadio).not.toBeChecked();
-
-    fireEvent.click(darkRadio);
+    fireEvent.change(themeSelect, { target: { value: "dark" } });
 
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
-    expect(darkRadio).toBeChecked();
+    expect(themeSelect).toHaveValue("dark");
 
-    fireEvent.click(lightRadio);
+    fireEvent.change(themeSelect, { target: { value: "light" } });
 
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
     expect(document.documentElement.style.colorScheme).toBe("light");
-    expect(lightRadio).toBeChecked();
+    expect(themeSelect).toHaveValue("light");
 
-    fireEvent.click(systemRadio);
+    fireEvent.change(themeSelect, { target: { value: "system" } });
 
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("system");
     expect(document.documentElement.dataset.theme).toBeUndefined();
-    expect(systemRadio).toBeChecked();
+    expect(themeSelect).toHaveValue("system");
   });
 
   it("shows the saved default tax as a percent and persists edited values as fractions", async () => {
@@ -275,7 +275,7 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     expect(await screen.findByDisplayValue("8.25")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/default tax rate/i), {
+    fireEvent.change(screen.getByLabelText(/tax rate/i), {
       target: { value: "7.5" },
     });
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));

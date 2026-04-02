@@ -194,7 +194,7 @@ export function QuoteList(): React.ReactElement {
 
   return (
     <main className="min-h-screen bg-background pb-24">
-      <ScreenHeader title={headerTitle} subtitle={headerSubtitle} />
+      <ScreenHeader title={headerTitle} subtitle={headerSubtitle} layout="top-level" />
       <section className="mx-auto w-full max-w-3xl pb-2 pt-20">
         <div className="mb-4 px-4">
           <div
