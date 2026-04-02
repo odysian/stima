@@ -43,6 +43,7 @@ export function TotalAmountSection({
   const [discountToggleOverride, setDiscountToggleOverride] = useState<boolean | null>(null);
   const [taxToggleOverride, setTaxToggleOverride] = useState<boolean | null>(null);
   const [depositToggleOverride, setDepositToggleOverride] = useState<boolean | null>(null);
+  const [isOptionalPricingOpen, setIsOptionalPricingOpen] = useState(false);
   const isDiscountEnabled = discountToggleOverride ?? (
     discountType !== null || isPopulatedPricingValue(discountValue)
   );
@@ -56,13 +57,14 @@ export function TotalAmountSection({
     discountValue,
     depositAmount,
   });
-  const hasPricingControls = (
+  const shouldAutoExpandOptionalPricing = (
     isDiscountEnabled
     || isTaxEnabled
     || isDepositEnabled
     || suggestedTaxRate !== null
   );
   const hasPricingBreakdown = pricingBreakdown.hasPricingBreakdown;
+  const shouldShowOptionalPricingPanel = shouldAutoExpandOptionalPricing || isOptionalPricingOpen;
 
   return (
     <section className="rounded-lg bg-surface-container-low p-4">
@@ -102,16 +104,45 @@ export function TotalAmountSection({
         </div>
       </div>
 
-      {hasPricingControls ? (
-        <div className="mt-4 space-y-4 border-t border-outline-variant/30 pt-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-widest text-on-surface">
-              Optional Pricing
-            </p>
-            <span className="text-xs text-outline">Only appears when enabled</span>
+      <div className="mt-4 border-t border-outline-variant/30 pt-4">
+        {shouldAutoExpandOptionalPricing ? (
+          <div className="flex items-center justify-between gap-4 rounded-lg bg-surface-container-lowest px-4 py-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-on-surface">
+                Optional Pricing
+              </p>
+              <p className="mt-1 text-sm text-outline">
+                Tax, discount, and deposit
+              </p>
+            </div>
+            <span className="text-xs font-semibold uppercase tracking-widest text-outline">
+              Shown
+            </span>
           </div>
+        ) : (
+          <button
+            type="button"
+            aria-expanded={isOptionalPricingOpen}
+            aria-controls="optional-pricing-panel"
+            className="flex w-full items-center justify-between gap-4 rounded-lg bg-surface-container-lowest px-4 py-3 text-left transition-colors hover:bg-surface-container"
+            onClick={() => setIsOptionalPricingOpen((current) => !current)}
+          >
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-on-surface">
+                Optional Pricing
+              </p>
+              <p className="mt-1 text-sm text-outline">
+                Tax, discount, and deposit
+              </p>
+            </div>
+            <span className="text-xs font-semibold uppercase tracking-widest text-outline">
+              {isOptionalPricingOpen ? "Hide" : "Show"}
+            </span>
+          </button>
+        )}
 
-          <div className="space-y-3">
+        {shouldShowOptionalPricingPanel ? (
+          <div id="optional-pricing-panel" className="mt-4 space-y-3">
             <label className="flex items-center gap-3 text-sm text-on-surface">
               <input
                 type="checkbox"
@@ -178,28 +209,42 @@ export function TotalAmountSection({
             </label>
             {suggestedTaxRate !== null && !isTaxEnabled ? (
               <div className="rounded-lg bg-surface-container-lowest p-3 text-sm text-on-surface-variant">
-                <p className="text-xs font-bold uppercase tracking-widest text-outline">Suggested Tax</p>
-                <input
-                  type="number"
-                  value={toTaxPercentDisplay(suggestedTaxRate)}
-                  disabled
-                  className="mt-2 w-full rounded-lg bg-surface-container-high px-4 py-3 text-sm text-on-surface-variant"
-                />
+                <p className="text-xs font-bold uppercase tracking-widest text-outline">
+                  Suggested Tax Rate
+                </p>
+                <div className="relative mt-2">
+                  <input
+                    type="number"
+                    aria-label="Suggested tax (%)"
+                    value={toTaxPercentDisplay(suggestedTaxRate)}
+                    disabled
+                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 pr-10 text-sm text-on-surface-variant"
+                  />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-outline">
+                    %
+                  </span>
+                </div>
                 <p className="mt-2 text-xs text-outline">
                   Enable tax to apply this default rate to this document.
                 </p>
               </div>
             ) : null}
             {isTaxEnabled ? (
-              <input
-                type="number"
-                step="0.01"
-                disabled={disabled}
-                value={toTaxPercentDisplay(taxRate)}
-                onChange={(event) => onTaxRateChange(parseTaxPercentInput(event.target.value))}
-                className="w-full rounded-lg bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                placeholder="8.25"
-              />
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  aria-label="Tax rate (%)"
+                  disabled={disabled}
+                  value={toTaxPercentDisplay(taxRate)}
+                  onChange={(event) => onTaxRateChange(parseTaxPercentInput(event.target.value))}
+                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 pr-10 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="8.25"
+                />
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-outline">
+                  %
+                </span>
+              </div>
             ) : null}
 
             <label className="flex items-center gap-3 text-sm text-on-surface">
@@ -236,8 +281,8 @@ export function TotalAmountSection({
               />
             ) : null}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {hasPricingBreakdown ? (
         <div className="mt-4 space-y-2 border-t border-outline-variant/30 pt-4 text-sm">
