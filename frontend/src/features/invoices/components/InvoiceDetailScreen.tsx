@@ -260,7 +260,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
             </section>
 
             <section className="mt-4 px-4" aria-label="Invoice actions">
-              <div className="ghost-shadow rounded-2xl border border-outline/40 bg-surface-container-lowest p-4">
+              <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
                 {openPdfUrl ? (
                   <a
                     href={openPdfUrl}
@@ -285,6 +285,17 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 )}
 
                 <div role="group" aria-label="Invoice utilities" className={`mt-3 ${utilityGridClassName}`}>
+                  {hasSourceQuote ? (
+                    <button
+                      type="button"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98]"
+                      onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
+                    >
+                      <span className="material-symbols-outlined text-base">arrow_back</span>
+                      Back to {invoice.source_quote_number}
+                    </button>
+                  ) : null}
+
                   <button
                     type="button"
                     className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
@@ -296,17 +307,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     <span className="material-symbols-outlined text-base">content_copy</span>
                     Copy Link
                   </button>
-
-                  {hasSourceQuote ? (
-                    <button
-                      type="button"
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98]"
-                      onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
-                    >
-                      <span className="material-symbols-outlined text-base">arrow_back</span>
-                      Back to {invoice.source_quote_number}
-                    </button>
-                  ) : null}
                 </div>
               </div>
             </section>

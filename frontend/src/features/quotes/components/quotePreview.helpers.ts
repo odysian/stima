@@ -66,7 +66,7 @@ export function resolveActionState(
 
 
 export function getEmailActionLabel(actionState: QuotePreviewActionState): string | null {
-  if (actionState === "draft" || actionState === "ready") {
+  if (actionState === "ready") {
     return "Send by Email";
   }
   if (

@@ -28,23 +28,24 @@ function makeProps(overrides: Partial<ComponentProps<typeof QuotePreviewActions>
 }
 
 describe("QuotePreviewActions", () => {
-  it("renders a primary send action with compact quote utilities for draft quotes", () => {
+  it("renders a primary generate action with copy-link only for draft quotes", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
+          emailActionLabel: null,
           openPdfUrl: null,
           shareUrl: null,
         })}
       />,
     );
 
-    expect(screen.getByRole("button", { name: /send by email/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
     const utilities = screen.getByRole("group", { name: /quote utilities/i });
     expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(within(utilities).getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
+    expect(within(utilities).queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
   });
 
-  it("renders send by email, copy link, and open pdf for ready quotes", () => {
+  it("renders generate pdf as primary with send and copy utilities for ready quotes", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
@@ -54,12 +55,13 @@ describe("QuotePreviewActions", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /send by email/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
+    const utilities = screen.getByRole("group", { name: /quote utilities/i });
+    expect(within(utilities).getByRole("button", { name: /send by email/i })).toBeInTheDocument();
+    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
   });
 
-  it("renders resend email, copy link, and open pdf for shared quotes", () => {
+  it("renders open pdf as primary with resend and copy utilities for shared quotes", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
@@ -68,15 +70,16 @@ describe("QuotePreviewActions", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
       "href",
       "blob:quote-preview",
     );
+    const utilities = screen.getByRole("group", { name: /quote utilities/i });
+    expect(within(utilities).getByRole("button", { name: /resend email/i })).toBeInTheDocument();
+    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
   });
 
-  it("renders resend email, copy link, and open pdf for closed quotes", () => {
+  it("renders open pdf as primary with resend and copy utilities for closed quotes", () => {
     render(
       <QuotePreviewActions
         {...makeProps({
@@ -85,9 +88,10 @@ describe("QuotePreviewActions", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
+    const utilities = screen.getByRole("group", { name: /quote utilities/i });
+    expect(within(utilities).getByRole("button", { name: /resend email/i })).toBeInTheDocument();
+    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
   });
 
   it("disables the email action and shows help text when customer email is missing", () => {
@@ -142,7 +146,7 @@ describe("QuotePreviewActions", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Sending quote email...");
   });
 
-  it("calls the request-send-email handler when the primary action is pressed", () => {
+  it("calls the request-send-email handler when the email utility is pressed", () => {
     const onRequestSendEmail = vi.fn();
     render(
       <QuotePreviewActions
@@ -152,7 +156,11 @@ describe("QuotePreviewActions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /send by email/i }));
+    fireEvent.click(
+      within(screen.getByRole("group", { name: /quote utilities/i })).getByRole("button", {
+        name: /send by email/i,
+      }),
+    );
 
     expect(onRequestSendEmail).toHaveBeenCalledTimes(1);
   });

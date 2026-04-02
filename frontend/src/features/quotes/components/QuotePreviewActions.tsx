@@ -22,7 +22,7 @@ interface QuotePreviewActionsProps {
 }
 
 const secondaryButtonClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
-const utilityButtonClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface-container px-4 py-4 text-center font-medium text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+const primaryLinkClasses = "forest-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
 
 export function QuotePreviewActions({
   emailActionLabel,
@@ -68,7 +68,7 @@ export function QuotePreviewActions({
           href={openPdfHref}
           target="_blank"
           rel="noopener noreferrer"
-          className={utilityButtonClasses}
+          className={primaryLinkClasses}
         >
           <span className="material-symbols-outlined text-base">open_in_new</span>
           Open PDF
@@ -101,39 +101,32 @@ export function QuotePreviewActions({
   return (
     <>
       <section className="mt-4 px-4" aria-label="Quote actions">
-        <div className="ghost-shadow rounded-2xl border border-outline/40 bg-surface-container-lowest p-4">
-          {showEmailAction ? (
-            <Button
-              type="button"
-              className="w-full"
-              onClick={onRequestSendEmail}
-              isLoading={isSendingEmail}
-              disabled={
-                disabled
-                || !hasCustomerEmail
-                || isGeneratingPdf
-                || isCopyingLink
-                || isMarkingWon
-                || isMarkingLost
-              }
-            >
-              {emailActionLabel}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              className="w-full"
-              onClick={() => {
-                void onGeneratePdf();
-              }}
-              isLoading={isGeneratingPdf}
-              disabled={disabled}
-            >
-              Generate PDF
-            </Button>
-          )}
+        <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+          {renderOpenPdfAction()}
 
           <div role="group" aria-label="Quote utilities" className={`mt-3 ${utilityGridClassName}`}>
+            {showEmailAction ? (
+              <button
+                type="button"
+                className={secondaryButtonClasses}
+                disabled={
+                  disabled
+                  || !hasCustomerEmail
+                  || isGeneratingPdf
+                  || isSendingEmail
+                  || isCopyingLink
+                  || isMarkingWon
+                  || isMarkingLost
+                }
+                onClick={onRequestSendEmail}
+              >
+                <span className="material-symbols-outlined text-base">mail</span>
+                {isSendingEmail ? "Sending..." : emailActionLabel}
+              </button>
+            ) : (
+              <div aria-hidden="true" />
+            )}
+
             <button
               type="button"
               className={secondaryButtonClasses}
@@ -153,8 +146,6 @@ export function QuotePreviewActions({
               <span className="material-symbols-outlined text-base">content_copy</span>
               Copy Link
             </button>
-
-            {renderOpenPdfAction()}
           </div>
         </div>
       </section>
