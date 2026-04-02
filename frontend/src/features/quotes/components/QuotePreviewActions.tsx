@@ -59,7 +59,6 @@ export function QuotePreviewActions({
   const openPdfHref = openPdfUrl ?? shareUrl;
   const showEmailAction = emailActionLabel !== null;
   const showUtilities = showEmailAction || Boolean(openPdfHref);
-  const canCopyLink = !disabled;
   const utilityGridClassName = "grid grid-cols-2 gap-2";
 
   function renderOpenPdfAction(): React.ReactElement {
@@ -132,7 +131,6 @@ export function QuotePreviewActions({
                 className={secondaryButtonClasses}
                 disabled={
                   disabled
-                  || !canCopyLink
                   || isGeneratingPdf
                   || isSendingEmail
                   || isCopyingLink
