@@ -74,6 +74,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const openPdfUrl = pdfUrl ?? rawShareUrl;
   const hasSourceQuote = Boolean(invoice?.source_document_id && invoice.source_quote_number);
   const canEdit = Boolean(invoice && id && isInvoiceEditableStatus(invoice.status));
+  const utilityGridClassName = hasSourceQuote ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2";
   const clientContact =
     [invoice?.customer.email, invoice?.customer.phone]
       .map((value) => value?.trim())
@@ -221,19 +222,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     </p>
                   </div>
                 </div>
-
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  {hasSourceQuote ? (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary"
-                      onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
-                    >
-                      Back to {invoice.source_quote_number}
-                      <span className="material-symbols-outlined text-base">arrow_back</span>
-                    </button>
-                  ) : null}
-                </div>
               </div>
             </section>
 
@@ -271,41 +259,57 @@ export function InvoiceDetailScreen(): React.ReactElement {
               </div>
             </section>
 
-            <div className="mt-4 flex flex-col gap-3 px-4">
-              {openPdfUrl ? (
-                <a
-                  href={openPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface-container px-4 py-4 text-center font-medium text-on-surface transition-all active:scale-[0.98]"
-                >
-                  <span className="material-symbols-outlined text-base">open_in_new</span>
-                  Open PDF
-                </a>
-              ) : (
-                <Button
-                  type="button"
-                  className="w-full"
-                  onClick={() => {
-                    void onGeneratePdf();
-                  }}
-                  isLoading={isGeneratingPdf}
-                >
-                  Generate PDF
-                </Button>
-              )}
+            <section className="mt-4 px-4" aria-label="Invoice actions">
+              <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+                {openPdfUrl ? (
+                  <a
+                    href={openPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="forest-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]"
+                  >
+                    <span className="material-symbols-outlined text-base">open_in_new</span>
+                    Open PDF
+                  </a>
+                ) : (
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={() => {
+                      void onGeneratePdf();
+                    }}
+                    isLoading={isGeneratingPdf}
+                  >
+                    Generate PDF
+                  </Button>
+                )}
 
-              <Button
-                type="button"
-                className="w-full"
-                onClick={() => {
-                  void onCopyLink();
-                }}
-                isLoading={isSharing}
-              >
-                Copy Link
-              </Button>
-            </div>
+                <div role="group" aria-label="Invoice utilities" className={`mt-3 ${utilityGridClassName}`}>
+                  {hasSourceQuote ? (
+                    <button
+                      type="button"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98]"
+                      onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
+                    >
+                      <span className="material-symbols-outlined text-base">arrow_back</span>
+                      Back to {invoice.source_quote_number}
+                    </button>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={isSharing || isGeneratingPdf}
+                    onClick={() => {
+                      void onCopyLink();
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-base">content_copy</span>
+                    Copy Link
+                  </button>
+                </div>
+              </div>
+            </section>
 
             {pdfError ? (
               <div className="mx-4 mt-3">

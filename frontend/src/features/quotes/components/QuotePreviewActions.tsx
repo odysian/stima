@@ -1,20 +1,10 @@
-import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 
-type QuotePreviewActionState =
-  | "draft"
-  | "ready"
-  | "shared"
-  | "viewed"
-  | "approved"
-  | "declined";
-
 interface QuotePreviewActionsProps {
-  actionState: QuotePreviewActionState;
   emailActionLabel: string | null;
   hasCustomerEmail: boolean;
   onGeneratePdf: () => Promise<void>;
-  onSendEmail: () => Promise<void>;
+  onRequestSendEmail: () => void;
   onCopyLink: () => Promise<void>;
   openPdfUrl: string | null;
   shareUrl: string | null;
@@ -31,14 +21,14 @@ interface QuotePreviewActionsProps {
 }
 
 const secondaryButtonClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
-const utilityButtonClasses = "inline-flex w-full items-center justify-center gap-2 rounded-lg bg-surface-container px-4 py-4 text-center font-medium text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+const primaryButtonClasses = "forest-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60";
+const primaryLinkClasses = "forest-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
 
 export function QuotePreviewActions({
-  actionState,
   emailActionLabel,
   hasCustomerEmail,
   onGeneratePdf,
-  onSendEmail,
+  onRequestSendEmail,
   onCopyLink,
   openPdfUrl,
   shareUrl,
@@ -68,7 +58,8 @@ export function QuotePreviewActions({
 
   const openPdfHref = openPdfUrl ?? shareUrl;
   const showEmailAction = emailActionLabel !== null;
-  const canCopyLink = actionState === "ready" || Boolean(shareUrl);
+  const showUtilities = showEmailAction || Boolean(openPdfHref);
+  const utilityGridClassName = "grid grid-cols-2 gap-2";
 
   function renderOpenPdfAction(): React.ReactElement {
     if (openPdfHref) {
@@ -77,7 +68,7 @@ export function QuotePreviewActions({
           href={openPdfHref}
           target="_blank"
           rel="noopener noreferrer"
-          className={utilityButtonClasses}
+          className={primaryLinkClasses}
         >
           <span className="material-symbols-outlined text-base">open_in_new</span>
           Open PDF
@@ -88,79 +79,75 @@ export function QuotePreviewActions({
     return (
       <button
         type="button"
-        className={utilityButtonClasses}
-        disabled={disabled || actionState !== "ready"}
+        className={primaryButtonClasses}
+        disabled={
+          disabled
+          || isGeneratingPdf
+          || isSendingEmail
+          || isCopyingLink
+          || isMarkingWon
+          || isMarkingLost
+        }
         onClick={() => {
           void onGeneratePdf();
         }}
       >
-        <span className="material-symbols-outlined text-base">open_in_new</span>
-        Open PDF
+        <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+        Generate PDF
       </button>
     );
   }
 
   return (
     <>
-      <div className="mt-4 flex flex-col gap-3 px-4">
-        {actionState === "draft" ? (
-          <Button
-            type="button"
-            className="w-full"
-            onClick={() => {
-              void onGeneratePdf();
-            }}
-            isLoading={isGeneratingPdf}
-            disabled={disabled}
-          >
-            Generate PDF
-          </Button>
-        ) : null}
+      <section className="mt-4 px-4" aria-label="Quote actions">
+        <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+          {renderOpenPdfAction()}
 
-        {showEmailAction ? (
-          <Button
-            type="button"
-            className="w-full"
-            onClick={() => {
-              void onSendEmail();
-            }}
-            isLoading={isSendingEmail}
-            disabled={
-              disabled
-              || !hasCustomerEmail
-              || isCopyingLink
-              || isMarkingWon
-              || isMarkingLost
-            }
-          >
-            {emailActionLabel}
-          </Button>
-        ) : null}
+          {showUtilities ? (
+            <div role="group" aria-label="Quote utilities" className={`mt-3 ${utilityGridClassName}`}>
+              {showEmailAction ? (
+                <button
+                  type="button"
+                  className={secondaryButtonClasses}
+                  disabled={
+                    disabled
+                    || !hasCustomerEmail
+                    || isGeneratingPdf
+                    || isSendingEmail
+                    || isCopyingLink
+                    || isMarkingWon
+                    || isMarkingLost
+                  }
+                  onClick={onRequestSendEmail}
+                >
+                  <span className="material-symbols-outlined text-base">mail</span>
+                  {isSendingEmail ? "Sending..." : emailActionLabel}
+                </button>
+              ) : null}
 
-        {actionState !== "draft" ? (
-          <button
-            type="button"
-            className={secondaryButtonClasses}
-            disabled={
-              disabled
-              || !canCopyLink
-              || isGeneratingPdf
-              || isSendingEmail
-              || isCopyingLink
-              || isMarkingWon
-              || isMarkingLost
-            }
-            onClick={() => {
-              void onCopyLink();
-            }}
-          >
-            <span className="material-symbols-outlined text-base">content_copy</span>
-            Copy Link
-          </button>
-        ) : null}
-
-        {actionState !== "draft" ? <>{renderOpenPdfAction()}</> : null}
-      </div>
+              <button
+                type="button"
+                className={secondaryButtonClasses}
+                disabled={
+                  disabled
+                  || isGeneratingPdf
+                  || isSendingEmail
+                  || isCopyingLink
+                  || isMarkingWon
+                  || isMarkingLost
+                }
+                onClick={() => {
+                  void onCopyLink();
+                }}
+              >
+                <span className="material-symbols-outlined text-base">content_copy</span>
+                Copy Link
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </section>
 
       {!hasCustomerEmail && showEmailAction ? (
         <p className="mx-4 mt-3 text-sm text-on-surface-variant">

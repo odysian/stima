@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -141,7 +141,9 @@ describe("InvoiceDetailScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
     expect(screen.getByText(/created from quote q-001/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /back to q-001/i })).toBeInTheDocument();
+    const utilities = screen.getByRole("group", { name: /invoice utilities/i });
+    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+    expect(within(utilities).getByRole("button", { name: /back to q-001/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit invoice/i })).toBeInTheDocument();
     expect(screen.getByText("Thanks for your business")).toBeInTheDocument();
     expect(screen.getByText("Apr 19, 2026")).toBeInTheDocument();

@@ -224,7 +224,7 @@ describe("QuotePreview", () => {
     },
   );
 
-  it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
+  it.each(["ready", "shared", "viewed", "approved", "declined"] as const)(
     "shows convert to invoice for %s quotes without a linked invoice",
     async (status) => {
       mockedQuoteService.getQuote.mockResolvedValueOnce(
@@ -238,6 +238,40 @@ describe("QuotePreview", () => {
       expect(screen.getByText("No invoice yet")).toBeInTheDocument();
     },
   );
+
+  it("demotes draft convert-to-invoice UI below the quote actions", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "draft", share_token: null }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    const generatePdfButton = screen.getByRole("button", { name: /generate pdf/i });
+    const convertButton = screen.getByRole("button", { name: /convert to invoice/i });
+
+    expect(generatePdfButton.compareDocumentPosition(convertButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(generatePdfButton).toHaveClass("forest-gradient");
+    expect(convertButton).not.toHaveClass("forest-gradient");
+    expect(convertButton).toHaveClass("border");
+    expect(screen.getByText("No invoice yet")).toBeInTheDocument();
+    expect(screen.queryByText(/fine-tune the due date before sharing/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps convert to invoice secondary when the quote is ready", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ status: "ready", share_token: "share-token-1" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    const convertButton = screen.getByRole("button", { name: /convert to invoice/i });
+
+    expect(convertButton).not.toHaveClass("forest-gradient");
+    expect(convertButton).toHaveClass("border");
+    expect(screen.queryByText(/fine-tune the due date before sharing/i)).not.toBeInTheDocument();
+  });
 
   it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
     "shows the linked invoice summary when a %s quote already has one",
@@ -377,7 +411,7 @@ describe("QuotePreview", () => {
     },
   );
 
-  it("shows send by email, copy link, and open pdf when the quote is ready", async () => {
+  it("shows generate pdf as primary with send and copy utilities when the quote is ready", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({
         status: "ready",
@@ -389,10 +423,11 @@ describe("QuotePreview", () => {
 
     await screen.findByRole("heading", { name: "Test Customer" });
     expect(screen.getByText("Quote ready to share")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /send by email/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /open pdf/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open pdf/i })).not.toBeInTheDocument();
+    const utilities = screen.getByRole("group", { name: /quote utilities/i });
+    expect(within(utilities).getByRole("button", { name: /send by email/i })).toBeInTheDocument();
+    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
   });
 
   it("renders quote title as the primary header when present", async () => {
@@ -625,10 +660,17 @@ describe("QuotePreview", () => {
     expect(lineItemsHeading.compareDocumentPosition(primaryAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("generates PDF and promotes email/copy actions into the action area", async () => {
+  it("keeps generate pdf primary on draft and unlocks send email after generation", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ customer_email: "customer@example.com" }),
+    );
+
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
+    expect(screen.queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /copy link/i })).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     await waitFor(() => {
@@ -637,8 +679,9 @@ describe("QuotePreview", () => {
     });
 
     expect(screen.getByText("PDF generated on this device")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /send by email/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /copy link/i })).toBeEnabled();
+    const utilities = screen.getByRole("group", { name: /quote utilities/i });
+    expect(within(utilities).getByRole("button", { name: /send by email/i })).toBeEnabled();
+    expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeEnabled();
     expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
       "href",
       "blob:quote-preview",
@@ -709,7 +752,15 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Preserved Customer" });
-    fireEvent.click(screen.getByRole("button", { name: /send by email/i }));
+    fireEvent.click(
+      within(screen.getByRole("group", { name: /quote utilities/i })).getByRole("button", {
+        name: /send by email/i,
+      }),
+    );
+
+    const dialog = screen.getByRole("dialog", { name: /send by email\?/i });
+    expect(mockedQuoteService.sendQuoteEmail).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: /send by email/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.sendQuoteEmail).toHaveBeenCalledWith("quote-1");
@@ -718,7 +769,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText(/preserved@example.com/i)).toBeInTheDocument();
   });
 
-  it("copies the share link from ready state by triggering the share transition first", async () => {
+  it("copies the share link from ready state without requiring prior local PDF generation", async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -922,7 +973,7 @@ describe("QuotePreview", () => {
     expect(await screen.findByText("Clipboard denied")).toBeInTheDocument();
   });
 
-  it("sends quote email and shows confirmation", async () => {
+  it("requires confirmation before sending quote email", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
     );
@@ -930,7 +981,16 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    fireEvent.click(screen.getByRole("button", { name: /send by email/i }));
+    fireEvent.click(
+      within(screen.getByRole("group", { name: /quote utilities/i })).getByRole("button", {
+        name: /send by email/i,
+      }),
+    );
+
+    const dialog = screen.getByRole("dialog", { name: /send by email\?/i });
+    expect(mockedQuoteService.sendQuoteEmail).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /send by email/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.sendQuoteEmail).toHaveBeenCalledWith("quote-1");
@@ -960,7 +1020,16 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    fireEvent.click(screen.getByRole("button", { name: /send by email/i }));
+    fireEvent.click(
+      within(screen.getByRole("group", { name: /quote utilities/i })).getByRole("button", {
+        name: /send by email/i,
+      }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /send by email\?/i })).getByRole("button", {
+        name: /send by email/i,
+      }),
+    );
 
     expect(
       await screen.findByText(
@@ -1046,5 +1115,17 @@ describe("QuotePreview", () => {
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
 
     expect(await screen.findByText("Quote List Screen")).toBeInTheDocument();
+  });
+
+  it("keeps send by email hidden for draft quotes even when a customer email exists", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({ customer_email: "customer@example.com" }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
   });
 });

@@ -6,6 +6,7 @@ import { LinkedInvoiceCard } from "@/features/quotes/components/LinkedInvoiceCar
 import { QuotePreviewHeaderActions } from "@/features/quotes/components/QuotePreviewHeaderActions";
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
+import { QuotePreviewDialogs } from "@/features/quotes/components/QuotePreviewDialogs";
 import { QuotePreviewStatusRow } from "@/features/quotes/components/QuotePreviewStatusRow";
 import {
   buildOverflowItems,
@@ -23,7 +24,6 @@ import { useQuoteInvoiceConversion } from "@/features/quotes/hooks/useQuoteInvoi
 import type { Quote } from "@/features/quotes/types/quote.types";
 import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { BottomNav } from "@/shared/components/BottomNav";
-import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
@@ -52,6 +52,7 @@ export function QuotePreview(): React.ReactElement {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMarkWonConfirm, setShowMarkWonConfirm] = useState(false);
   const [showMarkLostConfirm, setShowMarkLostConfirm] = useState(false);
+  const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
 
   useEffect(() => () => {
     if (pdfUrl) {
@@ -76,6 +77,9 @@ export function QuotePreview(): React.ReactElement {
       .join(" \u00b7 ") || "No contact details";
   const compactStatusRow = getCompactStatusRow(actionState, quote, hasLocalPdf);
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
+  const showDraftInvoicePromptBelowActions = Boolean(
+    quote && actionState === "draft" && !quote.linked_invoice,
+  );
   const {
     invoiceError,
     isConvertingInvoice,
@@ -223,11 +227,20 @@ export function QuotePreview(): React.ReactElement {
     }
   }
 
-  async function onSendEmail(): Promise<void> {
+  function onRequestSendEmail(): void {
+    if (!hasCustomerEmail || !emailActionLabel) {
+      return;
+    }
+
+    setShowSendEmailConfirm(true);
+  }
+
+  async function onConfirmSendEmail(): Promise<void> {
     if (!id || !quote) {
       return;
     }
 
+    setShowSendEmailConfirm(false);
     setShareError(null);
     setShareMessage(null);
     setIsSendingEmail(true);
@@ -356,7 +369,7 @@ export function QuotePreview(): React.ReactElement {
                 clientContact={clientContact}
               />
             ) : null}
-            {quote ? (
+            {quote && !showDraftInvoicePromptBelowActions ? (
               <LinkedInvoiceCard
                 linkedInvoice={quote.linked_invoice}
                 isConverting={isConvertingInvoice}
@@ -367,11 +380,10 @@ export function QuotePreview(): React.ReactElement {
             {quote ? <QuoteLineItemsSection lineItems={quote.line_items} /> : null}
 
             <QuotePreviewActions
-              actionState={actionState}
               emailActionLabel={emailActionLabel}
               hasCustomerEmail={hasCustomerEmail}
               onGeneratePdf={onGeneratePdf}
-              onSendEmail={onSendEmail}
+              onRequestSendEmail={onRequestSendEmail}
               onCopyLink={onCopyLink}
               openPdfUrl={openPdfUrl}
               shareUrl={shareUrl}
@@ -386,6 +398,16 @@ export function QuotePreview(): React.ReactElement {
               outcomeError={outcomeError}
               shareMessage={shareMessage}
             />
+
+            {quote && showDraftInvoicePromptBelowActions ? (
+              <LinkedInvoiceCard
+                linkedInvoice={quote.linked_invoice}
+                isConverting={isConvertingInvoice}
+                onConvert={onConvertToInvoice}
+                onOpenInvoice={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
+                lowEmphasis
+              />
+            ) : null}
 
             {deleteError ? (
               <div className="mx-4 mt-3">
@@ -402,38 +424,22 @@ export function QuotePreview(): React.ReactElement {
         ) : null}
       </section>
 
-      {showDeleteConfirm && quote ? (
-        <ConfirmModal
-          title={`Delete ${quote.title ?? quote.doc_number}?`}
-          body="This cannot be undone."
-          confirmLabel="Delete"
-          cancelLabel="Keep"
-          variant="destructive"
-          onConfirm={() => void onDelete()}
-          onCancel={() => setShowDeleteConfirm(false)}
-        />
-      ) : null}
-
-      {showMarkWonConfirm ? (
-        <ConfirmModal
-          title="Mark quote as won?"
-          body="This records the quote as won. You can still view the quote and its PDF."
-          confirmLabel="Mark as Won"
-          cancelLabel="Cancel"
-          onConfirm={() => void onConfirmMarkWon()}
-          onCancel={() => setShowMarkWonConfirm(false)}
-        />
-      ) : null}
-
-      {showMarkLostConfirm ? (
-        <ConfirmModal
-          title="Mark quote as lost?"
-          body="This records the quote as lost. You can still view the quote and its PDF."
-          confirmLabel="Mark as Lost"
-          cancelLabel="Cancel"
-          variant="destructive"
-          onConfirm={() => void onConfirmMarkLost()}
-          onCancel={() => setShowMarkLostConfirm(false)}
+      {quote ? (
+        <QuotePreviewDialogs
+          quoteLabel={quote.title ?? quote.doc_number}
+          emailActionLabel={emailActionLabel}
+          showDeleteConfirm={showDeleteConfirm}
+          showMarkWonConfirm={showMarkWonConfirm}
+          showMarkLostConfirm={showMarkLostConfirm}
+          showSendEmailConfirm={showSendEmailConfirm}
+          onDeleteConfirm={() => void onDelete()}
+          onDeleteCancel={() => setShowDeleteConfirm(false)}
+          onMarkWonConfirm={() => void onConfirmMarkWon()}
+          onMarkWonCancel={() => setShowMarkWonConfirm(false)}
+          onMarkLostConfirm={() => void onConfirmMarkLost()}
+          onMarkLostCancel={() => setShowMarkLostConfirm(false)}
+          onSendEmailConfirm={() => void onConfirmSendEmail()}
+          onSendEmailCancel={() => setShowSendEmailConfirm(false)}
         />
       ) : null}
 
