@@ -132,6 +132,13 @@ Deliver:
    - main tradeoff
    - assumptions/contracts that must hold
 7. Recommended issue artifact markdown (Task/Spec as applicable) ready for `gh issue create --body-file` when applicable.
+8. Execution Brief decision:
+   - Decide whether the resulting Task warrants an Execution Brief.
+   - Create one when task-local deltas, analog references, locked decisions, blockers, or task complexity would make implementation handoff meaningfully smaller and clearer.
+   - If yes, generate a filled Execution Brief using `docs/template/EXECUTION_BRIEF.md`.
+   - If no, state briefly why the Task issue is already compact enough without one.
+
+After a Task issue is created, create an Execution Brief only when task-local deltas, analog references, or locked decisions would make implementation handoff meaningfully smaller and clearer.
 
 Constraints:
 - Keep it lean and concrete.
