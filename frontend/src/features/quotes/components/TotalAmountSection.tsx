@@ -45,10 +45,10 @@ export function TotalAmountSection({
   const [depositToggleOverride, setDepositToggleOverride] = useState<boolean | null>(null);
   const [isOptionalPricingOpen, setIsOptionalPricingOpen] = useState(false);
   const isDiscountEnabled = discountToggleOverride ?? (
-    discountType !== null || isPopulatedPricingValue(discountValue)
+    discountType !== null || hasActivePricingValue(discountValue)
   );
-  const isTaxEnabled = taxToggleOverride ?? isPopulatedPricingValue(taxRate);
-  const isDepositEnabled = depositToggleOverride ?? isPopulatedPricingValue(depositAmount);
+  const isTaxEnabled = taxToggleOverride ?? hasActivePricingValue(taxRate);
+  const isDepositEnabled = depositToggleOverride ?? hasActivePricingValue(depositAmount);
 
   const pricingBreakdown = calculatePricingFromSubtotal({
     totalAmount: total,
@@ -57,14 +57,9 @@ export function TotalAmountSection({
     discountValue,
     depositAmount,
   });
-  const shouldAutoExpandOptionalPricing = (
-    isDiscountEnabled
-    || isTaxEnabled
-    || isDepositEnabled
-    || suggestedTaxRate !== null
-  );
+  const hasActiveOptionalPricing = isDiscountEnabled || isTaxEnabled || isDepositEnabled;
   const hasPricingBreakdown = pricingBreakdown.hasPricingBreakdown;
-  const shouldShowOptionalPricingPanel = shouldAutoExpandOptionalPricing || isOptionalPricingOpen;
+  const shouldShowOptionalPricingPanel = hasActiveOptionalPricing || isOptionalPricingOpen;
 
   return (
     <section className="rounded-lg bg-surface-container-low p-4">
@@ -105,7 +100,7 @@ export function TotalAmountSection({
       </div>
 
       <div className="mt-4 border-t border-outline-variant/30 pt-4">
-        {shouldAutoExpandOptionalPricing ? (
+        {hasActiveOptionalPricing ? (
           <div className="flex items-center justify-between gap-4 rounded-lg bg-surface-container-lowest px-4 py-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-on-surface">
@@ -306,6 +301,6 @@ export function TotalAmountSection({
   );
 }
 
-function isPopulatedPricingValue(value: number | null): boolean {
-  return value !== null && value !== 0;
+function hasActivePricingValue(value: number | null): boolean {
+  return value !== null;
 }

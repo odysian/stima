@@ -204,6 +204,49 @@ describe("QuoteEditScreen", () => {
     });
   });
 
+  it("keeps optional pricing collapsed by default when no pricing option is active", async () => {
+    window.sessionStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify(makeDraft()));
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Q-001" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /optional pricing/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByRole("checkbox", { name: "Tax" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /optional pricing/i }));
+
+    expect(screen.getByRole("checkbox", { name: "Tax" })).toBeInTheDocument();
+  });
+
+  it("returns optional pricing to a collapsible state after clearing the last active edit option", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        deposit_amount: 0,
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Q-001" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /optional pricing/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: "Deposit" })).toBeChecked();
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Deposit" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /optional pricing/i })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      expect(screen.queryByRole("checkbox", { name: "Deposit" })).not.toBeInTheDocument();
+    });
+  });
+
   it("shows a load error when the quote fetch fails", async () => {
     mockedQuoteService.getQuote.mockRejectedValueOnce(new Error("Unable to load quote"));
 
