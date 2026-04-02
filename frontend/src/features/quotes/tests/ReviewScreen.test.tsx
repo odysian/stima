@@ -258,6 +258,38 @@ describe("ReviewScreen", () => {
     expect(screen.getByText(/price for edging is uncertain/i)).toBeInTheDocument();
   });
 
+  it("keeps optional pricing collapsed until manually opened when only a suggested tax rate exists", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce({
+      id: "user-1",
+      email: "owner@example.com",
+      first_name: "Jamie",
+      last_name: "Owner",
+      business_name: "North Star Lawn",
+      trade_type: "Landscaper",
+      timezone: "UTC",
+      default_tax_rate: 0.0825,
+      has_logo: false,
+      is_active: true,
+      is_onboarded: true,
+    });
+
+    renderScreen(makeDraft());
+
+    await waitFor(() => {
+      expect(mockedProfileService.getProfile).toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /optional pricing/i })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+    });
+    expect(screen.queryByRole("checkbox", { name: "Tax" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /optional pricing/i }));
+
+    expect(screen.getByRole("spinbutton", { name: /suggested tax/i })).toHaveValue(8.25);
+    expect(screen.getByText(/enable tax to apply this default rate/i)).toBeInTheDocument();
+  });
+
   it("shows review-required guidance when a line item is flagged", () => {
     renderScreen(
       makeDraft({

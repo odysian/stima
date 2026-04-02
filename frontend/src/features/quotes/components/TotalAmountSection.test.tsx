@@ -65,16 +65,23 @@ describe("TotalAmountSection", () => {
     expect(screen.queryByRole("checkbox", { name: "Discount" })).not.toBeInTheDocument();
   });
 
-  it("auto-expands optional pricing when a suggested tax rate exists and shows percent units", () => {
+  it("keeps optional pricing collapsed by default when only a suggested tax rate exists", () => {
     renderSection();
 
-    expect(screen.getByText(/optional pricing/i)).toBeInTheDocument();
-    expect(screen.getByRole("spinbutton", { name: /suggested tax/i })).toHaveValue(8.25);
-    expect(screen.getByText("%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /optional pricing/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByRole("checkbox", { name: "Tax" })).not.toBeInTheDocument();
   });
 
-  it("shows editable inputs without seeding zero values and applies the suggested tax rate", () => {
+  it("shows the suggested tax hint after manually opening the panel and applies the default when tax is enabled", () => {
     renderSection();
+
+    fireEvent.click(screen.getByRole("button", { name: /optional pricing/i }));
+
+    expect(screen.getByRole("spinbutton", { name: /suggested tax/i })).toHaveValue(8.25);
+    expect(screen.getByText("%")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Discount" }));
     const discountInput = screen.getByPlaceholderText("25") as HTMLInputElement;
@@ -87,5 +94,27 @@ describe("TotalAmountSection", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Deposit" }));
     const depositInput = screen.getByPlaceholderText("50") as HTMLInputElement;
     expect(depositInput.value).toBe("");
+  });
+
+  it("forces optional pricing open only when an option is active and returns to collapsible state after clearing the last active option", () => {
+    renderSection({ initialDiscountType: "fixed" });
+
+    expect(screen.queryByRole("button", { name: /optional pricing/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Discount" })).toBeChecked();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Discount" }));
+
+    expect(screen.getByRole("button", { name: /optional pricing/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByRole("checkbox", { name: "Discount" })).not.toBeInTheDocument();
+  });
+
+  it("treats zero-valued pricing as active so the panel stays forced open", () => {
+    renderSection({ initialDepositAmount: 0 });
+
+    expect(screen.queryByRole("button", { name: /optional pricing/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Deposit" })).toBeChecked();
   });
 });
