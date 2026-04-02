@@ -2,6 +2,7 @@ import { Button } from "@/shared/components/Button";
 import {
   DocumentActionError,
   DocumentActionHint,
+  DocumentActionManualCopyField,
   DocumentActionStatus,
   DocumentActionSuccessMessage,
   DocumentActionSurface,
@@ -18,6 +19,7 @@ interface QuotePreviewActionsProps {
   onCopyLink: () => Promise<void>;
   openPdfUrl: string | null;
   shareUrl: string | null;
+  manualCopyUrl: string | null;
   isGeneratingPdf: boolean;
   isSendingEmail: boolean;
   isCopyingLink: boolean;
@@ -38,6 +40,7 @@ export function QuotePreviewActions({
   onCopyLink,
   openPdfUrl,
   shareUrl,
+  manualCopyUrl,
   isGeneratingPdf,
   isSendingEmail,
   isCopyingLink,
@@ -161,6 +164,12 @@ export function QuotePreviewActions({
           {pdfError ? <DocumentActionError>{pdfError}</DocumentActionError> : null}
           {shareError ? <DocumentActionError>{shareError}</DocumentActionError> : null}
           {outcomeError ? <DocumentActionError>{outcomeError}</DocumentActionError> : null}
+          {manualCopyUrl ? (
+            <DocumentActionManualCopyField
+              url={manualCopyUrl}
+              label={shareUrl ? "Share URL" : "Generated share URL"}
+            />
+          ) : null}
           {shareMessage ? (
             <DocumentActionSuccessMessage>{shareMessage}</DocumentActionSuccessMessage>
           ) : null}

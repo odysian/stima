@@ -9,7 +9,6 @@ import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewAc
 import { QuotePreviewDialogs } from "@/features/quotes/components/QuotePreviewDialogs";
 import {
   buildOverflowItems,
-  canNavigateBack,
   getEmailActionLabel,
   getSendEmailErrorMessage,
   isShareAbortError,
@@ -24,6 +23,7 @@ import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { canNavigateBack } from "@/shared/lib/navigation";
 
 export function QuotePreview(): React.ReactElement {
   const navigate = useNavigate();
@@ -42,6 +42,7 @@ export function QuotePreview(): React.ReactElement {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const [isMarkingWon, setIsMarkingWon] = useState(false);
   const [isMarkingLost, setIsMarkingLost] = useState(false);
   const [outcomeError, setOutcomeError] = useState<string | null>(null);
@@ -64,17 +65,14 @@ export function QuotePreview(): React.ReactElement {
   const actionState = resolveActionState(quote, hasLocalPdf);
   const emailActionLabel = getEmailActionLabel(actionState);
   const hasCustomerEmail = Boolean(readOptionalQuoteText(quote, "customer_email"));
+  const customerEmail = readOptionalQuoteText(quote, "customer_email");
   const openPdfUrl = pdfUrl ?? (quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null);
   const quoteTitle = readOptionalQuoteText(quote, "title");
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
-  const clientContact = readOptionalQuoteText(quote, "customer_phone")
-    ?? readOptionalQuoteText(quote, "customer_email")
-    ?? "No contact details";
+  const clientContact = readOptionalQuoteText(quote, "customer_phone") ?? readOptionalQuoteText(quote, "customer_email") ?? "No contact details";
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
-  const showDraftInvoicePromptBelowActions = Boolean(
-    quote && actionState === "draft" && !quote.linked_invoice,
-  );
+  const showDraftInvoicePromptBelowActions = Boolean(quote && actionState === "draft" && !quote.linked_invoice);
   const {
     invoiceError,
     isConvertingInvoice,
@@ -85,21 +83,10 @@ export function QuotePreview(): React.ReactElement {
     navigate,
     setQuote,
   });
-  const isBusy =
-    isGeneratingPdf
-    || isSharing
-    || isSendingEmail
-    || isMarkingWon
-    || isMarkingLost
-    || isDeleting
-    || isConvertingInvoice;
+  const isBusy = isGeneratingPdf || isSharing || isSendingEmail || isMarkingWon || isMarkingLost || isDeleting || isConvertingInvoice;
 
   function handleBack(): void {
-    if (canNavigateBack()) {
-      navigate(-1);
-      return;
-    }
-
+    if (canNavigateBack()) return void navigate(-1);
     navigate("/", { replace: true });
   }
 
@@ -111,6 +98,7 @@ export function QuotePreview(): React.ReactElement {
     setPdfError(null);
     setShareError(null);
     setShareMessage(null);
+    setManualCopyUrl(null);
     setIsGeneratingPdf(true);
     try {
       const blob = await quoteService.generatePdf(id);
@@ -185,6 +173,7 @@ export function QuotePreview(): React.ReactElement {
   async function onCopyLink(): Promise<void> {
     setShareError(null);
     setShareMessage(null);
+    setManualCopyUrl(null);
     setIsSharing(true);
 
     try {
@@ -198,6 +187,7 @@ export function QuotePreview(): React.ReactElement {
             url: nextSharedUrl,
           });
           setShareMessage("Quote link shared.");
+          setManualCopyUrl(null);
           return;
         } catch (error) {
           if (isShareAbortError(error)) {
@@ -208,13 +198,16 @@ export function QuotePreview(): React.ReactElement {
       }
 
       if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        setManualCopyUrl(nextSharedUrl);
         setShareMessage("Copy this share link manually.");
         return;
       }
 
       await navigator.clipboard.writeText(nextSharedUrl);
+      setManualCopyUrl(null);
       setShareMessage("Share link copied to clipboard.");
     } catch (error) {
+      setManualCopyUrl(null);
       const message = error instanceof Error ? error.message : "Unable to copy share link";
       setShareError(message);
     } finally {
@@ -238,6 +231,7 @@ export function QuotePreview(): React.ReactElement {
     setShowSendEmailConfirm(false);
     setShareError(null);
     setShareMessage(null);
+    setManualCopyUrl(null);
     setIsSendingEmail(true);
 
     try {
@@ -381,6 +375,7 @@ export function QuotePreview(): React.ReactElement {
               onCopyLink={onCopyLink}
               openPdfUrl={openPdfUrl}
               shareUrl={shareUrl}
+              manualCopyUrl={manualCopyUrl}
               isGeneratingPdf={isGeneratingPdf}
               isSendingEmail={isSendingEmail}
               isCopyingLink={isSharing}
@@ -422,6 +417,7 @@ export function QuotePreview(): React.ReactElement {
         <QuotePreviewDialogs
           quoteLabel={quote.title ?? quote.doc_number}
           emailActionLabel={emailActionLabel}
+          customerEmail={customerEmail}
           showDeleteConfirm={showDeleteConfirm}
           showMarkWonConfirm={showMarkWonConfirm}
           showMarkLostConfirm={showMarkLostConfirm}

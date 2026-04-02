@@ -98,6 +98,7 @@ function renderScreen(path = "/invoices/invoice-1"): void {
         <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
         <Route path="/invoices/:id/edit" element={<div>Invoice Edit Screen</div>} />
         <Route path="/quotes/:id/preview" element={<div>Quote Preview Screen</div>} />
+        <Route path="/" element={<div>Quote List Screen</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -329,6 +330,30 @@ describe("InvoiceDetailScreen", () => {
     expect(await screen.findByText("Invoice link copied to clipboard.")).toBeInTheDocument();
   });
 
+  it("shows the manual-copy URL when the clipboard API is unavailable", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "sent",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+      }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /copy link/i }));
+
+    expect(await screen.findByLabelText("Share URL")).toHaveValue(
+      "http://localhost:3000/share/invoice-share-token-1",
+    );
+    expect(await screen.findByText("Copy this share link manually.")).toBeInTheDocument();
+  });
+
   it("clears a generated local PDF after sharing the invoice", async () => {
     renderScreen();
 
@@ -359,13 +384,11 @@ describe("InvoiceDetailScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /send email/i }));
 
-    expect(screen.getByText("This sends the latest invoice to the customer email on file.")).toBeInTheDocument();
+    expect(screen.getByText(/alice@example\.com/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     await waitFor(() => {
-      expect(
-        screen.queryByText("This sends the latest invoice to the customer email on file."),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/alice@example\.com/i)).not.toBeInTheDocument();
     });
     expect(mockedInvoiceService.sendInvoiceEmail).not.toHaveBeenCalled();
   });
@@ -391,7 +414,7 @@ describe("InvoiceDetailScreen", () => {
     expect(
       await screen.findByRole("button", { name: /sending/i }),
     ).toBeDisabled();
-    expect(screen.queryByText("This sends the latest invoice to the customer email on file.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/alice@example\.com/i)).not.toBeInTheDocument();
 
     resolveSend(
       makeInvoice({
@@ -425,6 +448,16 @@ describe("InvoiceDetailScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Send Email$/i }));
 
     expect(await screen.findByText("Email delivery failed. Please try again.")).toBeInTheDocument();
-    expect(screen.queryByText("This sends the latest invoice to the customer email on file.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/alice@example\.com/i)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the quote list when back navigation is unsafe", async () => {
+    window.history.replaceState({ idx: 0 }, "");
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /back/i }));
+
+    expect(await screen.findByText("Quote List Screen")).toBeInTheDocument();
   });
 });

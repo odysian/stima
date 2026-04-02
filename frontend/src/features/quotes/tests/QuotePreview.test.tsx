@@ -955,6 +955,9 @@ describe("QuotePreview", () => {
     await screen.findByRole("heading", { name: "Test Customer" });
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
+    expect(await screen.findByLabelText("Share URL")).toHaveValue(
+      "http://localhost:3000/doc/already-shared-token",
+    );
     expect(await screen.findByText("Copy this share link manually.")).toBeInTheDocument();
   });
 
@@ -993,6 +996,7 @@ describe("QuotePreview", () => {
     );
 
     const dialog = screen.getByRole("dialog", { name: /send email\?/i });
+    expect(within(dialog).getByText(/customer@example\.com/i)).toBeInTheDocument();
     expect(mockedQuoteService.sendQuoteEmail).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole("button", { name: /send email/i }));
