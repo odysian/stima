@@ -20,6 +20,7 @@ from sqlalchemy.orm import aliased, selectinload
 
 from app.features.auth.models import User
 from app.features.customers.models import Customer
+from app.features.event_logs.models import EventLog
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRenderLineItem
 from app.features.quotes.schemas import LineItemDraft
@@ -76,6 +77,28 @@ class InvoiceListItemSummary:
     due_date: date | None
     created_at: datetime
     source_document_id: UUID | None
+
+
+@dataclass(slots=True)
+class InvoiceEmailContext:
+    """Invoice and contact fields required for transactional email delivery."""
+
+    invoice_id: UUID
+    user_id: UUID
+    customer_id: UUID
+    business_name: str | None
+    first_name: str | None
+    last_name: str | None
+    contractor_email: str
+    contractor_phone: str | None
+    customer_name: str
+    customer_email: str | None
+    doc_number: str
+    title: str | None
+    status: str
+    total_amount: Decimal | None
+    due_date: date | None
+    share_token: str | None
 
 
 class InvoiceRepository:
@@ -223,6 +246,50 @@ class InvoiceRepository:
             line_items=document.line_items,
             created_at=document.created_at,
             updated_at=document.updated_at,
+        )
+
+    async def get_email_context(
+        self,
+        invoice_id: UUID,
+        user_id: UUID,
+    ) -> InvoiceEmailContext | None:
+        """Return the invoice and contact fields needed to send an invoice email."""
+        result = await self._session.execute(
+            select(Document, Customer, User)
+            .join(Customer, Customer.id == Document.customer_id)
+            .join(User, User.id == Document.user_id)
+            .where(
+                Document.id == invoice_id,
+                Document.user_id == user_id,
+                Document.doc_type == _INVOICE_DOC_TYPE,
+            )
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+
+        document, customer, user = row
+        return InvoiceEmailContext(
+            invoice_id=document.id,
+            user_id=document.user_id,
+            customer_id=document.customer_id,
+            business_name=user.business_name,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            contractor_email=user.email,
+            contractor_phone=user.phone_number,
+            customer_name=customer.name,
+            customer_email=customer.email,
+            doc_number=document.doc_number,
+            title=document.title,
+            status=(
+                document.status.value
+                if isinstance(document.status, QuoteStatus)
+                else str(document.status)
+            ),
+            total_amount=document.total_amount,
+            due_date=document.due_date,
+            share_token=document.share_token,
         )
 
     async def get_render_context(
@@ -431,6 +498,46 @@ class InvoiceRepository:
             )
             .values(status=QuoteStatus.READY)
         )
+
+    async def get_latest_invoice_event_at(
+        self,
+        *,
+        user_id: UUID,
+        invoice_id: UUID,
+        event_name: str,
+    ) -> datetime | None:
+        """Return the latest event timestamp recorded for one invoice/event pair."""
+        return await self._session.scalar(
+            select(EventLog.created_at)
+            .where(
+                EventLog.user_id == user_id,
+                EventLog.event_name == event_name,
+                EventLog.metadata_json["invoice_id"].as_string() == str(invoice_id),
+            )
+            .order_by(EventLog.created_at.desc())
+            .limit(1)
+        )
+
+    async def persist_invoice_event(
+        self,
+        *,
+        user_id: UUID,
+        invoice_id: UUID,
+        customer_id: UUID,
+        event_name: str,
+    ) -> None:
+        """Persist one invoice event for duplicate-send throttling."""
+        self._session.add(
+            EventLog(
+                user_id=user_id,
+                event_name=event_name,
+                metadata_json={
+                    "invoice_id": str(invoice_id),
+                    "customer_id": str(customer_id),
+                },
+            )
+        )
+        await self._session.flush()
 
     async def commit(self) -> None:
         """Commit pending invoice writes."""

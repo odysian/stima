@@ -12,6 +12,7 @@ vi.mock("@/features/invoices/services/invoiceService", () => ({
     updateInvoice: vi.fn(),
     generatePdf: vi.fn(),
     shareInvoice: vi.fn(),
+    sendInvoiceEmail: vi.fn(),
   },
 }));
 
@@ -103,11 +104,20 @@ function renderScreen(path = "/invoices/invoice-1"): void {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mockedInvoiceService.getInvoice.mockResolvedValue(makeInvoiceDetail());
   mockedInvoiceService.generatePdf.mockResolvedValue(
     new Blob(["invoice-pdf"], { type: "application/pdf" }),
   );
   mockedInvoiceService.shareInvoice.mockResolvedValue(
+    makeInvoice({
+      status: "sent",
+      share_token: "invoice-share-token-1",
+      shared_at: "2026-03-20T00:15:00.000Z",
+      updated_at: "2026-03-20T00:15:00.000Z",
+    }),
+  );
+  mockedInvoiceService.sendInvoiceEmail.mockResolvedValue(
     makeInvoice({
       status: "sent",
       share_token: "invoice-share-token-1",
@@ -181,6 +191,64 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.queryByText(/sent invoices are read-only/i)).not.toBeInTheDocument();
   });
 
+  it("shows Send by Email for ready invoices", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "ready",
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("button", { name: /send by email/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /resend by email/i })).not.toBeInTheDocument();
+  });
+
+  it("shows Resend by Email for sent invoices", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "sent",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("button", { name: /resend by email/i })).toBeInTheDocument();
+  });
+
+  it("hides the email action for draft invoices", async () => {
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /send by email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /resend by email/i })).not.toBeInTheDocument();
+  });
+
+  it("disables the email action and shows a hint when the customer email is missing", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "ready",
+        customer: {
+          id: "cust-1",
+          name: "Alice Johnson",
+          email: null,
+          phone: "+1-555-0100",
+        },
+      }),
+    );
+
+    renderScreen();
+
+    const sendButton = await screen.findByRole("button", { name: /send by email/i });
+    expect(sendButton).toBeDisabled();
+    expect(
+      screen.getByText("Add a customer email to send this invoice by email. Copy Link still works."),
+    ).toBeInTheDocument();
+  });
+
   it("navigates to the invoice editor when edit is clicked", async () => {
     renderScreen();
 
@@ -220,5 +288,85 @@ describe("InvoiceDetailScreen", () => {
       expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:invoice-preview");
     });
     expect(screen.queryByRole("link", { name: "Open PDF" })).not.toBeInTheDocument();
+  });
+
+  it("opens a confirmation modal before sending and closes it on cancel", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "ready",
+      }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /send by email/i }));
+
+    expect(screen.getByText("This sends the latest invoice to the customer email on file.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText("This sends the latest invoice to the customer email on file."),
+      ).not.toBeInTheDocument();
+    });
+    expect(mockedInvoiceService.sendInvoiceEmail).not.toHaveBeenCalled();
+  });
+
+  it("sends invoice email after confirmation, shows in-flight state, and updates local invoice state", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "ready",
+      }),
+    );
+
+    let resolveSend!: (invoice: Invoice) => void;
+    const sendPromise = new Promise<Invoice>((resolve) => {
+      resolveSend = resolve;
+    });
+    mockedInvoiceService.sendInvoiceEmail.mockReturnValueOnce(sendPromise);
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /send by email/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send by Email$/i }));
+
+    expect(
+      await screen.findByRole("button", { name: /sending/i }),
+    ).toBeDisabled();
+    expect(screen.queryByText("This sends the latest invoice to the customer email on file.")).not.toBeInTheDocument();
+
+    resolveSend(
+      makeInvoice({
+        status: "sent",
+        share_token: "invoice-share-token-2",
+        shared_at: "2026-03-20T00:20:00.000Z",
+        updated_at: "2026-03-20T00:20:00.000Z",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.sendInvoiceEmail).toHaveBeenCalledWith("invoice-1");
+    });
+    expect(await screen.findByText("Invoice sent by email.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /resend by email/i })).toBeInTheDocument();
+  });
+
+  it("dismisses the confirmation modal and shows the backend detail when sending fails", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "ready",
+      }),
+    );
+    mockedInvoiceService.sendInvoiceEmail.mockRejectedValueOnce(
+      new Error("Email delivery failed. Please try again."),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /send by email/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Send by Email$/i }));
+
+    expect(await screen.findByText("Email delivery failed. Please try again.")).toBeInTheDocument();
+    expect(screen.queryByText("This sends the latest invoice to the customer email on file.")).not.toBeInTheDocument();
   });
 });

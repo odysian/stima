@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from app.features.auth.models import User
+from app.features.invoices.email_delivery_service import InvoiceEmailDeliveryService
 from app.features.invoices.schemas import (
     InvoiceCreateRequest,
     InvoiceCustomerResponse,
@@ -20,7 +21,12 @@ from app.features.invoices.schemas import (
 from app.features.invoices.service import InvoiceService
 from app.features.quotes.schemas import LineItemResponse
 from app.features.quotes.service import QuoteServiceError
-from app.shared.dependencies import get_current_user, get_invoice_service, require_csrf
+from app.shared.dependencies import (
+    get_current_user,
+    get_invoice_email_delivery_service,
+    get_invoice_service,
+    require_csrf,
+)
 from app.shared.pricing import DiscountType
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
@@ -158,6 +164,28 @@ async def share_invoice(
     """Create/reuse a share token and mark the invoice as sent."""
     try:
         invoice = await invoice_service.share_invoice(user, invoice_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return InvoiceResponse.model_validate(invoice)
+
+
+@router.post(
+    "/{invoice_id}/send-email",
+    response_model=InvoiceResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_csrf)],
+)
+async def send_invoice_email(
+    invoice_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    email_delivery_service: Annotated[
+        InvoiceEmailDeliveryService,
+        Depends(get_invoice_email_delivery_service),
+    ],
+) -> InvoiceResponse:
+    """Send an invoice email to the customer contact on file."""
+    try:
+        invoice = await email_delivery_service.send_invoice_email(user, invoice_id)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return InvoiceResponse.model_validate(invoice)

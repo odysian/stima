@@ -21,6 +21,7 @@ from app.features.auth.service import (
 )
 from app.features.customers.repository import CustomerRepository
 from app.features.customers.service import CustomerService
+from app.features.invoices.email_delivery_service import InvoiceEmailDeliveryService
 from app.features.invoices.repository import InvoiceRepository
 from app.features.invoices.service import InvoiceService
 from app.features.profile.repository import ProfileRepository
@@ -132,6 +133,28 @@ def get_quote_email_delivery_service(
     return QuoteEmailDeliveryService(
         repository=repository,
         quote_service=quote_service,
+        email_service=email_service,
+        frontend_url=settings.frontend_url,
+    )
+
+
+def get_invoice_email_delivery_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    storage_service: Annotated[StorageService, Depends(get_storage_service)],
+    email_service: Annotated[EmailService, Depends(get_email_service)],
+) -> InvoiceEmailDeliveryService:
+    """Build a request-scoped invoice email delivery service."""
+    settings = get_settings()
+    repository = InvoiceRepository(db)
+    invoice_service = InvoiceService(
+        invoice_repository=repository,
+        quote_repository=QuoteRepository(db),
+        pdf_integration=get_pdf_integration(),
+        storage_service=storage_service,
+    )
+    return InvoiceEmailDeliveryService(
+        repository=repository,
+        invoice_service=invoice_service,
         email_service=email_service,
         frontend_url=settings.frontend_url,
     )
