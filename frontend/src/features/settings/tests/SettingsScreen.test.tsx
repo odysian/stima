@@ -133,6 +133,18 @@ describe("SettingsScreen", () => {
     );
     expect(screen.getByText("Stima")).toBeInTheDocument();
     expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-name-row")).toHaveClass(
+      "grid",
+      "grid-cols-1",
+      "gap-4",
+      "min-[360px]:grid-cols-2",
+    );
+    expect(screen.getByTestId("settings-profile-meta-row")).toHaveClass(
+      "grid",
+      "grid-cols-1",
+      "gap-4",
+      "min-[360px]:grid-cols-2",
+    );
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).toBeNull();
     expect(screen.getByText("Account").closest("section")).toHaveClass("bg-surface-container-low");
@@ -408,9 +420,83 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByAltText(/business logo preview/i)).toBeInTheDocument();
+    expect(await screen.findByText("Business Profile")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-logo-block")).toHaveClass(
+      "rounded-xl",
+      "bg-surface-container-low",
+      "p-4",
+    );
+    expect(screen.getByTestId("settings-logo-content-row")).toHaveClass(
+      "flex",
+      "flex-col",
+      "gap-3",
+      "min-[360px]:grid",
+      "min-[360px]:grid-cols-[128px_minmax(0,1fr)]",
+      "min-[360px]:items-start",
+      "min-[360px]:gap-4",
+    );
+    expect(screen.getByTestId("settings-logo-actions")).toHaveClass(
+      "flex",
+      "min-w-0",
+      "flex-col",
+      "gap-2",
+    );
+    const previewTile = await screen.findByTestId("settings-logo-preview-tile");
+    expect(previewTile).toHaveClass(
+      "h-[128px]",
+      "w-[128px]",
+      "rounded-xl",
+      "bg-surface-container-lowest",
+    );
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
+    expect(await screen.findByAltText(/business logo preview/i)).toHaveClass(
+      "max-h-full",
+      "max-w-full",
+      "object-contain",
+    );
     expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/upload new/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
+  });
+
+  it("renders a fixed no-logo preview frame with the updated upload label", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+
+    renderScreen();
+
+    expect(await screen.findByText("Business Profile")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-logo-block")).toHaveClass(
+      "rounded-xl",
+      "bg-surface-container-low",
+      "p-4",
+    );
+    expect(screen.getByTestId("settings-logo-content-row")).toHaveClass(
+      "flex",
+      "flex-col",
+      "gap-3",
+      "min-[360px]:grid",
+      "min-[360px]:grid-cols-[128px_minmax(0,1fr)]",
+      "min-[360px]:items-start",
+      "min-[360px]:gap-4",
+    );
+    expect(screen.getByTestId("settings-logo-actions")).toHaveClass(
+      "flex",
+      "min-w-0",
+      "flex-col",
+      "gap-2",
+    );
+    const previewTile = await screen.findByTestId("settings-logo-preview-tile");
+    expect(previewTile).toHaveClass(
+      "h-[128px]",
+      "w-[128px]",
+      "rounded-xl",
+      "bg-surface-container-lowest",
+    );
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
+    expect(within(previewTile).getByText("No logo")).toBeInTheDocument();
+    expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
   });
 
   it("uploads a new logo and refreshes the preview state", async () => {
@@ -427,6 +513,34 @@ describe("SettingsScreen", () => {
 
     await waitFor(() => expect(mockedProfileService.uploadLogo).toHaveBeenCalledWith(file));
     expect(await screen.findByAltText(/business logo preview/i)).toBeInTheDocument();
+  });
+
+  it("shows an inline error for unsupported logo file types without uploading", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+
+    renderScreen();
+
+    const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
+    const file = new File(["not-an-image"], "logo.gif", { type: "image/gif" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Upload a JPEG or PNG logo.");
+    expect(mockedProfileService.uploadLogo).not.toHaveBeenCalled();
+  });
+
+  it("shows an inline error for oversized logo uploads without uploading", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+
+    renderScreen();
+
+    const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
+    const file = new File(["fake-logo"], "logo.png", { type: "image/png" });
+    Object.defineProperty(file, "size", { value: 2 * 1024 * 1024 + 1 });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Logo must be 2 MB or smaller.");
+    expect(mockedProfileService.uploadLogo).not.toHaveBeenCalled();
   });
 
   it("opens the remove confirmation modal and cancels without deleting", async () => {
@@ -463,6 +577,13 @@ describe("SettingsScreen", () => {
     await waitFor(() => expect(mockedProfileService.deleteLogo).toHaveBeenCalledTimes(1));
     await waitFor(() => {
       expect(screen.queryByAltText(/business logo preview/i)).not.toBeInTheDocument();
+      expect(screen.getByTestId("settings-logo-preview-tile")).toHaveClass(
+        "h-[128px]",
+        "w-[128px]",
+        "rounded-xl",
+        "bg-surface-container-lowest",
+      );
+      expect(screen.getByText("No logo")).toBeInTheDocument();
     });
   });
 

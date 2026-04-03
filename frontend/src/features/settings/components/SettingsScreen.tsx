@@ -24,6 +24,9 @@ const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = 
   { label: "Dark", value: "dark" },
 ];
 
+const ALLOWED_LOGO_TYPES = new Set(["image/jpeg", "image/png"]);
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+
 export function SettingsScreen(): React.ReactElement {
   const { logout, refreshUser } = useAuth();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
@@ -94,6 +97,16 @@ export function SettingsScreen(): React.ReactElement {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) {
+      return;
+    }
+
+    if (!ALLOWED_LOGO_TYPES.has(file.type)) {
+      setLogoError("Upload a JPEG or PNG logo.");
+      return;
+    }
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      setLogoError("Logo must be 2 MB or smaller.");
       return;
     }
 
@@ -200,60 +213,72 @@ export function SettingsScreen(): React.ReactElement {
               </h2>
 
               <div className="mt-4 flex flex-col gap-4">
-                <div className="rounded-xl bg-surface-container-low px-4 py-3">
+                <div
+                  data-testid="settings-logo-block"
+                  className="rounded-xl bg-surface-container-low p-4"
+                >
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-1 pr-2">
-                        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                          Logo
-                        </p>
+                    <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+                      Logo
+                    </p>
+                    <div
+                      data-testid="settings-logo-content-row"
+                      className="flex flex-col gap-3 min-[360px]:grid min-[360px]:grid-cols-[128px_minmax(0,1fr)] min-[360px]:items-start min-[360px]:gap-4"
+                    >
+                      <div
+                        data-testid="settings-logo-preview-tile"
+                        className="flex h-[128px] w-[128px] rounded-xl bg-surface-container-lowest p-2"
+                      >
+                        <div className="flex h-full w-full items-center justify-center rounded-lg bg-surface-container p-2">
+                          {hasLogo ? (
+                            <img
+                              key={logoPreviewVersion}
+                              src={logoPreviewSrc}
+                              alt="Business logo preview"
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          ) : (
+                            <p className="text-xs text-on-surface-variant">No logo</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        data-testid="settings-logo-actions"
+                        className="flex min-w-0 flex-col gap-2"
+                      >
                         <p className="text-xs text-on-surface-variant">
                           JPEG or PNG, up to 2 MB. Appears on quote PDFs.
                         </p>
+                        <div className="flex flex-col items-start gap-2">
+                          <label
+                            htmlFor="settings-logo-upload"
+                            className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container"
+                          >
+                            Upload Logo
+                          </label>
+                          <input
+                            id="settings-logo-upload"
+                            type="file"
+                            accept="image/jpeg,image/png"
+                            className="sr-only"
+                            disabled={isLogoSubmitting}
+                            onChange={onLogoUpload}
+                          />
+                          {hasLogo ? (
+                            <button
+                              type="button"
+                              className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-secondary px-3 py-2 text-xs font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={isLogoSubmitting}
+                              onClick={() => setIsRemoveLogoOpen(true)}
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
+                        {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
                       </div>
-
-                      {hasLogo ? (
-                        <img
-                          key={logoPreviewVersion}
-                          src={logoPreviewSrc}
-                          alt="Business logo preview"
-                          className="h-10 w-auto max-w-[140px] shrink-0 object-contain"
-                        />
-                      ) : (
-                        <p className="shrink-0 text-right text-xs text-on-surface-variant">
-                          No logo uploaded yet.
-                        </p>
-                      )}
                     </div>
-
-                    <div className="flex items-center gap-3">
-                      <label
-                        htmlFor="settings-logo-upload"
-                        className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
-                      >
-                        {hasLogo ? "Upload New" : "Upload Logo"}
-                      </label>
-                      <input
-                        id="settings-logo-upload"
-                        type="file"
-                        accept="image/jpeg,image/png"
-                        className="sr-only"
-                        disabled={isLogoSubmitting}
-                        onChange={onLogoUpload}
-                      />
-                      {hasLogo ? (
-                        <button
-                          type="button"
-                          className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={isLogoSubmitting}
-                          onClick={() => setIsRemoveLogoOpen(true)}
-                        >
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
-
-                    {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
                   </div>
                 </div>
 
@@ -264,7 +289,10 @@ export function SettingsScreen(): React.ReactElement {
                   onChange={(event) => setBusinessName(event.target.value)}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div
+                  data-testid="settings-name-row"
+                  className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"
+                >
                   <Input
                     id="settings-first-name"
                     label="First name"
@@ -279,7 +307,10 @@ export function SettingsScreen(): React.ReactElement {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div
+                  data-testid="settings-profile-meta-row"
+                  className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"
+                >
                   <div className="flex flex-col gap-1">
                     <label htmlFor="settings-trade-type" className="text-sm font-medium text-on-surface">
                       Trade type
