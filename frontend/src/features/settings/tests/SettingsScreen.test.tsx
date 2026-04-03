@@ -132,7 +132,7 @@ describe("SettingsScreen", () => {
       "text-outline",
     );
     expect(screen.getByText("Stima")).toBeInTheDocument();
-    expect(screen.queryByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).not.toBeInTheDocument();
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).toBeNull();
     expect(screen.getByText("Account").closest("section")).toHaveClass("bg-surface-container-low");
@@ -436,7 +436,7 @@ describe("SettingsScreen", () => {
       "rounded-xl",
       "bg-surface-container-lowest",
     );
-    expect(screen.queryByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).not.toBeInTheDocument();
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
     expect(await screen.findByAltText(/business logo preview/i)).toHaveClass(
       "max-h-full",
       "max-w-full",
@@ -480,7 +480,7 @@ describe("SettingsScreen", () => {
       "rounded-xl",
       "bg-surface-container-lowest",
     );
-    expect(screen.queryByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).not.toBeInTheDocument();
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
     expect(within(previewTile).getByText("No logo")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();

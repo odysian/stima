@@ -248,6 +248,10 @@ export function SettingsScreen(): React.ReactElement {
                         data-testid="settings-logo-actions"
                         className="flex min-w-0 flex-col gap-2"
                       >
+                        <p className="text-xs text-on-surface-variant">
+                          JPEG or PNG, up to 2 MB. Appears on quote PDFs.
+                        </p>
+
                         <div className="flex flex-col items-start gap-2">
                           <label
                             htmlFor="settings-logo-upload"
