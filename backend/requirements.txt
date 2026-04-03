@@ -44,7 +44,7 @@ pytest-asyncio==0.25.3
 pytest-cov==7.0.0
 
 # Linting / type checking / security
-ruff==0.9.1
+ruff==0.15.9
 mypy==1.11.2
 bandit==1.8.0
 # Transitive via bandit -> rich; pin for CVE-2026-4539 (pygments GHSA / PyPI advisory).
