@@ -145,6 +145,7 @@ async def generate_invoice_pdf(
         iter((pdf_bytes,)),
         media_type="application/pdf",
         headers={
+            "Cache-Control": "no-store",
             "Content-Disposition": f'inline; filename="invoice-{doc_number}.pdf"',
         },
     )

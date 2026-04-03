@@ -7,6 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.datastructures import MutableHeaders
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.admin.router import router as admin_router
 from app.core.config import get_settings
@@ -19,7 +23,42 @@ from app.features.profile.api import router as profile_router
 from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
 from app.shared.event_logger import configure_event_logging
+from app.shared.proxy_headers import TrustedProxyHeadersMiddleware
 from app.shared.rate_limit import limiter
+
+
+class SecurityHeadersMiddleware:
+    """Apply baseline security headers to backend-served HTTP responses."""
+
+    def __init__(self, app: ASGIApp, *, environment: str) -> None:
+        self.app = app
+        self.environment = environment.lower()
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_security_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers.setdefault("X-Content-Type-Options", "nosniff")
+                headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+                headers.setdefault("X-Frame-Options", "DENY")
+                if self.environment == "production" and scope.get("scheme") == "https":
+                    headers.setdefault(
+                        "Strict-Transport-Security",
+                        "max-age=63072000; includeSubDomains",
+                    )
+            await send(message)
+
+        await self.app(scope, receive, send_with_security_headers)
+
+
+def _resolve_allowed_hosts(allowed_hosts: list[str]) -> list[str]:
+    if not allowed_hosts or "*" in allowed_hosts:
+        return ["*"]
+    return allowed_hosts
 
 
 def create_app() -> FastAPI:
@@ -37,6 +76,20 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+    if settings.enable_https_redirect:
+        app.add_middleware(HTTPSRedirectMiddleware)
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=_resolve_allowed_hosts(settings.allowed_hosts),
+    )
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        environment=settings.environment,
+    )
+    app.add_middleware(
+        TrustedProxyHeadersMiddleware,
+        trusted_proxy_ips=settings.trusted_proxy_ips,
     )
     app.include_router(auth_router, prefix="/api")
     app.include_router(profile_router, prefix="/api")

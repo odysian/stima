@@ -351,3 +351,9 @@ Stima is deployed in production with same-site subdomains:
 - Container registry: GHCR
 
 Cookie auth is configured for the shared parent domain `.stima.odysian.dev`.
+
+Boundary hardening notes:
+- Backend host validation is driven by `ALLOWED_HOSTS`.
+- Backend trusts `X-Forwarded-*` headers only from `TRUSTED_PROXY_IPS`.
+- Backend emits baseline security headers for backend-served responses; static-host CSP headers remain owned by the frontend host/CDN layer.
+- The SPA shell is compatible with `script-src 'self'`; Google Fonts and Material Symbols still require explicit font/style allowlisting until they are self-hosted.
