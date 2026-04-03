@@ -17,7 +17,7 @@ python-multipart==0.0.22
 
 # Auth — PyJWT only. See exclusions table below.
 PyJWT==2.12.1
-argon2-cffi==23.1.0
+argon2-cffi==25.1.0
 
 # Rate limiting
 # Latest release on PyPI as of this task; keep intentionally pinned.
