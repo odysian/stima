@@ -125,3 +125,12 @@ def test_validate_payload_rejects_non_string_field_values() -> None:
         validator.validate_payload(payload, today=date(2026, 4, 3))
         == "entry 1 field 'expires_on' must be a non-empty string"
     )
+
+
+def test_validator_resolves_exception_file_from_repo_root() -> None:
+    validator = _load_validator_module()
+    repo_root = Path(__file__).resolve().parents[4]
+
+    assert validator.EXCEPTIONS_PATH == (
+        repo_root / "security" / "dependency-audit-exceptions.json"
+    )

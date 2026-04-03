@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Any
 
 
-EXCEPTIONS_PATH = Path("security/dependency-audit-exceptions.json")
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+EXCEPTIONS_PATH = REPO_ROOT / "security" / "dependency-audit-exceptions.json"
 REQUIRED_FIELDS = (
     "id",
     "ecosystem",
