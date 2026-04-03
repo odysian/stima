@@ -4,7 +4,7 @@ uvicorn[standard]==0.40.0
 
 # Database
 SQLAlchemy==2.0.45
-alembic==1.18.0
+alembic==1.18.4
 asyncpg==0.31.0
 psycopg2-binary==2.9.11
 
