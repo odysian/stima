@@ -270,6 +270,7 @@ async def generate_quote_pdf(
         iter((pdf_bytes,)),
         media_type="application/pdf",
         headers={
+            "Cache-Control": "no-store",
             "Content-Disposition": f'inline; filename="quote-{doc_number}.pdf"',
         },
     )

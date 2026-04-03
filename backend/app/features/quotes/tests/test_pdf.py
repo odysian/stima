@@ -126,6 +126,7 @@ async def test_generate_pdf_returns_pdf_and_sets_ready(client: AsyncClient) -> N
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/pdf")
+    assert response.headers["cache-control"] == "no-store"
     assert response.headers["content-disposition"] == 'inline; filename="quote-Q-001.pdf"'
     assert response.content == b"PDF for Q-001"
 
@@ -410,6 +411,9 @@ async def test_public_share_endpoint_streams_pdf_without_auth(client: AsyncClien
     assert response.headers["content-type"].startswith("application/pdf")
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-robots-tag"] == "noindex"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["x-frame-options"] == "DENY"
 
 
 async def test_public_share_endpoint_marks_first_view_once(
@@ -869,6 +873,7 @@ async def test_invoice_pdf_generation_sets_ready_and_renders_invoice_context(
     )
 
     assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
     assert response.headers["content-disposition"] == 'inline; filename="invoice-I-001.pdf"'
     assert response.content == b"PDF for I-001"
     assert _override_quote_service_dependency.last_context is not None

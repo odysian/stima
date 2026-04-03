@@ -11,6 +11,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 MIN_SECRET_KEY_LENGTH = 32
+LOCALHOST_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0"})  # nosec B104
 FORBIDDEN_SECRET_KEY_VALUES = frozenset(
     {
         "dev-secret-key-change-in-production",
@@ -93,6 +94,14 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173"],
         validation_alias="ALLOWED_ORIGINS",
     )
+    allowed_hosts: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        validation_alias="ALLOWED_HOSTS",
+    )
+    enable_https_redirect: bool = Field(
+        default=False,
+        validation_alias="ENABLE_HTTPS_REDIRECT",
+    )
     trusted_proxy_ips: Annotated[list[str], NoDecode] = Field(
         default_factory=list,
         validation_alias="TRUSTED_PROXY_IPS",
@@ -165,6 +174,16 @@ class Settings(BaseSettings):
             return [str(origin).strip() for origin in value if str(origin).strip()]
         return ["http://localhost:5173"]
 
+    @field_validator("allowed_hosts", mode="before")
+    @classmethod
+    def normalize_allowed_hosts(cls, value: Any) -> list[str]:
+        """Allow ALLOWED_HOSTS as CSV string or list."""
+        if isinstance(value, str):
+            return [host.strip() for host in value.split(",") if host.strip()]
+        if isinstance(value, list):
+            return [str(host).strip() for host in value if str(host).strip()]
+        return []
+
     @field_validator("trusted_proxy_ips", mode="before")
     @classmethod
     def normalize_trusted_proxy_ips(cls, value: Any) -> list[str]:
@@ -190,6 +209,23 @@ class Settings(BaseSettings):
         """Enforce browser-compatible SameSite=None cookie settings."""
         if self.cookie_samesite == "none" and not self.cookie_secure:
             raise ValueError("COOKIE_SECURE must be true when COOKIE_SAMESITE is 'none'")
+        return self
+
+    @model_validator(mode="after")
+    def validate_production_boundary_settings(self) -> Settings:
+        """Require production-safe cookie, origin, and host settings."""
+        if self.environment.lower() != "production":
+            return self
+
+        if not self.cookie_secure:
+            raise ValueError("COOKIE_SECURE must be true when ENVIRONMENT is 'production'")
+        if not self.allowed_hosts:
+            raise ValueError("ALLOWED_HOSTS must be non-empty when ENVIRONMENT is 'production'")
+
+        parsed_frontend_url = urlparse(self.frontend_url)
+        if parsed_frontend_url.hostname in LOCALHOST_HOSTS:
+            raise ValueError("FRONTEND_URL must not use localhost when ENVIRONMENT is 'production'")
+
         return self
 
 

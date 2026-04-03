@@ -45,6 +45,14 @@ def test_allowed_origins_csv_parses_to_list(monkeypatch) -> None:
     ]
 
 
+def test_allowed_hosts_csv_parses_to_list(monkeypatch) -> None:
+    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev, 127.0.0.1")
+
+    settings = get_settings()
+
+    assert settings.allowed_hosts == ["api.stima.dev", "127.0.0.1"]
+
+
 def test_frontend_url_is_normalized_without_trailing_slash(monkeypatch) -> None:
     monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev/")
 
@@ -123,3 +131,33 @@ def test_gcs_bucket_name_is_required(monkeypatch) -> None:
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_production_requires_secure_cookies(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "false")
+    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+
+def test_production_requires_non_localhost_frontend_url(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("FRONTEND_URL", "http://localhost:5173")
+    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+
+def test_production_requires_allowed_hosts(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.delenv("ALLOWED_HOSTS", raising=False)
+
+    with pytest.raises(ValidationError):
+        get_settings()
