@@ -221,7 +221,6 @@ export function SettingsScreen(): React.ReactElement {
                     <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                       Logo
                     </p>
-
                     <div
                       data-testid="settings-logo-content-row"
                       className="flex flex-col gap-3 min-[360px]:grid min-[360px]:grid-cols-[128px_minmax(0,1fr)] min-[360px]:items-start min-[360px]:gap-4"
@@ -251,7 +250,6 @@ export function SettingsScreen(): React.ReactElement {
                         <p className="text-xs text-on-surface-variant">
                           JPEG or PNG, up to 2 MB. Appears on quote PDFs.
                         </p>
-
                         <div className="flex flex-col items-start gap-2">
                           <label
                             htmlFor="settings-logo-upload"
@@ -278,7 +276,6 @@ export function SettingsScreen(): React.ReactElement {
                             </button>
                           ) : null}
                         </div>
-
                         {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
                       </div>
                     </div>
@@ -292,7 +289,10 @@ export function SettingsScreen(): React.ReactElement {
                   onChange={(event) => setBusinessName(event.target.value)}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div
+                  data-testid="settings-name-row"
+                  className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"
+                >
                   <Input
                     id="settings-first-name"
                     label="First name"
@@ -307,7 +307,10 @@ export function SettingsScreen(): React.ReactElement {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div
+                  data-testid="settings-profile-meta-row"
+                  className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"
+                >
                   <div className="flex flex-col gap-1">
                     <label htmlFor="settings-trade-type" className="text-sm font-medium text-on-surface">
                       Trade type

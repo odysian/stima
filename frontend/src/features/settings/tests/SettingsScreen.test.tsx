@@ -133,6 +133,18 @@ describe("SettingsScreen", () => {
     );
     expect(screen.getByText("Stima")).toBeInTheDocument();
     expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-name-row")).toHaveClass(
+      "grid",
+      "grid-cols-1",
+      "gap-4",
+      "min-[360px]:grid-cols-2",
+    );
+    expect(screen.getByTestId("settings-profile-meta-row")).toHaveClass(
+      "grid",
+      "grid-cols-1",
+      "gap-4",
+      "min-[360px]:grid-cols-2",
+    );
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).toBeNull();
     expect(screen.getByText("Account").closest("section")).toHaveClass("bg-surface-container-low");
