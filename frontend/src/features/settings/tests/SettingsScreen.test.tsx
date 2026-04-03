@@ -414,13 +414,26 @@ describe("SettingsScreen", () => {
       "bg-surface-container-low",
       "p-4",
     );
+    expect(screen.getByTestId("settings-logo-content-row")).toHaveClass(
+      "grid",
+      "grid-cols-[128px_minmax(0,1fr)]",
+      "items-start",
+      "gap-4",
+    );
+    expect(screen.getByTestId("settings-logo-actions")).toHaveClass(
+      "flex",
+      "min-w-0",
+      "flex-col",
+      "gap-3",
+    );
     const previewTile = await screen.findByTestId("settings-logo-preview-tile");
     expect(previewTile).toHaveClass(
-      "h-[136px]",
-      "w-[136px]",
+      "h-[128px]",
+      "w-[128px]",
       "rounded-xl",
       "bg-surface-container-lowest",
     );
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
     expect(await screen.findByAltText(/business logo preview/i)).toHaveClass(
       "max-h-full",
       "max-w-full",
@@ -442,13 +455,26 @@ describe("SettingsScreen", () => {
       "bg-surface-container-low",
       "p-4",
     );
+    expect(screen.getByTestId("settings-logo-content-row")).toHaveClass(
+      "grid",
+      "grid-cols-[128px_minmax(0,1fr)]",
+      "items-start",
+      "gap-4",
+    );
+    expect(screen.getByTestId("settings-logo-actions")).toHaveClass(
+      "flex",
+      "min-w-0",
+      "flex-col",
+      "gap-3",
+    );
     const previewTile = await screen.findByTestId("settings-logo-preview-tile");
     expect(previewTile).toHaveClass(
-      "h-[136px]",
-      "w-[136px]",
+      "h-[128px]",
+      "w-[128px]",
       "rounded-xl",
       "bg-surface-container-lowest",
     );
+    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
     expect(within(previewTile).getByText("No logo")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
@@ -506,8 +532,8 @@ describe("SettingsScreen", () => {
     await waitFor(() => {
       expect(screen.queryByAltText(/business logo preview/i)).not.toBeInTheDocument();
       expect(screen.getByTestId("settings-logo-preview-tile")).toHaveClass(
-        "h-[136px]",
-        "w-[136px]",
+        "h-[128px]",
+        "w-[128px]",
         "rounded-xl",
         "bg-surface-container-lowest",
       );
