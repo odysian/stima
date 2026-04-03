@@ -515,17 +515,36 @@ describe("SettingsScreen", () => {
     expect(await screen.findByAltText(/business logo preview/i)).toBeInTheDocument();
   });
 
-  it("shows an inline error for unsupported logo file types without uploading", async () => {
+  it("submits logo uploads when the browser omits file mime metadata", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+    mockedProfileService.uploadLogo.mockResolvedValueOnce(
+      makeProfileResponse({ has_logo: true }),
+    );
 
     renderScreen();
 
     const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
-    const file = new File(["not-an-image"], "logo.gif", { type: "image/gif" });
+    const file = new File(["fake-logo"], "logo.png");
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Upload a JPEG or PNG logo.");
-    expect(mockedProfileService.uploadLogo).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockedProfileService.uploadLogo).toHaveBeenCalledWith(file));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("submits logo uploads when the browser reports a generic mime type", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+    mockedProfileService.uploadLogo.mockResolvedValueOnce(
+      makeProfileResponse({ has_logo: true }),
+    );
+
+    renderScreen();
+
+    const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
+    const file = new File(["fake-logo"], "logo.txt", { type: "text/plain" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(mockedProfileService.uploadLogo).toHaveBeenCalledWith(file));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows an inline error for oversized logo uploads without uploading", async () => {
