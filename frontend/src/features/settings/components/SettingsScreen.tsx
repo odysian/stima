@@ -24,6 +24,9 @@ const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = 
   { label: "Dark", value: "dark" },
 ];
 
+const ALLOWED_LOGO_TYPES = new Set(["image/jpeg", "image/png"]);
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+
 export function SettingsScreen(): React.ReactElement {
   const { logout, refreshUser } = useAuth();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
@@ -94,6 +97,16 @@ export function SettingsScreen(): React.ReactElement {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) {
+      return;
+    }
+
+    if (!ALLOWED_LOGO_TYPES.has(file.type)) {
+      setLogoError("Upload a JPEG or PNG logo.");
+      return;
+    }
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      setLogoError("Logo must be 2 MB or smaller.");
       return;
     }
 
@@ -211,7 +224,7 @@ export function SettingsScreen(): React.ReactElement {
 
                     <div
                       data-testid="settings-logo-content-row"
-                      className="grid grid-cols-[128px_minmax(0,1fr)] items-start gap-4"
+                      className="flex flex-col gap-3 min-[360px]:grid min-[360px]:grid-cols-[128px_minmax(0,1fr)] min-[360px]:items-start min-[360px]:gap-4"
                     >
                       <div
                         data-testid="settings-logo-preview-tile"
@@ -233,16 +246,12 @@ export function SettingsScreen(): React.ReactElement {
 
                       <div
                         data-testid="settings-logo-actions"
-                        className="flex min-w-0 flex-col gap-3"
+                        className="flex min-w-0 flex-col gap-2"
                       >
-                        <p className="text-xs text-on-surface-variant">
-                          JPEG or PNG, up to 2 MB. Appears on quote PDFs.
-                        </p>
-
-                        <div className="flex flex-col items-start gap-3">
+                        <div className="flex flex-col items-start gap-2">
                           <label
                             htmlFor="settings-logo-upload"
-                            className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+                            className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container"
                           >
                             Upload Logo
                           </label>
@@ -257,7 +266,7 @@ export function SettingsScreen(): React.ReactElement {
                           {hasLogo ? (
                             <button
                               type="button"
-                              className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-secondary px-4 py-3 text-sm font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-secondary px-3 py-2 text-xs font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                               disabled={isLogoSubmitting}
                               onClick={() => setIsRemoveLogoOpen(true)}
                             >
