@@ -13,13 +13,14 @@ pydantic==2.12.5
 pydantic-settings==2.12.0
 python-dotenv==1.2.1
 email-validator==2.3.0
-python-multipart==0.0.21
+python-multipart==0.0.22
 
 # Auth — PyJWT only. See exclusions table below.
-PyJWT==2.11.0
+PyJWT==2.12.0
 argon2-cffi==23.1.0
 
 # Rate limiting
+# Latest release on PyPI as of this task; keep intentionally pinned.
 slowapi==0.1.9
 sentry-sdk[fastapi]==2.29.1
 
@@ -28,8 +29,8 @@ openai==2.15.0
 anthropic==0.76.0
 
 # PDF generation — WeasyPrint + Jinja2 template rendering
-weasyprint==65.0
-jinja2==3.1.4
+weasyprint==68.1
+jinja2==3.1.6
 google-cloud-storage==3.4.1
 
 # Audio processing — pydub requires ffmpeg binary (see Docker section)
