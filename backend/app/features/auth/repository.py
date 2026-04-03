@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.features.auth.models import RefreshToken, User
 
 
-class RefreshRotationOutcome(str, Enum):
+class RefreshRotationOutcome(StrEnum):
     """Classify refresh rotation attempts for service-level handling."""
 
     ROTATED = "rotated"
