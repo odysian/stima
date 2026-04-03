@@ -49,6 +49,11 @@ jobs:
           python -m venv backend/.venv
           backend/.venv/bin/pip install --upgrade pip
           backend/.venv/bin/pip install -r backend/requirements.txt
+          backend/.venv/bin/pip install pip-audit==2.10.0
+      - name: Validate dependency audit exceptions
+        run: python3 scripts/validate_dependency_audit_exceptions.py
+      - name: Backend dependency audit
+        run: backend/.venv/bin/pip-audit -r backend/requirements.txt
       - name: Template guard
         run: make template-verify
       - name: Backend verify
