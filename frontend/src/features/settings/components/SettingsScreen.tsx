@@ -24,7 +24,6 @@ const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = 
   { label: "Dark", value: "dark" },
 ];
 
-const ALLOWED_LOGO_TYPES = new Set(["image/jpeg", "image/png"]);
 const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
 
 export function SettingsScreen(): React.ReactElement {
@@ -97,11 +96,6 @@ export function SettingsScreen(): React.ReactElement {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) {
-      return;
-    }
-
-    if (!ALLOWED_LOGO_TYPES.has(file.type)) {
-      setLogoError("Upload a JPEG or PNG logo.");
       return;
     }
 
