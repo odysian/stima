@@ -153,11 +153,31 @@ def test_production_requires_non_localhost_frontend_url(monkeypatch) -> None:
         get_settings()
 
 
+def test_production_rejects_ipv6_loopback_frontend_url(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("FRONTEND_URL", "http://[::1]:5173")
+    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+
 def test_production_requires_allowed_hosts(monkeypatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("COOKIE_SECURE", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
     monkeypatch.delenv("ALLOWED_HOSTS", raising=False)
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+
+def test_production_rejects_wildcard_allowed_hosts(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.setenv("ALLOWED_HOSTS", "*")
 
     with pytest.raises(ValidationError):
         get_settings()

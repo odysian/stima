@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+from collections.abc import Iterable
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -57,6 +58,14 @@ def resolve_forwarded_client_ip(
     return None
 
 
+def _header_values(scope: Scope, header_name: bytes) -> list[str]:
+    return [value.decode("latin-1") for name, value in _raw_headers(scope) if name == header_name]
+
+
+def _raw_headers(scope: Scope) -> Iterable[tuple[bytes, bytes]]:
+    return scope.get("headers", [])
+
+
 class TrustedProxyHeadersMiddleware:
     """Apply trusted proxy forwarding headers only for configured peer IPs."""
 
@@ -75,11 +84,11 @@ class TrustedProxyHeadersMiddleware:
             await self.app(scope, receive, send)
             return
 
-        headers = dict(scope["headers"])
+        peer_port = client_addr[1] if client_addr is not None else 0
 
-        forwarded_proto = headers.get(b"x-forwarded-proto")
-        if forwarded_proto is not None:
-            resolved_proto = forwarded_proto.decode("latin-1").split(",")[0].strip().lower()
+        forwarded_proto_values = _header_values(scope, b"x-forwarded-proto")
+        if forwarded_proto_values:
+            resolved_proto = ",".join(forwarded_proto_values).split(",")[0].strip().lower()
             if scope["type"] == "websocket":
                 if resolved_proto == "https":
                     scope["scheme"] = "wss"
@@ -88,19 +97,19 @@ class TrustedProxyHeadersMiddleware:
             elif resolved_proto in {"http", "https"}:
                 scope["scheme"] = resolved_proto
 
-        forwarded_for = headers.get(b"x-forwarded-for")
-        if forwarded_for is not None:
+        forwarded_for_values = _header_values(scope, b"x-forwarded-for")
+        if forwarded_for_values:
             resolved_client = resolve_forwarded_client_ip(
-                forwarded_for.decode("latin-1"),
+                ",".join(forwarded_for_values),
                 trusted_networks=self.trusted_networks,
             )
             if resolved_client is not None:
-                scope["client"] = (resolved_client, 0)
+                scope["client"] = (resolved_client, peer_port)
         else:
-            real_ip = headers.get(b"x-real-ip")
-            if real_ip is not None:
-                parsed_real_ip = parse_ip(real_ip.decode("latin-1"))
+            real_ip_values = _header_values(scope, b"x-real-ip")
+            if real_ip_values:
+                parsed_real_ip = parse_ip(real_ip_values[0])
                 if parsed_real_ip is not None:
-                    scope["client"] = (parsed_real_ip, 0)
+                    scope["client"] = (parsed_real_ip, peer_port)
 
         await self.app(scope, receive, send)

@@ -11,7 +11,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 MIN_SECRET_KEY_LENGTH = 32
-LOCALHOST_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0"})  # nosec B104
+LOCALHOST_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1"})  # nosec B104
 FORBIDDEN_SECRET_KEY_VALUES = frozenset(
     {
         "dev-secret-key-change-in-production",
@@ -221,6 +221,8 @@ class Settings(BaseSettings):
             raise ValueError("COOKIE_SECURE must be true when ENVIRONMENT is 'production'")
         if not self.allowed_hosts:
             raise ValueError("ALLOWED_HOSTS must be non-empty when ENVIRONMENT is 'production'")
+        if "*" in self.allowed_hosts:
+            raise ValueError("ALLOWED_HOSTS must not contain '*' when ENVIRONMENT is 'production'")
 
         parsed_frontend_url = urlparse(self.frontend_url)
         if parsed_frontend_url.hostname in LOCALHOST_HOSTS:
