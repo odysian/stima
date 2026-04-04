@@ -22,6 +22,7 @@ argon2-cffi==25.1.0
 # Rate limiting
 # Latest release on PyPI as of this task; keep intentionally pinned.
 slowapi==0.1.9
+redis==6.4.0
 sentry-sdk[fastapi]==2.57.0
 
 # AI

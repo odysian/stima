@@ -16,6 +16,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
@@ -30,8 +31,17 @@ from app.main import app
 from app.shared import event_logger
 from app.shared.dependencies import get_invoice_service, get_quote_service, get_storage_service
 from app.shared.input_limits import DOCUMENT_LINE_ITEMS_MAX_ITEMS
+from app.shared.rate_limit import reset_local_rate_limit_state
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_state() -> Iterator[None]:
+    reset_local_rate_limit_state()
+    yield
+    reset_local_rate_limit_state()
+
 
 _PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC"
@@ -420,6 +430,31 @@ async def test_pdf_endpoint_requires_csrf(client: AsyncClient) -> None:
     assert response.json() == {"detail": "CSRF token missing"}
 
 
+async def test_generate_quote_pdf_slowapi_rate_limit_returns_429(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("AUTHENTICATED_PDF_GENERATION_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert "Rate limit exceeded" in second_response.json()["error"]
+
+
 async def test_share_endpoint_requires_csrf(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -665,6 +700,58 @@ async def test_public_quote_endpoint_returns_json_and_marks_first_view_once(
     assert emitted_events[0]["customer_id"] == customer_id
 
 
+async def test_public_share_pdf_rate_limit_returns_429(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("PUBLIC_DOCUMENT_FETCH_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    client.cookies.clear()
+    first_response = await client.get(f"/share/{share_token}")
+    second_response = await client.get(f"/share/{share_token}")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+
+
+async def test_public_quote_json_rate_limit_returns_429(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("PUBLIC_DOCUMENT_FETCH_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    client.cookies.clear()
+    first_response = await client.get(f"/api/public/doc/{share_token}")
+    second_response = await client.get(f"/api/public/doc/{share_token}")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+
+
 async def test_public_quote_endpoint_prefers_terminal_status_when_view_transition_races(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -796,6 +883,33 @@ async def test_public_logo_endpoint_returns_image_bytes(client: AsyncClient) -> 
     assert response.content == _PNG_BYTES
 
 
+async def test_public_logo_rate_limit_returns_429(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("PUBLIC_LOGO_FETCH_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+    await _upload_logo(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    client.cookies.clear()
+    first_response = await client.get(f"/api/public/doc/{share_token}/logo")
+    second_response = await client.get(f"/api/public/doc/{share_token}/logo")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+
+
 async def test_public_logo_endpoint_returns_404_when_quote_has_no_logo(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -923,6 +1037,40 @@ async def test_invoice_pdf_generation_sets_ready_and_renders_invoice_context(
     detail_response = await client.get(f"/api/invoices/{invoice_id}")
     assert detail_response.status_code == 200
     assert detail_response.json()["status"] == "ready"
+
+
+async def test_generate_invoice_pdf_slowapi_rate_limit_returns_429(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("AUTHENTICATED_PDF_GENERATION_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice_id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice_id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert "Rate limit exceeded" in second_response.json()["error"]
 
 
 async def test_invoice_share_returns_sent_and_raw_share_token_renders_pdf(

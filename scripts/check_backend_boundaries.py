@@ -92,7 +92,8 @@ def _validate_file(path: Path, layer: str) -> list[str]:
             violations.append(
                 f"{path}:{ref.lineno}: Relative imports are not allowed in "
                 f"boundary-checked modules (level={ref.relative_level}, module={module_segment})"
-                f" — use an absolute import instead (e.g. from app.features.auth.models import User)"
+                " — use an absolute import instead"
+                " (e.g. from app.features.auth.models import User)"
             )
             continue
 

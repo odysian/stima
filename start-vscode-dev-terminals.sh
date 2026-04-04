@@ -45,7 +45,7 @@ ensure_dev_stack_task() {
     {
       "label": "dev:db",
       "type": "shell",
-      "command": "docker compose up -d postgres",
+      "command": "docker compose up -d postgres redis",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -58,7 +58,7 @@ ensure_dev_stack_task() {
     {
       "label": "dev:backend",
       "type": "shell",
-      "command": "bash -lc 'test -x .venv/bin/python || { echo \"Missing backend/.venv. Run: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt\"; exit 1; }; for i in {1..60}; do (echo >/dev/tcp/127.0.0.1/5432) >/dev/null 2>&1 && break; sleep 1; done; exec .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000'",
+      "command": "bash -lc 'test -x .venv/bin/python || { echo \"Missing backend/.venv. Run: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt\"; exit 1; }; for i in {1..60}; do (echo >/dev/tcp/127.0.0.1/5432) >/dev/null 2>&1 && break; sleep 1; done; for i in {1..60}; do (echo >/dev/tcp/127.0.0.1/6379) >/dev/null 2>&1 && break; sleep 1; done; exec .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000'",
       "options": {
         "cwd": "${workspaceFolder}/backend"
       },
@@ -84,7 +84,7 @@ ensure_dev_stack_task() {
     {
       "label": "dev:db-shell",
       "type": "shell",
-      "command": "bash -lc 'docker compose up -d postgres >/dev/null; for i in {1..60}; do docker compose exec -T postgres pg_isready -U stima >/dev/null 2>&1 && break; sleep 1; done; docker compose exec -T postgres pg_isready -U stima >/dev/null 2>&1 || { echo \"Database did not become ready in time.\"; exit 1; }; exec docker compose exec postgres psql -U stima -d stima'",
+      "command": "bash -lc 'docker compose up -d postgres redis >/dev/null; for i in {1..60}; do docker compose exec -T postgres pg_isready -U stima >/dev/null 2>&1 && break; sleep 1; done; docker compose exec -T postgres pg_isready -U stima >/dev/null 2>&1 || { echo \"Database did not become ready in time.\"; exit 1; }; exec docker compose exec postgres psql -U stima -d stima'",
       "options": {
         "cwd": "${workspaceFolder}"
       },

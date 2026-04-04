@@ -34,6 +34,21 @@ def test_optional_sentry_and_admin_config_blank_values_are_normalized(monkeypatc
     assert settings.admin_api_key is None
 
 
+def test_redis_key_prefix_is_normalized(monkeypatch) -> None:
+    monkeypatch.setenv("REDIS_KEY_PREFIX", " custom-prefix: ")
+
+    settings = get_settings()
+
+    assert settings.redis_key_prefix == "custom-prefix"
+
+
+def test_redis_key_prefix_must_be_non_empty(monkeypatch) -> None:
+    monkeypatch.setenv("REDIS_KEY_PREFIX", "  :  ")
+
+    with pytest.raises(ValidationError, match="REDIS_KEY_PREFIX must be non-empty"):
+        get_settings()
+
+
 def test_allowed_origins_csv_parses_to_list(monkeypatch) -> None:
     monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:5173, https://app.stima.dev")
 
@@ -180,4 +195,15 @@ def test_production_rejects_wildcard_allowed_hosts(monkeypatch) -> None:
     monkeypatch.setenv("ALLOWED_HOSTS", "*")
 
     with pytest.raises(ValidationError):
+        get_settings()
+
+
+def test_production_requires_redis_url(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+    monkeypatch.setenv("REDIS_URL", "")
+
+    with pytest.raises(ValidationError, match="REDIS_URL must be set"):
         get_settings()

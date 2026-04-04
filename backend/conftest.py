@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncGenerator, Iterator
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from app.core.config import get_settings
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -14,11 +16,16 @@ from sqlalchemy.pool import NullPool
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes")
 os.environ.setdefault("GCS_BUCKET_NAME", "stima-test-logos")
+# Prevent backend/.env REDIS_URL from leaking into the test session.
+# Route tests to a dedicated test DB when TEST_REDIS_URL is set; otherwise
+# force memory-only mode so tests never touch the developer's local Redis.
+os.environ["REDIS_URL"] = os.environ.get("TEST_REDIS_URL", "")
 
 from app.core.database import Base, get_db
 from app.features import registry as feature_registry  # noqa: F401
 from app.main import app
 from app.shared import event_logger
+from app.shared.rate_limit import configure_active_limiter_key_prefix, reset_local_rate_limit_state
 
 TEST_SCHEMA = "stima_test"
 TEST_DATABASE_URL = os.getenv(
@@ -38,12 +45,54 @@ TestAsyncSession = async_sessionmaker(
 )
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _flush_test_redis() -> Iterator[None]:
+    """Flush the dedicated test Redis DB at session start and end.
+
+    Only runs when REDIS_URL is set (i.e. TEST_REDIS_URL was provided).
+    Gives every run a clean slate and avoids stale keys from crashed runs.
+    """
+    import redis as sync_redis
+
+    test_redis_url = os.environ.get("REDIS_URL", "")
+    if not test_redis_url:
+        yield
+        return
+
+    def _flush() -> None:
+        try:
+            client = sync_redis.Redis.from_url(test_redis_url, socket_connect_timeout=2)
+            client.flushdb()
+            client.close()
+        except Exception:
+            pass
+
+    _flush()
+    yield
+    _flush()
+
+
 @pytest.fixture(autouse=True)
 def _disable_db_event_persistence_by_default() -> Iterator[None]:
     """Keep integration tests isolated unless a test explicitly enables event persistence."""
     event_logger.configure_event_logging(session_factory=None)
     yield
     event_logger.configure_event_logging(session_factory=None)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_rate_limit_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[None]:
+    """Use a unique Redis namespace per test so local Redis-backed limits cannot leak."""
+    prefix = f"pytest-{uuid4().hex}"
+    monkeypatch.setenv("REDIS_KEY_PREFIX", prefix)
+    get_settings.cache_clear()
+    configure_active_limiter_key_prefix(prefix)
+    reset_local_rate_limit_state()
+    yield
+    reset_local_rate_limit_state()
+    get_settings.cache_clear()
 
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")

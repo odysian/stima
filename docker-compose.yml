@@ -11,5 +11,14 @@ services:
     volumes:
       - stima_postgres_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: stima-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - stima_redis_data:/data
+
 volumes:
   stima_postgres_data:
+  stima_redis_data:

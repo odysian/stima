@@ -19,6 +19,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 
+from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.invoices.schemas import InvoiceResponse
 from app.features.invoices.service import InvoiceService
@@ -39,6 +40,7 @@ from app.features.quotes.schemas import (
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.audio import infer_audio_format
 from app.shared.dependencies import (
+    extraction_capacity_guard,
     get_current_user,
     get_extraction_service,
     get_invoice_service,
@@ -52,7 +54,7 @@ from app.shared.input_limits import (
     MAX_AUDIO_TOTAL_BYTES,
     NOTE_INPUT_MAX_CHARS,
 )
-from app.shared.rate_limit import get_ip_key, limiter
+from app.shared.rate_limit import get_ip_key, get_user_key, limiter
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
@@ -119,17 +121,20 @@ async def _parse_upload_clips(clips: list[UploadFile]) -> list[CaptureAudioClip]
     response_model=ExtractionResult,
     dependencies=[Depends(require_csrf)],
 )
+@limiter.limit(lambda: get_settings().quote_text_extraction_rate_limit, key_func=get_user_key)
 async def convert_notes(
+    request: Request,
     payload: ConvertNotesRequest,
     user: Annotated[User, Depends(get_current_user)],
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
 ) -> ExtractionResult:
     """Convert freeform notes into structured quote extraction output."""
-    del user
-    try:
-        return await extraction_service.convert_notes(payload.notes)
-    except QuoteServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    del request
+    async with extraction_capacity_guard(user.id):
+        try:
+            return await extraction_service.convert_notes(payload.notes)
+        except QuoteServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post(
@@ -156,7 +161,7 @@ async def create_quote(
     response_model=ExtractionResult,
     dependencies=[Depends(require_csrf)],
 )
-@limiter.limit("10/minute", key_func=get_ip_key)
+@limiter.limit(lambda: get_settings().quote_audio_capture_rate_limit, key_func=get_user_key)
 async def capture_audio(
     request: Request,
     clips: Annotated[list[UploadFile], File(...)],
@@ -165,13 +170,13 @@ async def capture_audio(
 ) -> ExtractionResult:
     """Convert uploaded audio clips into structured quote extraction output."""
     del request
-    del user
-    clip_inputs = await _parse_upload_clips(clips)
+    async with extraction_capacity_guard(user.id):
+        clip_inputs = await _parse_upload_clips(clips)
 
-    try:
-        return await extraction_service.capture_audio(clip_inputs)
-    except QuoteServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        try:
+            return await extraction_service.capture_audio(clip_inputs)
+        except QuoteServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post(
@@ -179,7 +184,7 @@ async def capture_audio(
     response_model=ExtractionResult,
     dependencies=[Depends(require_csrf)],
 )
-@limiter.limit("10/minute", key_func=get_ip_key)
+@limiter.limit(lambda: get_settings().quote_combined_extract_rate_limit, key_func=get_user_key)
 async def extract_combined(
     request: Request,
     user: Annotated[User, Depends(get_current_user)],
@@ -189,12 +194,13 @@ async def extract_combined(
 ) -> ExtractionResult:
     """Extract structured quote data from optional audio clips and optional notes."""
     del request
-    clip_inputs = await _parse_upload_clips(clips or [])
+    async with extraction_capacity_guard(user.id):
+        clip_inputs = await _parse_upload_clips(clips or [])
 
-    try:
-        return await extraction_service.extract_combined(clip_inputs, notes, user_id=user.id)
-    except QuoteServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        try:
+            return await extraction_service.extract_combined(clip_inputs, notes, user_id=user.id)
+        except QuoteServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("", response_model=list[QuoteListItemResponse])
@@ -281,12 +287,18 @@ async def convert_quote_to_invoice(
     "/{quote_id}/pdf",
     dependencies=[Depends(require_csrf)],
 )
+@limiter.limit(
+    lambda: get_settings().authenticated_pdf_generation_rate_limit,
+    key_func=get_user_key,
+)
 async def generate_quote_pdf(
+    request: Request,
     quote_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
 ) -> StreamingResponse:
     """Render a user-owned quote to PDF and stream bytes inline."""
+    del request
     try:
         doc_number, pdf_bytes = await quote_service.generate_pdf(user, quote_id)
     except QuoteServiceError as exc:
@@ -325,7 +337,9 @@ async def share_quote(
     response_model=QuoteResponse,
     dependencies=[Depends(require_csrf)],
 )
+@limiter.limit(lambda: get_settings().quote_email_send_rate_limit, key_func=get_user_key)
 async def send_quote_email(
+    request: Request,
     quote_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     email_delivery_service: Annotated[
@@ -334,6 +348,7 @@ async def send_quote_email(
     ],
 ) -> QuoteResponse:
     """Send a quote email to the customer contact on file."""
+    del request
     try:
         quote = await email_delivery_service.send_quote_email(user, quote_id)
     except QuoteServiceError as exc:
@@ -386,12 +401,15 @@ async def mark_quote_lost(
 
 
 @public_router.get("/share/{share_token}")
+@limiter.limit(lambda: get_settings().public_document_fetch_rate_limit, key_func=get_ip_key)
 async def get_shared_document_pdf(
+    request: Request,
     share_token: str,
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
 ) -> StreamingResponse:
     """Render and stream a public quote or invoice PDF without auth."""
+    del request
     try:
         doc_number, pdf_bytes = await quote_service.generate_shared_pdf(share_token)
         filename = f'inline; filename="quote-{doc_number}.pdf"'
@@ -425,6 +443,7 @@ async def get_shared_document_pdf(
 
 
 @public_router.get("/api/public/doc/{share_token}", response_model=PublicQuoteResponse)
+@limiter.limit(lambda: get_settings().public_document_fetch_rate_limit, key_func=get_ip_key)
 async def get_public_quote(
     share_token: str,
     request: Request,
@@ -467,11 +486,14 @@ async def get_public_quote(
 
 
 @public_router.get("/api/public/doc/{share_token}/logo")
+@limiter.limit(lambda: get_settings().public_logo_fetch_rate_limit, key_func=get_ip_key)
 async def get_public_quote_logo(
+    request: Request,
     share_token: str,
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
 ) -> Response:
     """Proxy public quote logo bytes without exposing storage paths."""
+    del request
     try:
         logo_bytes, content_type = await quote_service.get_public_logo(share_token)
     except QuoteServiceError as exc:

@@ -17,7 +17,7 @@ from app.core.security import create_refresh_token, hash_token
 from app.features.auth.models import RefreshToken, User
 from app.features.auth.service import ACCESS_COOKIE_NAME, CSRF_COOKIE_NAME, REFRESH_COOKIE_NAME
 from app.main import app
-from app.shared.rate_limit import limiter as _shared_limiter
+from app.shared.rate_limit import reset_local_rate_limit_state
 
 pytestmark = pytest.mark.asyncio
 
@@ -43,9 +43,9 @@ def _configure_auth_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter() -> Iterator[None]:
-    _shared_limiter.reset()
+    reset_local_rate_limit_state()
     yield
-    _shared_limiter.reset()
+    reset_local_rate_limit_state()
 
 
 async def test_register_returns_201_with_user_payload(client: AsyncClient) -> None:

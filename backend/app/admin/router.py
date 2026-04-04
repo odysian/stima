@@ -60,7 +60,7 @@ def require_admin_api_key(
     include_in_schema=False,
     dependencies=[Depends(require_admin_api_key)],
 )
-@limiter.limit("10/minute", key_func=get_ip_key)
+@limiter.limit(lambda: get_settings().admin_events_rate_limit, key_func=get_ip_key)
 async def get_event_counts(
     request: Request,
     query: Annotated[AdminEventsQuery, Depends()],
