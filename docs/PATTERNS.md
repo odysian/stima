@@ -44,6 +44,14 @@ Record conventions that already exist in code.
 - **Transport tests**: use `vi.stubGlobal('fetch', ...)` for deterministic control. Test `request()` internals (retry, single-flight, header propagation).
 - Layers do not mix. Component tests never hit `fetch`. Transport tests never use MSW.
 
+## Backend Test Suite Patterns (Current Conventions)
+- Keep each test focused on one contract: status code, response shape, and key side effect.
+- Isolate persistence per test with transactional rollback + nested savepoint restart; never rely on test order.
+- Shared `client` fixture binds `get_db` to a per-test session and restores dependency overrides on teardown.
+- Shared `client` fixture disables `app.state.limiter.enabled` by default; tests that assert `429` behavior explicitly re-enable limiter for that test.
+- Event-log DB persistence is disabled by default in backend test fixtures to avoid background-task coupling.
+- External-provider tests are opt-in via `@pytest.mark.live` and excluded from default verify (`-m "not live"`).
+
 ## MSW Handler Design
 - Base handlers in `src/shared/tests/mocks/handlers.ts` encode the backend contract.
 - CSRF-protected endpoints (refresh, logout) must return 403 when `X-CSRF-Token` is missing — this catches regressions where code stops sending CSRF.
