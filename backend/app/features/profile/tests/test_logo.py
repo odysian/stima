@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Iterator
 from uuid import uuid4
 
@@ -15,8 +16,18 @@ from app.shared.dependencies import get_storage_service
 
 pytestmark = pytest.mark.asyncio
 
-_PNG_BYTES = b"\x89PNG\r\n\x1a\nfake-png"
-_JPEG_BYTES = b"\xff\xd8\xff\xe0fake-jpeg"
+_PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC"
+)
+_JPEG_BYTES = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/"
+    "2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/"
+    "8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2Jy"
+    "ggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLD"
+    "xMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3"
+    "AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6"
+    "goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigD//2Q=="
+)
 
 
 class _FakeStorageService:
@@ -97,6 +108,32 @@ async def test_upload_logo_rejects_invalid_magic_bytes(client: AsyncClient) -> N
     assert response.json() == {"detail": "Logo must be a JPEG or PNG image"}
 
 
+async def test_upload_logo_rejects_corrupted_png_with_valid_signature(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/profile/logo",
+        files={"file": ("logo.png", _PNG_BYTES[:-12], "image/png")},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Logo must be a JPEG or PNG image"}
+
+
+async def test_upload_logo_rejects_corrupted_jpeg_with_valid_signature(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/profile/logo",
+        files={"file": ("logo.jpg", _JPEG_BYTES[:-2] + b"\x00\x00", "image/jpeg")},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Logo must be a JPEG or PNG image"}
+
+
 async def test_upload_logo_rejects_files_larger_than_2mb(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -105,7 +142,7 @@ async def test_upload_logo_rejects_files_larger_than_2mb(client: AsyncClient) ->
         files={
             "file": (
                 "logo.png",
-                b"\x89PNG\r\n\x1a\n" + (b"0" * (2 * 1024 * 1024 + 1)),
+                _PNG_BYTES + (b"0" * (2 * 1024 * 1024 + 1)),
                 "image/png",
             )
         },

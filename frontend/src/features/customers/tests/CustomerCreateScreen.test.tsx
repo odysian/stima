@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerCreateScreen } from "@/features/customers/components/CustomerCreateScreen";
 import { customerService } from "@/features/customers/services/customerService";
+import { CUSTOMER_ADDRESS_MAX_CHARS } from "@/shared/lib/inputLimits";
 
 const navigateMock = vi.fn();
 
@@ -47,6 +48,10 @@ describe("CustomerCreateScreen", () => {
     expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^address$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^address$/i)).toHaveAttribute(
+      "maxLength",
+      CUSTOMER_ADDRESS_MAX_CHARS.toString(),
+    );
   });
 
   it("shows validation error when submitted with empty name", async () => {

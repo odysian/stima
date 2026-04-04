@@ -37,6 +37,7 @@ from app.features.quotes.schemas import (
     QuoteUpdateRequest,
 )
 from app.features.quotes.service import QuoteService, QuoteServiceError
+from app.integrations.audio import infer_audio_format
 from app.shared.dependencies import (
     get_current_user,
     get_extraction_service,
@@ -45,11 +46,16 @@ from app.shared.dependencies import (
     get_quote_service,
     require_csrf,
 )
+from app.shared.input_limits import (
+    MAX_AUDIO_CLIP_BYTES,
+    MAX_AUDIO_CLIPS_PER_REQUEST,
+    MAX_AUDIO_TOTAL_BYTES,
+    NOTE_INPUT_MAX_CHARS,
+)
 from app.shared.rate_limit import get_ip_key, limiter
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
-MAX_AUDIO_CLIP_BYTES = 10 * 1024 * 1024
 _NOINDEX_HEADERS = {"X-Robots-Tag": "noindex"}
 _PRIVATE_RESPONSE_HEADERS = {
     "Cache-Control": "no-store",
@@ -65,15 +71,35 @@ class _BusinessNameContext(Protocol):
 
 async def _parse_upload_clips(clips: list[UploadFile]) -> list[CaptureAudioClip]:
     """Read uploaded clips into service payloads while enforcing size limits."""
+    if len(clips) > MAX_AUDIO_CLIPS_PER_REQUEST:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No more than {MAX_AUDIO_CLIPS_PER_REQUEST} audio clips are allowed",
+        )
+
     parsed_clips: list[CaptureAudioClip] = []
+    total_bytes = 0
     for clip in clips:
         try:
+            if infer_audio_format(filename=clip.filename, content_type=clip.content_type) is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Audio clip content type is not supported",
+                )
             if clip.size is not None and clip.size > MAX_AUDIO_CLIP_BYTES:
                 raise HTTPException(status_code=400, detail="Clip too large")
 
             content = await clip.read()
+            if not content:
+                raise HTTPException(status_code=400, detail="Audio clip is empty")
             if len(content) > MAX_AUDIO_CLIP_BYTES:
                 raise HTTPException(status_code=400, detail="Clip too large")
+            total_bytes += len(content)
+            if total_bytes > MAX_AUDIO_TOTAL_BYTES:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Total audio upload too large",
+                )
 
             parsed_clips.append(
                 CaptureAudioClip(
@@ -159,7 +185,7 @@ async def extract_combined(
     user: Annotated[User, Depends(get_current_user)],
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
     clips: Annotated[list[UploadFile] | None, File()] = None,
-    notes: Annotated[str, Form()] = "",
+    notes: Annotated[str, Form(max_length=NOTE_INPUT_MAX_CHARS)] = "",
 ) -> ExtractionResult:
     """Extract structured quote data from optional audio clips and optional notes."""
     del request

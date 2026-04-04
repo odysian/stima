@@ -15,6 +15,7 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { useTheme } from "@/shared/hooks/useTheme";
+import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
 import { parseTaxPercentInput, toTaxPercentDisplay } from "@/shared/lib/pricing";
 import type { ThemePreference } from "@/shared/lib/theme";
 
@@ -23,8 +24,6 @@ const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = 
   { label: "Light", value: "light" },
   { label: "Dark", value: "dark" },
 ];
-
-const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
 
 export function SettingsScreen(): React.ReactElement {
   const { logout, refreshUser } = useAuth();

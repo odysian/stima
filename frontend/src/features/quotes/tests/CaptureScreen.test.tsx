@@ -8,6 +8,10 @@ import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { ExtractionResult } from "@/features/quotes/types/quote.types";
+import {
+  MAX_AUDIO_CLIPS_PER_REQUEST,
+  NOTE_INPUT_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
 
 const navigateMock = vi.fn();
 const setDraftMock = vi.fn();
@@ -141,6 +145,26 @@ describe("CaptureScreen", () => {
     });
 
     expect(screen.getByRole("button", { name: /extract line items/i })).toBeEnabled();
+    expect(screen.getByLabelText(/written description/i)).toHaveAttribute(
+      "maxLength",
+      NOTE_INPUT_MAX_CHARS.toString(),
+    );
+  });
+
+  it("disables recording when the clip-count limit is reached", () => {
+    const clips = Array.from({ length: MAX_AUDIO_CLIPS_PER_REQUEST }, (_, index) => ({
+      ...clipFixture,
+      id: `clip-${index + 1}`,
+      url: `blob:clip-${index + 1}`,
+    }));
+    mockVoiceCapture({ clips });
+    renderScreen();
+
+    expect(
+      screen.getByText(`Maximum of ${MAX_AUDIO_CLIPS_PER_REQUEST} clips per request reached.`),
+    ).toBeInTheDocument();
+    const startButton = screen.getByText("mic").closest("button");
+    expect(startButton).toBeDisabled();
   });
 
   it("enables extract button when at least one clip exists", () => {

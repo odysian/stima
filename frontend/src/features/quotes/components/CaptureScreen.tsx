@@ -11,6 +11,11 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
+import {
+  MAX_AUDIO_CLIPS_PER_REQUEST,
+  MAX_AUDIO_TOTAL_BYTES,
+  NOTE_INPUT_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
 
 const EXTRACTION_STAGE_DELAY_MS = 2500;
 
@@ -133,6 +138,15 @@ export function CaptureScreen(): React.ReactElement {
 
     setError(null);
     clearError();
+    if (clips.length > MAX_AUDIO_CLIPS_PER_REQUEST) {
+      setError(`You can upload up to ${MAX_AUDIO_CLIPS_PER_REQUEST} clips at a time.`);
+      return;
+    }
+    const totalClipBytes = clips.reduce((runningTotal, clip) => runningTotal + clip.blob.size, 0);
+    if (totalClipBytes > MAX_AUDIO_TOTAL_BYTES) {
+      setError("Total audio upload must be 100 MB or smaller.");
+      return;
+    }
     clearExtractionStageTimers();
     const stages = getExtractionStages(hasClips, hasNotes);
     setExtractionStage(stages[0]);
@@ -193,6 +207,7 @@ export function CaptureScreen(): React.ReactElement {
   }
 
   const displayedError = error ?? voiceError;
+  const hasReachedClipLimit = clips.length >= MAX_AUDIO_CLIPS_PER_REQUEST;
   const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording;
 
   return (
@@ -271,11 +286,15 @@ export function CaptureScreen(): React.ReactElement {
           <textarea
             id="capture-written-description"
             rows={4}
+            maxLength={NOTE_INPUT_MAX_CHARS}
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Add any typed details here..."
             className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
           />
+          <p className="mt-2 text-xs text-outline">
+            {notes.length}/{NOTE_INPUT_MAX_CHARS}
+          </p>
         </section>
 
         {isRecording ? (
@@ -295,11 +314,16 @@ export function CaptureScreen(): React.ReactElement {
         ) : (
           <div className="my-6 flex flex-col items-center gap-3">
             <p className="text-xs uppercase tracking-widest text-outline">TAP TO START</p>
+            {hasReachedClipLimit ? (
+              <p className="text-center text-xs text-outline">
+                Maximum of {MAX_AUDIO_CLIPS_PER_REQUEST} clips per request reached.
+              </p>
+            ) : null}
             <button
               type="button"
               className="forest-gradient ghost-shadow flex h-20 w-20 cursor-pointer items-center justify-center rounded-full text-on-primary transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => void startRecording()}
-              disabled={!isSupported}
+              disabled={!isSupported || hasReachedClipLimit}
             >
               <span className="material-symbols-outlined text-4xl">mic</span>
             </button>

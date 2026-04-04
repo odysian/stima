@@ -8,6 +8,7 @@ interface InputProps {
   type?: string;
   required?: boolean;
   hideLabel?: boolean;
+  maxLength?: number;
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
   error?: string;
@@ -21,6 +22,7 @@ export function Input({
   type = "text",
   required = false,
   hideLabel = false,
+  maxLength,
   value,
   onChange,
   error,
@@ -50,6 +52,7 @@ export function Input({
         onChange={onChange}
         required={required}
         aria-required={required}
+        maxLength={maxLength}
         placeholder={placeholder}
         className={inputClassName}
       />
