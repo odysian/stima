@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import cache, lru_cache
 from hmac import compare_digest
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -206,15 +208,18 @@ def require_csrf(
         )
 
 
-async def require_extraction_capacity_guard(
-    user: Annotated[User, Depends(get_current_user)],
-) -> AsyncIterator[None]:
-    """Fail fast when extraction quota or provider concurrency has been exhausted."""
+@asynccontextmanager
+async def extraction_capacity_guard(user_id: UUID) -> AsyncIterator[None]:
+    """Hold extraction quota/concurrency for the wrapped block (no-op when limiter disabled).
+
+    Use inside route handlers after SlowAPI's per-route limit check so 429s from the
+    rate limiter do not consume quota or concurrency slots.
+    """
     if not limiter.enabled:
         yield
         return
 
-    async with reserve_extraction_capacity(user.id) as capacity_available:
+    async with reserve_extraction_capacity(user_id) as capacity_available:
         if not capacity_available:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

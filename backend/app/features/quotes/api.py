@@ -40,13 +40,13 @@ from app.features.quotes.schemas import (
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.audio import infer_audio_format
 from app.shared.dependencies import (
+    extraction_capacity_guard,
     get_current_user,
     get_extraction_service,
     get_invoice_service,
     get_quote_email_delivery_service,
     get_quote_service,
     require_csrf,
-    require_extraction_capacity_guard,
 )
 from app.shared.input_limits import (
     MAX_AUDIO_CLIP_BYTES,
@@ -119,7 +119,7 @@ async def _parse_upload_clips(clips: list[UploadFile]) -> list[CaptureAudioClip]
 @router.post(
     "/convert-notes",
     response_model=ExtractionResult,
-    dependencies=[Depends(require_csrf), Depends(require_extraction_capacity_guard)],
+    dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(lambda: get_settings().quote_text_extraction_rate_limit, key_func=get_user_key)
 async def convert_notes(
@@ -130,11 +130,11 @@ async def convert_notes(
 ) -> ExtractionResult:
     """Convert freeform notes into structured quote extraction output."""
     del request
-    del user
-    try:
-        return await extraction_service.convert_notes(payload.notes)
-    except QuoteServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    async with extraction_capacity_guard(user.id):
+        try:
+            return await extraction_service.convert_notes(payload.notes)
+        except QuoteServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post(
@@ -159,7 +159,7 @@ async def create_quote(
 @router.post(
     "/capture-audio",
     response_model=ExtractionResult,
-    dependencies=[Depends(require_csrf), Depends(require_extraction_capacity_guard)],
+    dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(lambda: get_settings().quote_audio_capture_rate_limit, key_func=get_user_key)
 async def capture_audio(
@@ -170,19 +170,19 @@ async def capture_audio(
 ) -> ExtractionResult:
     """Convert uploaded audio clips into structured quote extraction output."""
     del request
-    del user
-    clip_inputs = await _parse_upload_clips(clips)
+    async with extraction_capacity_guard(user.id):
+        clip_inputs = await _parse_upload_clips(clips)
 
-    try:
-        return await extraction_service.capture_audio(clip_inputs)
-    except QuoteServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        try:
+            return await extraction_service.capture_audio(clip_inputs)
+        except QuoteServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post(
     "/extract",
     response_model=ExtractionResult,
-    dependencies=[Depends(require_csrf), Depends(require_extraction_capacity_guard)],
+    dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(lambda: get_settings().quote_combined_extract_rate_limit, key_func=get_user_key)
 async def extract_combined(
@@ -194,12 +194,13 @@ async def extract_combined(
 ) -> ExtractionResult:
     """Extract structured quote data from optional audio clips and optional notes."""
     del request
-    clip_inputs = await _parse_upload_clips(clips or [])
+    async with extraction_capacity_guard(user.id):
+        clip_inputs = await _parse_upload_clips(clips or [])
 
-    try:
-        return await extraction_service.extract_combined(clip_inputs, notes, user_id=user.id)
-    except QuoteServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        try:
+            return await extraction_service.extract_combined(clip_inputs, notes, user_id=user.id)
+        except QuoteServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("", response_model=list[QuoteListItemResponse])

@@ -6,11 +6,12 @@ from collections.abc import Iterator
 from uuid import uuid4
 
 import pytest
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.security import create_access_token
 from app.shared.rate_limit import build_limiter, get_ip_key, get_user_key, resolve_limiter_backend
 from limits.storage.memory import MemoryStorage
 from limits.storage.redis import RedisStorage
+from pydantic import ValidationError
 from starlette.requests import Request
 
 
@@ -134,7 +135,11 @@ def test_get_user_key_falls_back_to_ip_when_access_token_is_missing() -> None:
     assert get_user_key(request) == "ip:198.51.100.20"
 
 
-def test_build_limiter_uses_memory_storage_when_redis_url_is_unset() -> None:
+def test_build_limiter_uses_memory_storage_when_redis_url_is_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    get_settings.cache_clear()
     limiter = build_limiter(get_settings())
 
     assert isinstance(limiter._storage, MemoryStorage)  # type: ignore[attr-defined]
@@ -149,19 +154,27 @@ def test_build_limiter_uses_redis_storage_when_redis_url_is_configured(
     limiter = build_limiter(get_settings())
 
     assert isinstance(limiter._storage, RedisStorage)  # type: ignore[attr-defined]
+    get_settings.cache_clear()
 
 
-def test_resolve_limiter_backend_rejects_production_without_redis_url(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_production_settings_require_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Production Settings validation requires REDIS_URL (runs before limiter backend)."""
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("COOKIE_SECURE", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
     monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+    monkeypatch.delenv("REDIS_URL", raising=False)
     get_settings.cache_clear()
 
+    with pytest.raises(ValidationError, match="REDIS_URL must be set"):
+        get_settings()
+
+
+def test_resolve_limiter_backend_rejects_production_without_redis_url() -> None:
+    """resolve_limiter_backend enforces Redis when environment is production (direct call)."""
+    settings = Settings.model_construct(environment="production", redis_url=None)
     with pytest.raises(ValueError, match="REDIS_URL must be set"):
-        resolve_limiter_backend(get_settings())
+        resolve_limiter_backend(settings)
 
 
 def _build_request(peer_ip: str, headers: dict[str, str]) -> Request:

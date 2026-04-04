@@ -74,7 +74,7 @@ class LimiterBackendConfig:
 class ConcurrencyLease:
     """Release handle for one acquired provider-concurrency slot."""
 
-    user_id: str
+    concurrency_key: str
     manager: ExtractionControlManager
     active: bool = True
 
@@ -82,7 +82,7 @@ class ConcurrencyLease:
         if not self.active:
             return
         self.active = False
-        await self.manager.release_concurrency(self.user_id)
+        await self.manager.release_concurrency(self.concurrency_key)
 
 
 class ExtractionStateStore:
@@ -128,8 +128,10 @@ class InMemoryExtractionStateStore(ExtractionStateStore):
             count, expiry = self._concurrency.get(key, (0, now + expiry_seconds))
             if expiry <= now:
                 count = 0
+                expiry = now + expiry_seconds
             if count >= limit:
-                self._concurrency[key] = (count, now + expiry_seconds)
+                # Do not refresh TTL on failed acquire (matches Redis script: no INCR/EXPIRE).
+                self._concurrency[key] = (count, expiry)
                 return False
             self._concurrency[key] = (count + 1, now + expiry_seconds)
             return True
@@ -218,7 +220,7 @@ class ExtractionControlManager:
         )
         if not acquired:
             return None
-        return ConcurrencyLease(user_id=concurrency_key, manager=self)
+        return ConcurrencyLease(concurrency_key=concurrency_key, manager=self)
 
     async def release_concurrency(self, key: str) -> None:
         await self._store.release_concurrency(key)

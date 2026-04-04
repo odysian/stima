@@ -430,6 +430,31 @@ async def test_pdf_endpoint_requires_csrf(client: AsyncClient) -> None:
     assert response.json() == {"detail": "CSRF token missing"}
 
 
+async def test_generate_quote_pdf_slowapi_rate_limit_returns_429(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("AUTHENTICATED_PDF_GENERATION_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert "Rate limit exceeded" in second_response.json()["error"]
+
+
 async def test_share_endpoint_requires_csrf(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -1012,6 +1037,40 @@ async def test_invoice_pdf_generation_sets_ready_and_renders_invoice_context(
     detail_response = await client.get(f"/api/invoices/{invoice_id}")
     assert detail_response.status_code == 200
     assert detail_response.json()["status"] == "ready"
+
+
+async def test_generate_invoice_pdf_slowapi_rate_limit_returns_429(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("AUTHENTICATED_PDF_GENERATION_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice_id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice_id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert "Rate limit exceeded" in second_response.json()["error"]
 
 
 async def test_invoice_share_returns_sent_and_raw_share_token_renders_pdf(

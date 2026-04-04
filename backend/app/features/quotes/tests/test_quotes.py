@@ -1186,6 +1186,41 @@ async def test_send_quote_email_returns_429_on_immediate_retry_after_success(
     assert email_sent_count == 1
 
 
+async def test_send_quote_email_slowapi_rate_limit_returns_429(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("QUOTE_EMAIL_SEND_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert "Rate limit exceeded" in second_response.json()["error"]
+    assert len(mock_email_service.messages) == 1
+
+
 @pytest.mark.parametrize("starting_status", [QuoteStatus.SHARED, QuoteStatus.VIEWED])
 async def test_send_quote_email_resends_without_changing_existing_shared_status(
     client: AsyncClient,
@@ -1472,6 +1507,48 @@ async def test_send_invoice_email_shares_invoice_delivers_email_and_logs_success
         )
     )
     assert email_sent_count == 1
+
+
+async def test_send_invoice_email_slowapi_rate_limit_returns_429(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("INVOICE_EMAIL_SEND_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(
+        client,
+        csrf_token,
+        email="customer@example.com",
+    )
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert "Rate limit exceeded" in second_response.json()["error"]
+    assert len(mock_email_service.messages) == 1
 
 
 async def test_send_invoice_email_returns_200_on_resend_when_already_sent(
