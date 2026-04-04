@@ -10,6 +10,10 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
+import {
+  LINE_ITEM_DESCRIPTION_MAX_CHARS,
+  LINE_ITEM_DETAILS_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
 
 function parsePrice(rawPrice: string): number | null {
   const trimmedPrice = rawPrice.trim();
@@ -117,6 +121,7 @@ export function EditLineItemScreen(): React.ReactElement | null {
             </div>
             <Input
               id="line-item-description"
+              maxLength={LINE_ITEM_DESCRIPTION_MAX_CHARS}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
             />
@@ -129,6 +134,7 @@ export function EditLineItemScreen(): React.ReactElement | null {
             </div>
             <Input
               id="line-item-details"
+              maxLength={LINE_ITEM_DETAILS_MAX_CHARS}
               value={details}
               onChange={(event) => setDetails(event.target.value)}
             />

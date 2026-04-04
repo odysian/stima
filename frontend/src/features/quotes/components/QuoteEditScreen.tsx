@@ -15,6 +15,10 @@ import { OptionalPricingBanner } from "@/shared/components/OptionalPricingBanner
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import {
+  DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+  DOCUMENT_NOTES_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
+import {
   calculatePricingFromPersisted,
   getPricingValidationMessage,
   resolveLineItemSum,
@@ -149,6 +153,7 @@ export function QuoteEditScreen(): React.ReactElement {
       price: lineItem.price,
     }));
   const hasNullPrices = lineItemsForSubmit.some((lineItem) => lineItem.price === null);
+  const hasReachedLineItemLimit = normalizedLineItems.length >= DOCUMENT_LINE_ITEMS_MAX_ITEMS;
   const canSubmit = !isLoadingQuote && !loadError && currentDraft !== null;
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
@@ -188,6 +193,9 @@ export function QuoteEditScreen(): React.ReactElement {
   }
 
   function onLineItemAdd(): void {
+    if (hasReachedLineItemLimit) {
+      return;
+    }
     setSaveError(null);
     updateDraft((nextDraft) => ({
       ...nextDraft,
@@ -339,12 +347,18 @@ export function QuoteEditScreen(): React.ReactElement {
 
             <button
               type="button"
-              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low"
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
               onClick={onLineItemAdd}
+              disabled={hasReachedLineItemLimit}
             >
               <span className="material-symbols-outlined text-base">add</span>
               + Add Line Item
             </button>
+            {hasReachedLineItemLimit ? (
+              <p className="text-xs text-outline">
+                You can include up to {DOCUMENT_LINE_ITEMS_MAX_ITEMS} line items per document.
+              </p>
+            ) : null}
 
             <div className="space-y-4">
               <TotalAmountSection
@@ -381,6 +395,7 @@ export function QuoteEditScreen(): React.ReactElement {
                 <textarea
                   id="quote-edit-notes"
                   rows={3}
+                  maxLength={DOCUMENT_NOTES_MAX_CHARS}
                   value={currentDraft.notes}
                   onChange={(event) =>
                     updateDraft((nextDraft) => ({

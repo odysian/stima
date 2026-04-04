@@ -9,6 +9,7 @@ from typing import Any
 
 MAX_AUDIO_DURATION_SECONDS = 600
 CLIP_GAP_MS = 300
+SUPPORTED_AUDIO_FORMATS = frozenset({"webm", "wav", "mpeg", "mp3", "mp4", "ogg"})
 
 
 class AudioError(Exception):
@@ -70,7 +71,7 @@ class AudioIntegration:
         return wav_bytes
 
     def _decode_clip(self, clip: AudioClip, audio_segment_cls: Any) -> Any:
-        format_hint = _infer_format(filename=clip.filename, content_type=clip.content_type)
+        format_hint = infer_audio_format(filename=clip.filename, content_type=clip.content_type)
         buffer = BytesIO(clip.content)
 
         try:
@@ -93,19 +94,20 @@ def _load_audio_segment_class() -> Any:
     return AudioSegment
 
 
-def _infer_format(*, filename: str | None, content_type: str | None) -> str | None:
-    """Infer best-effort format hint from multipart metadata when available."""
+def infer_audio_format(*, filename: str | None, content_type: str | None) -> str | None:
+    """Infer a supported format hint from multipart metadata when available."""
     if content_type and "/" in content_type:
         subtype = content_type.split("/", 1)[1].lower()
         if subtype in {"x-m4a", "m4a", "aac"}:
             return "mp4"
-        if subtype in {"webm", "wav", "mpeg", "mp3", "mp4", "ogg"}:
+        if subtype in SUPPORTED_AUDIO_FORMATS:
             return subtype
 
     if filename and "." in filename:
         extension = filename.rsplit(".", 1)[-1].lower()
         if extension == "m4a":
             return "mp4"
-        return extension
+        if extension in SUPPORTED_AUDIO_FORMATS:
+            return extension
 
     return None

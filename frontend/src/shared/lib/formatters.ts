@@ -37,3 +37,12 @@ export function formatDate(isoString: string, timezone?: string | null): string 
     });
   }
 }
+
+export function formatByteLimit(bytes: number): string {
+  const megabytes = bytes / (1024 * 1024);
+  if (Number.isInteger(megabytes)) {
+    return `${megabytes} MB`;
+  }
+
+  return `${megabytes.toFixed(1)} MB`;
+}

@@ -16,6 +16,10 @@ from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
 from app.shared.event_logger import log_event
+from app.shared.input_limits import (
+    AUDIO_TRANSCRIPT_MAX_CHARS,
+    EXTRACTION_TRANSCRIPT_MAX_CHARS,
+)
 
 
 class ExtractionIntegrationProtocol(Protocol):
@@ -106,6 +110,11 @@ class ExtractionService:
                 if normalized_notes:
                     combined_text = f"{transcript}\n\n{normalized_notes}"
 
+            _validate_transcript_length(
+                combined_text,
+                max_chars=EXTRACTION_TRANSCRIPT_MAX_CHARS,
+            )
+
             extraction = await self.convert_notes(combined_text)
         except QuoteServiceError:
             log_event("draft_generation_failed", user_id=user_id, detail=source_type)
@@ -133,10 +142,24 @@ class ExtractionService:
             raise QuoteServiceError(detail=str(exc), status_code=400) from exc
 
         try:
-            return await self._transcription.transcribe(stitched_wav)
+            transcript = await self._transcription.transcribe(stitched_wav)
         except TranscriptionError as exc:
             sentry_sdk.capture_exception(exc)
             raise QuoteServiceError(
                 detail=f"Transcription failed: {exc}",
                 status_code=502,
             ) from exc
+        _validate_transcript_length(
+            transcript,
+            max_chars=AUDIO_TRANSCRIPT_MAX_CHARS,
+        )
+        return transcript
+
+
+def _validate_transcript_length(transcript: str, *, max_chars: int) -> None:
+    if len(transcript) <= max_chars:
+        return
+    raise QuoteServiceError(
+        detail=f"Transcript exceeds maximum length of {max_chars} characters",
+        status_code=422,
+    )

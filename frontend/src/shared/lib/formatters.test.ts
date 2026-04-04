@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatCurrency, formatDate } from "@/shared/lib/formatters";
+import { formatByteLimit, formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 describe("formatCurrency", () => {
   it("formats integer values in USD", () => {
@@ -41,5 +41,15 @@ describe("formatDate", () => {
 
   it("returns fallback for invalid dates", () => {
     expect(formatDate("not-a-date")).toBe("Unknown date");
+  });
+});
+
+describe("formatByteLimit", () => {
+  it("formats whole-megabyte limits without decimals", () => {
+    expect(formatByteLimit(100 * 1024 * 1024)).toBe("100 MB");
+  });
+
+  it("formats fractional megabyte limits with one decimal place", () => {
+    expect(formatByteLimit(1536 * 1024)).toBe("1.5 MB");
   });
 });

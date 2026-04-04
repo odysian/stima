@@ -44,6 +44,16 @@ from app.shared.dependencies import (
     get_quote_service,
     get_storage_service,
 )
+from app.shared.input_limits import (
+    CUSTOMER_ADDRESS_MAX_CHARS,
+    DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    DOCUMENT_NOTES_MAX_CHARS,
+    DOCUMENT_TRANSCRIPT_MAX_CHARS,
+    LINE_ITEM_DESCRIPTION_MAX_CHARS,
+    LINE_ITEM_DETAILS_MAX_CHARS,
+    MAX_AUDIO_CLIPS_PER_REQUEST,
+    NOTE_INPUT_MAX_CHARS,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -1864,6 +1874,134 @@ async def test_convert_notes_returns_422_for_extraction_errors(client: AsyncClie
     assert response.json()["detail"].startswith("Extraction failed:")
 
 
+async def test_convert_notes_rejects_notes_over_limit(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/convert-notes",
+        json={"notes": "x" * (NOTE_INPUT_MAX_CHARS + 1)},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("payload_overrides", "expected_field"),
+    [
+        ({"transcript": "x" * (DOCUMENT_TRANSCRIPT_MAX_CHARS + 1)}, "transcript"),
+        ({"notes": "x" * (DOCUMENT_NOTES_MAX_CHARS + 1)}, "notes"),
+        (
+            {
+                "line_items": [
+                    {"description": "line item", "details": None, "price": 1}
+                    for _ in range(DOCUMENT_LINE_ITEMS_MAX_ITEMS + 1)
+                ]
+            },
+            "line_items",
+        ),
+        (
+            {
+                "line_items": [
+                    {
+                        "description": "x" * (LINE_ITEM_DESCRIPTION_MAX_CHARS + 1),
+                        "details": None,
+                        "price": 55,
+                    }
+                ]
+            },
+            "description",
+        ),
+        (
+            {
+                "line_items": [
+                    {
+                        "description": "line item",
+                        "details": "x" * (LINE_ITEM_DETAILS_MAX_CHARS + 1),
+                        "price": 55,
+                    }
+                ]
+            },
+            "details",
+        ),
+    ],
+)
+async def test_create_quote_rejects_payloads_over_document_ceilings(
+    client: AsyncClient,
+    payload_overrides: dict[str, object],
+    expected_field: str,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    payload: dict[str, object] = {
+        "customer_id": customer_id,
+        "transcript": "quote transcript",
+        "line_items": [{"description": "line item", "details": None, "price": 55}],
+        "total_amount": 55,
+        "notes": "Original note",
+        "source_type": "text",
+    }
+    payload.update(payload_overrides)
+
+    response = await client.post(
+        "/api/quotes",
+        json=payload,
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+    assert expected_field in json.dumps(response.json()["detail"])
+
+
+async def test_update_quote_rejects_notes_over_limit(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    response = await client.patch(
+        f"/api/quotes/{quote['id']}",
+        json={"notes": "x" * (DOCUMENT_NOTES_MAX_CHARS + 1)},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_create_direct_invoice_rejects_transcript_over_limit(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "transcript": "x" * (DOCUMENT_TRANSCRIPT_MAX_CHARS + 1),
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": "Original note",
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+
+
+async def test_create_customer_rejects_address_over_limit(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/customers",
+        json={
+            "name": "Quote Test Customer",
+            "address": "x" * (CUSTOMER_ADDRESS_MAX_CHARS + 1),
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+
+
 async def test_get_quote_detail_includes_nullable_customer_contact_fields(
     client: AsyncClient,
 ) -> None:
@@ -2041,6 +2179,24 @@ async def test_capture_audio_multi_clip_success(client: AsyncClient) -> None:
     assert response.json()["transcript"] == "transcript from stitched-2"
 
 
+async def test_capture_audio_rejects_too_many_clips(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/capture-audio",
+        files=[
+            ("clips", (f"clip-{index}.webm", b"x", "audio/webm"))
+            for index in range(MAX_AUDIO_CLIPS_PER_REQUEST + 1)
+        ],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": f"No more than {MAX_AUDIO_CLIPS_PER_REQUEST} audio clips are allowed"
+    }
+
+
 async def test_capture_audio_missing_clips_field_returns_422(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -2093,6 +2249,26 @@ async def test_capture_audio_rejects_oversized_clip_with_400(
 
     assert response.status_code == 400
     assert response.json() == {"detail": "Clip too large"}
+
+
+async def test_capture_audio_rejects_total_upload_limit(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(quote_api, "MAX_AUDIO_TOTAL_BYTES", 4)
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/capture-audio",
+        files=[
+            ("clips", ("clip-1.webm", b"123", "audio/webm")),
+            ("clips", ("clip-2.webm", b"456", "audio/webm")),
+        ],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Total audio upload too large"}
 
 
 async def test_capture_audio_transcription_failure_returns_502(client: AsyncClient) -> None:
@@ -2178,6 +2354,33 @@ async def test_extract_combined_rejects_empty_clip_with_400(client: AsyncClient)
 
     assert response.status_code == 400
     assert response.json() == {"detail": "Audio clip is empty"}
+
+
+async def test_extract_combined_rejects_unsupported_content_type_before_processing(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("clips", ("clip-1.txt", b"not-audio", "text/plain"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Audio clip content type is not supported"}
+
+
+async def test_extract_combined_rejects_notes_over_limit(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "x" * (NOTE_INPUT_MAX_CHARS + 1)))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
 
 
 async def test_extract_combined_clips_and_notes_success(client: AsyncClient) -> None:

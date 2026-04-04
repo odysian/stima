@@ -3,6 +3,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { CUSTOMER_ADDRESS_MAX_CHARS } from "@/shared/lib/inputLimits";
 
 interface CustomerInlineCreateFormProps {
   name: string;
@@ -59,6 +60,7 @@ export function CustomerInlineCreateForm({
           <textarea
             id="customer-address"
             rows={4}
+            maxLength={CUSTOMER_ADDRESS_MAX_CHARS}
             value={address}
             onChange={onAddressChange}
             className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"

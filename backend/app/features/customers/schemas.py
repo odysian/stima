@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.shared.input_limits import CUSTOMER_ADDRESS_MAX_CHARS
+
 
 class CustomerCreateRequest(BaseModel):
     """Request payload for customer creation."""
@@ -14,7 +16,7 @@ class CustomerCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     phone: str | None = Field(default=None, max_length=30)
     email: str | None = Field(default=None, max_length=320)
-    address: str | None = None
+    address: str | None = Field(default=None, max_length=CUSTOMER_ADDRESS_MAX_CHARS)
 
 
 class CustomerUpdateRequest(BaseModel):
@@ -23,7 +25,7 @@ class CustomerUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     phone: str | None = Field(default=None, max_length=30)
     email: str | None = Field(default=None, max_length=320)
-    address: str | None = None
+    address: str | None = Field(default=None, max_length=CUSTOMER_ADDRESS_MAX_CHARS)
 
     @model_validator(mode="after")
     def validate_name_is_not_null_when_provided(self) -> CustomerUpdateRequest:

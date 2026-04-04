@@ -5,18 +5,13 @@ import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { profileService } from "@/features/profile/services/profileService";
 import { createCaptureLocationState, HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
-import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
+import {
+  ReviewDocumentTypeSelector,
+  type ReviewDocumentType,
+} from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewSubmitFooter } from "@/features/quotes/components/ReviewSubmitFooter";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
-import {
-  buildCreatePayload,
-  EMPTY_LINE_ITEM,
-  getReviewMessages,
-  getWarningMessages,
-  isInvalidLineItem,
-  mapExtractedLineItems,
-  normalizeLineItem,
-} from "@/features/quotes/components/reviewScreenUtils";
+import { buildCreatePayload, EMPTY_LINE_ITEM, getReviewMessages, getWarningMessages, isInvalidLineItem, mapExtractedLineItems, normalizeLineItem } from "@/features/quotes/components/reviewScreenUtils";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft } from "@/features/quotes/types/quote.types";
@@ -24,6 +19,7 @@ import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
+import { DOCUMENT_LINE_ITEMS_MAX_ITEMS, DOCUMENT_NOTES_MAX_CHARS, DOCUMENT_TRANSCRIPT_MAX_CHARS } from "@/shared/lib/inputLimits";
 import { getPricingValidationMessage } from "@/shared/lib/pricing";
 
 export function ReviewScreen(): React.ReactElement | null {
@@ -81,6 +77,7 @@ export function ReviewScreen(): React.ReactElement | null {
       price: lineItem.price,
     }));
   const hasNullPrices = lineItemsForSubmit.some((lineItem) => lineItem.price === null);
+  const hasReachedLineItemLimit = currentDraft.lineItems.length >= DOCUMENT_LINE_ITEMS_MAX_ITEMS;
   const canSubmit = lineItemsForSubmit.length > 0 && !hasInvalidLineItems;
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
@@ -93,11 +90,10 @@ export function ReviewScreen(): React.ReactElement | null {
   const warningMessages = getWarningMessages(reviewMessages, hasNullPrices, documentType);
   const isInteractionLocked = isSaving || isRegenerating;
 
-  function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void {
-    setDraft(updater);
-  }
+  function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void { setDraft(updater); }
 
   function onLineItemAdd(): void {
+    if (hasReachedLineItemLimit) return;
     setSaveError(null);
     updateDraft((nextDraft) => ({
       ...nextDraft,
@@ -285,6 +281,7 @@ export function ReviewScreen(): React.ReactElement | null {
                 <textarea
                   id="transcript-notes"
                   rows={6}
+                  maxLength={DOCUMENT_TRANSCRIPT_MAX_CHARS}
                   disabled={isInteractionLocked}
                   value={currentDraft.transcript}
                   onChange={(event) =>
@@ -358,9 +355,9 @@ export function ReviewScreen(): React.ReactElement | null {
 
         <button
           type="button"
-          disabled={isInteractionLocked}
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onLineItemAdd}
+          disabled={isInteractionLocked || hasReachedLineItemLimit}
         >
           <span className="material-symbols-outlined text-base">add</span>
           Add Line Item
@@ -402,6 +399,7 @@ export function ReviewScreen(): React.ReactElement | null {
           <textarea
             id="quote-notes"
             rows={3}
+            maxLength={DOCUMENT_NOTES_MAX_CHARS}
             disabled={isInteractionLocked}
             value={currentDraft.notes}
             onChange={(event) =>

@@ -8,20 +8,35 @@ from anthropic import AsyncAnthropic
 from pydantic import ValidationError
 
 from app.features.quotes.schemas import ExtractionResult
+from app.shared.input_limits import (
+    CONFIDENCE_NOTE_MAX_CHARS,
+    CONFIDENCE_NOTES_MAX_ITEMS,
+    DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    EXTRACTION_TRANSCRIPT_MAX_CHARS,
+    LINE_ITEM_DESCRIPTION_MAX_CHARS,
+    LINE_ITEM_DETAILS_MAX_CHARS,
+)
 
 EXTRACTION_TOOL_NAME = "extract_quote"
 
 EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "transcript": {"type": "string"},
+        "transcript": {"type": "string", "maxLength": EXTRACTION_TRANSCRIPT_MAX_CHARS},
         "line_items": {
             "type": "array",
+            "maxItems": DOCUMENT_LINE_ITEMS_MAX_ITEMS,
             "items": {
                 "type": "object",
                 "properties": {
-                    "description": {"type": "string"},
-                    "details": {"type": ["string", "null"]},
+                    "description": {
+                        "type": "string",
+                        "maxLength": LINE_ITEM_DESCRIPTION_MAX_CHARS,
+                    },
+                    "details": {
+                        "type": ["string", "null"],
+                        "maxLength": LINE_ITEM_DETAILS_MAX_CHARS,
+                    },
                     "price": {"type": ["number", "null"]},
                     "flagged": {"type": "boolean"},
                     "flag_reason": {"type": ["string", "null"]},
@@ -33,7 +48,11 @@ EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
         "total": {"type": ["number", "null"]},
         "confidence_notes": {
             "type": "array",
-            "items": {"type": "string"},
+            "maxItems": CONFIDENCE_NOTES_MAX_ITEMS,
+            "items": {
+                "type": "string",
+                "maxLength": CONFIDENCE_NOTE_MAX_CHARS,
+            },
         },
     },
     "required": ["transcript", "line_items", "confidence_notes"],

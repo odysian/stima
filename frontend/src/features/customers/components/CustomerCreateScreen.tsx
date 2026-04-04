@@ -6,6 +6,7 @@ import type { CustomerCreateRequest } from "@/features/customers/types/customer.
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { CUSTOMER_ADDRESS_MAX_CHARS } from "@/shared/lib/inputLimits";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
 export function CustomerCreateScreen(): React.ReactElement {
@@ -94,6 +95,7 @@ export function CustomerCreateScreen(): React.ReactElement {
               <textarea
                 id="customer-address"
                 rows={4}
+                maxLength={CUSTOMER_ADDRESS_MAX_CHARS}
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
                 className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"

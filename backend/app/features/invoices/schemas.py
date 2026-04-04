@@ -9,6 +9,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.features.quotes.schemas import DiscountType, LineItemDraft, LineItemResponse
+from app.shared.input_limits import (
+    DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    DOCUMENT_NOTES_MAX_CHARS,
+    DOCUMENT_TRANSCRIPT_MAX_CHARS,
+)
 
 
 def _normalize_optional_title(value: object) -> object:
@@ -24,14 +29,17 @@ class InvoiceCreateRequest(BaseModel):
 
     customer_id: UUID
     title: str | None = Field(default=None, max_length=120)
-    transcript: str = Field(min_length=1)
-    line_items: list[LineItemDraft] = Field(default_factory=list)
+    transcript: str = Field(min_length=1, max_length=DOCUMENT_TRANSCRIPT_MAX_CHARS)
+    line_items: list[LineItemDraft] = Field(
+        default_factory=list,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
     total_amount: float | None = None
     tax_rate: float | None = None
     discount_type: DiscountType | None = None
     discount_value: float | None = None
     deposit_amount: float | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=DOCUMENT_NOTES_MAX_CHARS)
     source_type: Literal["text", "voice"]
 
     _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
@@ -99,13 +107,16 @@ class InvoiceUpdateRequest(BaseModel):
     """Request payload for partial invoice updates with full line-item replacement."""
 
     title: str | None = Field(default=None, max_length=120)
-    line_items: list[LineItemDraft] | None = None
+    line_items: list[LineItemDraft] | None = Field(
+        default=None,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
     total_amount: float | None = None
     tax_rate: float | None = None
     discount_type: DiscountType | None = None
     discount_value: float | None = None
     deposit_amount: float | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=DOCUMENT_NOTES_MAX_CHARS)
     due_date: date | None = None
 
     _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)

@@ -3,11 +3,22 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.shared.input_limits import (
+    CONFIDENCE_NOTE_MAX_CHARS,
+    CONFIDENCE_NOTES_MAX_ITEMS,
+    DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    DOCUMENT_NOTES_MAX_CHARS,
+    DOCUMENT_TRANSCRIPT_MAX_CHARS,
+    EXTRACTION_TRANSCRIPT_MAX_CHARS,
+    LINE_ITEM_DESCRIPTION_MAX_CHARS,
+    LINE_ITEM_DETAILS_MAX_CHARS,
+    NOTE_INPUT_MAX_CHARS,
+)
 from app.shared.pricing import DiscountType
 
 
@@ -22,8 +33,8 @@ def _normalize_optional_title(value: object) -> object:
 class LineItemDraft(BaseModel):
     """Editable line item payload used for quote creation and updates."""
 
-    description: str = Field(min_length=1)
-    details: str | None = None
+    description: str = Field(min_length=1, max_length=LINE_ITEM_DESCRIPTION_MAX_CHARS)
+    details: str | None = Field(default=None, max_length=LINE_ITEM_DETAILS_MAX_CHARS)
     price: float | None = None
 
 
@@ -37,16 +48,22 @@ class LineItemExtracted(LineItemDraft):
 class ExtractionResult(BaseModel):
     """Structured extraction output returned from convert-notes."""
 
-    transcript: str = Field(min_length=1)
-    line_items: list[LineItemExtracted] = Field(default_factory=list)
+    transcript: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    line_items: list[LineItemExtracted] = Field(
+        default_factory=list,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
     total: float | None = None
-    confidence_notes: list[str] = Field(default_factory=list)
+    confidence_notes: list[Annotated[str, Field(max_length=CONFIDENCE_NOTE_MAX_CHARS)]] = Field(
+        default_factory=list,
+        max_length=CONFIDENCE_NOTES_MAX_ITEMS,
+    )
 
 
 class ConvertNotesRequest(BaseModel):
     """Request payload for text-note extraction."""
 
-    notes: str = Field(min_length=1)
+    notes: str = Field(min_length=1, max_length=NOTE_INPUT_MAX_CHARS)
 
 
 class QuoteCreateRequest(BaseModel):
@@ -54,14 +71,17 @@ class QuoteCreateRequest(BaseModel):
 
     customer_id: UUID
     title: str | None = Field(default=None, max_length=120)
-    transcript: str = Field(min_length=1)
-    line_items: list[LineItemDraft] = Field(default_factory=list)
+    transcript: str = Field(min_length=1, max_length=DOCUMENT_TRANSCRIPT_MAX_CHARS)
+    line_items: list[LineItemDraft] = Field(
+        default_factory=list,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
     total_amount: float | None = None
     tax_rate: float | None = None
     discount_type: DiscountType | None = None
     discount_value: float | None = None
     deposit_amount: float | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=DOCUMENT_NOTES_MAX_CHARS)
     source_type: Literal["text", "voice"]
 
     _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
@@ -71,13 +91,16 @@ class QuoteUpdateRequest(BaseModel):
     """Request payload for partial quote updates with full line-item replacement."""
 
     title: str | None = Field(default=None, max_length=120)
-    line_items: list[LineItemDraft] | None = None
+    line_items: list[LineItemDraft] | None = Field(
+        default=None,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
     total_amount: float | None = None
     tax_rate: float | None = None
     discount_type: DiscountType | None = None
     discount_value: float | None = None
     deposit_amount: float | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=DOCUMENT_NOTES_MAX_CHARS)
 
     _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
 

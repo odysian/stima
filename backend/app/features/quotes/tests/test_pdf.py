@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 from collections.abc import Iterator
 from typing import Annotated
@@ -13,24 +14,28 @@ from fastapi import Depends
 from httpx import AsyncClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.invoices.repository import InvoiceRepository
 from app.features.invoices.service import InvoiceService
-from app.features.quotes.models import Document, QuoteStatus
+from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.service import QuoteService
-from app.integrations.pdf import PdfRenderError
+from app.integrations.pdf import PdfRenderError, validate_render_context
 from app.integrations.storage import StorageNotFoundError
 from app.main import app
 from app.shared import event_logger
 from app.shared.dependencies import get_invoice_service, get_quote_service, get_storage_service
+from app.shared.input_limits import DOCUMENT_LINE_ITEMS_MAX_ITEMS
 
 pytestmark = pytest.mark.asyncio
 
-_PNG_BYTES = b"\x89PNG\r\n\x1a\nfake-png"
+_PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC"
+)
 
 
 class _ConfigurablePdfIntegration:
@@ -42,6 +47,7 @@ class _ConfigurablePdfIntegration:
         self.last_context = context
         if self.should_fail:
             raise PdfRenderError("Unable to render quote PDF")
+        validate_render_context(context)
         return f"PDF for {context.doc_number}".encode()
 
 
@@ -343,6 +349,40 @@ async def test_generate_pdf_returns_422_when_render_fails(
 
     assert response.status_code == 422
     assert response.json() == {"detail": "Unable to render quote PDF"}
+
+
+async def test_generate_pdf_rejects_documents_that_exceed_render_limits(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    quote_row = await db_session.scalar(
+        select(Document)
+        .options(selectinload(Document.line_items))
+        .where(Document.id == UUID(quote["id"]))
+    )
+    assert quote_row is not None
+    quote_row.line_items = [
+        LineItem(
+            description=f"line item {index}",
+            details=None,
+            price=55,
+            sort_order=index,
+        )
+        for index in range(DOCUMENT_LINE_ITEMS_MAX_ITEMS + 1)
+    ]
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Document exceeds supported render limits"}
 
 
 async def test_generate_pdf_returns_404_for_nonexistent_quote(client: AsyncClient) -> None:
