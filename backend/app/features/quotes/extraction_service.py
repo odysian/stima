@@ -16,7 +16,7 @@ from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
 from app.shared.event_logger import log_event
-from app.shared.input_limits import DOCUMENT_TRANSCRIPT_MAX_CHARS
+from app.shared.input_limits import AUDIO_TRANSCRIPT_MAX_CHARS, DOCUMENT_TRANSCRIPT_MAX_CHARS
 
 
 class ExtractionIntegrationProtocol(Protocol):
@@ -107,7 +107,10 @@ class ExtractionService:
                 if normalized_notes:
                     combined_text = f"{transcript}\n\n{normalized_notes}"
 
-            _validate_transcript_length(combined_text)
+            _validate_transcript_length(
+                combined_text,
+                max_chars=DOCUMENT_TRANSCRIPT_MAX_CHARS,
+            )
 
             extraction = await self.convert_notes(combined_text)
         except QuoteServiceError:
@@ -143,14 +146,17 @@ class ExtractionService:
                 detail=f"Transcription failed: {exc}",
                 status_code=502,
             ) from exc
-        _validate_transcript_length(transcript)
+        _validate_transcript_length(
+            transcript,
+            max_chars=AUDIO_TRANSCRIPT_MAX_CHARS,
+        )
         return transcript
 
 
-def _validate_transcript_length(transcript: str) -> None:
-    if len(transcript) <= DOCUMENT_TRANSCRIPT_MAX_CHARS:
+def _validate_transcript_length(transcript: str, *, max_chars: int) -> None:
+    if len(transcript) <= max_chars:
         return
     raise QuoteServiceError(
-        detail=f"Transcript exceeds maximum length of {DOCUMENT_TRANSCRIPT_MAX_CHARS} characters",
+        detail=f"Transcript exceeds maximum length of {max_chars} characters",
         status_code=422,
     )

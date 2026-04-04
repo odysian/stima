@@ -37,7 +37,7 @@ class PdfIntegration:
     def render(self, context: QuoteRenderContext) -> bytes:
         """Render a document PDF and return raw bytes."""
         try:
-            _validate_render_context(context)
+            validate_render_context(context)
             template = self._environment.get_template("quote.html")
             rendered_html = template.render(
                 **asdict(context),
@@ -50,7 +50,7 @@ class PdfIntegration:
             raise PdfRenderError("Unable to render document PDF") from exc
 
 
-def _validate_render_context(context: QuoteRenderContext) -> None:
+def validate_render_context(context: QuoteRenderContext) -> None:
     if len(context.line_items) > DOCUMENT_LINE_ITEMS_MAX_ITEMS:
         raise PdfRenderError("Document exceeds supported render limits")
     if context.customer_address and len(context.customer_address) > CUSTOMER_ADDRESS_MAX_CHARS:

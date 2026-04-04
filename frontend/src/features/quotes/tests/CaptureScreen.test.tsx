@@ -10,6 +10,7 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type { ExtractionResult } from "@/features/quotes/types/quote.types";
 import {
   MAX_AUDIO_CLIPS_PER_REQUEST,
+  MAX_AUDIO_TOTAL_BYTES,
   NOTE_INPUT_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
 
@@ -368,6 +369,27 @@ describe("CaptureScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed");
     expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
+  });
+
+  it("derives the total audio limit error from the shared byte ceiling", async () => {
+    const oversizedBlob = new Blob(["clip-1"], { type: "audio/webm" });
+    Object.defineProperty(oversizedBlob, "size", { value: MAX_AUDIO_TOTAL_BYTES + 1 });
+    mockVoiceCapture({
+      clips: [
+        {
+          ...clipFixture,
+          blob: oversizedBlob,
+        },
+      ],
+    });
+    renderScreen();
+
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      `Total audio upload must be ${MAX_AUDIO_TOTAL_BYTES / (1024 * 1024)} MB or smaller.`,
+    );
+    expect(mockedQuoteService.extract).not.toHaveBeenCalled();
   });
 
   it("shows staged extraction progress and clears it after extraction resolves", async () => {

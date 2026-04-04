@@ -24,7 +24,7 @@ from app.features.invoices.service import InvoiceService
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.service import QuoteService
-from app.integrations.pdf import PdfRenderError, _validate_render_context
+from app.integrations.pdf import PdfRenderError, validate_render_context
 from app.integrations.storage import StorageNotFoundError
 from app.main import app
 from app.shared import event_logger
@@ -47,7 +47,7 @@ class _ConfigurablePdfIntegration:
         self.last_context = context
         if self.should_fail:
             raise PdfRenderError("Unable to render quote PDF")
-        _validate_render_context(context)
+        validate_render_context(context)
         return f"PDF for {context.doc_number}".encode()
 
 

@@ -13,6 +13,11 @@ from app.features.quotes.service import QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
+from app.shared.input_limits import (
+    AUDIO_TRANSCRIPT_MAX_CHARS,
+    DOCUMENT_TRANSCRIPT_MAX_CHARS,
+    NOTE_INPUT_MAX_CHARS,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,6 +44,28 @@ class _SuccessfulAudioIntegration:
     def normalize_and_stitch(self, clips: Sequence[AudioClip]) -> bytes:
         del clips
         return b"stitched-audio"
+
+
+class _SuccessfulExtractionIntegration:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def extract(self, notes: str) -> ExtractionResult:
+        self.calls.append(notes)
+        return ExtractionResult(
+            transcript=notes,
+            line_items=[],
+            confidence_notes=[],
+        )
+
+
+class _SuccessfulTranscriptionIntegration:
+    def __init__(self, transcript: str = "transcript from stitched-audio") -> None:
+        self.transcript = transcript
+
+    async def transcribe(self, audio_wav: bytes) -> str:
+        del audio_wav
+        return self.transcript
 
 
 async def test_convert_notes_captures_extraction_errors(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -89,6 +116,24 @@ async def test_capture_audio_captures_transcription_errors(
 
     assert len(captured) == 1
     assert isinstance(captured[0], TranscriptionError)
+
+
+async def test_extract_combined_allows_audio_and_notes_up_to_document_limit() -> None:
+    extraction = _SuccessfulExtractionIntegration()
+    transcript = "t" * AUDIO_TRANSCRIPT_MAX_CHARS
+    notes = "n" * NOTE_INPUT_MAX_CHARS
+    service = ExtractionService(
+        extraction_integration=extraction,
+        audio_integration=_SuccessfulAudioIntegration(),
+        transcription_integration=_SuccessfulTranscriptionIntegration(transcript),
+    )
+
+    result = await service.extract_combined([_clip()], notes)
+
+    expected_transcript = f"{transcript}\n\n{notes}"
+    assert extraction.calls == [expected_transcript]
+    assert result.transcript == expected_transcript
+    assert len(result.transcript) == DOCUMENT_TRANSCRIPT_MAX_CHARS
 
 
 def _clip() -> CaptureAudioClip:

@@ -11,6 +11,7 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
+import { formatByteLimit } from "@/shared/lib/formatters";
 import {
   MAX_AUDIO_CLIPS_PER_REQUEST,
   MAX_AUDIO_TOTAL_BYTES,
@@ -144,7 +145,7 @@ export function CaptureScreen(): React.ReactElement {
     }
     const totalClipBytes = clips.reduce((runningTotal, clip) => runningTotal + clip.blob.size, 0);
     if (totalClipBytes > MAX_AUDIO_TOTAL_BYTES) {
-      setError("Total audio upload must be 100 MB or smaller.");
+      setError(`Total audio upload must be ${formatByteLimit(MAX_AUDIO_TOTAL_BYTES)} or smaller.`);
       return;
     }
     clearExtractionStageTimers();
