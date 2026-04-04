@@ -59,6 +59,7 @@ async def test_trusted_proxy_headers_prevent_https_redirect_loops(
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("COOKIE_SECURE", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://stima.odysian.dev")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.odysian.dev,127.0.0.1")
     monkeypatch.setenv("ENABLE_HTTPS_REDIRECT", "true")
     monkeypatch.setenv("TRUSTED_PROXY_IPS", "127.0.0.1")

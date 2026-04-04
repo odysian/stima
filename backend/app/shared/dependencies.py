@@ -1,7 +1,8 @@
-"""Shared app dependencies for auth services and request guards."""
+"""Shared app dependencies for auth services, rate guards, and request guards."""
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from functools import cache, lru_cache
 from hmac import compare_digest
 from typing import Annotated
@@ -36,6 +37,7 @@ from app.integrations.extraction import ExtractionIntegration
 from app.integrations.pdf import PdfIntegration
 from app.integrations.storage import StorageService
 from app.integrations.transcription import TranscriptionIntegration
+from app.shared.rate_limit import limiter, reserve_extraction_capacity
 
 
 @lru_cache(maxsize=1)
@@ -202,3 +204,20 @@ def require_csrf(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="CSRF token mismatch",
         )
+
+
+async def require_extraction_capacity_guard(
+    user: Annotated[User, Depends(get_current_user)],
+) -> AsyncIterator[None]:
+    """Fail fast when extraction quota or provider concurrency has been exhausted."""
+    if not limiter.enabled:
+        yield
+        return
+
+    async with reserve_extraction_capacity(user.id) as capacity_available:
+        if not capacity_available:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Extraction quota or concurrency exhausted. Please retry later.",
+            )
+        yield

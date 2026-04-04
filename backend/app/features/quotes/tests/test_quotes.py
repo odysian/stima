@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Iterator, Sequence
 from datetime import date
@@ -10,10 +11,11 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi import Depends
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
@@ -54,6 +56,7 @@ from app.shared.input_limits import (
     MAX_AUDIO_CLIPS_PER_REQUEST,
     NOTE_INPUT_MAX_CHARS,
 )
+from app.shared.rate_limit import reset_local_rate_limit_state
 
 pytestmark = pytest.mark.asyncio
 
@@ -215,9 +218,9 @@ def _override_extraction_service_dependency() -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter() -> Iterator[None]:
-    quote_api.limiter.reset()
+    reset_local_rate_limit_state()
     yield
-    quote_api.limiter.reset()
+    reset_local_rate_limit_state()
 
 
 async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
@@ -2460,6 +2463,134 @@ async def test_extract_combined_rate_limit_returns_429(
     )
 
     assert response.status_code == 429
+
+
+async def test_convert_notes_rate_limit_is_keyed_by_user_not_ip(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("QUOTE_TEXT_EXTRACTION_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+
+    csrf_token_user_one = await _register_and_login(client, _credentials())
+    first_response = await client.post(
+        "/api/quotes/convert-notes",
+        json={"notes": "mulch the side yard"},
+        headers={"X-CSRF-Token": csrf_token_user_one},
+    )
+    assert first_response.status_code == 200
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as second_client:
+        csrf_token_user_two = await _register_and_login(
+            second_client,
+            _credentials(),
+        )
+        second_response = await second_client.post(
+            "/api/quotes/convert-notes",
+            json={"notes": "edge the front beds"},
+            headers={"X-CSRF-Token": csrf_token_user_two},
+        )
+        assert second_response.status_code == 200
+
+    blocked_response = await client.post(
+        "/api/quotes/convert-notes",
+        json={"notes": "rate limited request"},
+        headers={"X-CSRF-Token": csrf_token_user_one},
+    )
+
+    assert blocked_response.status_code == 429
+
+
+async def test_convert_notes_rejects_when_daily_quota_is_exhausted(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("EXTRACTION_DAILY_QUOTA", "1")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+
+    first_response = await client.post(
+        "/api/quotes/convert-notes",
+        json={"notes": "mulch the side yard"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert first_response.status_code == 200
+
+    second_response = await client.post(
+        "/api/quotes/convert-notes",
+        json={"notes": "edge the front beds"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert second_response.status_code == 429
+    assert second_response.json() == {
+        "detail": "Extraction quota or concurrency exhausted. Please retry later."
+    }
+
+
+async def test_convert_notes_rejects_when_concurrency_limit_is_exhausted(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _BlockingExtractionIntegration:
+        def __init__(self) -> None:
+            self.started = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def extract(self, notes: str) -> ExtractionResult:
+            self.started.set()
+            await self.release.wait()
+            return ExtractionResult(
+                transcript=notes,
+                line_items=[],
+                total=None,
+                confidence_notes=[],
+            )
+
+    blocking_integration = _BlockingExtractionIntegration()
+
+    async def _override_get_extraction_service() -> ExtractionService:
+        return ExtractionService(
+            extraction_integration=blocking_integration,
+            audio_integration=_MockAudioIntegration(),
+            transcription_integration=_MockTranscriptionIntegration(),
+        )
+
+    app.dependency_overrides[get_extraction_service] = _override_get_extraction_service
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("EXTRACTION_CONCURRENCY_LIMIT", "1")
+    get_settings.cache_clear()
+    csrf_token = await _register_and_login(client, _credentials())
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as second_client:
+        second_client.cookies.update(client.cookies)
+        first_request = asyncio.create_task(
+            client.post(
+                "/api/quotes/convert-notes",
+                json={"notes": "mulch the side yard"},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+        )
+        await blocking_integration.started.wait()
+
+        blocked_response = await second_client.post(
+            "/api/quotes/convert-notes",
+            json={"notes": "edge the front beds"},
+            headers={"X-CSRF-Token": csrf_token},
+        )
+
+        blocking_integration.release.set()
+        first_response = await first_request
+
+    assert first_response.status_code == 200
+    assert blocked_response.status_code == 429
+    assert blocked_response.json() == {
+        "detail": "Extraction quota or concurrency exhausted. Please retry later."
+    }
 
 
 @pytest.mark.parametrize(

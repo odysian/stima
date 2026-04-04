@@ -181,3 +181,14 @@ def test_production_rejects_wildcard_allowed_hosts(monkeypatch) -> None:
 
     with pytest.raises(ValidationError):
         get_settings()
+
+
+def test_production_requires_redis_url(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+    monkeypatch.delenv("REDIS_URL", raising=False)
+
+    with pytest.raises(ValidationError, match="REDIS_URL must be set"):
+        get_settings()

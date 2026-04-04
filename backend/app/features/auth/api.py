@@ -33,7 +33,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
-@limiter.limit("3/hour", key_func=get_ip_key)
+@limiter.limit(lambda: get_settings().auth_register_rate_limit, key_func=get_ip_key)
 async def register(
     request: Request,
     payload: RegisterRequest,
@@ -52,7 +52,7 @@ async def register(
 
 
 @router.post("/login", response_model=AuthSessionResponse)
-@limiter.limit("5/minute", key_func=get_ip_key)
+@limiter.limit(lambda: get_settings().auth_login_rate_limit, key_func=get_ip_key)
 async def login(
     request: Request,
     payload: LoginRequest,
@@ -86,7 +86,7 @@ async def login(
     response_model=AuthSessionResponse,
     dependencies=[Depends(require_csrf)],
 )
-@limiter.limit("10/minute", key_func=get_ip_key)
+@limiter.limit(lambda: get_settings().auth_refresh_rate_limit, key_func=get_ip_key)
 async def refresh(
     request: Request,
     response: Response,
@@ -113,7 +113,7 @@ async def refresh(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("10/minute", key_func=get_ip_key)
+@limiter.limit(lambda: get_settings().auth_logout_rate_limit, key_func=get_ip_key)
 async def logout(
     request: Request,
     auth_service: Annotated[AuthService, Depends(get_auth_service)],

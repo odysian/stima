@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 
+from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.invoices.email_delivery_service import InvoiceEmailDeliveryService
 from app.features.invoices.schemas import (
@@ -28,6 +29,7 @@ from app.shared.dependencies import (
     require_csrf,
 )
 from app.shared.pricing import DiscountType
+from app.shared.rate_limit import get_user_key, limiter
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
@@ -130,12 +132,18 @@ async def update_invoice(
     "/{invoice_id}/pdf",
     dependencies=[Depends(require_csrf)],
 )
+@limiter.limit(
+    lambda: get_settings().authenticated_pdf_generation_rate_limit,
+    key_func=get_user_key,
+)
 async def generate_invoice_pdf(
+    request: Request,
     invoice_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
 ) -> StreamingResponse:
     """Render a user-owned invoice to PDF and stream bytes inline."""
+    del request
     try:
         doc_number, pdf_bytes = await invoice_service.generate_pdf(user, invoice_id)
     except QuoteServiceError as exc:
@@ -176,7 +184,9 @@ async def share_invoice(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_csrf)],
 )
+@limiter.limit(lambda: get_settings().invoice_email_send_rate_limit, key_func=get_user_key)
 async def send_invoice_email(
+    request: Request,
     invoice_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     email_delivery_service: Annotated[
@@ -185,6 +195,7 @@ async def send_invoice_email(
     ],
 ) -> InvoiceResponse:
     """Send an invoice email to the customer contact on file."""
+    del request
     try:
         invoice = await email_delivery_service.send_invoice_email(user, invoice_id)
     except QuoteServiceError as exc:

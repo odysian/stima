@@ -62,6 +62,75 @@ class Settings(BaseSettings):
     cookie_domain: str | None = Field(default=None, validation_alias="COOKIE_DOMAIN")
 
     environment: str = Field(default="development", validation_alias="ENVIRONMENT")
+    redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
+    rate_limit_headers_enabled: bool = Field(
+        default=False,
+        validation_alias="RATE_LIMIT_HEADERS_ENABLED",
+    )
+    auth_register_rate_limit: str = Field(
+        default="3/hour",
+        validation_alias="AUTH_REGISTER_RATE_LIMIT",
+    )
+    auth_login_rate_limit: str = Field(
+        default="5/minute",
+        validation_alias="AUTH_LOGIN_RATE_LIMIT",
+    )
+    auth_refresh_rate_limit: str = Field(
+        default="10/minute",
+        validation_alias="AUTH_REFRESH_RATE_LIMIT",
+    )
+    auth_logout_rate_limit: str = Field(
+        default="10/minute",
+        validation_alias="AUTH_LOGOUT_RATE_LIMIT",
+    )
+    admin_events_rate_limit: str = Field(
+        default="10/minute",
+        validation_alias="ADMIN_EVENTS_RATE_LIMIT",
+    )
+    public_document_fetch_rate_limit: str = Field(
+        default="60/minute",
+        validation_alias="PUBLIC_DOCUMENT_FETCH_RATE_LIMIT",
+    )
+    public_logo_fetch_rate_limit: str = Field(
+        default="120/minute",
+        validation_alias="PUBLIC_LOGO_FETCH_RATE_LIMIT",
+    )
+    quote_text_extraction_rate_limit: str = Field(
+        default="15/hour",
+        validation_alias="QUOTE_TEXT_EXTRACTION_RATE_LIMIT",
+    )
+    quote_audio_capture_rate_limit: str = Field(
+        default="10/hour",
+        validation_alias="QUOTE_AUDIO_CAPTURE_RATE_LIMIT",
+    )
+    quote_combined_extract_rate_limit: str = Field(
+        default="10/hour",
+        validation_alias="QUOTE_COMBINED_EXTRACT_RATE_LIMIT",
+    )
+    authenticated_pdf_generation_rate_limit: str = Field(
+        default="20/hour",
+        validation_alias="AUTHENTICATED_PDF_GENERATION_RATE_LIMIT",
+    )
+    quote_email_send_rate_limit: str = Field(
+        default="10/day",
+        validation_alias="QUOTE_EMAIL_SEND_RATE_LIMIT",
+    )
+    invoice_email_send_rate_limit: str = Field(
+        default="10/day",
+        validation_alias="INVOICE_EMAIL_SEND_RATE_LIMIT",
+    )
+    extraction_daily_quota: int = Field(
+        default=40,
+        validation_alias="EXTRACTION_DAILY_QUOTA",
+    )
+    extraction_concurrency_limit: int = Field(
+        default=2,
+        validation_alias="EXTRACTION_CONCURRENCY_LIMIT",
+    )
+    extraction_concurrency_ttl_seconds: int = Field(
+        default=900,
+        validation_alias="EXTRACTION_CONCURRENCY_TTL_SECONDS",
+    )
     sentry_dsn: str | None = Field(default=None, validation_alias="SENTRY_DSN")
     admin_api_key: str | None = Field(default=None, validation_alias="ADMIN_API_KEY")
     frontend_url: str = Field(
@@ -124,6 +193,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "sentry_dsn",
+        "redis_url",
         "admin_api_key",
         "resend_api_key",
         "email_from_address",
@@ -227,6 +297,8 @@ class Settings(BaseSettings):
         parsed_frontend_url = urlparse(self.frontend_url)
         if parsed_frontend_url.hostname in LOCALHOST_HOSTS:
             raise ValueError("FRONTEND_URL must not use localhost when ENVIRONMENT is 'production'")
+        if self.redis_url is None:
+            raise ValueError("REDIS_URL must be set when ENVIRONMENT is 'production'")
 
         return self
 

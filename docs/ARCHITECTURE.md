@@ -38,7 +38,7 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 
 **Flow**: register → login → access+refresh+csrf cookies set → authenticated requests carry cookies automatically → mutating requests include `X-CSRF-Token` header → on 401, frontend attempts one refresh → refresh rotates token and soft-revokes consumed token → on refresh failure, session clears.
 
-**Security**: Argon2id password hashing. Refresh token stored as SHA-256 hash. Replay of revoked token revokes entire token family. Rate limiting on all auth endpoints. Proxy-aware IP extraction for rate limiting.
+**Security**: Argon2id password hashing. Refresh token stored as SHA-256 hash. Replay of revoked token revokes entire token family. Redis-backed distributed rate limiting protects auth, public document, PDF/email, and extraction routes; public routes stay IP-keyed while authenticated hot paths use per-user keys. Provider-backed extraction routes also enforce Redis-backed per-user daily quota and concurrency guards before upstream calls. Proxy-aware IP extraction remains the fallback key source for unauthenticated routes.
 
 **Multi-device**: multiple active refresh tokens per user are allowed.
 
@@ -223,6 +223,11 @@ Rules:
 | `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
 | `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "An invoice already exists for this quote" }` |
 
+Quote extraction guardrails:
+- `POST /quotes/convert-notes`, `POST /quotes/capture-audio`, and `POST /quotes/extract` use user-keyed rate limits when a valid access cookie is present, with IP fallback only for unauthenticated resolution failures.
+- Those same extraction routes return `429 { "detail": "Extraction quota or concurrency exhausted. Please retry later." }` when the per-user daily quota or concurrent in-flight extraction limit is exhausted before provider work starts.
+- `POST /quotes/{id}/pdf`, `POST /quotes/{id}/send-email`, `POST /invoices/{id}/pdf`, and `POST /invoices/{id}/send-email` are also user-keyed and rate-limited.
+
 ### Invoice endpoints (`/api/invoices`)
 
 | Endpoint | Method | CSRF | Auth | Request | Response |
@@ -248,6 +253,7 @@ Public landing-page rules:
 - transactional quote emails reuse that same `/doc/{share_token}` landing page as the primary CTA and include `/share/{share_token}` as the secondary "Download PDF" link
 - first public load of a `shared` quote transitions it to `viewed` and logs exactly one `quote_viewed` event
 - repeat public loads of `viewed`, `approved`, and `declined` quotes are read-only and do not create duplicate `quote_viewed` events
+- public JSON, logo, and PDF responses are IP-keyed rate-limited and return `429` on limit exhaustion
 - public JSON, logo, and PDF responses send `X-Robots-Tag: noindex`
 
 `PATCH /quotes/{id}` behavior:
@@ -355,5 +361,6 @@ Cookie auth is configured for the shared parent domain `.stima.odysian.dev`.
 Boundary hardening notes:
 - Backend host validation is driven by `ALLOWED_HOSTS`.
 - Backend trusts `X-Forwarded-*` headers only from `TRUSTED_PROXY_IPS`.
+- Production startup requires `REDIS_URL`; local development can leave it unset and run with the documented in-memory degraded fallback.
 - Backend emits baseline security headers for backend-served responses; static-host CSP headers remain owned by the frontend host/CDN layer.
 - The SPA shell is compatible with `script-src 'self'`; Google Fonts and Material Symbols still require explicit font/style allowlisting until they are self-hosted.
