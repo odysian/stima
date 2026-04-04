@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any, cast
+from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from fastapi import Request
@@ -100,6 +102,9 @@ class ExtractionStateStore:
     def reset_local_state(self) -> None:
         """Reset state for in-memory test fixtures when available."""
 
+    async def aclose(self) -> None:
+        """Release backend resources when the store keeps external clients."""
+
 
 class InMemoryExtractionStateStore(ExtractionStateStore):
     """Async-safe local fallback store for degraded development/test mode."""
@@ -153,9 +158,40 @@ class RedisExtractionStateStore(ExtractionStateStore):
     """Redis-backed quota and concurrency store for distributed request coordination."""
 
     def __init__(self, redis_url: str) -> None:
-        self._client = Redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+        self._redis_url = redis_url
+        self._client: Redis | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    async def _get_client(self) -> Redis:
+        running_loop = asyncio.get_running_loop()
+        if self._client is None:
+            self._client = Redis.from_url(
+                self._redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            self._loop = running_loop
+            return self._client
+
+        if self._loop is not running_loop:
+            await self.aclose()
+            self._client = Redis.from_url(
+                self._redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            self._loop = running_loop
+
+        return self._client
+
+    async def _eval(self, client: Redis, script: str, num_keys: int, *args: str) -> Any:
+        raw_result = client.eval(script, num_keys, *args)
+        if asyncio.iscoroutine(raw_result):
+            return await cast(Awaitable[Any], raw_result)
+        return raw_result
 
     async def reserve_daily_quota(self, key: str, *, limit: int, expiry_seconds: int) -> bool:
+        client = await self._get_client()
         script = """
 local current = tonumber(redis.call('GET', KEYS[1]) or '0')
 if current >= tonumber(ARGV[1]) then
@@ -167,10 +203,11 @@ if current == 1 then
 end
 return 1
 """
-        result = await self._client.eval(script, 1, key, limit, expiry_seconds)
+        result = await self._eval(client, script, 1, key, str(limit), str(expiry_seconds))
         return bool(result)
 
     async def acquire_concurrency(self, key: str, *, limit: int, expiry_seconds: int) -> bool:
+        client = await self._get_client()
         script = """
 local current = tonumber(redis.call('GET', KEYS[1]) or '0')
 if current >= tonumber(ARGV[1]) then
@@ -180,10 +217,11 @@ current = redis.call('INCR', KEYS[1])
 redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
 return 1
 """
-        result = await self._client.eval(script, 1, key, limit, expiry_seconds)
+        result = await self._eval(client, script, 1, key, str(limit), str(expiry_seconds))
         return bool(result)
 
     async def release_concurrency(self, key: str) -> None:
+        client = await self._get_client()
         script = """
 local current = tonumber(redis.call('GET', KEYS[1]) or '0')
 if current <= 1 then
@@ -192,18 +230,42 @@ if current <= 1 then
 end
 return redis.call('DECR', KEYS[1])
 """
-        await self._client.eval(script, 1, key)
+        await self._eval(client, script, 1, key)
+
+    async def aclose(self) -> None:
+        if self._client is None:
+            return
+
+        client = self._client
+        self._client = None
+        self._loop = None
+        close = getattr(client, "aclose", None)
+        if callable(close):
+            try:
+                await close()
+            except RuntimeError:
+                pass
+            return
+        close_sync = getattr(client, "close", None)
+        if callable(close_sync):
+            maybe_awaitable = close_sync()
+            if asyncio.iscoroutine(maybe_awaitable):
+                try:
+                    await maybe_awaitable
+                except RuntimeError:
+                    pass
 
 
 class ExtractionControlManager:
     """Coordinate per-user extraction quota and concurrency limits."""
 
-    def __init__(self, store: ExtractionStateStore) -> None:
+    def __init__(self, store: ExtractionStateStore, *, settings: Settings | None = None) -> None:
         self._store = store
+        self._settings = settings
 
     async def reserve_daily_quota(self, user_id: UUID) -> bool:
-        settings = get_settings()
-        quota_key = f"quota:extract:{user_id}"
+        settings = self._resolved_settings()
+        quota_key = _redis_prefixed_key(settings.redis_key_prefix, "quota", "extract", str(user_id))
         return await self._store.reserve_daily_quota(
             quota_key,
             limit=settings.extraction_daily_quota,
@@ -211,8 +273,13 @@ class ExtractionControlManager:
         )
 
     async def acquire_concurrency(self, user_id: UUID) -> ConcurrencyLease | None:
-        settings = get_settings()
-        concurrency_key = f"concurrency:extract:{user_id}"
+        settings = self._resolved_settings()
+        concurrency_key = _redis_prefixed_key(
+            settings.redis_key_prefix,
+            "concurrency",
+            "extract",
+            str(user_id),
+        )
         acquired = await self._store.acquire_concurrency(
             concurrency_key,
             limit=settings.extraction_concurrency_limit,
@@ -228,16 +295,46 @@ class ExtractionControlManager:
     def reset_local_state(self) -> None:
         self._store.reset_local_state()
 
+    async def aclose(self) -> None:
+        await self._store.aclose()
+
+    def _resolved_settings(self) -> Settings:
+        return self._settings if self._settings is not None else get_settings()
+
+
+def _redis_prefixed_key(prefix: str, *parts: str) -> str:
+    return ":".join((prefix, *parts))
+
+
+def _redact_redis_url_for_logs(url: str) -> str:
+    parsed = urlsplit(url)
+    host = parsed.hostname or ""
+    port = f":{parsed.port}" if parsed.port is not None else ""
+    userinfo = "***@" if "@" in parsed.netloc else ""
+    return urlunsplit((parsed.scheme, f"{userinfo}{host}{port}", parsed.path, "", ""))
+
 
 def build_limiter(settings: Settings | None = None) -> Limiter:
     """Build a settings-backed SlowAPI limiter."""
     resolved_settings = settings if settings is not None else get_settings()
     backend = resolve_limiter_backend(resolved_settings)
-    rate_limiter = Limiter(
-        key_func=get_ip_key,
-        headers_enabled=resolved_settings.rate_limit_headers_enabled,
-        storage_uri=backend.storage_uri,
-    )
+    if backend.mode == "redis":
+        LOGGER.info(
+            "Redis rate limiting enabled with backend %s",
+            _redact_redis_url_for_logs(backend.storage_uri),
+        )
+        rate_limiter = Limiter(
+            key_func=get_ip_key,
+            headers_enabled=resolved_settings.rate_limit_headers_enabled,
+            storage_uri=backend.storage_uri,
+            storage_options={"key_prefix": resolved_settings.redis_key_prefix},
+        )
+    else:
+        rate_limiter = Limiter(
+            key_func=get_ip_key,
+            headers_enabled=resolved_settings.rate_limit_headers_enabled,
+            storage_uri=backend.storage_uri,
+        )
     rate_limiter._stima_storage_mode = backend.mode  # type: ignore[attr-defined]
     rate_limiter._stima_fallback_reason = backend.fallback_reason  # type: ignore[attr-defined]
     return rate_limiter
@@ -250,8 +347,19 @@ def build_extraction_control_manager(
     resolved_settings = settings if settings is not None else get_settings()
     backend = resolve_limiter_backend(resolved_settings)
     if backend.mode == "redis" and resolved_settings.redis_url is not None:
-        return ExtractionControlManager(RedisExtractionStateStore(resolved_settings.redis_url))
-    return ExtractionControlManager(InMemoryExtractionStateStore())
+        return ExtractionControlManager(
+            RedisExtractionStateStore(resolved_settings.redis_url),
+            settings=settings,
+        )
+    return ExtractionControlManager(InMemoryExtractionStateStore(), settings=settings)
+
+
+def configure_active_limiter_key_prefix(prefix: str) -> None:
+    """Update the active limiter storage namespace when the backend supports key prefixes."""
+    storage = getattr(limiter, "_storage", None)
+    if storage is None or not hasattr(storage, "key_prefix"):
+        return
+    storage.key_prefix = prefix
 
 
 def resolve_limiter_backend(settings: Settings | None = None) -> LimiterBackendConfig:

@@ -63,6 +63,11 @@ class Settings(BaseSettings):
 
     environment: str = Field(default="development", validation_alias="ENVIRONMENT")
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
+    redis_key_prefix: str = Field(
+        default="stima",
+        validation_alias="REDIS_KEY_PREFIX",
+        validate_default=True,
+    )
     rate_limit_headers_enabled: bool = Field(
         default=False,
         validation_alias="RATE_LIMIT_HEADERS_ENABLED",
@@ -211,6 +216,15 @@ class Settings(BaseSettings):
                 return None
             return normalized_value
         return str(value)
+
+    @field_validator("redis_key_prefix", mode="before")
+    @classmethod
+    def validate_redis_key_prefix(cls, value: Any) -> str:
+        """Normalize Redis key prefixes for consistent namespaced key construction."""
+        normalized_value = str(value).strip().rstrip(":")
+        if not normalized_value:
+            raise ValueError("REDIS_KEY_PREFIX must be non-empty")
+        return normalized_value
 
     @field_validator("secret_key")
     @classmethod

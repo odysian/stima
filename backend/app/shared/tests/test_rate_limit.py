@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from uuid import uuid4
 
 import pytest
 from app.core.config import Settings, get_settings
 from app.core.security import create_access_token
-from app.shared.rate_limit import build_limiter, get_ip_key, get_user_key, resolve_limiter_backend
+from app.shared.rate_limit import (
+    ExtractionControlManager,
+    ExtractionStateStore,
+    RedisExtractionStateStore,
+    build_limiter,
+    get_ip_key,
+    get_user_key,
+    resolve_limiter_backend,
+)
 from limits.storage.memory import MemoryStorage
 from limits.storage.redis import RedisStorage
 from pydantic import ValidationError
@@ -138,7 +147,7 @@ def test_get_user_key_falls_back_to_ip_when_access_token_is_missing() -> None:
 def test_build_limiter_uses_memory_storage_when_redis_url_is_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("REDIS_URL", "")
     get_settings.cache_clear()
     limiter = build_limiter(get_settings())
 
@@ -157,13 +166,40 @@ def test_build_limiter_uses_redis_storage_when_redis_url_is_configured(
     get_settings.cache_clear()
 
 
+def test_build_limiter_applies_configured_redis_key_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("REDIS_KEY_PREFIX", " custom: ")
+    get_settings.cache_clear()
+
+    limiter = build_limiter(get_settings())
+
+    assert isinstance(limiter._storage, RedisStorage)  # type: ignore[attr-defined]
+    assert limiter._storage.key_prefix == "custom"  # type: ignore[attr-defined]
+
+
+def test_build_limiter_logs_redacted_redis_url(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("REDIS_URL", "rediss://default:secret-token@cache.example:6379/0")
+    get_settings.cache_clear()
+
+    with caplog.at_level(logging.INFO, logger="app.shared.rate_limit"):
+        build_limiter(get_settings())
+
+    assert "secret-token" not in caplog.text
+    assert "rediss://***@cache.example:6379/0" in caplog.text
+
+
 def test_production_settings_require_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
     """Production Settings validation requires REDIS_URL (runs before limiter backend)."""
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("COOKIE_SECURE", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
     monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("REDIS_URL", "")
     get_settings.cache_clear()
 
     with pytest.raises(ValidationError, match="REDIS_URL must be set"):
@@ -175,6 +211,67 @@ def test_resolve_limiter_backend_rejects_production_without_redis_url() -> None:
     settings = Settings.model_construct(environment="production", redis_url=None)
     with pytest.raises(ValueError, match="REDIS_URL must be set"):
         resolve_limiter_backend(settings)
+
+
+@pytest.mark.asyncio
+async def test_extraction_control_manager_prefixes_redis_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REDIS_KEY_PREFIX", "stima_test:")
+    get_settings.cache_clear()
+    store = _RecordingExtractionStateStore()
+    manager = ExtractionControlManager(store, settings=get_settings())
+    user_id = uuid4()
+
+    quota_reserved = await manager.reserve_daily_quota(user_id)
+    lease = await manager.acquire_concurrency(user_id)
+
+    assert quota_reserved is True
+    assert store.reserve_calls == [f"stima_test:quota:extract:{user_id}"]
+    assert store.acquire_calls == [f"stima_test:concurrency:extract:{user_id}"]
+    assert lease is not None
+    assert lease.concurrency_key == f"stima_test:concurrency:extract:{user_id}"
+
+
+@pytest.mark.asyncio
+async def test_redis_extraction_state_store_rotates_client_when_event_loop_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeRedisClient:
+        def __init__(self) -> None:
+            self.closed = False
+
+        async def eval(self, *_: object) -> int:
+            return 1
+
+        async def aclose(self) -> None:
+            self.closed = True
+
+    clients: list[_FakeRedisClient] = []
+
+    def _fake_from_url(*_: object, **__: object) -> _FakeRedisClient:
+        client = _FakeRedisClient()
+        clients.append(client)
+        return client
+
+    first_loop = object()
+    second_loop = object()
+    loop_sequence = iter([first_loop, second_loop, second_loop])
+    monkeypatch.setattr("app.shared.rate_limit.Redis.from_url", _fake_from_url)
+    monkeypatch.setattr(
+        "app.shared.rate_limit.asyncio.get_running_loop",
+        lambda: next(loop_sequence),
+    )
+
+    store = RedisExtractionStateStore("redis://localhost:6379/0")
+
+    assert await store.acquire_concurrency("stima:test", limit=1, expiry_seconds=60) is True
+    assert await store.acquire_concurrency("stima:test", limit=1, expiry_seconds=60) is True
+    assert len(clients) == 2
+    assert clients[0].closed is True
+
+    await store.aclose()
+    assert clients[1].closed is True
 
 
 def _build_request(peer_ip: str, headers: dict[str, str]) -> Request:
@@ -195,3 +292,20 @@ def _build_request(peer_ip: str, headers: dict[str, str]) -> Request:
         "server": ("testserver", 80),
     }
     return Request(scope)
+
+
+class _RecordingExtractionStateStore(ExtractionStateStore):
+    def __init__(self) -> None:
+        self.reserve_calls: list[str] = []
+        self.acquire_calls: list[str] = []
+
+    async def reserve_daily_quota(self, key: str, *, limit: int, expiry_seconds: int) -> bool:
+        self.reserve_calls.append(key)
+        return True
+
+    async def acquire_concurrency(self, key: str, *, limit: int, expiry_seconds: int) -> bool:
+        self.acquire_calls.append(key)
+        return True
+
+    async def release_concurrency(self, key: str) -> None:
+        return None
