@@ -6,7 +6,7 @@ from collections.abc import Sized
 from io import BytesIO
 
 import pytest
-from app.integrations.audio import AudioClip, AudioError, AudioIntegration, _infer_format
+from app.integrations.audio import AudioClip, AudioError, AudioIntegration, infer_audio_format
 
 
 class _FakeSegment:
@@ -126,8 +126,8 @@ def test_normalize_and_stitch_returns_wav_bytes(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_infer_format_prefers_content_type_over_filename_extension() -> None:
-    assert _infer_format(filename="clip.webm", content_type="audio/mp4") == "mp4"  # nosec B101
+    assert infer_audio_format(filename="clip.webm", content_type="audio/mp4") == "mp4"  # nosec B101
 
 
 def test_infer_format_falls_back_to_filename_extension() -> None:
-    assert _infer_format(filename="clip.ogg", content_type=None) == "ogg"  # nosec B101
+    assert infer_audio_format(filename="clip.ogg", content_type=None) == "ogg"  # nosec B101

@@ -111,6 +111,3 @@ def infer_audio_format(*, filename: str | None, content_type: str | None) -> str
             return extension
 
     return None
-
-
-_infer_format = infer_audio_format
