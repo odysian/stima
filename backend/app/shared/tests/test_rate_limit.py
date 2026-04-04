@@ -12,6 +12,7 @@ from app.core.security import create_access_token
 from app.shared.rate_limit import (
     ExtractionControlManager,
     ExtractionStateStore,
+    RedisExtractionStateStore,
     build_limiter,
     get_ip_key,
     get_user_key,
@@ -230,6 +231,47 @@ async def test_extraction_control_manager_prefixes_redis_keys(
     assert store.acquire_calls == [f"stima_test:concurrency:extract:{user_id}"]
     assert lease is not None
     assert lease.concurrency_key == f"stima_test:concurrency:extract:{user_id}"
+
+
+@pytest.mark.asyncio
+async def test_redis_extraction_state_store_rotates_client_when_event_loop_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeRedisClient:
+        def __init__(self) -> None:
+            self.closed = False
+
+        async def eval(self, *_: object) -> int:
+            return 1
+
+        async def aclose(self) -> None:
+            self.closed = True
+
+    clients: list[_FakeRedisClient] = []
+
+    def _fake_from_url(*_: object, **__: object) -> _FakeRedisClient:
+        client = _FakeRedisClient()
+        clients.append(client)
+        return client
+
+    first_loop = object()
+    second_loop = object()
+    loop_sequence = iter([first_loop, second_loop, second_loop])
+    monkeypatch.setattr("app.shared.rate_limit.Redis.from_url", _fake_from_url)
+    monkeypatch.setattr(
+        "app.shared.rate_limit.asyncio.get_running_loop",
+        lambda: next(loop_sequence),
+    )
+
+    store = RedisExtractionStateStore("redis://localhost:6379/0")
+
+    assert await store.acquire_concurrency("stima:test", limit=1, expiry_seconds=60) is True
+    assert await store.acquire_concurrency("stima:test", limit=1, expiry_seconds=60) is True
+    assert len(clients) == 2
+    assert clients[0].closed is True
+
+    await store.aclose()
+    assert clients[1].closed is True
 
 
 def _build_request(peer_ip: str, headers: dict[str, str]) -> Request:

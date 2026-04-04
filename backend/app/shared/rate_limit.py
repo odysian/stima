@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
@@ -101,6 +102,9 @@ class ExtractionStateStore:
     def reset_local_state(self) -> None:
         """Reset state for in-memory test fixtures when available."""
 
+    async def aclose(self) -> None:
+        """Release backend resources when the store keeps external clients."""
+
 
 class InMemoryExtractionStateStore(ExtractionStateStore):
     """Async-safe local fallback store for degraded development/test mode."""
@@ -154,9 +158,40 @@ class RedisExtractionStateStore(ExtractionStateStore):
     """Redis-backed quota and concurrency store for distributed request coordination."""
 
     def __init__(self, redis_url: str) -> None:
-        self._client = Redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+        self._redis_url = redis_url
+        self._client: Redis | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    async def _get_client(self) -> Redis:
+        running_loop = asyncio.get_running_loop()
+        if self._client is None:
+            self._client = Redis.from_url(
+                self._redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            self._loop = running_loop
+            return self._client
+
+        if self._loop is not running_loop:
+            await self.aclose()
+            self._client = Redis.from_url(
+                self._redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            self._loop = running_loop
+
+        return self._client
+
+    async def _eval(self, client: Redis, script: str, num_keys: int, *args: str) -> Any:
+        raw_result = client.eval(script, num_keys, *args)
+        if asyncio.iscoroutine(raw_result):
+            return await cast(Awaitable[Any], raw_result)
+        return raw_result
 
     async def reserve_daily_quota(self, key: str, *, limit: int, expiry_seconds: int) -> bool:
+        client = await self._get_client()
         script = """
 local current = tonumber(redis.call('GET', KEYS[1]) or '0')
 if current >= tonumber(ARGV[1]) then
@@ -168,10 +203,11 @@ if current == 1 then
 end
 return 1
 """
-        result = await self._client.eval(script, 1, key, limit, expiry_seconds)
+        result = await self._eval(client, script, 1, key, str(limit), str(expiry_seconds))
         return bool(result)
 
     async def acquire_concurrency(self, key: str, *, limit: int, expiry_seconds: int) -> bool:
+        client = await self._get_client()
         script = """
 local current = tonumber(redis.call('GET', KEYS[1]) or '0')
 if current >= tonumber(ARGV[1]) then
@@ -181,10 +217,11 @@ current = redis.call('INCR', KEYS[1])
 redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
 return 1
 """
-        result = await self._client.eval(script, 1, key, limit, expiry_seconds)
+        result = await self._eval(client, script, 1, key, str(limit), str(expiry_seconds))
         return bool(result)
 
     async def release_concurrency(self, key: str) -> None:
+        client = await self._get_client()
         script = """
 local current = tonumber(redis.call('GET', KEYS[1]) or '0')
 if current <= 1 then
@@ -193,7 +230,30 @@ if current <= 1 then
 end
 return redis.call('DECR', KEYS[1])
 """
-        await self._client.eval(script, 1, key)
+        await self._eval(client, script, 1, key)
+
+    async def aclose(self) -> None:
+        if self._client is None:
+            return
+
+        client = self._client
+        self._client = None
+        self._loop = None
+        close = getattr(client, "aclose", None)
+        if callable(close):
+            try:
+                await close()
+            except RuntimeError:
+                pass
+            return
+        close_sync = getattr(client, "close", None)
+        if callable(close_sync):
+            maybe_awaitable = close_sync()
+            if asyncio.iscoroutine(maybe_awaitable):
+                try:
+                    await maybe_awaitable
+                except RuntimeError:
+                    pass
 
 
 class ExtractionControlManager:
@@ -234,6 +294,9 @@ class ExtractionControlManager:
 
     def reset_local_state(self) -> None:
         self._store.reset_local_state()
+
+    async def aclose(self) -> None:
+        await self._store.aclose()
 
     def _resolved_settings(self) -> Settings:
         return self._settings if self._settings is not None else get_settings()
