@@ -386,20 +386,32 @@ async def send_quote_email(
     try:
         quote = await email_delivery_service.send_quote_email(user, quote_id)
     except QuoteServiceError as exc:
-        await idempotency_store.abort(
-            endpoint_slug="quote-send-email",
-            user_id=user.id,
-            resource_id=quote_id,
-            idempotency_key=normalized_idempotency_key,
-        )
+        try:
+            await idempotency_store.abort(
+                endpoint_slug="quote-send-email",
+                user_id=user.id,
+                resource_id=quote_id,
+                idempotency_key=normalized_idempotency_key,
+            )
+        except Exception:  # pragma: no cover - degraded Redis persistence path
+            LOGGER.warning(
+                "quote email idempotency abort failed after QuoteServiceError",
+                extra={"quote_id": str(quote_id), "user_id": str(user.id)},
+            )
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception:
-        await idempotency_store.abort(
-            endpoint_slug="quote-send-email",
-            user_id=user.id,
-            resource_id=quote_id,
-            idempotency_key=normalized_idempotency_key,
-        )
+        try:
+            await idempotency_store.abort(
+                endpoint_slug="quote-send-email",
+                user_id=user.id,
+                resource_id=quote_id,
+                idempotency_key=normalized_idempotency_key,
+            )
+        except Exception:  # pragma: no cover - degraded Redis persistence path
+            LOGGER.warning(
+                "quote email idempotency abort failed after unexpected error",
+                extra={"quote_id": str(quote_id), "user_id": str(user.id)},
+            )
         raise
 
     quote_response = QuoteResponse.model_validate(quote)

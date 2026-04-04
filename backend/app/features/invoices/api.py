@@ -232,20 +232,32 @@ async def send_invoice_email(
     try:
         invoice = await email_delivery_service.send_invoice_email(user, invoice_id)
     except QuoteServiceError as exc:
-        await idempotency_store.abort(
-            endpoint_slug="invoice-send-email",
-            user_id=user.id,
-            resource_id=invoice_id,
-            idempotency_key=normalized_idempotency_key,
-        )
+        try:
+            await idempotency_store.abort(
+                endpoint_slug="invoice-send-email",
+                user_id=user.id,
+                resource_id=invoice_id,
+                idempotency_key=normalized_idempotency_key,
+            )
+        except Exception:  # pragma: no cover - degraded Redis persistence path
+            LOGGER.warning(
+                "invoice email idempotency abort failed after QuoteServiceError",
+                extra={"invoice_id": str(invoice_id), "user_id": str(user.id)},
+            )
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception:
-        await idempotency_store.abort(
-            endpoint_slug="invoice-send-email",
-            user_id=user.id,
-            resource_id=invoice_id,
-            idempotency_key=normalized_idempotency_key,
-        )
+        try:
+            await idempotency_store.abort(
+                endpoint_slug="invoice-send-email",
+                user_id=user.id,
+                resource_id=invoice_id,
+                idempotency_key=normalized_idempotency_key,
+            )
+        except Exception:  # pragma: no cover - degraded Redis persistence path
+            LOGGER.warning(
+                "invoice email idempotency abort failed after unexpected error",
+                extra={"invoice_id": str(invoice_id), "user_id": str(user.id)},
+            )
         raise
 
     invoice_response = InvoiceResponse.model_validate(invoice)

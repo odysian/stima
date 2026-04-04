@@ -43,9 +43,11 @@ from app.shared import event_logger
 from app.shared.dependencies import (
     get_email_service,
     get_extraction_service,
+    get_idempotency_store,
     get_quote_service,
     get_storage_service,
 )
+from app.shared.idempotency import IdempotencyBeginResult
 from app.shared.input_limits import (
     CUSTOMER_ADDRESS_MAX_CHARS,
     DOCUMENT_LINE_ITEMS_MAX_ITEMS,
@@ -169,6 +171,17 @@ class _MockEmailService:
         if self.raise_send_error:
             raise EmailSendError("Provider failure")
         self.messages.append(message)
+
+
+class _FailingAbortIdempotencyStore:
+    async def begin(self, **_: object) -> IdempotencyBeginResult:
+        return IdempotencyBeginResult(kind="started")
+
+    async def abort(self, **_: object) -> None:
+        raise RuntimeError("redis unavailable")
+
+    async def complete(self, **_: object) -> None:
+        return None
 
 
 def _send_email_headers(csrf_token: str, *, idempotency_key: str | None = None) -> dict[str, str]:
@@ -1495,6 +1508,28 @@ async def test_send_quote_email_surfaces_provider_failures_with_expected_status_
     assert detail_response.json()["status"] == "shared"
 
 
+async def test_send_quote_email_preserves_original_error_when_idempotency_abort_fails(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    app.dependency_overrides[get_idempotency_store] = lambda: _FailingAbortIdempotencyStore()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token, email="not-an-email")
+        quote = await _create_quote(client, csrf_token, customer_id)
+        await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+        response = await client.post(
+            f"/api/quotes/{quote['id']}/send-email",
+            headers=_send_email_headers(csrf_token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_idempotency_store, None)
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Customer email address looks invalid."}
+
+
 async def test_send_invoice_email_shares_invoice_delivers_email_and_logs_success(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1590,6 +1625,40 @@ async def test_send_invoice_email_requires_idempotency_key(
     assert mock_email_service.messages == []
 
 
+async def test_send_invoice_email_replays_same_idempotency_key_without_second_send(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay"),
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay"),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert second_response.headers["Idempotency-Replayed"] == "true"
+    assert second_response.json() == first_response.json()
+    assert len(mock_email_service.messages) == 1
+
+
 async def test_send_email_rejects_same_idempotency_key_for_different_resource_fingerprint(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1618,6 +1687,35 @@ async def test_send_email_rejects_same_idempotency_key_for_different_resource_fi
         "detail": "Idempotency key was already used for a different request.",
     }
     assert len(mock_email_service.messages) == 1
+
+
+async def test_send_invoice_email_preserves_original_error_when_idempotency_abort_fails(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    app.dependency_overrides[get_idempotency_store] = lambda: _FailingAbortIdempotencyStore()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token, email="not-an-email")
+        invoice = await _create_direct_invoice(
+            client,
+            csrf_token,
+            customer_id,
+            title="Spring cleanup",
+            transcript="invoice transcript",
+            total_amount=55,
+        )
+        await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+        response = await client.post(
+            f"/api/invoices/{invoice['id']}/send-email",
+            headers=_send_email_headers(csrf_token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_idempotency_store, None)
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Customer email address looks invalid."}
 
 
 async def test_send_invoice_email_slowapi_rate_limit_returns_429(
