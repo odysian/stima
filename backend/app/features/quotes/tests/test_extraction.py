@@ -6,6 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+import anthropic
+import httpx
 import pytest
 
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
@@ -36,6 +38,24 @@ class _FakeMessages:
 class _FakeClient:
     def __init__(self, factory: Callable[[dict[str, object]], _FakeResponse]) -> None:
         self.messages = _FakeMessages(factory)
+
+
+class _SequencedMessages:
+    def __init__(self, outcomes: list[object]) -> None:
+        self._outcomes = iter(outcomes)
+        self.calls: list[dict[str, object]] = []
+
+    async def create(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
+        outcome = next(self._outcomes)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+class _SequencedClient:
+    def __init__(self, outcomes: list[object]) -> None:
+        self.messages = _SequencedMessages(outcomes)
 
 
 async def test_extract_keeps_null_prices_without_zero_fill() -> None:
@@ -164,6 +184,113 @@ async def test_extract_raises_typed_error_for_malformed_payload() -> None:
 
     with pytest.raises(ExtractionError, match="schema"):
         await integration.extract(transcript)
+
+
+async def test_extract_builds_client_with_configured_timeout_and_disabled_sdk_retries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_kwargs: dict[str, object] = {}
+    transcript = TRANSCRIPTS["clean_with_total"]
+
+    class _FakeAnthropicClient:
+        def __init__(self, **kwargs: object) -> None:
+            captured_kwargs.update(kwargs)
+            self.messages = _FakeMessages(
+                lambda _: _FakeResponse(
+                    content=[
+                        {
+                            "type": "tool_use",
+                            "input": {
+                                "transcript": transcript,
+                                "line_items": [],
+                                "confidence_notes": [],
+                            },
+                        }
+                    ]
+                )
+            )
+
+    monkeypatch.setattr("app.integrations.extraction.AsyncAnthropic", _FakeAnthropicClient)
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="test-model",
+        timeout_seconds=17.5,
+    )
+
+    await integration.extract(transcript)
+
+    assert captured_kwargs["timeout"] == 17.5
+    assert captured_kwargs["max_retries"] == 0
+
+
+async def test_extract_retries_rate_limit_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.integrations.extraction.secrets.randbelow", lambda *_: 0)
+    sleep_calls: list[float] = []
+
+    async def _fake_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+
+    monkeypatch.setattr("app.integrations.extraction.asyncio.sleep", _fake_sleep)
+    transcript = TRANSCRIPTS["clean_with_total"]
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    rate_limit_error = anthropic.RateLimitError(
+        "rate limited",
+        response=httpx.Response(429, request=request),
+        body=None,
+    )
+    client = _SequencedClient(
+        [
+            rate_limit_error,
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": [],
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+        ]
+    )
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="test-model",
+        max_attempts=2,
+        client=client,
+    )
+
+    result = await integration.extract(transcript)
+
+    assert result.transcript == transcript
+    assert len(client.messages.calls) == 2
+    assert sleep_calls == [0.25]
+
+
+async def test_extract_does_not_retry_non_retryable_provider_status() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    bad_request_error = anthropic.APIStatusError(
+        "bad request",
+        response=httpx.Response(400, request=request),
+        body=None,
+    )
+    client = _SequencedClient([bad_request_error])
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="test-model",
+        max_attempts=3,
+        client=client,
+    )
+
+    with pytest.raises(ExtractionError, match="Claude request failed"):
+        await integration.extract(transcript)
+
+    assert len(client.messages.calls) == 1
 
 
 async def test_extract_accepts_flagged_line_items_with_reason() -> None:

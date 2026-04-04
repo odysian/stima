@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import secrets
 from typing import Any, cast
 
+import anthropic
 from anthropic import AsyncAnthropic
 from pydantic import ValidationError
 
@@ -68,6 +71,9 @@ EXTRACTION_SYSTEM_PROMPT = (
     "Return only structured tool output."
 )
 
+_RETRY_BASE_DELAY_SECONDS = 0.25
+_RETRY_MAX_DELAY_SECONDS = 2.0
+
 
 class ExtractionError(Exception):
     """Raised when quote extraction cannot produce a valid structured payload."""
@@ -81,10 +87,14 @@ class ExtractionIntegration:
         *,
         api_key: str,
         model: str,
+        timeout_seconds: float = 30.0,
+        max_attempts: int = 3,
         client: object | None = None,
     ) -> None:
         self._api_key = api_key
         self._model = model
+        self._timeout_seconds = timeout_seconds
+        self._max_attempts = max_attempts
         self._client = client
 
     async def extract(self, notes: str) -> ExtractionResult:
@@ -96,39 +106,18 @@ class ExtractionIntegration:
         if self._client is None:
             if not self._api_key:
                 raise ExtractionError("Extraction API key is not configured")
-            self._client = AsyncAnthropic(api_key=self._api_key)
+            self._client = AsyncAnthropic(
+                api_key=self._api_key,
+                timeout=self._timeout_seconds,
+                max_retries=0,
+            )
 
         client = self._client
         if client is None:  # pragma: no cover - defensive invariant
             raise ExtractionError("Claude client was not initialized")
         typed_client = cast(Any, client)
 
-        try:
-            response = await typed_client.messages.create(
-                model=self._model,
-                max_tokens=800,
-                temperature=0,
-                system=EXTRACTION_SYSTEM_PROMPT,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": normalized_notes,
-                    }
-                ],
-                tools=[
-                    {
-                        "name": EXTRACTION_TOOL_NAME,
-                        "description": (
-                            "Extract quote line items, optional per-item pricing, "
-                            "optional total, and confidence notes."
-                        ),
-                        "input_schema": EXTRACTION_TOOL_SCHEMA,
-                    }
-                ],
-                tool_choice={"type": "tool", "name": EXTRACTION_TOOL_NAME},
-            )
-        except Exception as exc:  # pragma: no cover - provider-level failures
-            raise ExtractionError(f"Claude request failed: {exc}") from exc
+        response = await self._request_with_retry(typed_client, normalized_notes)
 
         payload = _extract_tool_payload(response)
         payload.setdefault("transcript", normalized_notes)
@@ -139,6 +128,43 @@ class ExtractionIntegration:
             return ExtractionResult.model_validate(payload)
         except ValidationError as exc:
             raise ExtractionError("Claude response did not match extraction schema") from exc
+
+    async def _request_with_retry(self, typed_client: Any, normalized_notes: str) -> object:
+        last_error: Exception | None = None
+        for attempt in range(1, self._max_attempts + 1):
+            try:
+                return await typed_client.messages.create(
+                    model=self._model,
+                    max_tokens=800,
+                    temperature=0,
+                    system=EXTRACTION_SYSTEM_PROMPT,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": normalized_notes,
+                        }
+                    ],
+                    tools=[
+                        {
+                            "name": EXTRACTION_TOOL_NAME,
+                            "description": (
+                                "Extract quote line items, optional per-item pricing, "
+                                "optional total, and confidence notes."
+                            ),
+                            "input_schema": EXTRACTION_TOOL_SCHEMA,
+                        }
+                    ],
+                    tool_choice={"type": "tool", "name": EXTRACTION_TOOL_NAME},
+                )
+            except Exception as exc:  # pragma: no cover - provider-level failures
+                last_error = exc
+                if attempt >= self._max_attempts or not _is_retryable_provider_error(exc):
+                    break
+                await asyncio.sleep(_retry_delay_seconds(attempt))
+
+        if last_error is None:  # pragma: no cover - defensive invariant
+            raise ExtractionError("Claude request failed")
+        raise ExtractionError(f"Claude request failed: {last_error}") from last_error
 
 
 def _extract_tool_payload(response: object) -> dict[str, Any]:
@@ -165,3 +191,31 @@ def _extract_tool_payload(response: object) -> dict[str, Any]:
             return dict(tool_input)
 
     raise ExtractionError("Claude response missing structured tool output")
+
+
+def _is_retryable_provider_error(exc: Exception) -> bool:
+    if isinstance(
+        exc,
+        (
+            anthropic.APIConnectionError,
+            anthropic.APITimeoutError,
+            asyncio.TimeoutError,
+            TimeoutError,
+        ),
+    ):
+        return True
+    if isinstance(exc, anthropic.RateLimitError):
+        return True
+    if isinstance(exc, anthropic.InternalServerError):
+        return True
+    if isinstance(exc, anthropic.APIStatusError):
+        return getattr(exc, "status_code", 0) >= 500
+    return False
+
+
+def _retry_delay_seconds(attempt: int) -> float:
+    base_delay = min(_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)), _RETRY_MAX_DELAY_SECONDS)
+    jitter_bound = min(0.1, base_delay / 2)
+    if jitter_bound <= 0:
+        return base_delay
+    return base_delay + (secrets.randbelow(1000) / 1000) * jitter_bound

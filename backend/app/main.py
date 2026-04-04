@@ -25,6 +25,7 @@ from app.features.invoices.api import router as invoice_router
 from app.features.profile.api import router as profile_router
 from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
+from app.shared.dependencies import get_idempotency_store
 from app.shared.event_logger import configure_event_logging
 from app.shared.proxy_headers import TrustedProxyHeadersMiddleware
 from app.shared.rate_limit import extraction_controls, limiter
@@ -67,6 +68,8 @@ def _resolve_allowed_hosts(allowed_hosts: list[str]) -> list[str]:
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
+    if get_idempotency_store.cache_info().currsize:
+        await get_idempotency_store().aclose()
     await extraction_controls.aclose()
 
 

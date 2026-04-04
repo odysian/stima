@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Iterator
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -117,6 +118,16 @@ async def test_app_lifespan_closes_extraction_controls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     aclose = AsyncMock()
+    idempotency_aclose = AsyncMock()
+
+    class _CachedStoreFactory:
+        def __call__(self) -> object:
+            return SimpleNamespace(aclose=idempotency_aclose)
+
+        def cache_info(self) -> SimpleNamespace:
+            return SimpleNamespace(currsize=1)
+
+    monkeypatch.setattr("app.main.get_idempotency_store", _CachedStoreFactory())
     monkeypatch.setattr("app.main.extraction_controls.aclose", aclose)
 
     app = create_app()
@@ -124,4 +135,5 @@ async def test_app_lifespan_closes_extraction_controls(
     async with app.router.lifespan_context(app):
         pass
 
+    idempotency_aclose.assert_awaited_once()
     aclose.assert_awaited_once()

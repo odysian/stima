@@ -39,6 +39,7 @@ from app.integrations.extraction import ExtractionIntegration
 from app.integrations.pdf import PdfIntegration
 from app.integrations.storage import StorageService
 from app.integrations.transcription import TranscriptionIntegration
+from app.shared.idempotency import IdempotencyStore, build_idempotency_store
 from app.shared.rate_limit import limiter, reserve_extraction_capacity
 
 
@@ -69,6 +70,36 @@ def get_email_service() -> EmailService:
         from_address=settings.email_from_address,
         from_name=settings.email_from_name,
     )
+
+
+@lru_cache(maxsize=1)
+def get_extraction_integration() -> ExtractionIntegration:
+    """Return the configured Anthropic extraction integration singleton."""
+    settings = get_settings()
+    return ExtractionIntegration(
+        api_key=settings.anthropic_api_key,
+        model=settings.extraction_model,
+        timeout_seconds=settings.provider_request_timeout_seconds,
+        max_attempts=settings.provider_max_retries,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_transcription_integration() -> TranscriptionIntegration:
+    """Return the configured OpenAI transcription integration singleton."""
+    settings = get_settings()
+    return TranscriptionIntegration(
+        api_key=settings.openai_api_key,
+        model=settings.transcription_model,
+        timeout_seconds=settings.provider_request_timeout_seconds,
+        max_attempts=settings.provider_max_retries,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_idempotency_store() -> IdempotencyStore:
+    """Return the configured idempotency store singleton."""
+    return build_idempotency_store()
 
 
 def get_auth_service(
@@ -166,17 +197,10 @@ def get_invoice_email_delivery_service(
 
 def get_extraction_service() -> ExtractionService:
     """Build a request-scoped extraction service wired to external integrations."""
-    settings = get_settings()
     return ExtractionService(
-        extraction_integration=ExtractionIntegration(
-            api_key=settings.anthropic_api_key,
-            model=settings.extraction_model,
-        ),
+        extraction_integration=get_extraction_integration(),
         audio_integration=AudioIntegration(),
-        transcription_integration=TranscriptionIntegration(
-            api_key=settings.openai_api_key,
-            model=settings.transcription_model,
-        ),
+        transcription_integration=get_transcription_integration(),
     )
 
 
