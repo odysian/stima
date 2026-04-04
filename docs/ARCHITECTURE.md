@@ -362,5 +362,6 @@ Boundary hardening notes:
 - Backend host validation is driven by `ALLOWED_HOSTS`.
 - Backend trusts `X-Forwarded-*` headers only from `TRUSTED_PROXY_IPS`.
 - Production startup requires `REDIS_URL`; local development can leave it unset and run with the documented in-memory degraded fallback.
+- Shared production Redis (for example Upstash) is supported when Stima isolates every key under `REDIS_KEY_PREFIX` (default `stima`), keeping its `stima:*` keys separate from sibling apps such as Rostra's `rostra:*`.
 - Backend emits baseline security headers for backend-served responses; static-host CSP headers remain owned by the frontend host/CDN layer.
 - The SPA shell is compatible with `script-src 'self'`; Google Fonts and Material Symbols still require explicit font/style allowlisting until they are self-hosted.

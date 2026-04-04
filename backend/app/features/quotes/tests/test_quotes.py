@@ -2586,6 +2586,7 @@ async def test_convert_notes_rejects_when_daily_quota_is_exhausted(
 ) -> None:
     monkeypatch.setattr(app.state.limiter, "enabled", True)
     monkeypatch.setenv("EXTRACTION_DAILY_QUOTA", "1")
+    monkeypatch.setenv("REDIS_KEY_PREFIX", f"test-daily-quota-{uuid4()}")
     get_settings.cache_clear()
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -2639,6 +2640,7 @@ async def test_convert_notes_rejects_when_concurrency_limit_is_exhausted(
     app.dependency_overrides[get_extraction_service] = _override_get_extraction_service
     monkeypatch.setattr(app.state.limiter, "enabled", True)
     monkeypatch.setenv("EXTRACTION_CONCURRENCY_LIMIT", "1")
+    monkeypatch.setenv("REDIS_KEY_PREFIX", f"test-concurrency-{uuid4()}")
     get_settings.cache_clear()
     csrf_token = await _register_and_login(client, _credentials())
 

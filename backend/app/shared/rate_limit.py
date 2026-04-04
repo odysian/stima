@@ -8,6 +8,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from fastapi import Request
@@ -198,12 +199,13 @@ return redis.call('DECR', KEYS[1])
 class ExtractionControlManager:
     """Coordinate per-user extraction quota and concurrency limits."""
 
-    def __init__(self, store: ExtractionStateStore) -> None:
+    def __init__(self, store: ExtractionStateStore, *, settings: Settings | None = None) -> None:
         self._store = store
+        self._settings = settings
 
     async def reserve_daily_quota(self, user_id: UUID) -> bool:
-        settings = get_settings()
-        quota_key = f"quota:extract:{user_id}"
+        settings = self._resolved_settings()
+        quota_key = _redis_prefixed_key(settings.redis_key_prefix, "quota", "extract", str(user_id))
         return await self._store.reserve_daily_quota(
             quota_key,
             limit=settings.extraction_daily_quota,
@@ -211,8 +213,13 @@ class ExtractionControlManager:
         )
 
     async def acquire_concurrency(self, user_id: UUID) -> ConcurrencyLease | None:
-        settings = get_settings()
-        concurrency_key = f"concurrency:extract:{user_id}"
+        settings = self._resolved_settings()
+        concurrency_key = _redis_prefixed_key(
+            settings.redis_key_prefix,
+            "concurrency",
+            "extract",
+            str(user_id),
+        )
         acquired = await self._store.acquire_concurrency(
             concurrency_key,
             limit=settings.extraction_concurrency_limit,
@@ -228,16 +235,43 @@ class ExtractionControlManager:
     def reset_local_state(self) -> None:
         self._store.reset_local_state()
 
+    def _resolved_settings(self) -> Settings:
+        return self._settings if self._settings is not None else get_settings()
+
+
+def _redis_prefixed_key(prefix: str, *parts: str) -> str:
+    return ":".join((prefix, *parts))
+
+
+def _redact_redis_url_for_logs(url: str) -> str:
+    parsed = urlsplit(url)
+    host = parsed.hostname or ""
+    port = f":{parsed.port}" if parsed.port is not None else ""
+    userinfo = "***@" if "@" in parsed.netloc else ""
+    return urlunsplit((parsed.scheme, f"{userinfo}{host}{port}", parsed.path, "", ""))
+
 
 def build_limiter(settings: Settings | None = None) -> Limiter:
     """Build a settings-backed SlowAPI limiter."""
     resolved_settings = settings if settings is not None else get_settings()
     backend = resolve_limiter_backend(resolved_settings)
-    rate_limiter = Limiter(
-        key_func=get_ip_key,
-        headers_enabled=resolved_settings.rate_limit_headers_enabled,
-        storage_uri=backend.storage_uri,
-    )
+    if backend.mode == "redis":
+        LOGGER.info(
+            "Redis rate limiting enabled with backend %s",
+            _redact_redis_url_for_logs(backend.storage_uri),
+        )
+        rate_limiter = Limiter(
+            key_func=get_ip_key,
+            headers_enabled=resolved_settings.rate_limit_headers_enabled,
+            storage_uri=backend.storage_uri,
+            storage_options={"key_prefix": resolved_settings.redis_key_prefix},
+        )
+    else:
+        rate_limiter = Limiter(
+            key_func=get_ip_key,
+            headers_enabled=resolved_settings.rate_limit_headers_enabled,
+            storage_uri=backend.storage_uri,
+        )
     rate_limiter._stima_storage_mode = backend.mode  # type: ignore[attr-defined]
     rate_limiter._stima_fallback_reason = backend.fallback_reason  # type: ignore[attr-defined]
     return rate_limiter
@@ -250,8 +284,11 @@ def build_extraction_control_manager(
     resolved_settings = settings if settings is not None else get_settings()
     backend = resolve_limiter_backend(resolved_settings)
     if backend.mode == "redis" and resolved_settings.redis_url is not None:
-        return ExtractionControlManager(RedisExtractionStateStore(resolved_settings.redis_url))
-    return ExtractionControlManager(InMemoryExtractionStateStore())
+        return ExtractionControlManager(
+            RedisExtractionStateStore(resolved_settings.redis_url),
+            settings=settings,
+        )
+    return ExtractionControlManager(InMemoryExtractionStateStore(), settings=settings)
 
 
 def resolve_limiter_backend(settings: Settings | None = None) -> LimiterBackendConfig:
