@@ -27,7 +27,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -38,7 +38,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
       - name: Cache mypy results
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: backend/.mypy_cache
           key: mypy-${{ runner.os }}-${{ hashFiles('backend/**/*.py', 'pyproject.toml') }}
