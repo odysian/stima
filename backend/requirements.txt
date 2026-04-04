@@ -17,7 +17,7 @@ python-multipart==0.0.22
 
 # Auth — PyJWT only. See exclusions table below.
 PyJWT==2.12.1
-argon2-cffi==23.1.0
+argon2-cffi==25.1.0
 
 # Rate limiting
 # Latest release on PyPI as of this task; keep intentionally pinned.
@@ -40,7 +40,7 @@ audioop-lts==0.2.2; python_version >= "3.13"
 # Testing
 httpx==0.28.1
 pytest==8.3.5
-pytest-asyncio==0.25.3
+pytest-asyncio==1.3.0
 pytest-cov==7.1.0
 
 # Linting / type checking / security
