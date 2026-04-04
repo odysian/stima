@@ -16,7 +16,11 @@ from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
 from app.shared.event_logger import log_event
-from app.shared.input_limits import AUDIO_TRANSCRIPT_MAX_CHARS, DOCUMENT_TRANSCRIPT_MAX_CHARS
+from app.shared.input_limits import (
+    AUDIO_TRANSCRIPT_MAX_CHARS,
+    DOCUMENT_TRANSCRIPT_MAX_CHARS,
+    EXTRACTION_TRANSCRIPT_MAX_CHARS,
+)
 
 
 class ExtractionIntegrationProtocol(Protocol):
@@ -109,7 +113,7 @@ class ExtractionService:
 
             _validate_transcript_length(
                 combined_text,
-                max_chars=DOCUMENT_TRANSCRIPT_MAX_CHARS,
+                max_chars=EXTRACTION_TRANSCRIPT_MAX_CHARS,
             )
 
             extraction = await self.convert_notes(combined_text)

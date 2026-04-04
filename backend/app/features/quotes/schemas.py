@@ -14,6 +14,7 @@ from app.shared.input_limits import (
     DOCUMENT_LINE_ITEMS_MAX_ITEMS,
     DOCUMENT_NOTES_MAX_CHARS,
     DOCUMENT_TRANSCRIPT_MAX_CHARS,
+    EXTRACTION_TRANSCRIPT_MAX_CHARS,
     LINE_ITEM_DESCRIPTION_MAX_CHARS,
     LINE_ITEM_DETAILS_MAX_CHARS,
     NOTE_INPUT_MAX_CHARS,
@@ -47,7 +48,7 @@ class LineItemExtracted(LineItemDraft):
 class ExtractionResult(BaseModel):
     """Structured extraction output returned from convert-notes."""
 
-    transcript: str = Field(min_length=1, max_length=DOCUMENT_TRANSCRIPT_MAX_CHARS)
+    transcript: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
     line_items: list[LineItemExtracted] = Field(
         default_factory=list,
         max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,

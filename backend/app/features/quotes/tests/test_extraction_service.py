@@ -15,7 +15,7 @@ from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
 from app.shared.input_limits import (
     AUDIO_TRANSCRIPT_MAX_CHARS,
-    DOCUMENT_TRANSCRIPT_MAX_CHARS,
+    EXTRACTION_TRANSCRIPT_MAX_CHARS,
     NOTE_INPUT_MAX_CHARS,
 )
 
@@ -118,7 +118,7 @@ async def test_capture_audio_captures_transcription_errors(
     assert isinstance(captured[0], TranscriptionError)
 
 
-async def test_extract_combined_allows_audio_and_notes_up_to_document_limit() -> None:
+async def test_extract_combined_allows_audio_and_notes_up_to_extraction_limit() -> None:
     extraction = _SuccessfulExtractionIntegration()
     transcript = "t" * AUDIO_TRANSCRIPT_MAX_CHARS
     notes = "n" * NOTE_INPUT_MAX_CHARS
@@ -133,7 +133,7 @@ async def test_extract_combined_allows_audio_and_notes_up_to_document_limit() ->
     expected_transcript = f"{transcript}\n\n{notes}"
     assert extraction.calls == [expected_transcript]
     assert result.transcript == expected_transcript
-    assert len(result.transcript) == DOCUMENT_TRANSCRIPT_MAX_CHARS
+    assert len(result.transcript) == EXTRACTION_TRANSCRIPT_MAX_CHARS
 
 
 def _clip() -> CaptureAudioClip:
