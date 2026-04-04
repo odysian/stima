@@ -18,7 +18,6 @@ from app.integrations.transcription import TranscriptionError
 from app.shared.event_logger import log_event
 from app.shared.input_limits import (
     AUDIO_TRANSCRIPT_MAX_CHARS,
-    DOCUMENT_TRANSCRIPT_MAX_CHARS,
     EXTRACTION_TRANSCRIPT_MAX_CHARS,
 )
 
