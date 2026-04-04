@@ -291,6 +291,14 @@ def build_extraction_control_manager(
     return ExtractionControlManager(InMemoryExtractionStateStore(), settings=settings)
 
 
+def configure_active_limiter_key_prefix(prefix: str) -> None:
+    """Update the active limiter storage namespace when the backend supports key prefixes."""
+    storage = getattr(limiter, "_storage", None)
+    if storage is None or not hasattr(storage, "key_prefix"):
+        return
+    storage.key_prefix = prefix
+
+
 def resolve_limiter_backend(settings: Settings | None = None) -> LimiterBackendConfig:
     """Resolve whether the app should use Redis or degraded in-memory storage."""
     resolved_settings = settings if settings is not None else get_settings()

@@ -146,7 +146,7 @@ def test_get_user_key_falls_back_to_ip_when_access_token_is_missing() -> None:
 def test_build_limiter_uses_memory_storage_when_redis_url_is_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("REDIS_URL", "")
     get_settings.cache_clear()
     limiter = build_limiter(get_settings())
 
@@ -198,7 +198,7 @@ def test_production_settings_require_redis_url(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("COOKIE_SECURE", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
     monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("REDIS_URL", "")
     get_settings.cache_clear()
 
     with pytest.raises(ValidationError, match="REDIS_URL must be set"):
