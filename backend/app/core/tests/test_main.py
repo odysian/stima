@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Iterator
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -109,3 +110,18 @@ async def test_https_redirect_ignores_untrusted_forwarded_proto(
 
     assert response.status_code == 307
     assert response.headers["location"] == "https://api.stima.dev/health"
+
+
+@pytest.mark.asyncio
+async def test_app_lifespan_closes_extraction_controls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    aclose = AsyncMock()
+    monkeypatch.setattr("app.main.extraction_controls.aclose", aclose)
+
+    app = create_app()
+
+    async with app.router.lifespan_context(app):
+        pass
+
+    aclose.assert_awaited_once()

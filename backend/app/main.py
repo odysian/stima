@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -24,7 +27,7 @@ from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
 from app.shared.event_logger import configure_event_logging
 from app.shared.proxy_headers import TrustedProxyHeadersMiddleware
-from app.shared.rate_limit import limiter
+from app.shared.rate_limit import extraction_controls, limiter
 
 
 class SecurityHeadersMiddleware:
@@ -61,13 +64,19 @@ def _resolve_allowed_hosts(allowed_hosts: list[str]) -> list[str]:
     return allowed_hosts
 
 
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    yield
+    await extraction_controls.aclose()
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
     init_sentry(dsn=settings.sentry_dsn, environment=settings.environment)
     configure_event_logging(session_factory=get_session_maker())
 
-    app = FastAPI(title="Stima API")
+    app = FastAPI(title="Stima API", lifespan=_lifespan)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_middleware(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 NOTE_INPUT_MAX_CHARS = 50_000
 AUDIO_TRANSCRIPT_MAX_CHARS = 100_000
+# +2 accounts for the newline separator inserted when transcript and notes are combined.
 EXTRACTION_TRANSCRIPT_MAX_CHARS = AUDIO_TRANSCRIPT_MAX_CHARS + NOTE_INPUT_MAX_CHARS + 2
 DOCUMENT_TRANSCRIPT_MAX_CHARS = 100_000
 CUSTOMER_ADDRESS_MAX_CHARS = 500

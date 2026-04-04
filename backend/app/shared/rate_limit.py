@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import asyncio
 import logging
 import time
@@ -87,23 +88,28 @@ class ConcurrencyLease:
         await self.manager.release_concurrency(self.concurrency_key)
 
 
-class ExtractionStateStore:
-    """Protocol-like base for extraction quota and concurrency state backends."""
+class ExtractionStateStore(abc.ABC):
+    """Backend interface for extraction quota and concurrency state."""
 
+    @abc.abstractmethod
     async def reserve_daily_quota(self, key: str, *, limit: int, expiry_seconds: int) -> bool:
-        raise NotImplementedError
+        """Reserve one daily extraction quota slot."""
 
+    @abc.abstractmethod
     async def acquire_concurrency(self, key: str, *, limit: int, expiry_seconds: int) -> bool:
-        raise NotImplementedError
+        """Acquire one provider-concurrency slot."""
 
+    @abc.abstractmethod
     async def release_concurrency(self, key: str) -> None:
-        raise NotImplementedError
+        """Release one provider-concurrency slot."""
 
     def reset_local_state(self) -> None:
         """Reset state for in-memory test fixtures when available."""
+        return None
 
     async def aclose(self) -> None:
         """Release backend resources when the store keeps external clients."""
+        return None
 
 
 class InMemoryExtractionStateStore(ExtractionStateStore):
@@ -395,7 +401,18 @@ def reset_local_rate_limit_state() -> None:
 
 @asynccontextmanager
 async def reserve_extraction_capacity(user_id: UUID) -> AsyncIterator[bool]:
-    """Acquire extraction concurrency and daily quota before provider-backed work starts."""
+    """Acquire extraction concurrency and daily quota before provider-backed work starts.
+
+    Ordering: concurrency is acquired first so a provider slot is confirmed before
+    consuming daily quota. Quota is a non-reversible per-UTC-day counter and is
+    not rolled back if the caller raises inside the ``async with`` block. That is
+    intentional: failed provider calls still count against the daily limit to
+    prevent abuse via rapid retry loops against a failing provider.
+
+    Task #200 note: if retries re-enter this guard, each retry consumes another
+    quota slot. Decide there whether retries should bypass this guard or consume
+    quota per attempt.
+    """
     lease = await extraction_controls.acquire_concurrency(user_id)
     if lease is None:
         yield False

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Iterator
 from uuid import uuid4
 
@@ -14,6 +15,7 @@ from app.shared.rate_limit import (
     ExtractionStateStore,
     RedisExtractionStateStore,
     build_limiter,
+    configure_active_limiter_key_prefix,
     get_ip_key,
     get_user_key,
     resolve_limiter_backend,
@@ -22,6 +24,8 @@ from limits.storage.memory import MemoryStorage
 from limits.storage.redis import RedisStorage
 from pydantic import ValidationError
 from starlette.requests import Request
+
+_SKIP_REDIS_LIMITER_CONSTRUCTION = os.getenv("STIMA_SKIP_EAGER_REDIS_LIMITER_TESTS") == "1"
 
 
 @pytest.fixture(autouse=True)
@@ -177,6 +181,45 @@ def test_build_limiter_applies_configured_redis_key_prefix(
 
     assert isinstance(limiter._storage, RedisStorage)  # type: ignore[attr-defined]
     assert limiter._storage.key_prefix == "custom"  # type: ignore[attr-defined]
+
+
+def test_configure_active_limiter_key_prefix_is_no_op_for_memory_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> None:
+    monkeypatch.setenv("REDIS_URL", "")
+    get_settings.cache_clear()
+    request.addfinalizer(get_settings.cache_clear)
+    memory_limiter = build_limiter(get_settings())
+    monkeypatch.setattr("app.shared.rate_limit.limiter", memory_limiter)
+
+    configure_active_limiter_key_prefix("any-prefix")
+
+    assert isinstance(memory_limiter._storage, MemoryStorage)  # type: ignore[attr-defined]
+    assert not hasattr(memory_limiter._storage, "key_prefix")  # type: ignore[attr-defined]
+
+
+@pytest.mark.skipif(
+    _SKIP_REDIS_LIMITER_CONSTRUCTION,
+    reason=(
+        "Set STIMA_SKIP_EAGER_REDIS_LIMITER_TESTS=1 for environments whose Redis limiter "
+        "construction eagerly connects."
+    ),
+)
+def test_configure_active_limiter_key_prefix_updates_redis_storage(
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> None:
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    get_settings.cache_clear()
+    request.addfinalizer(get_settings.cache_clear)
+    redis_limiter = build_limiter(get_settings())
+    monkeypatch.setattr("app.shared.rate_limit.limiter", redis_limiter)
+
+    configure_active_limiter_key_prefix("custom-test-prefix")
+
+    assert isinstance(redis_limiter._storage, RedisStorage)  # type: ignore[attr-defined]
+    assert redis_limiter._storage.key_prefix == "custom-test-prefix"  # type: ignore[attr-defined]
 
 
 def test_build_limiter_logs_redacted_redis_url(

@@ -1,3 +1,6 @@
+// These values mirror backend/app/shared/input_limits.py.
+// They are duplicated intentionally because frontend and backend do not share a build artifact.
+// If a backend limit changes, update the corresponding constant here as a manual contract sync.
 export const NOTE_INPUT_MAX_CHARS = 50_000;
 export const AUDIO_TRANSCRIPT_MAX_CHARS = 100_000;
 export const EXTRACTION_TRANSCRIPT_MAX_CHARS = AUDIO_TRANSCRIPT_MAX_CHARS + NOTE_INPUT_MAX_CHARS + 2;
