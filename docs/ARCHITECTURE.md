@@ -98,7 +98,7 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | notes | Text | nullable, customer-facing notes |
 | due_date | Date | nullable; used by invoice documents |
 | pdf_url | Text | nullable legacy field; PDFs are streamed directly in V0 and this is not populated by the current flow |
-| share_token | Text | nullable, unique, set on first active share and reused until explicitly regenerated |
+| share_token | Text | nullable, unique, set on first active share and reused until regenerated explicitly or rotated automatically when revoked/expired |
 | shared_at | DateTime(tz) | nullable, set when a quote transitions to `shared` or an invoice transitions to `sent` |
 | share_token_created_at | DateTime(tz) | nullable, set when the current active share token is minted |
 | share_token_expires_at | DateTime(tz) | nullable, defaults to `share_token_created_at + PUBLIC_SHARE_LINK_EXPIRE_DAYS` (`90` by default) |
