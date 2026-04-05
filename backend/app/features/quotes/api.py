@@ -6,6 +6,7 @@ import logging
 from typing import Annotated, Protocol, cast
 from uuid import UUID
 
+from arq.connections import ArqRedis
 from fastapi import (
     APIRouter,
     Depends,
@@ -20,11 +21,16 @@ from fastapi import (
     status,
 )
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.invoices.schemas import InvoiceResponse
 from app.features.invoices.service import InvoiceService
+from app.features.jobs.models import JobType
+from app.features.jobs.schemas import JobRecordResponse, job_record_to_response
+from app.features.jobs.service import JobService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
 from app.features.quotes.schemas import (
@@ -45,10 +51,12 @@ from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.audio import infer_audio_format
 from app.shared.dependencies import (
     extraction_capacity_guard,
+    get_arq_pool,
     get_current_user,
     get_extraction_service,
     get_idempotency_store,
     get_invoice_service,
+    get_job_service,
     get_quote_email_delivery_service,
     get_quote_service,
     require_csrf,
@@ -61,6 +69,7 @@ from app.shared.input_limits import (
     NOTE_INPUT_MAX_CHARS,
 )
 from app.shared.rate_limit import get_ip_key, get_user_key, limiter
+from app.worker.job_registry import EXTRACTION_JOB_NAME
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
@@ -70,6 +79,7 @@ _PRIVATE_RESPONSE_HEADERS = {
     "X-Robots-Tag": "noindex",
 }
 LOGGER = logging.getLogger(__name__)
+_QUEUE_FAILURE_DETAIL = "Unable to start extraction right now. Please try again."
 
 
 class _BusinessNameContext(Protocol):
@@ -188,7 +198,7 @@ async def capture_audio(
 
 @router.post(
     "/extract",
-    response_model=ExtractionResult,
+    response_model=ExtractionResult | JobRecordResponse,
     dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(lambda: get_settings().quote_combined_extract_rate_limit, key_func=get_user_key)
@@ -196,18 +206,67 @@ async def extract_combined(
     request: Request,
     user: Annotated[User, Depends(get_current_user)],
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
+    job_service: Annotated[JobService, Depends(get_job_service)],
+    response: Response,
     clips: Annotated[list[UploadFile] | None, File()] = None,
     notes: Annotated[str, Form(max_length=NOTE_INPUT_MAX_CHARS)] = "",
-) -> ExtractionResult:
+) -> ExtractionResult | JobRecordResponse:
     """Extract structured quote data from optional audio clips and optional notes."""
     del request
-    async with extraction_capacity_guard(user.id):
-        clip_inputs = await _parse_upload_clips(clips or [])
+    clip_inputs = await _parse_upload_clips(clips or [])
 
-        try:
-            return await extraction_service.extract_combined(clip_inputs, notes, user_id=user.id)
-        except QuoteServiceError as exc:
-            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    if arq_pool is None:
+        async with extraction_capacity_guard(user.id):
+            try:
+                return await extraction_service.extract_combined(
+                    clip_inputs,
+                    notes,
+                    user_id=user.id,
+                )
+            except QuoteServiceError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    try:
+        transcript = await extraction_service.prepare_combined_transcript(
+            clip_inputs,
+            notes,
+            user_id=user.id,
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    settings = get_settings()
+    active_jobs = await job_service.count_active_extraction_jobs(user.id)
+    if active_jobs >= settings.extraction_concurrency_limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Extraction quota or concurrency exhausted. Please retry later.",
+        )
+
+    job = await job_service.create_job(user_id=user.id, job_type=JobType.EXTRACTION)
+    try:
+        queued_job = await arq_pool.enqueue_job(
+            EXTRACTION_JOB_NAME,
+            str(job.id),
+            _job_id=str(job.id),
+            transcript=transcript,
+        )
+        if queued_job is None:
+            raise RuntimeError("ARQ did not accept the extraction job")
+    except Exception as exc:
+        LOGGER.warning("Failed to enqueue extraction job %s", job.id, exc_info=True)
+        await job_service.mark_enqueue_failed(job.id)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_QUEUE_FAILURE_DETAIL,
+        ) from exc
+
+    await db.commit()
+    response.status_code = status.HTTP_202_ACCEPTED
+    return job_record_to_response(job)
 
 
 @router.get("", response_model=list[QuoteListItemResponse])

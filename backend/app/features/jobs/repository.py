@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 
 _ALLOWED_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
-    JobStatus.PENDING: frozenset({JobStatus.RUNNING}),
+    JobStatus.PENDING: frozenset({JobStatus.RUNNING, JobStatus.TERMINAL}),
     JobStatus.RUNNING: frozenset({JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.TERMINAL}),
     JobStatus.FAILED: frozenset({JobStatus.RUNNING, JobStatus.TERMINAL}),
     JobStatus.SUCCESS: frozenset(),
@@ -44,6 +44,22 @@ class JobRepository:
         await self._session.refresh(record)
         return record
 
+    async def count_active_for_user(
+        self,
+        *,
+        user_id: UUID,
+        job_type: JobType,
+    ) -> int:
+        """Count pending and running jobs of the given type for one user."""
+        active_count = await self._session.scalar(
+            select(func.count(JobRecord.id)).where(
+                JobRecord.user_id == user_id,
+                JobRecord.job_type == job_type,
+                JobRecord.status.in_((JobStatus.PENDING, JobStatus.RUNNING)),
+            )
+        )
+        return int(active_count or 0)
+
     async def get_by_id(self, job_id: UUID) -> JobRecord | None:
         """Return one job record by id when it exists."""
         return await self._session.get(JobRecord, job_id)
@@ -69,6 +85,7 @@ class JobRepository:
         record.status = JobStatus.RUNNING
         record.attempts += 1
         record.terminal_error = None
+        record.result_json = None
         await self._session.flush()
         await self._session.refresh(record)
         return record
@@ -84,6 +101,24 @@ class JobRepository:
         self._ensure_transition(record.status, JobStatus.FAILED)
         record.status = JobStatus.FAILED
         record.terminal_error = None
+        record.result_json = None
+        await self._session.flush()
+        await self._session.refresh(record)
+        return record
+
+    async def set_success_with_result(
+        self,
+        job_id: UUID,
+        *,
+        result_json: str | None = None,
+        expected_job_type: JobType | None = None,
+    ) -> JobRecord:
+        """Mark a running job as successful and persist any serialized result payload."""
+        record = await self._get_required(job_id, expected_job_type=expected_job_type)
+        self._ensure_transition(record.status, JobStatus.SUCCESS)
+        record.status = JobStatus.SUCCESS
+        record.terminal_error = None
+        record.result_json = result_json
         await self._session.flush()
         await self._session.refresh(record)
         return record
@@ -94,14 +129,12 @@ class JobRepository:
         *,
         expected_job_type: JobType | None = None,
     ) -> JobRecord:
-        """Mark a running job as successful."""
-        record = await self._get_required(job_id, expected_job_type=expected_job_type)
-        self._ensure_transition(record.status, JobStatus.SUCCESS)
-        record.status = JobStatus.SUCCESS
-        record.terminal_error = None
-        await self._session.flush()
-        await self._session.refresh(record)
-        return record
+        """Mark a running job as successful without persisting a result payload."""
+        return await self.set_success_with_result(
+            job_id,
+            result_json=None,
+            expected_job_type=expected_job_type,
+        )
 
     async def set_terminal(
         self,
@@ -115,6 +148,7 @@ class JobRepository:
         self._ensure_transition(record.status, JobStatus.TERMINAL)
         record.status = JobStatus.TERMINAL
         record.terminal_error = reason
+        record.result_json = None
         await self._session.flush()
         await self._session.refresh(record)
         return record

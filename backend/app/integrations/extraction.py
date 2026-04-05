@@ -167,6 +167,14 @@ class ExtractionIntegration:
         raise ExtractionError(f"Claude request failed: {last_error}") from last_error
 
 
+def is_retryable_extraction_error(exc: Exception) -> bool:
+    """Return whether an extraction failure should be retried at the job layer."""
+    candidate = exc
+    if isinstance(exc, ExtractionError) and isinstance(exc.__cause__, Exception):
+        candidate = exc.__cause__
+    return _is_retryable_provider_error(candidate)
+
+
 def _extract_tool_payload(response: object) -> dict[str, Any]:
     """Return tool payload from Claude response content blocks."""
     content = getattr(response, "content", None)
@@ -210,6 +218,9 @@ def _is_retryable_provider_error(exc: Exception) -> bool:
         return True
     if isinstance(exc, anthropic.APIStatusError):
         return getattr(exc, "status_code", 0) >= 500
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code == 429 or status_code >= 500
     return False
 
 

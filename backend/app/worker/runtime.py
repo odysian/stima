@@ -19,6 +19,7 @@ from app.core.config import Settings, get_settings
 from app.core.database import get_session_maker
 from app.features.jobs.models import JobType
 from app.features.jobs.repository import JobRepository
+from app.shared.dependencies import get_extraction_integration
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ async def on_worker_startup(ctx: dict[str, Any]) -> None:
         retry_base_seconds=DEFAULT_RETRY_BASE_SECONDS,
         retry_jitter_seconds=DEFAULT_RETRY_JITTER_SECONDS,
     )
+    ctx["extraction_integration"] = get_extraction_integration()
 
 
 async def ping_worker_redis(redis_url: str) -> None:
@@ -93,12 +95,13 @@ async def ping_worker_redis(redis_url: str) -> None:
         await client.aclose()
 
 
-async def process_job(
+async def process_job[T](
     ctx: dict[str, Any],
     *,
     job_id: UUID,
     job_type: JobType,
-    handler: Callable[[], Awaitable[None]],
+    handler: Callable[[], Awaitable[T]],
+    on_success: Callable[[WorkerRuntimeSettings, T], Awaitable[None]] | None = None,
 ) -> None:
     """Wrap domain handlers with durable job status transitions and retry policy."""
     runtime = _get_runtime(ctx)
@@ -107,7 +110,11 @@ async def process_job(
     await _set_running(runtime, job_id=job_id, job_type=job_type)
 
     try:
-        await handler()
+        result = await handler()
+        if on_success is None:
+            await _set_success(runtime, job_id=job_id, job_type=job_type)
+        else:
+            await on_success(runtime, result)
     except RetryableJobError as exc:
         if attempt_number >= runtime.max_tries:
             await _set_failed(runtime, job_id=job_id, job_type=job_type)
@@ -142,8 +149,6 @@ async def process_job(
             reason=_terminal_error_code(exc),
         )
         raise
-    else:
-        await _set_success(runtime, job_id=job_id, job_type=job_type)
 
 
 def calculate_retry_delay_seconds(

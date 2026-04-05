@@ -79,14 +79,14 @@ class ExtractionService:
         transcript = await self._transcribe_clips(clips)
         return await self.convert_notes(transcript)
 
-    async def extract_combined(
+    async def prepare_combined_transcript(
         self,
         clips: Sequence[CaptureAudioClip] | None,
         notes: str | None,
         *,
         user_id: UUID | None = None,
-    ) -> ExtractionResult:
-        """Extract quote line items from optional clips plus optional typed notes."""
+    ) -> str:
+        """Normalize user inputs into one validated transcript for extraction."""
         normalized_notes = (notes or "").strip()
         has_clips = bool(clips)
         if not has_clips and not normalized_notes:
@@ -103,23 +103,43 @@ class ExtractionService:
             log_event("audio_uploaded", user_id=user_id, detail=source_type)
 
         combined_text = normalized_notes
+        if clips:
+            transcript = await self._transcribe_clips(clips)
+            combined_text = transcript
+            if normalized_notes:
+                combined_text = f"{transcript}\n\n{normalized_notes}"
+
+        _validate_transcript_length(
+            combined_text,
+            max_chars=EXTRACTION_TRANSCRIPT_MAX_CHARS,
+        )
+        return combined_text
+
+    async def extract_combined(
+        self,
+        clips: Sequence[CaptureAudioClip] | None,
+        notes: str | None,
+        *,
+        user_id: UUID | None = None,
+    ) -> ExtractionResult:
+        """Extract quote line items from optional clips plus optional typed notes."""
         try:
-            if clips:
-                transcript = await self._transcribe_clips(clips)
-                combined_text = transcript
-                if normalized_notes:
-                    combined_text = f"{transcript}\n\n{normalized_notes}"
-
-            _validate_transcript_length(
-                combined_text,
-                max_chars=EXTRACTION_TRANSCRIPT_MAX_CHARS,
+            combined_text = await self.prepare_combined_transcript(
+                clips,
+                notes,
+                user_id=user_id,
             )
-
             extraction = await self.convert_notes(combined_text)
         except QuoteServiceError:
+            source_type = (
+                "audio+notes" if clips and (notes or "").strip() else "audio" if clips else "notes"
+            )
             log_event("draft_generation_failed", user_id=user_id, detail=source_type)
             raise
 
+        source_type = (
+            "audio+notes" if clips and (notes or "").strip() else "audio" if clips else "notes"
+        )
         log_event("draft_generated", user_id=user_id, detail=source_type)
         return extraction
 

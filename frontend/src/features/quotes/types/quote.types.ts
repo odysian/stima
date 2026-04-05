@@ -24,6 +24,29 @@ export interface ExtractionResult {
   confidence_notes: string[];
 }
 
+export type JobStatus = "pending" | "running" | "success" | "failed" | "terminal";
+export type JobType = "extraction" | "pdf" | "email";
+
+export interface JobRecord {
+  id: string;
+  user_id: string;
+  document_id: string | null;
+  job_type: JobType;
+  status: JobStatus;
+  attempts: number;
+  terminal_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobStatusResponse extends JobRecord {
+  extraction_result: ExtractionResult | null;
+}
+
+export type QuoteExtractResponse =
+  | { type: "async"; jobId: string }
+  | { type: "sync"; result: ExtractionResult };
+
 export interface LineItem {
   id: string;
   description: string;

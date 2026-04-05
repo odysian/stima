@@ -1,13 +1,15 @@
 import type { Invoice } from "@/features/invoices/types/invoice.types";
 import type {
   ExtractionResult,
+  JobStatusResponse,
   Quote,
   QuoteDetail,
   QuoteCreateRequest,
+  QuoteExtractResponse,
   QuoteListItem,
   QuoteUpdateRequest,
 } from "@/features/quotes/types/quote.types";
-import { request, requestBlob } from "@/shared/lib/http";
+import { request, requestBlob, requestWithMetadata } from "@/shared/lib/http";
 
 function resolveAudioExtensionFromMimeType(mimeType: string): string {
   const normalizedMimeType = mimeType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
@@ -53,7 +55,7 @@ function captureAudio(clips: Blob[]): Promise<ExtractionResult> {
   });
 }
 
-function extract(params: { clips?: Blob[]; notes?: string }): Promise<ExtractionResult> {
+async function extract(params: { clips?: Blob[]; notes?: string }): Promise<QuoteExtractResponse> {
   const formData = new FormData();
   (params.clips ?? []).forEach((clip, index) => {
     const extension = resolveAudioExtensionFromMimeType(clip.type);
@@ -65,10 +67,22 @@ function extract(params: { clips?: Blob[]; notes?: string }): Promise<Extraction
     formData.append("notes", notes);
   }
 
-  return request<ExtractionResult>("/api/quotes/extract", {
+  const response = await requestWithMetadata<ExtractionResult | JobStatusResponse>("/api/quotes/extract", {
     method: "POST",
     body: formData,
   });
+
+  if (response.status === 202) {
+    return {
+      type: "async",
+      jobId: (response.data as JobStatusResponse).id,
+    };
+  }
+
+  return {
+    type: "sync",
+    result: response.data as ExtractionResult,
+  };
 }
 
 function createQuote(data: QuoteCreateRequest): Promise<Quote> {

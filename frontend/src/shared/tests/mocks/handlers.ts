@@ -275,6 +275,35 @@ export const handlers = [
     );
   }),
 
+  http.get("/api/jobs/:jobId", ({ params }) => {
+    return HttpResponse.json(
+      {
+        id: String(params.jobId),
+        user_id: "user-1",
+        document_id: null,
+        job_type: "extraction",
+        status: "success",
+        attempts: 1,
+        terminal_error: null,
+        extraction_result: {
+          transcript: "Transcribed clip transcript",
+          line_items: [
+            {
+              description: "Brown mulch",
+              details: "5 yards",
+              price: 120,
+            },
+          ],
+          total: 120,
+          confidence_notes: [],
+        },
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
+      { status: 200 },
+    );
+  }),
+
   http.get("/api/quotes", () => {
     return HttpResponse.json(
       [

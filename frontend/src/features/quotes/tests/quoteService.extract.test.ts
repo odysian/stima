@@ -1,29 +1,30 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { quoteService } from "@/features/quotes/services/quoteService";
-import { request } from "@/shared/lib/http";
+import { requestWithMetadata } from "@/shared/lib/http";
 
 vi.mock("@/shared/lib/http", () => ({
   request: vi.fn(),
+  requestWithMetadata: vi.fn(),
   requestBlob: vi.fn(),
 }));
 
-const mockedRequest = vi.mocked(request);
+const mockedRequestWithMetadata = vi.mocked(requestWithMetadata);
 
 describe("quoteService.extract", () => {
   afterEach(() => {
-    mockedRequest.mockReset();
+    mockedRequestWithMetadata.mockReset();
   });
 
-  it("builds multipart form data with clips and trimmed notes", async () => {
-    mockedRequest.mockResolvedValue({
-      transcript: "combined transcript",
-      line_items: [],
-      total: null,
-      confidence_notes: [],
+  it("builds multipart form data with clips and trimmed notes for async extraction", async () => {
+    mockedRequestWithMetadata.mockResolvedValue({
+      status: 202,
+      data: {
+        id: "job-1",
+      },
     });
 
-    await quoteService.extract({
+    const result = await quoteService.extract({
       clips: [
         new Blob(["clip-a"], { type: "audio/mp4" }),
         new Blob(["clip-b"], { type: "audio/webm;codecs=opus" }),
@@ -31,8 +32,9 @@ describe("quoteService.extract", () => {
       notes: "  add 10% travel surcharge  ",
     });
 
-    expect(mockedRequest).toHaveBeenCalledTimes(1);
-    const [path, options] = mockedRequest.mock.calls[0] ?? [];
+    expect(result).toEqual({ type: "async", jobId: "job-1" });
+    expect(mockedRequestWithMetadata).toHaveBeenCalledTimes(1);
+    const [path, options] = mockedRequestWithMetadata.mock.calls[0] ?? [];
     expect(path).toBe("/api/quotes/extract");
     expect(options?.method).toBe("POST");
 
@@ -47,34 +49,50 @@ describe("quoteService.extract", () => {
   });
 
   it("sends notes without clips for notes-only extraction", async () => {
-    mockedRequest.mockResolvedValue({
-      transcript: "typed note only",
-      line_items: [],
-      total: null,
-      confidence_notes: [],
+    mockedRequestWithMetadata.mockResolvedValue({
+      status: 200,
+      data: {
+        transcript: "typed note only",
+        line_items: [],
+        total: null,
+        confidence_notes: [],
+      },
     });
 
-    await quoteService.extract({ notes: "typed note only" });
+    const result = await quoteService.extract({ notes: "typed note only" });
 
-    const [, options] = mockedRequest.mock.calls[0] ?? [];
+    expect(result).toEqual({
+      type: "sync",
+      result: {
+        transcript: "typed note only",
+        line_items: [],
+        total: null,
+        confidence_notes: [],
+      },
+    });
+
+    const [, options] = mockedRequestWithMetadata.mock.calls[0] ?? [];
     const formData = options?.body as FormData;
     expect(formData.getAll("clips")).toHaveLength(0);
     expect(formData.get("notes")).toBe("typed note only");
   });
 
   it("omits notes field for clips-only extraction", async () => {
-    mockedRequest.mockResolvedValue({
-      transcript: "clips only",
-      line_items: [],
-      total: null,
-      confidence_notes: [],
+    mockedRequestWithMetadata.mockResolvedValue({
+      status: 200,
+      data: {
+        transcript: "clips only",
+        line_items: [],
+        total: null,
+        confidence_notes: [],
+      },
     });
 
     await quoteService.extract({
       clips: [new Blob(["clip-a"], { type: "audio/webm" })],
     });
 
-    const [, options] = mockedRequest.mock.calls[0] ?? [];
+    const [, options] = mockedRequestWithMetadata.mock.calls[0] ?? [];
     const formData = options?.body as FormData;
     expect(formData.getAll("clips")).toHaveLength(1);
     expect((formData.getAll("clips")[0] as File).name).toBe("clip-1.webm");

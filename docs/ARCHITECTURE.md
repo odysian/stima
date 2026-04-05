@@ -230,7 +230,8 @@ Rules:
 |---|---|---|---|---|---|
 | `/quotes/convert-notes` | POST | yes | cookie | `{ notes }` | `200 ExtractionResult` |
 | `/quotes/capture-audio` | POST | yes | cookie | multipart form-data `clips` files | `200 ExtractionResult` |
-| `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `200 ExtractionResult` |
+| `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `202 JobRecordResponse` when ARQ is available, otherwise `200 ExtractionResult` sync fallback; `429` when active extraction jobs are at the per-user limit; `503 { detail: "Unable to start extraction right now. Please try again." }` if enqueue fails after the durable job row is created |
+| `/jobs/{job_id}` | GET | no | cookie | — | `200 JobRecordResponse` for owned jobs, with `extraction_result` populated on successful extraction jobs; `404 { detail: "Not found" }` for unknown or foreign-owned jobs |
 | `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
 | `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`, `linked_invoice`) or `404 { detail: "Not found" }` |
@@ -244,7 +245,8 @@ Rules:
 
 Quote extraction guardrails:
 - `POST /quotes/convert-notes`, `POST /quotes/capture-audio`, and `POST /quotes/extract` use user-keyed rate limits when a valid access cookie is present, with IP fallback only for unauthenticated resolution failures.
-- Those same extraction routes return `429 { "detail": "Extraction quota or concurrency exhausted. Please retry later." }` when the per-user daily quota or concurrent in-flight extraction limit is exhausted before provider work starts.
+- `POST /quotes/convert-notes` and the sync fallback path of `POST /quotes/extract` return `429 { "detail": "Extraction quota or concurrency exhausted. Please retry later." }` when the per-user daily quota or concurrent in-flight extraction limit is exhausted before provider work starts.
+- The async `POST /quotes/extract` path uses durable `job_records` plus a count of user-owned extraction jobs in `pending|running` state to reject new enqueue attempts with the same `429` detail when the active-job cap is already reached.
 - `POST /quotes/{id}/pdf`, `POST /quotes/{id}/send-email`, `POST /invoices/{id}/pdf`, and `POST /invoices/{id}/send-email` are also user-keyed and rate-limited.
 
 ### Invoice endpoints (`/api/invoices`)

@@ -6,6 +6,7 @@ import asyncio
 import json
 from collections.abc import Iterator, Sequence
 from datetime import date
+from types import SimpleNamespace
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -22,6 +23,8 @@ from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.event_logs.models import EventLog
 from app.features.invoices import email_delivery_service as invoice_email_delivery_service
 from app.features.invoices.repository import InvoiceRepository
+from app.features.jobs.models import JobRecord, JobStatus, JobType
+from app.features.jobs.repository import JobRepository
 from app.features.quotes import api as quote_api
 from app.features.quotes import email_delivery_service
 from app.features.quotes.extraction_service import ExtractionService
@@ -193,6 +196,29 @@ class _InProgressIdempotencyStore:
 
     async def complete(self, **_: object) -> None:
         return None
+
+
+class _MockArqPool:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def enqueue_job(self, function: str, *args: object, **kwargs: object) -> object:
+        self.calls.append(
+            {
+                "function": function,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        )
+        return SimpleNamespace(job_id=kwargs.get("_job_id"))
+
+
+class _FailingArqPool:
+    async def enqueue_job(self, function: str, *args: object, **kwargs: object) -> object:
+        del function
+        del args
+        del kwargs
+        raise RuntimeError("redis unavailable")
 
 
 def _send_email_headers(csrf_token: str, *, idempotency_key: str | None = None) -> dict[str, str]:
@@ -2686,6 +2712,61 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     assert payload["confidence_notes"] == []
 
 
+async def test_extract_combined_falls_back_to_sync_when_no_arq_pool_is_available(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    job_count = await db_session.scalar(select(func.count(JobRecord.id)))
+
+    assert response.status_code == 200
+    assert response.json()["transcript"] == "mulch the front beds"
+    assert int(job_count or 0) == 0
+
+
+async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    jobs = (await db_session.scalars(select(JobRecord))).all()
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["job_type"] == "extraction"
+    assert payload["status"] == "pending"
+    assert payload["extraction_result"] is None
+    assert len(jobs) == 1
+    assert jobs[0].status == JobStatus.PENDING
+    assert pool.calls == [
+        {
+            "function": "jobs.extraction",
+            "args": (str(jobs[0].id),),
+            "kwargs": {
+                "_job_id": str(jobs[0].id),
+                "transcript": "mulch the front beds",
+            },
+        }
+    ]
+
+
 async def test_extract_combined_clips_only_success(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -2819,6 +2900,56 @@ async def test_extract_combined_rate_limit_returns_429(
     )
 
     assert response.status_code == 429
+
+
+async def test_extract_combined_rejects_when_async_job_limit_is_exhausted(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    app.state.arq_pool = _MockArqPool()
+    monkeypatch.setenv("EXTRACTION_CONCURRENCY_LIMIT", "1")
+    get_settings.cache_clear()
+
+    user = await _get_user_by_email(db_session, credentials["email"])
+    repository = JobRepository(db_session)
+    await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "detail": "Extraction quota or concurrency exhausted. Please retry later."
+    }
+
+
+async def test_extract_combined_marks_pending_job_terminal_when_enqueue_fails(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = _FailingArqPool()
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    jobs = (await db_session.scalars(select(JobRecord))).all()
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Unable to start extraction right now. Please try again."}
+    assert len(jobs) == 1
+    assert jobs[0].status == JobStatus.TERMINAL
+    assert jobs[0].terminal_error == "enqueue_failed"
 
 
 async def test_convert_notes_rate_limit_is_keyed_by_user_not_ip(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from arq.connections import ArqRedis, create_pool
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -22,6 +23,7 @@ from app.core.sentry import init_sentry
 from app.features.auth.api import router as auth_router
 from app.features.customers.api import router as customer_router
 from app.features.invoices.api import router as invoice_router
+from app.features.jobs.api import router as jobs_router
 from app.features.profile.api import router as profile_router
 from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
@@ -29,6 +31,7 @@ from app.shared.dependencies import get_idempotency_store
 from app.shared.event_logger import configure_event_logging
 from app.shared.proxy_headers import TrustedProxyHeadersMiddleware
 from app.shared.rate_limit import extraction_controls, limiter
+from app.worker.runtime import build_arq_redis_settings
 
 
 class SecurityHeadersMiddleware:
@@ -66,8 +69,15 @@ def _resolve_allowed_hosts(allowed_hosts: list[str]) -> list[str]:
 
 
 @asynccontextmanager
-async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    arq_pool: ArqRedis | None = None
+    if settings.redis_url is not None:
+        arq_pool = await create_pool(build_arq_redis_settings(settings))
+    app.state.arq_pool = arq_pool
     yield
+    if arq_pool is not None:
+        await arq_pool.aclose()
     if get_idempotency_store.cache_info().currsize:
         await get_idempotency_store().aclose()
     await extraction_controls.aclose()
@@ -81,6 +91,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Stima API", lifespan=_lifespan)
     app.state.limiter = limiter
+    app.state.arq_pool = None
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_middleware(
         CORSMiddleware,
@@ -107,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(profile_router, prefix="/api")
     app.include_router(customer_router, prefix="/api")
     app.include_router(invoice_router, prefix="/api")
+    app.include_router(jobs_router, prefix="/api")
     app.include_router(quote_router, prefix="/api")
     app.include_router(quote_public_router)
     if settings.admin_api_key is not None:
