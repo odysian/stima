@@ -49,6 +49,19 @@ def test_redis_key_prefix_must_be_non_empty(monkeypatch) -> None:
         get_settings()
 
 
+def test_worker_concurrency_defaults_to_ten() -> None:
+    settings = get_settings()
+
+    assert settings.worker_concurrency == 10
+
+
+def test_worker_concurrency_must_be_positive(monkeypatch) -> None:
+    monkeypatch.setenv("WORKER_CONCURRENCY", "0")
+
+    with pytest.raises(ValidationError, match="WORKER_CONCURRENCY must be at least 1"):
+        get_settings()
+
+
 def test_allowed_origins_csv_parses_to_list(monkeypatch) -> None:
     monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:5173, https://app.stima.dev")
 

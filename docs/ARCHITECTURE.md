@@ -15,6 +15,7 @@ backend/app/
     registry.py  — central model import for Alembic discovery
   shared/        — cross-cutting: dependencies, rate limiting, exceptions
   integrations/  — external service adapters (audio, transcription, pdf)
+  worker/        — ARQ worker settings and background job entrypoints
 ```
 
 ### Frontend layout
@@ -130,6 +131,18 @@ Unique constraints:
 | event_name | String(64) | pilot event name, underscore format |
 | metadata_json | JSON | lightweight `quote_id`, `invoice_id`, `customer_id`, `detail` payload |
 | created_at | DateTime(tz) | server default |
+
+### `job_records`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → users) | indexed, cascade delete |
+| document_id | UUID (FK → documents) | nullable, `ON DELETE SET NULL`; domain tasks attach related quote/invoice rows |
+| job_type | String(20) | constrained enum: `extraction \| pdf \| email` |
+| status | String(20) | constrained enum: `pending \| running \| success \| failed \| terminal` |
+| attempts | Integer | default `0`; incremented when a worker attempt starts |
+| terminal_error | Text | nullable final failure reason once retries are exhausted |
+| created_at, updated_at | DateTime(tz) | server defaults |
 
 Pilot event set:
 - `quote_started`
