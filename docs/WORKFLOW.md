@@ -267,7 +267,7 @@ For in-code documentation and comment quality requirements, follow `docs/CODE_CO
 
 Docs paths:
 
-- `docs/README.md, docs/ARCHITECTURE.md, docs/PATTERNS.md, docs/REVIEW_CHECKLIST.md, backend/TESTPLAN.md`
+- `docs/README.md, docs/ARCHITECTURE.md, docs/PATTERNS.md, docs/REVIEW_CHECKLIST.md`
 
 ## CI
 

@@ -106,7 +106,7 @@ For tiny quick fixes with no contract change, decision brief is optional.
 2. Read `docs/template/KICKOFF.md`
 3. Read `docs/WORKFLOW.md`
 4. Read `docs/GREENFIELD_BLUEPRINT.md` only for greenfield/restructure tasks
-5. Read project docs in `docs/README.md, docs/ARCHITECTURE.md, docs/PATTERNS.md, docs/REVIEW_CHECKLIST.md, backend/TESTPLAN.md` only when needed for touched scope
+5. Read project docs in `docs/README.md, docs/ARCHITECTURE.md, docs/PATTERNS.md, docs/REVIEW_CHECKLIST.md` only when needed for touched scope
 6. Execute one ready Task issue
 
 ## Reviewer Handoff Contract
