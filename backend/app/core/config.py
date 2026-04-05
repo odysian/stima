@@ -140,6 +140,10 @@ class Settings(BaseSettings):
         default=900,
         validation_alias="EXTRACTION_CONCURRENCY_TTL_SECONDS",
     )
+    worker_concurrency: int = Field(
+        default=10,
+        validation_alias="WORKER_CONCURRENCY",
+    )
     sentry_dsn: str | None = Field(default=None, validation_alias="SENTRY_DSN")
     admin_api_key: str | None = Field(default=None, validation_alias="ADMIN_API_KEY")
     frontend_url: str = Field(
@@ -314,6 +318,14 @@ class Settings(BaseSettings):
         """Require at least one total provider attempt."""
         if value < 1:
             raise ValueError("PROVIDER_MAX_RETRIES must be at least 1")
+        return value
+
+    @field_validator("worker_concurrency")
+    @classmethod
+    def validate_worker_concurrency(cls, value: int) -> int:
+        """Require at least one worker slot."""
+        if value < 1:
+            raise ValueError("WORKER_CONCURRENCY must be at least 1")
         return value
 
     @model_validator(mode="after")

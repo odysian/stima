@@ -1,0 +1,140 @@
+"""Persistence operations for durable background job records."""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.features.jobs.models import JobRecord, JobStatus, JobType
+
+_ALLOWED_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
+    JobStatus.PENDING: frozenset({JobStatus.RUNNING}),
+    JobStatus.RUNNING: frozenset({JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.TERMINAL}),
+    JobStatus.FAILED: frozenset({JobStatus.RUNNING, JobStatus.TERMINAL}),
+    JobStatus.SUCCESS: frozenset(),
+    JobStatus.TERMINAL: frozenset(),
+}
+
+
+class JobRepository:
+    """Create and update durable job records using async SQLAlchemy sessions."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(
+        self,
+        *,
+        user_id: UUID,
+        job_type: JobType,
+        document_id: UUID | None = None,
+    ) -> JobRecord:
+        """Persist a newly enqueued job in pending state."""
+        record = JobRecord(
+            user_id=user_id,
+            document_id=document_id,
+            job_type=job_type,
+            status=JobStatus.PENDING,
+            attempts=0,
+        )
+        self._session.add(record)
+        await self._session.flush()
+        await self._session.refresh(record)
+        return record
+
+    async def get_by_id(self, job_id: UUID) -> JobRecord | None:
+        """Return one job record by id when it exists."""
+        return await self._session.get(JobRecord, job_id)
+
+    async def get_by_id_for_user(self, job_id: UUID, user_id: UUID) -> JobRecord | None:
+        """Return one job record owned by the given user."""
+        return await self._session.scalar(
+            select(JobRecord).where(
+                JobRecord.id == job_id,
+                JobRecord.user_id == user_id,
+            )
+        )
+
+    async def set_running(
+        self,
+        job_id: UUID,
+        *,
+        expected_job_type: JobType | None = None,
+    ) -> JobRecord:
+        """Mark a pending or retryable failed job as running and increment attempts."""
+        record = await self._get_required(job_id, expected_job_type=expected_job_type)
+        self._ensure_transition(record.status, JobStatus.RUNNING)
+        record.status = JobStatus.RUNNING
+        record.attempts += 1
+        record.terminal_error = None
+        await self._session.flush()
+        await self._session.refresh(record)
+        return record
+
+    async def set_failed(
+        self,
+        job_id: UUID,
+        *,
+        expected_job_type: JobType | None = None,
+    ) -> JobRecord:
+        """Mark a running job as failed but still retryable."""
+        record = await self._get_required(job_id, expected_job_type=expected_job_type)
+        self._ensure_transition(record.status, JobStatus.FAILED)
+        record.status = JobStatus.FAILED
+        record.terminal_error = None
+        await self._session.flush()
+        await self._session.refresh(record)
+        return record
+
+    async def set_success(
+        self,
+        job_id: UUID,
+        *,
+        expected_job_type: JobType | None = None,
+    ) -> JobRecord:
+        """Mark a running job as successful."""
+        record = await self._get_required(job_id, expected_job_type=expected_job_type)
+        self._ensure_transition(record.status, JobStatus.SUCCESS)
+        record.status = JobStatus.SUCCESS
+        record.terminal_error = None
+        await self._session.flush()
+        await self._session.refresh(record)
+        return record
+
+    async def set_terminal(
+        self,
+        job_id: UUID,
+        *,
+        reason: str,
+        expected_job_type: JobType | None = None,
+    ) -> JobRecord:
+        """Mark a failed or running job as terminal after retries are exhausted."""
+        record = await self._get_required(job_id, expected_job_type=expected_job_type)
+        self._ensure_transition(record.status, JobStatus.TERMINAL)
+        record.status = JobStatus.TERMINAL
+        record.terminal_error = reason
+        await self._session.flush()
+        await self._session.refresh(record)
+        return record
+
+    async def _get_required(
+        self,
+        job_id: UUID,
+        *,
+        expected_job_type: JobType | None = None,
+    ) -> JobRecord:
+        record = await self.get_by_id(job_id)
+        if record is None:
+            raise ValueError(f"JobRecord {job_id} does not exist")
+        if expected_job_type is not None and record.job_type != expected_job_type:
+            raise ValueError(
+                f"JobRecord {job_id} is {record.job_type.value}, expected {expected_job_type.value}"
+            )
+        return record
+
+    def _ensure_transition(self, current: JobStatus, target: JobStatus) -> None:
+        allowed_targets = _ALLOWED_TRANSITIONS[current]
+        if target not in allowed_targets:
+            raise ValueError(f"Invalid job status transition: {current.value} -> {target.value}")
