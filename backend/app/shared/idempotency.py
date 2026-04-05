@@ -7,7 +7,6 @@ import asyncio
 import json
 import logging
 import time
-from collections.abc import Awaitable
 from dataclasses import asdict, dataclass
 from typing import Any, Literal, cast
 from uuid import UUID
@@ -156,29 +155,19 @@ class RedisIdempotencyStateStore(IdempotencyStateStore):
 
     async def put_if_absent(self, key: str, value: str, *, expiry_seconds: int) -> bool:
         client = await self._get_client()
-        result = client.set(key, value, ex=expiry_seconds, nx=True)
-        if asyncio.iscoroutine(result):
-            return bool(await cast(Awaitable[bool | None], result))
-        return bool(result)
+        return bool(await client.set(key, value, ex=expiry_seconds, nx=True))
 
     async def get(self, key: str) -> str | None:
         client = await self._get_client()
-        result = client.get(key)
-        if asyncio.iscoroutine(result):
-            return cast(str | None, await cast(Awaitable[str | None], result))
-        return cast(str | None, result)
+        return cast(str | None, await client.get(key))
 
     async def set(self, key: str, value: str, *, expiry_seconds: int) -> None:
         client = await self._get_client()
-        result = client.set(key, value, ex=expiry_seconds)
-        if asyncio.iscoroutine(result):
-            await cast(Awaitable[Any], result)
+        await client.set(key, value, ex=expiry_seconds)
 
     async def delete(self, key: str) -> None:
         client = await self._get_client()
-        result = client.delete(key)
-        if asyncio.iscoroutine(result):
-            await cast(Awaitable[Any], result)
+        await client.delete(key)
 
     async def aclose(self) -> None:
         if self._client is None:

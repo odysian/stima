@@ -71,7 +71,7 @@ class TranscriptionIntegration:
                     model=self._model,
                     file=("audio.wav", audio_wav, "audio/wav"),
                 )
-            except Exception as exc:  # pragma: no cover - provider-level failures
+            except Exception as exc:
                 last_error = exc
                 if attempt >= self._max_attempts or not _is_retryable_provider_error(exc):
                     break

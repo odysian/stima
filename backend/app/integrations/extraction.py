@@ -156,7 +156,7 @@ class ExtractionIntegration:
                     ],
                     tool_choice={"type": "tool", "name": EXTRACTION_TOOL_NAME},
                 )
-            except Exception as exc:  # pragma: no cover - provider-level failures
+            except Exception as exc:
                 last_error = exc
                 if attempt >= self._max_attempts or not _is_retryable_provider_error(exc):
                     break

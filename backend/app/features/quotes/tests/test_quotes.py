@@ -184,6 +184,17 @@ class _FailingAbortIdempotencyStore:
         return None
 
 
+class _InProgressIdempotencyStore:
+    async def begin(self, **_: object) -> IdempotencyBeginResult:
+        return IdempotencyBeginResult(kind="in_progress")
+
+    async def abort(self, **_: object) -> None:
+        return None
+
+    async def complete(self, **_: object) -> None:
+        return None
+
+
 def _send_email_headers(csrf_token: str, *, idempotency_key: str | None = None) -> dict[str, str]:
     return {
         "X-CSRF-Token": csrf_token,
@@ -1530,6 +1541,32 @@ async def test_send_quote_email_preserves_original_error_when_idempotency_abort_
     assert response.json() == {"detail": "Customer email address looks invalid."}
 
 
+async def test_send_quote_email_returns_409_when_idempotency_key_is_in_progress(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    app.dependency_overrides[get_idempotency_store] = lambda: _InProgressIdempotencyStore()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+        quote = await _create_quote(client, csrf_token, customer_id)
+        await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+        response = await client.post(
+            f"/api/quotes/{quote['id']}/send-email",
+            headers=_send_email_headers(csrf_token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_idempotency_store, None)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "A request with this Idempotency-Key is already in progress."
+    }
+    assert mock_email_service.messages == []
+
+
 async def test_send_invoice_email_shares_invoice_delivers_email_and_logs_success(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1716,6 +1753,39 @@ async def test_send_invoice_email_preserves_original_error_when_idempotency_abor
 
     assert response.status_code == 422
     assert response.json() == {"detail": "Customer email address looks invalid."}
+
+
+async def test_send_invoice_email_returns_409_when_idempotency_key_is_in_progress(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    app.dependency_overrides[get_idempotency_store] = lambda: _InProgressIdempotencyStore()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+        invoice = await _create_direct_invoice(
+            client,
+            csrf_token,
+            customer_id,
+            title="Spring cleanup",
+            transcript="invoice transcript",
+            total_amount=55,
+        )
+        await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+        response = await client.post(
+            f"/api/invoices/{invoice['id']}/send-email",
+            headers=_send_email_headers(csrf_token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_idempotency_store, None)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "A request with this Idempotency-Key is already in progress."
+    }
+    assert mock_email_service.messages == []
 
 
 async def test_send_invoice_email_slowapi_rate_limit_returns_429(
