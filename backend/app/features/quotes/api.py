@@ -419,6 +419,7 @@ async def send_quote_email(
         await idempotency_store.complete(
             endpoint_slug="quote-send-email",
             user_id=user.id,
+            resource_id=quote_id,
             idempotency_key=normalized_idempotency_key,
             status_code=status.HTTP_200_OK,
             payload=quote_response.model_dump(mode="json"),

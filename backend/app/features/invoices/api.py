@@ -265,6 +265,7 @@ async def send_invoice_email(
         await idempotency_store.complete(
             endpoint_slug="invoice-send-email",
             user_id=user.id,
+            resource_id=invoice_id,
             idempotency_key=normalized_idempotency_key,
             status_code=status.HTTP_200_OK,
             payload=invoice_response.model_dump(mode="json"),

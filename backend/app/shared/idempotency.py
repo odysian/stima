@@ -273,6 +273,7 @@ class IdempotencyStore:
         *,
         endpoint_slug: str,
         user_id: UUID,
+        resource_id: UUID,
         idempotency_key: str,
         status_code: int,
         payload: dict[str, Any],
@@ -288,7 +289,7 @@ class IdempotencyStore:
             fingerprint=IdempotencyFingerprint(
                 endpoint_slug=endpoint_slug,
                 user_id=str(user_id),
-                resource_id=str(payload["id"]),
+                resource_id=str(resource_id),
             ),
             payload=payload,
             status_code=status_code,
@@ -353,7 +354,14 @@ class IdempotencyStore:
         raw_record = await self._store.get(storage_key)
         if raw_record is None:
             return None
-        return _decode_record(raw_record)
+        try:
+            return _decode_record(raw_record)
+        except (json.JSONDecodeError, KeyError, TypeError):
+            LOGGER.warning(
+                "unreadable idempotency record encountered; treating as conflict",
+                extra={"storage_key": storage_key},
+            )
+            return _unreadable_record()
 
     def _resolved_settings(self) -> Settings:
         return self._settings if self._settings is not None else get_settings()
@@ -412,4 +420,15 @@ def _decode_record(raw_record: str) -> _StoredRecord:
         ),
         payload=cast(dict[str, Any] | None, payload.get("payload")),
         status_code=cast(int | None, payload.get("status_code")),
+    )
+
+
+def _unreadable_record() -> _StoredRecord:
+    return _StoredRecord(
+        status="in_progress",
+        fingerprint=IdempotencyFingerprint(
+            endpoint_slug="",
+            user_id="",
+            resource_id="",
+        ),
     )
