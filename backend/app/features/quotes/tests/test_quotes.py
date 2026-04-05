@@ -43,9 +43,11 @@ from app.shared import event_logger
 from app.shared.dependencies import (
     get_email_service,
     get_extraction_service,
+    get_idempotency_store,
     get_quote_service,
     get_storage_service,
 )
+from app.shared.idempotency import IdempotencyBeginResult
 from app.shared.input_limits import (
     CUSTOMER_ADDRESS_MAX_CHARS,
     DOCUMENT_LINE_ITEMS_MAX_ITEMS,
@@ -169,6 +171,35 @@ class _MockEmailService:
         if self.raise_send_error:
             raise EmailSendError("Provider failure")
         self.messages.append(message)
+
+
+class _FailingAbortIdempotencyStore:
+    async def begin(self, **_: object) -> IdempotencyBeginResult:
+        return IdempotencyBeginResult(kind="started")
+
+    async def abort(self, **_: object) -> None:
+        raise RuntimeError("redis unavailable")
+
+    async def complete(self, **_: object) -> None:
+        return None
+
+
+class _InProgressIdempotencyStore:
+    async def begin(self, **_: object) -> IdempotencyBeginResult:
+        return IdempotencyBeginResult(kind="in_progress")
+
+    async def abort(self, **_: object) -> None:
+        return None
+
+    async def complete(self, **_: object) -> None:
+        return None
+
+
+def _send_email_headers(csrf_token: str, *, idempotency_key: str | None = None) -> dict[str, str]:
+    return {
+        "X-CSRF-Token": csrf_token,
+        "Idempotency-Key": idempotency_key or uuid4().hex,
+    }
 
 
 @pytest.fixture(autouse=True)
@@ -863,7 +894,7 @@ async def test_send_quote_email_shares_quote_delivers_email_and_logs_success(
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 200
@@ -892,6 +923,53 @@ async def test_send_quote_email_shares_quote_delivers_email_and_logs_success(
     assert quote_event_names[-2:] == ["quote_shared", "email_sent"]
 
 
+async def test_send_quote_email_requires_idempotency_key(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Idempotency-Key header is required"}
+    assert mock_email_service.messages == []
+
+
+async def test_send_quote_email_replays_same_idempotency_key_without_second_send(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-replay"),
+    )
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-replay"),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert second_response.headers["Idempotency-Replayed"] == "true"
+    assert second_response.json() == first_response.json()
+    assert len(mock_email_service.messages) == 1
+
+
 async def test_send_quote_email_uses_reply_copy_when_phone_is_missing(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -911,7 +989,7 @@ async def test_send_quote_email_uses_reply_copy_when_phone_is_missing(
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 200
@@ -951,7 +1029,7 @@ async def test_send_quote_email_uses_neutral_contact_copy_when_phone_and_email_a
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 200
@@ -993,7 +1071,7 @@ async def test_send_quote_email_returns_422_for_missing_or_invalid_customer_emai
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 422
@@ -1015,7 +1093,7 @@ async def test_send_quote_email_returns_409_when_quote_is_still_draft(
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 409
@@ -1054,7 +1132,7 @@ async def test_send_quote_email_allows_resend_for_finalized_quotes_without_rotat
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 200
@@ -1072,7 +1150,7 @@ async def test_send_quote_email_returns_404_for_missing_quote(
 
     response = await client.post(
         f"/api/quotes/{uuid4()}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 404
@@ -1097,7 +1175,7 @@ async def test_send_quote_email_returns_404_for_different_users_quote(
     csrf_token_user_b = await _register_and_login(client, _credentials())
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token_user_b},
+        headers=_send_email_headers(csrf_token_user_b),
     )
 
     assert response.status_code == 404
@@ -1131,7 +1209,7 @@ async def test_send_quote_email_returns_429_when_duplicate_send_guard_triggers(
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 429
@@ -1159,11 +1237,11 @@ async def test_send_quote_email_returns_429_on_immediate_retry_after_success(
 
     first_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-send-1"),
     )
     second_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-send-2"),
     )
 
     assert first_response.status_code == 200
@@ -1208,11 +1286,11 @@ async def test_send_quote_email_slowapi_rate_limit_returns_429(
 
     first_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-rate-limit-1"),
     )
     second_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-rate-limit-2"),
     )
 
     assert first_response.status_code == 200
@@ -1248,7 +1326,7 @@ async def test_send_quote_email_resends_without_changing_existing_shared_status(
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 200
@@ -1297,11 +1375,11 @@ async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
 
     first_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-fallback-persist-1"),
     )
     second_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-fallback-persist-2"),
     )
 
     assert first_response.status_code == 200
@@ -1353,11 +1431,11 @@ async def test_send_quote_email_returns_200_when_event_commit_fails_after_send(
 
     first_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-fallback-commit-1"),
     )
     second_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-fallback-commit-2"),
     )
 
     assert first_response.status_code == 200
@@ -1388,12 +1466,12 @@ async def test_send_quote_email_allows_immediate_retry_after_provider_failure(
 
     first_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-provider-failure"),
     )
     mock_email_service.raise_send_error = False
     second_response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-provider-failure"),
     )
 
     assert first_response.status_code == 502
@@ -1430,7 +1508,7 @@ async def test_send_quote_email_surfaces_provider_failures_with_expected_status_
 
     response = await client.post(
         f"/api/quotes/{quote['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == expected_status
@@ -1439,6 +1517,54 @@ async def test_send_quote_email_surfaces_provider_failures_with_expected_status_
     detail_response = await client.get(f"/api/quotes/{quote['id']}")
     assert detail_response.status_code == 200
     assert detail_response.json()["status"] == "shared"
+
+
+async def test_send_quote_email_preserves_original_error_when_idempotency_abort_fails(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    app.dependency_overrides[get_idempotency_store] = lambda: _FailingAbortIdempotencyStore()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token, email="not-an-email")
+        quote = await _create_quote(client, csrf_token, customer_id)
+        await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+        response = await client.post(
+            f"/api/quotes/{quote['id']}/send-email",
+            headers=_send_email_headers(csrf_token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_idempotency_store, None)
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Customer email address looks invalid."}
+
+
+async def test_send_quote_email_returns_409_when_idempotency_key_is_in_progress(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    app.dependency_overrides[get_idempotency_store] = lambda: _InProgressIdempotencyStore()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+        quote = await _create_quote(client, csrf_token, customer_id)
+        await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+        response = await client.post(
+            f"/api/quotes/{quote['id']}/send-email",
+            headers=_send_email_headers(csrf_token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_idempotency_store, None)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "A request with this Idempotency-Key is already in progress."
+    }
+    assert mock_email_service.messages == []
 
 
 async def test_send_invoice_email_shares_invoice_delivers_email_and_logs_success(
@@ -1472,7 +1598,7 @@ async def test_send_invoice_email_shares_invoice_delivers_email_and_logs_success
 
     response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 200
@@ -1509,6 +1635,159 @@ async def test_send_invoice_email_shares_invoice_delivers_email_and_logs_success
     assert email_sent_count == 1
 
 
+async def test_send_invoice_email_requires_idempotency_key(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Idempotency-Key header is required"}
+    assert mock_email_service.messages == []
+
+
+async def test_send_invoice_email_replays_same_idempotency_key_without_second_send(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay"),
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay"),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert second_response.headers["Idempotency-Replayed"] == "true"
+    assert second_response.json() == first_response.json()
+    assert len(mock_email_service.messages) == 1
+
+
+async def test_send_email_rejects_same_idempotency_key_for_different_resource_fingerprint(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    first_quote = await _create_quote(client, csrf_token, customer_id)
+    second_quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, first_quote["id"], QuoteStatus.READY)
+    await _set_quote_status(db_session, second_quote["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/quotes/{first_quote['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="shared-key"),
+    )
+    second_response = await client.post(
+        f"/api/quotes/{second_quote['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="shared-key"),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 409
+    assert second_response.json() == {
+        "detail": "Idempotency key was already used for a different request.",
+    }
+    assert len(mock_email_service.messages) == 1
+
+
+async def test_send_invoice_email_preserves_original_error_when_idempotency_abort_fails(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    app.dependency_overrides[get_idempotency_store] = lambda: _FailingAbortIdempotencyStore()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token, email="not-an-email")
+        invoice = await _create_direct_invoice(
+            client,
+            csrf_token,
+            customer_id,
+            title="Spring cleanup",
+            transcript="invoice transcript",
+            total_amount=55,
+        )
+        await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+        response = await client.post(
+            f"/api/invoices/{invoice['id']}/send-email",
+            headers=_send_email_headers(csrf_token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_idempotency_store, None)
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Customer email address looks invalid."}
+
+
+async def test_send_invoice_email_returns_409_when_idempotency_key_is_in_progress(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_email_service: _MockEmailService,
+) -> None:
+    app.dependency_overrides[get_idempotency_store] = lambda: _InProgressIdempotencyStore()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
+        customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+        invoice = await _create_direct_invoice(
+            client,
+            csrf_token,
+            customer_id,
+            title="Spring cleanup",
+            transcript="invoice transcript",
+            total_amount=55,
+        )
+        await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+        response = await client.post(
+            f"/api/invoices/{invoice['id']}/send-email",
+            headers=_send_email_headers(csrf_token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_idempotency_store, None)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "A request with this Idempotency-Key is already in progress."
+    }
+    assert mock_email_service.messages == []
+
+
 async def test_send_invoice_email_slowapi_rate_limit_returns_429(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1538,11 +1817,11 @@ async def test_send_invoice_email_slowapi_rate_limit_returns_429(
 
     first_response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-rate-limit-1"),
     )
     second_response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-rate-limit-2"),
     )
 
     assert first_response.status_code == 200
@@ -1582,7 +1861,7 @@ async def test_send_invoice_email_returns_200_on_resend_when_already_sent(
 
     response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 200
@@ -1600,7 +1879,7 @@ async def test_send_invoice_email_returns_404_for_missing_invoice(
 
     response = await client.post(
         f"/api/invoices/{uuid4()}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 404
@@ -1633,7 +1912,7 @@ async def test_send_invoice_email_returns_404_for_different_users_invoice(
     other_csrf_token = await _register_and_login(client, _credentials())
     response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": other_csrf_token},
+        headers=_send_email_headers(other_csrf_token),
     )
 
     assert response.status_code == 404
@@ -1662,7 +1941,7 @@ async def test_send_invoice_email_returns_409_when_invoice_is_still_draft(
 
     response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 409
@@ -1704,7 +1983,7 @@ async def test_send_invoice_email_returns_422_for_missing_or_invalid_customer_em
 
     response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 422
@@ -1745,7 +2024,7 @@ async def test_send_invoice_email_returns_429_when_duplicate_send_guard_triggers
 
     response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == 429
@@ -1779,11 +2058,11 @@ async def test_send_invoice_email_returns_429_on_immediate_retry_after_success(
 
     first_response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-send-1"),
     )
     second_response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-send-2"),
     )
 
     assert first_response.status_code == 200
@@ -1839,11 +2118,11 @@ async def test_send_invoice_email_returns_200_when_event_persist_fails_after_sen
 
     first_response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-fallback-persist-1"),
     )
     second_response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-fallback-persist-2"),
     )
 
     assert first_response.status_code == 200
@@ -1880,12 +2159,12 @@ async def test_send_invoice_email_allows_immediate_retry_after_provider_failure(
 
     first_response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-provider-failure"),
     )
     mock_email_service.raise_send_error = False
     second_response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-provider-failure"),
     )
 
     assert first_response.status_code == 502
@@ -1929,7 +2208,7 @@ async def test_send_invoice_email_surfaces_provider_failures_with_expected_statu
 
     response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
-        headers={"X-CSRF-Token": csrf_token},
+        headers=_send_email_headers(csrf_token),
     )
 
     assert response.status_code == expected_status

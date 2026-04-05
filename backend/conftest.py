@@ -25,6 +25,12 @@ from app.core.database import Base, get_db
 from app.features import registry as feature_registry  # noqa: F401
 from app.main import app
 from app.shared import event_logger
+from app.shared.dependencies import (
+    get_extraction_integration,
+    get_idempotency_store,
+    get_transcription_integration,
+)
+from app.shared.idempotency import reset_local_idempotency_state
 from app.shared.rate_limit import configure_active_limiter_key_prefix, reset_local_rate_limit_state
 
 TEST_SCHEMA = "stima_test"
@@ -88,10 +94,18 @@ def _isolate_rate_limit_state(
     prefix = f"pytest-{uuid4().hex}"
     monkeypatch.setenv("REDIS_KEY_PREFIX", prefix)
     get_settings.cache_clear()
+    get_extraction_integration.cache_clear()
+    get_transcription_integration.cache_clear()
     configure_active_limiter_key_prefix(prefix)
     reset_local_rate_limit_state()
+    if get_idempotency_store.cache_info().currsize:
+        reset_local_idempotency_state(get_idempotency_store())
     yield
     reset_local_rate_limit_state()
+    if get_idempotency_store.cache_info().currsize:
+        reset_local_idempotency_state(get_idempotency_store())
+    get_extraction_integration.cache_clear()
+    get_transcription_integration.cache_clear()
     get_settings.cache_clear()
 
 

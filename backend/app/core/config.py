@@ -164,6 +164,14 @@ class Settings(BaseSettings):
         default="whisper-1",
         validation_alias="TRANSCRIPTION_MODEL",
     )
+    provider_request_timeout_seconds: float = Field(
+        default=30.0,
+        validation_alias="PROVIDER_REQUEST_TIMEOUT_SECONDS",
+    )
+    provider_max_retries: int = Field(
+        default=3,
+        validation_alias="PROVIDER_MAX_RETRIES",
+    )
     allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"],
         validation_alias="ALLOWED_ORIGINS",
@@ -287,6 +295,22 @@ class Settings(BaseSettings):
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("FRONTEND_URL must be an absolute http(s) URL")
         return normalized_value
+
+    @field_validator("provider_request_timeout_seconds")
+    @classmethod
+    def validate_provider_request_timeout_seconds(cls, value: float) -> float:
+        """Require a positive provider timeout."""
+        if value <= 0:
+            raise ValueError("PROVIDER_REQUEST_TIMEOUT_SECONDS must be greater than 0")
+        return value
+
+    @field_validator("provider_max_retries")
+    @classmethod
+    def validate_provider_max_retries(cls, value: int) -> int:
+        """Require at least one total provider attempt."""
+        if value < 1:
+            raise ValueError("PROVIDER_MAX_RETRIES must be at least 1")
+        return value
 
     @model_validator(mode="after")
     def validate_cookie_samesite_secure_combination(self) -> Settings:

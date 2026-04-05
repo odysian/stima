@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Protocol, cast
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Query,
     Request,
@@ -43,11 +45,13 @@ from app.shared.dependencies import (
     extraction_capacity_guard,
     get_current_user,
     get_extraction_service,
+    get_idempotency_store,
     get_invoice_service,
     get_quote_email_delivery_service,
     get_quote_service,
     require_csrf,
 )
+from app.shared.idempotency import IdempotencyStore, validate_idempotency_key
 from app.shared.input_limits import (
     MAX_AUDIO_CLIP_BYTES,
     MAX_AUDIO_CLIPS_PER_REQUEST,
@@ -63,6 +67,7 @@ _PRIVATE_RESPONSE_HEADERS = {
     "Cache-Control": "no-store",
     "X-Robots-Tag": "noindex",
 }
+LOGGER = logging.getLogger(__name__)
 
 
 class _BusinessNameContext(Protocol):
@@ -340,20 +345,91 @@ async def share_quote(
 @limiter.limit(lambda: get_settings().quote_email_send_rate_limit, key_func=get_user_key)
 async def send_quote_email(
     request: Request,
+    response: Response,
     quote_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     email_delivery_service: Annotated[
         QuoteEmailDeliveryService,
         Depends(get_quote_email_delivery_service),
     ],
+    idempotency_store: Annotated[IdempotencyStore, Depends(get_idempotency_store)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> QuoteResponse:
     """Send a quote email to the customer contact on file."""
     del request
     try:
+        normalized_idempotency_key = validate_idempotency_key(idempotency_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    replay = await idempotency_store.begin(
+        endpoint_slug="quote-send-email",
+        user_id=user.id,
+        resource_id=quote_id,
+        idempotency_key=normalized_idempotency_key,
+    )
+    if replay.kind == "replay" and replay.response is not None:
+        response.headers["Idempotency-Replayed"] = "true"
+        response.status_code = replay.response.status_code
+        return QuoteResponse.model_validate(replay.response.payload)
+    if replay.kind == "conflict":
+        raise HTTPException(
+            status_code=409,
+            detail="Idempotency key was already used for a different request.",
+        )
+    if replay.kind == "in_progress":
+        raise HTTPException(
+            status_code=409,
+            detail="A request with this Idempotency-Key is already in progress.",
+        )
+
+    try:
         quote = await email_delivery_service.send_quote_email(user, quote_id)
     except QuoteServiceError as exc:
+        try:
+            await idempotency_store.abort(
+                endpoint_slug="quote-send-email",
+                user_id=user.id,
+                resource_id=quote_id,
+                idempotency_key=normalized_idempotency_key,
+            )
+        except Exception:  # pragma: no cover - degraded Redis persistence path
+            LOGGER.warning(
+                "quote email idempotency abort failed after QuoteServiceError",
+                extra={"quote_id": str(quote_id), "user_id": str(user.id)},
+            )
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    return QuoteResponse.model_validate(quote)
+    except Exception:
+        try:
+            await idempotency_store.abort(
+                endpoint_slug="quote-send-email",
+                user_id=user.id,
+                resource_id=quote_id,
+                idempotency_key=normalized_idempotency_key,
+            )
+        except Exception:  # pragma: no cover - degraded Redis persistence path
+            LOGGER.warning(
+                "quote email idempotency abort failed after unexpected error",
+                extra={"quote_id": str(quote_id), "user_id": str(user.id)},
+            )
+        raise
+
+    quote_response = QuoteResponse.model_validate(quote)
+    try:
+        await idempotency_store.complete(
+            endpoint_slug="quote-send-email",
+            user_id=user.id,
+            resource_id=quote_id,
+            idempotency_key=normalized_idempotency_key,
+            status_code=status.HTTP_200_OK,
+            payload=quote_response.model_dump(mode="json"),
+        )
+    except Exception:  # pragma: no cover - degraded Redis persistence path
+        LOGGER.warning(
+            "quote email sent without persisted idempotency replay state",
+            extra={"quote_id": str(quote_id), "user_id": str(user.id)},
+        )
+    return quote_response
 
 
 @router.post(
