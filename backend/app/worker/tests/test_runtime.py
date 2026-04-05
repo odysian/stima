@@ -9,6 +9,7 @@ from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
 from app.worker.runtime import (
+    TERMINAL_ERROR_RETRY_EXHAUSTED,
     RetryableJobError,
     WorkerRuntimeSettings,
     calculate_retry_delay_seconds,
@@ -105,7 +106,42 @@ async def test_process_job_retries_transient_failures_before_terminal(
     assert terminal_record is not None  # nosec B101 - pytest assertion
     assert terminal_record.status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
     assert terminal_record.attempts == 3  # nosec B101 - pytest assertion
-    assert terminal_record.terminal_error == "temporary upstream outage"  # nosec B101 - pytest assertion
+    assert terminal_record.terminal_error == TERMINAL_ERROR_RETRY_EXHAUSTED  # nosec B101 - pytest assertion
+
+
+async def test_process_job_marks_failed_before_terminal_on_final_retryable_error(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EMAIL)
+    await db_session.commit()
+
+    call_order: list[str] = []
+    original_set_failed = _resolve_runtime_helper("_set_failed")
+    original_set_terminal = _resolve_runtime_helper("_set_terminal")
+
+    async def _tracking_set_failed(*args, **kwargs) -> None:
+        call_order.append("failed")
+        await original_set_failed(*args, **kwargs)
+
+    async def _tracking_set_terminal(*args, **kwargs) -> None:
+        call_order.append("terminal")
+        await original_set_terminal(*args, **kwargs)
+
+    monkeypatch.setattr("app.worker.runtime._set_failed", _tracking_set_failed)
+    monkeypatch.setattr("app.worker.runtime._set_terminal", _tracking_set_terminal)
+
+    with pytest.raises(RetryableJobError, match="temporary upstream outage"):
+        await process_job(
+            _worker_context(db_session, job_try=3),
+            job_id=record.id,
+            job_type=JobType.EMAIL,
+            handler=_retryable_failure_handler,
+        )
+
+    assert call_order == ["failed", "terminal"]  # nosec B101 - pytest assertion
 
 
 async def test_worker_startup_raises_when_redis_is_unreachable(
@@ -179,3 +215,9 @@ async def _load_job_record(db_session: AsyncSession, job_id: UUID) -> JobRecord 
     async with session_maker() as session:
         repository = JobRepository(session)
         return await repository.get_by_id(job_id)
+
+
+def _resolve_runtime_helper(name: str):
+    from app.worker import runtime
+
+    return getattr(runtime, name)

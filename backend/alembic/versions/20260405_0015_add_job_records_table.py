@@ -41,9 +41,6 @@ job_status_enum = sa.Enum(
 
 
 def upgrade() -> None:
-    job_type_enum.create(op.get_bind(), checkfirst=True)
-    job_status_enum.create(op.get_bind(), checkfirst=True)
-
     op.create_table(
         "job_records",
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -87,5 +84,3 @@ def downgrade() -> None:
     op.drop_index("ix_job_records_document_id", table_name="job_records")
     op.drop_index("ix_job_records_user_id", table_name="job_records")
     op.drop_table("job_records")
-    job_status_enum.drop(op.get_bind(), checkfirst=True)
-    job_type_enum.drop(op.get_bind(), checkfirst=True)

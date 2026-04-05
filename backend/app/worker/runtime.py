@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from hashlib import sha256
@@ -19,9 +20,13 @@ from app.core.database import get_session_maker
 from app.features.jobs.models import JobType
 from app.features.jobs.repository import JobRepository
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_MAX_TRIES = 3
 DEFAULT_RETRY_BASE_SECONDS = 5.0
 DEFAULT_RETRY_JITTER_SECONDS = 3.0
+TERMINAL_ERROR_RETRY_EXHAUSTED = "retry_exhausted"
+TERMINAL_ERROR_UNEXPECTED = "unexpected_error"
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,11 +110,17 @@ async def process_job(
         await handler()
     except RetryableJobError as exc:
         if attempt_number >= runtime.max_tries:
+            await _set_failed(runtime, job_id=job_id, job_type=job_type)
+            logger.warning(
+                "Job %s exhausted retry budget and is transitioning to terminal state.",
+                job_id,
+                exc_info=True,
+            )
             await _set_terminal(
                 runtime,
                 job_id=job_id,
                 job_type=job_type,
-                reason=_terminal_error_message(exc),
+                reason=_terminal_error_code(exc),
             )
             raise
 
@@ -123,11 +134,12 @@ async def process_job(
             )
         ) from exc
     except Exception as exc:
+        logger.exception("Job %s failed with a terminal exception.", job_id)
         await _set_terminal(
             runtime,
             job_id=job_id,
             job_type=job_type,
-            reason=_terminal_error_message(exc),
+            reason=_terminal_error_code(exc),
         )
         raise
     else:
@@ -212,8 +224,7 @@ async def _set_terminal(
         await session.commit()
 
 
-def _terminal_error_message(exc: Exception) -> str:
-    message = str(exc).strip()
-    if message:
-        return message
-    return exc.__class__.__name__
+def _terminal_error_code(exc: Exception) -> str:
+    if isinstance(exc, RetryableJobError):
+        return TERMINAL_ERROR_RETRY_EXHAUSTED
+    return TERMINAL_ERROR_UNEXPECTED
