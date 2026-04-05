@@ -98,8 +98,13 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 | notes | Text | nullable, customer-facing notes |
 | due_date | Date | nullable; used by invoice documents |
 | pdf_url | Text | nullable legacy field; PDFs are streamed directly in V0 and this is not populated by the current flow |
-| share_token | Text | nullable, unique, set on first share and reused for public PDF access |
+| share_token | Text | nullable, unique, set on first active share and reused until explicitly regenerated |
 | shared_at | DateTime(tz) | nullable, set when a quote transitions to `shared` or an invoice transitions to `sent` |
+| share_token_created_at | DateTime(tz) | nullable, set when the current active share token is minted |
+| share_token_expires_at | DateTime(tz) | nullable, defaults to `share_token_created_at + PUBLIC_SHARE_LINK_EXPIRE_DAYS` (`90` by default) |
+| share_token_revoked_at | DateTime(tz) | nullable, marks the current token unusable without exposing that state publicly |
+| last_public_accessed_at | DateTime(tz) | nullable, updated on successful public JSON/PDF document loads |
+| invoice_first_viewed_at | DateTime(tz) | nullable, set exactly once on the first successful public invoice landing-page load |
 | created_at, updated_at | DateTime(tz) | server defaults |
 
 Unique constraints:
@@ -217,7 +222,8 @@ Rules:
 | `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`, `linked_invoice`) or `404 { detail: "Not found" }` |
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes, or `404 { detail: "Not found" }` |
-| `/quotes/{id}/share` | POST | yes | cookie | — | `200 Quote`; returns existing quote unchanged when status is already `viewed`, `approved`, or `declined` |
+| `/quotes/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Quote`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, and preserves terminal quote status on resend |
+| `/quotes/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current quote share token without leaking token state publicly |
 | `/quotes/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `200 Quote` after ensuring the quote is shared and emailing the customer link; replayed `200` responses include `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when quote is missing/not owned, `409` when still `draft`, when the same key is reused for a different quote, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
 | `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
 | `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
@@ -237,22 +243,29 @@ Quote extraction guardrails:
 | `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail`, `404 { detail: "Not found" }` |
 | `/invoices/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, due_date?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
-| `/invoices/{id}/share` | POST | yes | cookie | — | `200 Invoice`; creates/reuses `share_token` and transitions invoice to `sent` |
+| `/invoices/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Invoice`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, and transitions invoice to `sent` |
+| `/invoices/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current invoice share token without leaking token state publicly |
 | `/invoices/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `200 Invoice` after ensuring the invoice is shared and emailing the customer PDF link; replayed `200` responses include `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when invoice is missing/not owned, `409` when still `draft`, when the same key is reused for a different invoice, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
 
-### Public quote landing endpoints
+### Public document landing endpoints
 
 | Endpoint | Method | Auth | Response |
 |---|---|---|---|
-| `/api/public/doc/{share_token}` | GET | no | `200 PublicQuoteResponse` (`Quote`-shaped fields including `tax_rate?`, `discount_type?`, `discount_value?`, `deposit_amount?`, plus `logo_url`, `download_url`), `404 { detail: "Not found" }` for unknown or non-public tokens |
-| `/api/public/doc/{share_token}/logo` | GET | no | raw image bytes with correct `Content-Type`, `Cache-Control: public, max-age=300`, `404 { detail: "Logo not found" }`, or `500 { detail: "Unable to load logo" }` |
-| `/share/{share_token}` | GET | no | raw quote or sent-invoice PDF bytes with `Content-Type: application/pdf`, `Cache-Control: no-store`, and `X-Robots-Tag: noindex` |
+| `/api/public/doc/{share_token}` | GET | no | `200 PublicQuoteResponse \| PublicInvoiceResponse` discriminated by `doc_type`; generic `404 { detail: "Not found" }` for unknown, expired, revoked, or non-public tokens |
+| `/api/public/doc/{share_token}/logo` | GET | no | raw image bytes with correct `Content-Type`, `Cache-Control: public, max-age=300`, `404 { detail: "Logo not found" }`, or `500 { detail: "Unable to load logo" }`; resolves both quote and invoice tokens |
+| `/share/{share_token}` | GET | no | raw quote or sent-invoice PDF bytes with `Content-Type: application/pdf`, `Cache-Control: no-store`, and `X-Robots-Tag: noindex`; generic `404` for unknown, expired, revoked, or non-public tokens |
 
 Public landing-page rules:
 - contractor share/copy actions hand out the frontend route `/doc/{share_token}` instead of the raw PDF URL
 - transactional quote emails reuse that same `/doc/{share_token}` landing page as the primary CTA and include `/share/{share_token}` as the secondary "Download PDF" link
+- the public JSON contract is a discriminated union keyed by `doc_type`:
+  - quote variant: `doc_type = "quote"`, `status` in `shared | viewed | approved | declined`
+  - invoice variant: `doc_type = "invoice"`, `status = "sent"`, includes `due_date`
 - first public load of a `shared` quote transitions it to `viewed` and logs exactly one `quote_viewed` event
 - repeat public loads of `viewed`, `approved`, and `declined` quotes are read-only and do not create duplicate `quote_viewed` events
+- first public load of a `sent` invoice sets `invoice_first_viewed_at`, logs exactly one `invoice_viewed` event, and does not mutate invoice status
+- repeat public loads of a `sent` invoice are read-only and do not create duplicate `invoice_viewed` events
+- revoked, expired, and unknown tokens all return the same external `404`; internal logs retain the reason code for revoked/expired cases
 - public JSON, logo, and PDF responses are IP-keyed rate-limited and return `429` on limit exhaustion
 - public JSON, logo, and PDF responses send `X-Robots-Tag: noindex`
 
@@ -269,7 +282,7 @@ Public landing-page rules:
 - Successful same-key retries replay the original `200` response with `Idempotency-Replayed: true` and do not send a second email.
 - Reusing the same key for a different quote, or while the original request is still in progress, returns `409`.
 - The quote is shared before the provider call, so a `502` or `503` can still leave the quote in `shared` state on a subsequent `GET`.
-- Ready, shared, viewed, approved, and declined quotes can all send or resend email without rotating the existing share token.
+- Ready, shared, viewed, approved, and declined quotes can all send or resend email without rotating the existing share token; if the existing token is expired or revoked, the share step regenerates a fresh one before delivery.
 - The duplicate-send guard allows an immediate retry after provider failure because no `email_sent` throttle event is recorded on failed sends.
 
 `POST /invoices/{id}/send-email` behavior:
@@ -277,8 +290,8 @@ Public landing-page rules:
 - Successful same-key retries replay the original `200` response with `Idempotency-Replayed: true` and do not send a second email.
 - Reusing the same key for a different invoice, or while the original request is still in progress, returns `409`.
 - The invoice is shared before the provider call, so a `502` or `503` can still leave the invoice in `sent` state with a reusable `share_token` on a subsequent `GET`.
-- Ready and sent invoices can both send or resend email without rotating the existing share token; draft invoices are rejected until the PDF is generated.
-- Invoice email CTAs use the raw frontend `/share/{share_token}` PDF route because the public `/doc/{share_token}` landing page is currently quote-only.
+- Ready and sent invoices can both send or resend email without rotating the existing share token; if the existing token is expired or revoked, the share step regenerates a fresh one before delivery. Draft invoices are rejected until the PDF is generated.
+- Invoice email CTAs now use the public frontend `/doc/{share_token}` landing page as the primary customer route, with `/share/{share_token}` remaining the raw PDF download path.
 - The duplicate-send guard allows an immediate retry after provider failure because no `email_sent` throttle event is recorded on failed sends.
 
 `QuoteListItem` fields:
@@ -329,7 +342,7 @@ Invoice rules:
 - if `line_items` is present, existing rows are fully replaced; if omitted, existing rows are preserved
 - editing preserves the persisted invoice status plus any existing `share_token` / `shared_at` values
 - editing a `ready` invoice keeps it in `ready`; editing a `sent` invoice keeps it in `sent`
-- first-cut invoice copy/share surfaces the raw PDF route `/share/{share_token}` rather than the frontend `/doc/{share_token}` landing page
+- invoice public landing pages share the same `/doc/{share_token}` route shell as quotes, but render invoice-specific fields (`due_date`, `status = sent`) without quote-only terminal-state messaging
 
 ### Error format
 ```json
@@ -369,5 +382,6 @@ Boundary hardening notes:
 - Backend trusts `X-Forwarded-*` headers only from `TRUSTED_PROXY_IPS`.
 - Production startup requires `REDIS_URL`; local development can leave it unset and run with the documented in-memory degraded fallback.
 - Shared production Redis (for example Upstash) is supported when Stima isolates every key under `REDIS_KEY_PREFIX` (default `stima`), keeping its `stima:*` keys separate from sibling apps such as Rostra's `rostra:*`.
+- GCS logo storage is private-by-default: uniform bucket-level access enabled, public access prevention enabled, least-privilege runtime IAM only, and no object ACL reliance in app or runbook flows.
 - Backend emits baseline security headers for backend-served responses; static-host CSP headers remain owned by the frontend host/CDN layer.
 - The SPA shell is compatible with `script-src 'self'`; Google Fonts and Material Symbols still require explicit font/style allowlisting until they are self-hosted.

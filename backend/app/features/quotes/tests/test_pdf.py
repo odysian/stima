@@ -6,6 +6,7 @@ import asyncio
 import base64
 import json
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -684,6 +685,7 @@ async def test_public_quote_endpoint_returns_json_and_marks_first_view_once(
     assert first_response.headers["cache-control"] == "no-store"
     assert first_response.headers["x-robots-tag"] == "noindex"
     first_payload = first_response.json()
+    assert first_payload["doc_type"] == "quote"
     assert first_payload["doc_number"] == "Q-001"
     assert first_payload["status"] == "viewed"
     assert first_payload["download_url"].endswith(f"/share/{share_token}")
@@ -698,6 +700,101 @@ async def test_public_quote_endpoint_returns_json_and_marks_first_view_once(
     assert [event["event"] for event in emitted_events] == ["quote_viewed"]
     assert emitted_events[0]["quote_id"] == quote["id"]
     assert emitted_events[0]["customer_id"] == customer_id
+
+
+async def test_revoked_public_quote_token_returns_generic_404(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    revoke_response = await client.delete(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert revoke_response.status_code == 204
+
+    client.cookies.clear()
+    json_response = await client.get(f"/api/public/doc/{share_token}")
+    pdf_response = await client.get(f"/share/{share_token}")
+
+    assert json_response.status_code == 404
+    assert json_response.json() == {"detail": "Not found"}
+    assert pdf_response.status_code == 404
+    assert pdf_response.json() == {"detail": "Not found"}
+
+    quote_row = await db_session.scalar(select(Document).where(Document.id == UUID(quote["id"])))
+    assert quote_row is not None
+    assert quote_row.share_token_revoked_at is not None
+
+
+async def test_expired_public_quote_token_returns_generic_404(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    await _set_share_token_expiry(
+        db_session,
+        document_id=UUID(quote["id"]),
+        expires_at=datetime.now(UTC) - timedelta(days=1),
+    )
+
+    client.cookies.clear()
+    response = await client.get(f"/api/public/doc/{share_token}")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_regenerate_quote_share_invalidates_old_token(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    first_share = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert first_share.status_code == 200
+    first_token = first_share.json()["share_token"]
+
+    second_share = await client.post(
+        f"/api/quotes/{quote['id']}/share?regenerate=true",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert second_share.status_code == 200
+    second_token = second_share.json()["share_token"]
+
+    assert second_token != first_token
+
+    client.cookies.clear()
+    old_response = await client.get(f"/api/public/doc/{first_token}")
+    new_response = await client.get(f"/api/public/doc/{second_token}")
+
+    assert old_response.status_code == 404
+    assert new_response.status_code == 200
+    assert new_response.json()["doc_type"] == "quote"
 
 
 async def test_public_share_pdf_rate_limit_returns_429(
@@ -773,13 +870,19 @@ async def test_public_quote_endpoint_prefers_terminal_status_when_view_transitio
     def _capture(message: str) -> None:
         emitted_events.append(json.loads(message))
 
-    async def _simulate_terminal_race(self: QuoteRepository, share_token: str) -> None:
+    async def _simulate_terminal_race(
+        self: QuoteRepository,
+        share_token: str,
+        *,
+        accessed_at: datetime,
+    ) -> None:
         await self._session.execute(
             update(Document)
             .where(Document.share_token == share_token)
             .values(status=QuoteStatus.APPROVED)
         )
         await self._session.commit()
+        del accessed_at
         return None
 
     monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
@@ -1104,6 +1207,96 @@ async def test_invoice_share_returns_sent_and_raw_share_token_renders_pdf(
     assert pdf_response.content == b"PDF for I-001"
 
 
+async def test_public_invoice_endpoint_returns_json_and_logs_first_view_once(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    share_response = await client.post(
+        f"/api/invoices/{invoice_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+    assert share_token is not None
+
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    client.cookies.clear()
+    first_response = await client.get(f"/api/public/doc/{share_token}")
+    second_response = await client.get(f"/api/public/doc/{share_token}")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    first_payload = first_response.json()
+    assert first_payload["doc_type"] == "invoice"
+    assert first_payload["status"] == "sent"
+    assert first_payload["doc_number"] == "I-001"
+    assert first_payload["due_date"] is not None
+    assert second_response.json()["doc_type"] == "invoice"
+
+    await event_logger.flush_event_tasks()
+    invoice_row = await db_session.scalar(select(Document).where(Document.id == UUID(invoice_id)))
+    assert invoice_row is not None
+    assert invoice_row.invoice_first_viewed_at is not None
+    assert invoice_row.last_public_accessed_at is not None
+
+    invoice_view_events = [event for event in emitted_events if event["event"] == "invoice_viewed"]
+    assert len(invoice_view_events) == 1
+    assert invoice_view_events[0]["invoice_id"] == invoice_id
+    assert invoice_view_events[0]["customer_id"] == customer_id
+
+
+async def test_public_logo_endpoint_supports_invoice_tokens(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _upload_logo(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    share_response = await client.post(
+        f"/api/invoices/{invoice_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+    assert share_token is not None
+
+    client.cookies.clear()
+    response = await client.get(f"/api/public/doc/{share_token}/logo")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/png")
+    assert response.content == _PNG_BYTES
+
+
 async def test_sent_invoice_share_pdf_renders_latest_persisted_content_after_edit(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1226,6 +1419,18 @@ async def _set_quote_status(
     quote = await db_session.scalar(select(Document).where(Document.id == UUID(quote_id)))
     assert quote is not None
     quote.status = status
+    await db_session.commit()
+
+
+async def _set_share_token_expiry(
+    db_session: AsyncSession,
+    *,
+    document_id: UUID,
+    expires_at: datetime,
+) -> None:
+    document = await db_session.scalar(select(Document).where(Document.id == document_id))
+    assert document is not None
+    document.share_token_expires_at = expires_at
     await db_session.commit()
 
 

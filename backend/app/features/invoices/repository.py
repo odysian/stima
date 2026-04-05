@@ -101,6 +101,28 @@ class InvoiceEmailContext:
     share_token: str | None
 
 
+@dataclass(slots=True)
+class InvoicePublicShareRecord:
+    """Lifecycle metadata resolved for one invoice share token."""
+
+    invoice_id: UUID
+    user_id: UUID
+    customer_id: UUID
+    status: QuoteStatus
+    share_token_created_at: datetime | None
+    share_token_expires_at: datetime | None
+    share_token_revoked_at: datetime | None
+
+
+@dataclass(slots=True)
+class InvoiceFirstViewTransition:
+    """Identifiers needed when the first public invoice view is recorded."""
+
+    invoice_id: UUID
+    user_id: UUID
+    customer_id: UUID
+
+
 class InvoiceRepository:
     """Persist and query invoice documents using SQLAlchemy async sessions."""
 
@@ -338,6 +360,86 @@ class InvoiceRepository:
 
         document, customer, user = row
         return _build_render_context(document=document, customer=customer, user=user)
+
+    async def get_public_share_record(
+        self,
+        share_token: str,
+    ) -> InvoicePublicShareRecord | None:
+        """Return invoice share lifecycle metadata for one token regardless of status."""
+        result = await self._session.execute(
+            select(
+                Document.id,
+                Document.user_id,
+                Document.customer_id,
+                Document.status,
+                Document.share_token_created_at,
+                Document.share_token_expires_at,
+                Document.share_token_revoked_at,
+            ).where(
+                Document.share_token == share_token,
+                Document.doc_type == _INVOICE_DOC_TYPE,
+            )
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+
+        return InvoicePublicShareRecord(
+            invoice_id=row.id,
+            user_id=row.user_id,
+            customer_id=row.customer_id,
+            status=cast(QuoteStatus, row.status),
+            share_token_created_at=row.share_token_created_at,
+            share_token_expires_at=row.share_token_expires_at,
+            share_token_revoked_at=row.share_token_revoked_at,
+        )
+
+    async def mark_first_public_view_by_share_token(
+        self,
+        share_token: str,
+        *,
+        viewed_at: datetime,
+    ) -> InvoiceFirstViewTransition | None:
+        """Set the invoice first-view timestamp exactly once for a sent share token."""
+        row = await self._session.execute(
+            update(Document)
+            .where(
+                Document.share_token == share_token,
+                Document.doc_type == _INVOICE_DOC_TYPE,
+                Document.status == _SENT_INVOICE_STATUS,
+                Document.invoice_first_viewed_at.is_(None),
+            )
+            .values(
+                invoice_first_viewed_at=viewed_at,
+                last_public_accessed_at=viewed_at,
+            )
+            .returning(Document.id, Document.user_id, Document.customer_id)
+        )
+        updated_row = row.one_or_none()
+        if updated_row is None:
+            return None
+
+        return InvoiceFirstViewTransition(
+            invoice_id=updated_row.id,
+            user_id=updated_row.user_id,
+            customer_id=updated_row.customer_id,
+        )
+
+    async def touch_last_public_accessed_at_by_share_token(
+        self,
+        share_token: str,
+        *,
+        accessed_at: datetime,
+    ) -> None:
+        """Update the last successful public access timestamp for one invoice token."""
+        await self._session.execute(
+            update(Document)
+            .where(
+                Document.share_token == share_token,
+                Document.doc_type == _INVOICE_DOC_TYPE,
+            )
+            .values(last_public_accessed_at=accessed_at)
+        )
 
     async def create_from_quote(
         self,

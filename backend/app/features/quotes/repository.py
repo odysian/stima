@@ -173,6 +173,19 @@ class QuoteViewTransition:
     customer_id: UUID
 
 
+@dataclass(slots=True)
+class PublicShareRecord:
+    """Lifecycle metadata resolved for one quote share token."""
+
+    document_id: UUID
+    user_id: UUID
+    customer_id: UUID
+    status: QuoteStatus
+    share_token_created_at: datetime | None
+    share_token_expires_at: datetime | None
+    share_token_revoked_at: datetime | None
+
+
 class QuoteRepository:
     """Persist and query quote documents using SQLAlchemy async sessions."""
 
@@ -386,8 +399,41 @@ class QuoteRepository:
         document, customer, user = row
         return _build_render_context(document=document, customer=customer, user=user)
 
+    async def get_public_share_record(self, share_token: str) -> PublicShareRecord | None:
+        """Return quote share lifecycle metadata for one token regardless of status."""
+        result = await self._session.execute(
+            select(
+                Document.id,
+                Document.user_id,
+                Document.customer_id,
+                Document.status,
+                Document.share_token_created_at,
+                Document.share_token_expires_at,
+                Document.share_token_revoked_at,
+            ).where(
+                Document.share_token == share_token,
+                Document.doc_type == _QUOTE_DOC_TYPE,
+            )
+        )
+        row = result.one_or_none()
+        if row is None:
+            return None
+
+        return PublicShareRecord(
+            document_id=row.id,
+            user_id=row.user_id,
+            customer_id=row.customer_id,
+            status=cast(QuoteStatus, row.status),
+            share_token_created_at=row.share_token_created_at,
+            share_token_expires_at=row.share_token_expires_at,
+            share_token_revoked_at=row.share_token_revoked_at,
+        )
+
     async def transition_to_viewed_by_share_token(
-        self, share_token: str
+        self,
+        share_token: str,
+        *,
+        accessed_at: datetime,
     ) -> QuoteViewTransition | None:
         """Mark a shared quote as viewed once and return ids when the write occurred."""
         row = await self._session.execute(
@@ -397,7 +443,10 @@ class QuoteRepository:
                 Document.doc_type == _QUOTE_DOC_TYPE,
                 Document.status == QuoteStatus.SHARED,
             )
-            .values(status=QuoteStatus.VIEWED)
+            .values(
+                status=QuoteStatus.VIEWED,
+                last_public_accessed_at=accessed_at,
+            )
             .returning(Document.id, Document.user_id, Document.customer_id)
         )
         updated_row = row.one_or_none()
@@ -408,6 +457,22 @@ class QuoteRepository:
             quote_id=updated_row.id,
             user_id=updated_row.user_id,
             customer_id=updated_row.customer_id,
+        )
+
+    async def touch_last_public_accessed_at_by_share_token(
+        self,
+        share_token: str,
+        *,
+        accessed_at: datetime,
+    ) -> None:
+        """Update the last successful public access timestamp for one quote token."""
+        await self._session.execute(
+            update(Document)
+            .where(
+                Document.share_token == share_token,
+                Document.doc_type == _QUOTE_DOC_TYPE,
+            )
+            .values(last_public_accessed_at=accessed_at)
         )
 
     async def mark_ready_if_not_shared(self, *, quote_id: UUID, user_id: UUID) -> None:

@@ -1,6 +1,6 @@
 import { captureException } from "@/sentry";
 
-import type { PublicQuote } from "@/features/public/types/public.types";
+import type { PublicDocument } from "@/features/public/types/public.types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -39,7 +39,7 @@ async function parsePayload(response: Response): Promise<unknown> {
   return JSON.parse(text) as unknown;
 }
 
-async function getQuote(token: string): Promise<PublicQuote> {
+async function getDocument(token: string): Promise<PublicDocument> {
   let response: Response;
 
   try {
@@ -64,9 +64,9 @@ async function getQuote(token: string): Promise<PublicQuote> {
     throw requestError;
   }
 
-  return payload as PublicQuote;
+  return payload as PublicDocument;
 }
 
 export const publicService = {
-  getQuote,
+  getDocument,
 };

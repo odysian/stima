@@ -62,6 +62,7 @@ def log_event(
     *,
     user_id: UUID | None = None,
     quote_id: UUID | None = None,
+    invoice_id: UUID | None = None,
     customer_id: UUID | None = None,
     detail: str | None = None,
     persist_async: bool = True,
@@ -72,6 +73,7 @@ def log_event(
         "timestamp": datetime.now(UTC).isoformat(),
         "user_id": str(user_id) if user_id else None,
         "quote_id": str(quote_id) if quote_id else None,
+        "invoice_id": str(invoice_id) if invoice_id else None,
         "customer_id": str(customer_id) if customer_id else None,
         "detail": detail,
     }
@@ -95,6 +97,7 @@ def log_event(
                 user_id=user_id,
                 metadata_json=_build_metadata_payload(
                     quote_id=quote_id,
+                    invoice_id=invoice_id,
                     customer_id=customer_id,
                     detail=detail,
                 ),
@@ -118,12 +121,15 @@ async def flush_event_tasks() -> None:
 def _build_metadata_payload(
     *,
     quote_id: UUID | None,
+    invoice_id: UUID | None,
     customer_id: UUID | None,
     detail: str | None,
 ) -> dict[str, str]:
     metadata: dict[str, str] = {}
     if quote_id is not None:
         metadata["quote_id"] = str(quote_id)
+    if invoice_id is not None:
+        metadata["invoice_id"] = str(invoice_id)
     if customer_id is not None:
         metadata["customer_id"] = str(customer_id)
     if detail is not None:

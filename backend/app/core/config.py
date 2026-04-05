@@ -100,6 +100,10 @@ class Settings(BaseSettings):
         default="120/minute",
         validation_alias="PUBLIC_LOGO_FETCH_RATE_LIMIT",
     )
+    public_share_link_expire_days: int = Field(
+        default=90,
+        validation_alias="PUBLIC_SHARE_LINK_EXPIRE_DAYS",
+    )
     quote_text_extraction_rate_limit: str = Field(
         default="15/hour",
         validation_alias="QUOTE_TEXT_EXTRACTION_RATE_LIMIT",

@@ -61,6 +61,25 @@ class _RetryingInvoiceRepository:
         del share_token
         return None
 
+    async def get_public_share_record(self, share_token):  # noqa: ANN001
+        del share_token
+        return None
+
+    async def mark_first_public_view_by_share_token(self, share_token, *, viewed_at):  # noqa: ANN001
+        del share_token
+        del viewed_at
+        return None
+
+    async def touch_last_public_accessed_at_by_share_token(  # noqa: ANN001
+        self,
+        share_token,
+        *,
+        accessed_at,
+    ):
+        del share_token
+        del accessed_at
+        return None
+
     async def create_from_quote(self, *, source_quote, due_date: date):  # noqa: ANN001
         del due_date
         self.create_attempts += 1
@@ -161,6 +180,25 @@ class _DirectInvoiceCollisionRepository:
 
     async def get_render_context_by_share_token(self, share_token):  # noqa: ANN001
         del share_token
+        return None
+
+    async def get_public_share_record(self, share_token):  # noqa: ANN001
+        del share_token
+        return None
+
+    async def mark_first_public_view_by_share_token(self, share_token, *, viewed_at):  # noqa: ANN001
+        del share_token
+        del viewed_at
+        return None
+
+    async def touch_last_public_accessed_at_by_share_token(  # noqa: ANN001
+        self,
+        share_token,
+        *,
+        accessed_at,
+    ):
+        del share_token
+        del accessed_at
         return None
 
     async def create_from_quote(self, *, source_quote, due_date: date):  # noqa: ANN001

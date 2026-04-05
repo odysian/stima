@@ -200,6 +200,7 @@ class QuoteDetailResponse(QuoteResponse):
 class PublicQuoteResponse(BaseModel):
     """Serializable unauthenticated quote payload for the public landing page."""
 
+    doc_type: Literal["quote"]
     business_name: str | None
     customer_name: str
     doc_number: str
@@ -215,3 +216,31 @@ class PublicQuoteResponse(BaseModel):
     logo_url: str
     download_url: str
     line_items: list[PublicLineItemResponse]
+
+
+class PublicInvoiceResponse(BaseModel):
+    """Serializable unauthenticated invoice payload for the public landing page."""
+
+    doc_type: Literal["invoice"]
+    business_name: str | None
+    customer_name: str
+    doc_number: str
+    title: str | None
+    status: Literal["sent"]
+    total_amount: float | None
+    tax_rate: float | None
+    discount_type: DiscountType | None
+    discount_value: float | None
+    deposit_amount: float | None
+    notes: str | None
+    issued_date: str
+    due_date: str | None
+    logo_url: str
+    download_url: str
+    line_items: list[PublicLineItemResponse]
+
+
+PublicDocumentResponse = Annotated[
+    PublicQuoteResponse | PublicInvoiceResponse,
+    Field(discriminator="doc_type"),
+]
