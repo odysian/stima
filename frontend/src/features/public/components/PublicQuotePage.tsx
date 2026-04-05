@@ -5,7 +5,7 @@ import {
   PublicRequestError,
   publicService,
 } from "@/features/public/services/publicService";
-import type { PublicQuote } from "@/features/public/types/public.types";
+import type { PublicDocument } from "@/features/public/types/public.types";
 import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
@@ -23,24 +23,31 @@ const statusCopy = {
   },
 } as const;
 
-function getDisplayTitle(quote: PublicQuote | null): string {
-  if (!quote) {
-    return "Shared Quote";
+function getDisplayTitle(documentData: PublicDocument | null): string {
+  if (!documentData) {
+    return "Shared Document";
   }
-  return quote.title?.trim() || quote.doc_number;
+  return documentData.title?.trim() || documentData.doc_number;
 }
 
-function getDisplayBusinessName(quote: PublicQuote | null): string {
-  if (!quote) {
+function getDisplayBusinessName(documentData: PublicDocument | null): string {
+  if (!documentData) {
     return "Stima";
   }
-  return quote.business_name?.trim() || "Stima";
+  return documentData.business_name?.trim() || "Stima";
+}
+
+function getDocumentLabel(documentData: PublicDocument | null): string {
+  if (documentData?.doc_type === "invoice") {
+    return "Invoice";
+  }
+  return "Quote";
 }
 
 export function PublicQuotePage(): React.ReactElement {
   const { token } = useParams<{ token: string }>();
   const hasToken = typeof token === "string" && token.length > 0;
-  const [quote, setQuote] = useState<PublicQuote | null>(null);
+  const [documentData, setDocumentData] = useState<PublicDocument | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [hiddenLogoUrl, setHiddenLogoUrl] = useState<string | null>(null);
 
@@ -72,15 +79,15 @@ export function PublicQuotePage(): React.ReactElement {
 
   useEffect(() => {
     if (!hasToken || loadState === "invalid") {
-      document.title = "Shared Quote Unavailable";
+      document.title = "Shared Document Unavailable";
       return;
     }
     if (loadState === "error") {
-      document.title = "Shared Quote";
+      document.title = "Shared Document";
       return;
     }
-    document.title = `${getDisplayTitle(quote)} | ${getDisplayBusinessName(quote)}`;
-  }, [hasToken, loadState, quote]);
+    document.title = `${getDisplayTitle(documentData)} | ${getDisplayBusinessName(documentData)}`;
+  }, [documentData, hasToken, loadState]);
 
   useEffect(() => {
     if (!hasToken) {
@@ -90,20 +97,20 @@ export function PublicQuotePage(): React.ReactElement {
 
     let isActive = true;
 
-    async function loadQuote(): Promise<void> {
+    async function loadDocument(): Promise<void> {
       setLoadState("loading");
       try {
-        const nextQuote = await publicService.getQuote(shareToken);
+        const nextDocument = await publicService.getDocument(shareToken);
         if (!isActive) {
           return;
         }
-        setQuote(nextQuote);
+        setDocumentData(nextDocument);
         setLoadState("ready");
       } catch (error) {
         if (!isActive) {
           return;
         }
-        setQuote(null);
+        setDocumentData(null);
         if (error instanceof PublicRequestError && error.status === 404) {
           setLoadState("invalid");
           return;
@@ -112,14 +119,14 @@ export function PublicQuotePage(): React.ReactElement {
       }
     }
 
-    void loadQuote();
+    void loadDocument();
     return () => {
       isActive = false;
     };
   }, [hasToken, token]);
 
   const effectiveLoadState: LoadState = hasToken ? loadState : "invalid";
-  const logoUrl = quote?.logo_url ?? null;
+  const logoUrl = documentData?.logo_url ?? null;
   const showLogo = logoUrl !== null && logoUrl !== hiddenLogoUrl;
 
   if (effectiveLoadState === "loading") {
@@ -127,7 +134,7 @@ export function PublicQuotePage(): React.ReactElement {
       <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
         <div className="mx-auto max-w-3xl rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest p-8 ghost-shadow">
           <p role="status" className="text-sm text-on-surface-variant">
-            Loading shared quote...
+            Loading shared document...
           </p>
         </div>
       </main>
@@ -138,7 +145,9 @@ export function PublicQuotePage(): React.ReactElement {
     return (
       <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
         <div className="mx-auto max-w-xl rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest p-8 text-center ghost-shadow">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-outline">Shared Quote</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-outline">
+            Shared Document
+          </p>
           <h1 className="mt-4 text-3xl font-semibold">This link is not valid</h1>
           <p className="mt-3 text-sm text-on-surface-variant">
             Double-check the link or ask the contractor to share it again.
@@ -148,11 +157,11 @@ export function PublicQuotePage(): React.ReactElement {
     );
   }
 
-  if (effectiveLoadState === "error" || quote === null) {
+  if (effectiveLoadState === "error" || documentData === null) {
     return (
       <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
         <div className="mx-auto max-w-xl rounded-[1.75rem] border border-error/15 bg-surface-container-lowest p-8 ghost-shadow">
-          <h1 className="text-2xl font-semibold">We couldn&apos;t load this quote</h1>
+          <h1 className="text-2xl font-semibold">We couldn&apos;t load this document</h1>
           <p className="mt-3 text-sm text-on-surface-variant">
             Try refreshing the page in a moment.
           </p>
@@ -161,19 +170,20 @@ export function PublicQuotePage(): React.ReactElement {
     );
   }
 
-  const banner = quote.status === "approved" || quote.status === "declined"
-    ? statusCopy[quote.status]
+  const banner = documentData.doc_type === "quote"
+    && (documentData.status === "approved" || documentData.status === "declined")
+    ? statusCopy[documentData.status]
     : null;
-  const businessInitial = getDisplayBusinessName(quote).slice(0, 1).toUpperCase();
+  const businessInitial = getDisplayBusinessName(documentData).slice(0, 1).toUpperCase();
   const pricingBreakdown = calculatePricingFromPersisted(
     {
-      totalAmount: quote.total_amount,
-      taxRate: quote.tax_rate,
-      discountType: quote.discount_type,
-      discountValue: quote.discount_value,
-      depositAmount: quote.deposit_amount,
+      totalAmount: documentData.total_amount,
+      taxRate: documentData.tax_rate,
+      discountType: documentData.discount_type,
+      discountValue: documentData.discount_value,
+      depositAmount: documentData.deposit_amount,
     },
-    resolveLineItemSum(quote.line_items.map((item) => item.price)),
+    resolveLineItemSum(documentData.line_items.map((item) => item.price)),
   );
 
   return (
@@ -185,10 +195,10 @@ export function PublicQuotePage(): React.ReactElement {
               <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-on-primary/15 text-xl font-semibold uppercase text-on-primary">
                 {showLogo ? (
                   <img
-                    src={quote.logo_url}
-                    alt={`${getDisplayBusinessName(quote)} logo`}
+                    src={documentData.logo_url}
+                    alt={`${getDisplayBusinessName(documentData)} logo`}
                     className="h-full w-full object-cover"
-                    onError={() => setHiddenLogoUrl(quote.logo_url)}
+                    onError={() => setHiddenLogoUrl(documentData.logo_url)}
                   />
                 ) : (
                   businessInitial
@@ -196,13 +206,13 @@ export function PublicQuotePage(): React.ReactElement {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-on-primary/70">
-                  {getDisplayBusinessName(quote)}
+                  {getDisplayBusinessName(documentData)}
                 </p>
                 <h1 className="mt-3 text-3xl font-semibold leading-tight">
-                  {getDisplayTitle(quote)}
+                  {getDisplayTitle(documentData)}
                 </h1>
                 <p className="mt-2 text-sm text-on-primary/80">
-                  {quote.doc_number} · Issued {quote.issued_date}
+                  {getDocumentLabel(documentData)} {documentData.doc_number} · Issued {documentData.issued_date}
                 </p>
               </div>
             </div>
@@ -215,21 +225,31 @@ export function PublicQuotePage(): React.ReactElement {
               </div>
             ) : null}
 
-            <section className="grid gap-4 rounded-2xl bg-surface-container-low p-4 sm:grid-cols-2">
+            <section className="grid gap-4 rounded-2xl bg-surface-container-low p-4 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
                   Customer
                 </p>
-                <p className="mt-2 text-lg font-semibold">{quote.customer_name}</p>
+                <p className="mt-2 text-lg font-semibold">{documentData.customer_name}</p>
               </div>
               <div className="sm:text-right">
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
                   Total
                 </p>
                 <p className="mt-2 text-lg font-semibold">
-                  {quote.total_amount !== null ? formatCurrency(quote.total_amount) : "TBD"}
+                  {documentData.total_amount !== null ? formatCurrency(documentData.total_amount) : "TBD"}
                 </p>
               </div>
+              {documentData.doc_type === "invoice" ? (
+                <div className="lg:text-right">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
+                    Due Date
+                  </p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {documentData.due_date ?? "Not set"}
+                  </p>
+                </div>
+              ) : null}
             </section>
 
             {pricingBreakdown.hasPricingBreakdown ? (
@@ -259,11 +279,11 @@ export function PublicQuotePage(): React.ReactElement {
                   Line Items
                 </h2>
                 <span className="text-xs text-on-surface-variant">
-                  {quote.line_items.length} item{quote.line_items.length === 1 ? "" : "s"}
+                  {documentData.line_items.length} item{documentData.line_items.length === 1 ? "" : "s"}
                 </span>
               </div>
               <ul className="mt-4 space-y-3">
-                {quote.line_items.map((item, index) => (
+                {documentData.line_items.map((item, index) => (
                   <li
                     key={`${index}-${item.description}-${item.details ?? "none"}`}
                     className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4"
@@ -284,19 +304,19 @@ export function PublicQuotePage(): React.ReactElement {
               </ul>
             </section>
 
-            {quote.notes ? (
+            {documentData.notes ? (
               <section className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4">
                 <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-outline">
                   Notes
                 </h2>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-on-surface-variant">
-                  {quote.notes}
+                  {documentData.notes}
                 </p>
               </section>
             ) : null}
 
             <a
-              href={quote.download_url}
+              href={documentData.download_url}
               className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-4 text-sm font-semibold text-on-primary transition-transform active:scale-[0.99]"
             >
               Download PDF

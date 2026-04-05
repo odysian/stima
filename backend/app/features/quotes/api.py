@@ -31,6 +31,8 @@ from app.features.quotes.schemas import (
     ConvertNotesRequest,
     DiscountType,
     ExtractionResult,
+    PublicDocumentResponse,
+    PublicInvoiceResponse,
     PublicLineItemResponse,
     PublicQuoteResponse,
     QuoteCreateRequest,
@@ -328,13 +330,32 @@ async def share_quote(
     quote_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    regenerate: Annotated[bool, Query()] = False,
 ) -> QuoteResponse:
     """Create/reuse a share token and mark quote as shared."""
     try:
-        quote = await quote_service.share_quote(user, quote_id)
+        quote = await quote_service.share_quote(user, quote_id, regenerate=regenerate)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return QuoteResponse.model_validate(quote)
+
+
+@router.delete(
+    "/{quote_id}/share",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def revoke_quote_share(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> Response:
+    """Revoke the current public share token for one quote."""
+    try:
+        await quote_service.revoke_public_share(user, quote_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
@@ -518,46 +539,85 @@ async def get_shared_document_pdf(
     )
 
 
-@public_router.get("/api/public/doc/{share_token}", response_model=PublicQuoteResponse)
+@public_router.get("/api/public/doc/{share_token}", response_model=PublicDocumentResponse)
 @limiter.limit(lambda: get_settings().public_document_fetch_rate_limit, key_func=get_ip_key)
 async def get_public_quote(
     share_token: str,
     request: Request,
     response: Response,
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
-) -> PublicQuoteResponse:
-    """Return unauthenticated public quote data for the landing page."""
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+) -> PublicDocumentResponse:
+    """Return unauthenticated public quote or invoice data for the landing page."""
     response.headers.update(_PRIVATE_RESPONSE_HEADERS)
     try:
         quote = await quote_service.get_public_quote(share_token)
+        doc_type: str = "quote"
     except QuoteServiceError as exc:
-        raise HTTPException(
-            status_code=exc.status_code,
-            detail=exc.detail,
-            headers=_PRIVATE_RESPONSE_HEADERS,
-        ) from exc
+        if exc.status_code != 404:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail=exc.detail,
+                headers=_PRIVATE_RESPONSE_HEADERS,
+            ) from exc
+        try:
+            quote = await invoice_service.get_public_invoice(share_token)
+            doc_type = "invoice"
+        except QuoteServiceError as invoice_exc:
+            raise HTTPException(
+                status_code=invoice_exc.status_code,
+                detail=invoice_exc.detail,
+                headers=_PRIVATE_RESPONSE_HEADERS,
+            ) from invoice_exc
 
     logo_url = str(request.url_for("get_public_quote_logo", share_token=share_token))
     download_url = str(request.url_for("get_shared_document_pdf", share_token=share_token))
+    line_items = [
+        PublicLineItemResponse.model_validate(item, from_attributes=True)
+        for item in quote.line_items
+    ]
+    if doc_type == "invoice":
+        return PublicInvoiceResponse(
+            doc_type="invoice",
+            business_name=_resolve_public_business_name(quote),
+            customer_name=quote.customer_name,
+            doc_number=quote.doc_number,
+            title=quote.title,
+            status="sent",
+            total_amount=float(quote.total_amount) if quote.total_amount is not None else None,
+            tax_rate=float(quote.tax_rate) if quote.tax_rate is not None else None,
+            discount_type=cast(DiscountType | None, quote.discount_type),
+            discount_value=(
+                float(quote.discount_value) if quote.discount_value is not None else None
+            ),
+            deposit_amount=(
+                float(quote.deposit_amount) if quote.deposit_amount is not None else None
+            ),
+            notes=quote.notes,
+            issued_date=quote.issued_date,
+            due_date=quote.due_date,
+            logo_url=logo_url,
+            download_url=download_url,
+            line_items=line_items,
+        )
+
     return PublicQuoteResponse(
+        doc_type="quote",
         business_name=_resolve_public_business_name(quote),
         customer_name=quote.customer_name,
         doc_number=quote.doc_number,
         title=quote.title,
-        status=quote.status,
+        status=cast(str, quote.status),
         total_amount=float(quote.total_amount) if quote.total_amount is not None else None,
         tax_rate=float(quote.tax_rate) if quote.tax_rate is not None else None,
         discount_type=cast(DiscountType | None, quote.discount_type),
-        discount_value=float(quote.discount_value) if quote.discount_value is not None else None,
-        deposit_amount=float(quote.deposit_amount) if quote.deposit_amount is not None else None,
+        discount_value=(float(quote.discount_value) if quote.discount_value is not None else None),
+        deposit_amount=(float(quote.deposit_amount) if quote.deposit_amount is not None else None),
         notes=quote.notes,
         issued_date=quote.issued_date,
         logo_url=logo_url,
         download_url=download_url,
-        line_items=[
-            PublicLineItemResponse.model_validate(item, from_attributes=True)
-            for item in quote.line_items
-        ],
+        line_items=line_items,
     )
 
 
@@ -567,17 +627,30 @@ async def get_public_quote_logo(
     request: Request,
     share_token: str,
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
 ) -> Response:
-    """Proxy public quote logo bytes without exposing storage paths."""
+    """Proxy public quote or invoice logo bytes without exposing storage paths."""
     del request
     try:
         logo_bytes, content_type = await quote_service.get_public_logo(share_token)
     except QuoteServiceError as exc:
-        raise HTTPException(
-            status_code=exc.status_code,
-            detail=exc.detail,
-            headers=_NOINDEX_HEADERS,
-        ) from exc
+        # Fall through to invoice only when the token is not recognisable as a quote token
+        # ("Not found" 404). A valid quote token that has no logo raises "Logo not found" 404
+        # which must not fall through — it is already the correct terminal response.
+        if exc.status_code != 404 or exc.detail != "Not found":
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail=exc.detail,
+                headers=_NOINDEX_HEADERS,
+            ) from exc
+        try:
+            logo_bytes, content_type = await invoice_service.get_public_logo(share_token)
+        except QuoteServiceError as invoice_exc:
+            raise HTTPException(
+                status_code=invoice_exc.status_code,
+                detail=invoice_exc.detail,
+                headers=_NOINDEX_HEADERS,
+            ) from invoice_exc
 
     return Response(
         content=logo_bytes,

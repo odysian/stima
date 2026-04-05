@@ -7,7 +7,7 @@ import {
   PublicRequestError,
   publicService,
 } from "@/features/public/services/publicService";
-import type { PublicQuote } from "@/features/public/types/public.types";
+import type { PublicInvoice, PublicQuote } from "@/features/public/types/public.types";
 
 vi.mock("@/features/public/services/publicService", async () => {
   const actual = await vi.importActual<typeof import("@/features/public/services/publicService")>(
@@ -17,7 +17,7 @@ vi.mock("@/features/public/services/publicService", async () => {
   return {
     ...actual,
     publicService: {
-      getQuote: vi.fn(),
+      getDocument: vi.fn(),
     },
   };
 });
@@ -26,6 +26,7 @@ const mockedPublicService = vi.mocked(publicService);
 
 function makePublicQuote(overrides: Partial<PublicQuote> = {}): PublicQuote {
   return {
+    doc_type: "quote",
     business_name: "Northline Landscaping",
     customer_name: "Taylor Morgan",
     doc_number: "Q-001",
@@ -56,6 +57,35 @@ function makePublicQuote(overrides: Partial<PublicQuote> = {}): PublicQuote {
   };
 }
 
+function makePublicInvoice(overrides: Partial<PublicInvoice> = {}): PublicInvoice {
+  return {
+    doc_type: "invoice",
+    business_name: "Northline Landscaping",
+    customer_name: "Taylor Morgan",
+    doc_number: "I-001",
+    title: "Spring Cleanup Invoice",
+    status: "sent",
+    total_amount: 425,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
+    notes: "Payment due on receipt.",
+    issued_date: "Apr 04, 2026",
+    due_date: "May 04, 2026",
+    logo_url: "https://example.com/logo.png",
+    download_url: "https://api.example.com/share/invoice-token-1",
+    line_items: [
+      {
+        description: "Mulch refresh",
+        details: "Front beds",
+        price: 425,
+      },
+    ],
+    ...overrides,
+  };
+}
+
 function renderScreen(path = "/doc/token-1"): void {
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -67,7 +97,7 @@ function renderScreen(path = "/doc/token-1"): void {
 }
 
 beforeEach(() => {
-  mockedPublicService.getQuote.mockResolvedValue(makePublicQuote());
+  mockedPublicService.getDocument.mockResolvedValue(makePublicQuote());
 });
 
 afterEach(() => {
@@ -76,7 +106,7 @@ afterEach(() => {
 
 describe("PublicQuotePage", () => {
   it("renders the public quote details and mounts a noindex meta tag", async () => {
-    mockedPublicService.getQuote.mockResolvedValueOnce(
+    mockedPublicService.getDocument.mockResolvedValueOnce(
       makePublicQuote({ status: "approved" }),
     );
 
@@ -84,7 +114,7 @@ describe("PublicQuotePage", () => {
 
     expect(await screen.findByRole("heading", { name: "Spring Cleanup" })).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
-    expect(mockedPublicService.getQuote).toHaveBeenCalledWith("token-1");
+    expect(mockedPublicService.getDocument).toHaveBeenCalledWith("token-1");
     expect(screen.getByText("This quote has been accepted")).toBeInTheDocument();
     expect(screen.getByText("Northline Landscaping")).toHaveClass("text-on-primary/70");
     expect(screen.getByText("Taylor Morgan")).toBeInTheDocument();
@@ -101,7 +131,7 @@ describe("PublicQuotePage", () => {
   });
 
   it("shows the invalid-link state when the token is unknown", async () => {
-    mockedPublicService.getQuote.mockRejectedValueOnce(
+    mockedPublicService.getDocument.mockRejectedValueOnce(
       new PublicRequestError("Not found", 404),
     );
 
@@ -113,11 +143,11 @@ describe("PublicQuotePage", () => {
   });
 
   it("shows the generic error state when the request fails for another reason", async () => {
-    mockedPublicService.getQuote.mockRejectedValueOnce(new Error("Server exploded"));
+    mockedPublicService.getDocument.mockRejectedValueOnce(new Error("Server exploded"));
 
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: /we couldn't load this quote/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /we couldn't load this document/i })).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
     expect(screen.queryByRole("link", { name: /download pdf/i })).not.toBeInTheDocument();
   });
@@ -138,7 +168,7 @@ describe("PublicQuotePage", () => {
   });
 
   it("renders the optional pricing breakdown when public pricing controls are present", async () => {
-    mockedPublicService.getQuote.mockResolvedValueOnce(
+    mockedPublicService.getDocument.mockResolvedValueOnce(
       makePublicQuote({
         total_amount: 99,
         tax_rate: 0.1,
@@ -165,5 +195,17 @@ describe("PublicQuotePage", () => {
     expect(screen.getByText("-$10.00")).toBeInTheDocument();
     expect(screen.getByText("$9.00")).toBeInTheDocument();
     expect(screen.getByText("$59.00")).toBeInTheDocument();
+  });
+
+  it("renders invoice variants without quote-only status messaging", async () => {
+    mockedPublicService.getDocument.mockResolvedValueOnce(makePublicInvoice());
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Spring Cleanup Invoice" })).toBeInTheDocument();
+    expect(screen.getByText("Invoice I-001 · Issued Apr 04, 2026")).toBeInTheDocument();
+    expect(screen.getByText("Due Date")).toBeInTheDocument();
+    expect(screen.getByText("May 04, 2026")).toBeInTheDocument();
+    expect(screen.queryByText("This quote has been accepted")).not.toBeInTheDocument();
   });
 });

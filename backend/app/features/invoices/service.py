@@ -11,17 +11,20 @@ import asyncio
 import base64
 import logging
 from collections.abc import Sequence
-from datetime import UTC, date, datetime
-from typing import Protocol, cast
+from datetime import UTC, date, datetime, timedelta
+from typing import Literal, Protocol, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.invoices.repository import (
     InvoiceDetailRow,
+    InvoiceFirstViewTransition,
     InvoiceListItemSummary,
+    InvoicePublicShareRecord,
     InvoiceRepository,
     build_default_due_date,
 )
@@ -82,6 +85,25 @@ class InvoiceRepositoryProtocol(Protocol):
         self,
         share_token: str,
     ) -> QuoteRenderContext | None: ...
+
+    async def get_public_share_record(
+        self,
+        share_token: str,
+    ) -> InvoicePublicShareRecord | None: ...
+
+    async def mark_first_public_view_by_share_token(
+        self,
+        share_token: str,
+        *,
+        viewed_at: datetime,
+    ) -> InvoiceFirstViewTransition | None: ...
+
+    async def touch_last_public_accessed_at_by_share_token(
+        self,
+        share_token: str,
+        *,
+        accessed_at: datetime,
+    ) -> None: ...
 
     async def create_from_quote(
         self,
@@ -414,28 +436,54 @@ class InvoiceService:
         await self._invoice_repository.commit()
         return context.doc_number, pdf_bytes
 
-    async def share_invoice(self, user: User, invoice_id: UUID) -> Document:
+    async def share_invoice(
+        self,
+        user: User,
+        invoice_id: UUID,
+        *,
+        regenerate: bool = False,
+    ) -> Document:
         """Create/reuse a share token and transition the invoice to sent."""
         user_id = _resolve_user_id(user)
         invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
         if invoice is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        if invoice.status == QuoteStatus.SENT:
+        now = _utcnow()
+        should_refresh_token = (
+            regenerate
+            or invoice.share_token is None
+            or invoice.share_token_revoked_at is not None
+            or _share_token_has_expired(invoice.share_token_expires_at, now)
+        )
+        if invoice.status == QuoteStatus.SENT and not should_refresh_token:
             return invoice
 
-        if invoice.share_token is None:
+        if should_refresh_token:
             invoice.share_token = str(uuid4())
+            invoice.share_token_created_at = now
+            invoice.share_token_expires_at = _build_share_token_expiry(now)
+            invoice.share_token_revoked_at = None
 
-        invoice.shared_at = _utcnow()
+        invoice.shared_at = now
         invoice.status = QuoteStatus.SENT
         await self._invoice_repository.commit()
         return await self._invoice_repository.refresh(invoice)
 
+    async def revoke_public_share(self, user: User, invoice_id: UUID) -> None:
+        """Revoke the currently active public share token for one invoice."""
+        user_id = _resolve_user_id(user)
+        invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
+        if invoice is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if invoice.share_token is None or invoice.share_token_revoked_at is not None:
+            return
+
+        invoice.share_token_revoked_at = _utcnow()
+        await self._invoice_repository.commit()
+
     async def generate_shared_pdf(self, share_token: str) -> tuple[str, bytes]:
         """Render and return a sent invoice PDF by share token."""
-        context = await self._invoice_repository.get_render_context_by_share_token(share_token)
-        if context is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
+        context = await self._get_public_invoice_context(share_token)
         await self._attach_logo_data_uri(context)
 
         try:
@@ -443,7 +491,92 @@ class InvoiceService:
         except PdfRenderError as exc:
             raise QuoteServiceError(detail=str(exc), status_code=422) from exc
 
+        await self._invoice_repository.touch_last_public_accessed_at_by_share_token(
+            share_token,
+            accessed_at=_utcnow(),
+        )
+        await self._invoice_repository.commit()
         return context.doc_number, pdf_bytes
+
+    async def get_public_invoice(self, share_token: str) -> QuoteRenderContext:
+        """Return public invoice data and emit the first-view event exactly once."""
+        context = await self._get_public_invoice_context(share_token)
+        viewed_at = _utcnow()
+        first_view_transition = (
+            await self._invoice_repository.mark_first_public_view_by_share_token(
+                share_token,
+                viewed_at=viewed_at,
+            )
+        )
+        if first_view_transition is None:
+            await self._invoice_repository.touch_last_public_accessed_at_by_share_token(
+                share_token,
+                accessed_at=viewed_at,
+            )
+        await self._invoice_repository.commit()
+
+        if first_view_transition is not None:
+            log_event(
+                "invoice_viewed",
+                user_id=first_view_transition.user_id,
+                invoice_id=first_view_transition.invoice_id,
+                customer_id=first_view_transition.customer_id,
+            )
+
+        return context
+
+    async def get_public_logo(self, share_token: str) -> tuple[bytes, str]:
+        """Return public logo bytes/content type for one shared invoice token."""
+        context = await self._get_public_invoice_context(share_token)
+        if context.logo_path is None:
+            raise QuoteServiceError(detail="Logo not found", status_code=404)
+
+        try:
+            logo_bytes = await asyncio.to_thread(
+                self._storage_service.fetch_bytes,
+                context.logo_path,
+            )
+        except StorageNotFoundError as exc:
+            raise QuoteServiceError(detail="Logo not found", status_code=404) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise QuoteServiceError(detail="Unable to load logo", status_code=500) from exc
+
+        content_type = detect_image_content_type(logo_bytes)
+        if content_type is None:
+            raise QuoteServiceError(detail="Unable to load logo", status_code=500)
+
+        return logo_bytes, content_type
+
+    async def _get_public_invoice_context(self, share_token: str) -> QuoteRenderContext:
+        """Load public invoice context for a share token or raise a 404."""
+        now = _utcnow()
+        share_record = await self._invoice_repository.get_public_share_record(share_token)
+        if share_record is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if share_record.share_token_revoked_at is not None:
+            self._log_public_share_denied(share_record, reason_code="revoked")
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if _share_token_has_expired(share_record.share_token_expires_at, now):
+            self._log_public_share_denied(share_record, reason_code="expired")
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        context = await self._invoice_repository.get_render_context_by_share_token(share_token)
+        if context is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        return context
+
+    def _log_public_share_denied(
+        self,
+        share_record: InvoicePublicShareRecord,
+        *,
+        reason_code: Literal["revoked", "expired"],
+    ) -> None:
+        """Record the internal reason when an invoice token is denied publicly."""
+        LOGGER.info(
+            "Public share access denied for invoice %s (%s)",
+            share_record.invoice_id,
+            reason_code,
+        )
 
     async def _attach_logo_data_uri(self, context: QuoteRenderContext) -> None:
         if context.logo_path is None:
@@ -491,6 +624,14 @@ def _resolve_user_id(user: User) -> UUID:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _build_share_token_expiry(created_at: datetime) -> datetime:
+    return created_at + timedelta(days=get_settings().public_share_link_expire_days)
+
+
+def _share_token_has_expired(expires_at: datetime | None, now: datetime) -> bool:
+    return expires_at is not None and expires_at < now
 
 
 def _is_doc_sequence_collision(exc: IntegrityError) -> bool:

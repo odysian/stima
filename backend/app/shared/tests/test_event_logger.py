@@ -48,6 +48,7 @@ def test_log_event_emits_json_payload_without_none_fields(monkeypatch) -> None:
     calls: list[str] = []
     user_id = uuid4()
     quote_id = uuid4()
+    invoice_id = uuid4()
 
     monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", calls.append)  # noqa: SLF001
 
@@ -55,6 +56,7 @@ def test_log_event_emits_json_payload_without_none_fields(monkeypatch) -> None:
         "quote.created",
         user_id=user_id,
         quote_id=quote_id,
+        invoice_id=invoice_id,
     )
 
     assert len(calls) == 1
@@ -62,6 +64,7 @@ def test_log_event_emits_json_payload_without_none_fields(monkeypatch) -> None:
     assert payload["event"] == "quote.created"
     assert payload["user_id"] == str(user_id)
     assert payload["quote_id"] == str(quote_id)
+    assert payload["invoice_id"] == str(invoice_id)
     assert "customer_id" not in payload
     assert "detail" not in payload
     datetime.fromisoformat(payload["timestamp"])
@@ -138,6 +141,7 @@ async def test_log_event_persists_pilot_events_with_metadata(
     fake_session = _FakeSession()
     session_factory = _FakeSessionFactory(fake_session)
     quote_id = uuid4()
+    invoice_id = uuid4()
     customer_id = uuid4()
     user_id = uuid4()
     monkeypatch.setattr(event_logger, "EventLog", EventLog)
@@ -148,6 +152,7 @@ async def test_log_event_persists_pilot_events_with_metadata(
         user_id=user_id,
         metadata_json={
             "quote_id": str(quote_id),
+            "invoice_id": str(invoice_id),
             "customer_id": str(customer_id),
             "detail": "audio+notes",
         },
@@ -159,6 +164,7 @@ async def test_log_event_persists_pilot_events_with_metadata(
     assert fake_session.added[0].user_id == user_id
     assert fake_session.added[0].metadata_json == {
         "quote_id": str(quote_id),
+        "invoice_id": str(invoice_id),
         "customer_id": str(customer_id),
         "detail": "audio+notes",
     }
@@ -219,6 +225,60 @@ async def test_log_event_persists_new_quote_outcome_events(
     assert fake_session.added[0].user_id == user_id
     assert fake_session.added[0].metadata_json == {
         "quote_id": str(quote_id),
+        "customer_id": str(customer_id),
+    }
+
+
+@pytest.mark.asyncio
+async def test_log_event_persists_invoice_id_metadata() -> None:
+    class _FakeSession:
+        def __init__(self) -> None:
+            self.added: list[EventLog] = []
+            self.committed = False
+
+        def add(self, instance: EventLog) -> None:
+            self.added.append(instance)
+
+        async def commit(self) -> None:
+            self.committed = True
+
+    class _FakeSessionContext:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        async def __aenter__(self) -> _FakeSession:
+            return self._session
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            del exc_type, exc, tb
+
+    class _FakeSessionFactory:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        def __call__(self) -> _FakeSessionContext:
+            return _FakeSessionContext(self._session)
+
+    fake_session = _FakeSession()
+    invoice_id = uuid4()
+    customer_id = uuid4()
+    user_id = uuid4()
+    event_logger.configure_event_logging(
+        session_factory=_FakeSessionFactory(fake_session),  # type: ignore[arg-type]
+    )
+
+    event_logger.log_event(
+        "invoice_viewed",
+        user_id=user_id,
+        invoice_id=invoice_id,
+        customer_id=customer_id,
+    )
+    await event_logger.flush_event_tasks()
+
+    assert fake_session.committed is True
+    assert len(fake_session.added) == 1
+    assert fake_session.added[0].metadata_json == {
+        "invoice_id": str(invoice_id),
         "customer_id": str(customer_id),
     }
 

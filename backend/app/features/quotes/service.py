@@ -6,16 +6,18 @@ import asyncio
 import base64
 import logging
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import (
+    PublicShareRecord,
     QuoteDetailRow,
     QuoteListItemSummary,
     QuoteRenderContext,
@@ -98,8 +100,20 @@ class QuoteRepositoryProtocol(Protocol):
     ) -> QuoteRenderContext | None: ...
 
     async def transition_to_viewed_by_share_token(
-        self, share_token: str
+        self,
+        share_token: str,
+        *,
+        accessed_at: datetime,
     ) -> QuoteViewTransition | None: ...
+
+    async def get_public_share_record(self, share_token: str) -> PublicShareRecord | None: ...
+
+    async def touch_last_public_accessed_at_by_share_token(
+        self,
+        share_token: str,
+        *,
+        accessed_at: datetime,
+    ) -> None: ...
 
     async def mark_ready_if_not_shared(self, *, quote_id: UUID, user_id: UUID) -> None: ...
 
@@ -439,6 +453,17 @@ class QuoteService:
 
     async def _get_public_quote_context(self, share_token: str) -> QuoteRenderContext:
         """Load public quote context for a share token or raise a 404."""
+        now = _utcnow()
+        share_record = await self._repository.get_public_share_record(share_token)
+        if share_record is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if share_record.share_token_revoked_at is not None:
+            self._log_public_share_denied(share_record, reason_code="revoked")
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if _share_token_has_expired(share_record.share_token_expires_at, now):
+            self._log_public_share_denied(share_record, reason_code="expired")
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
         context = await self._repository.get_render_context_by_share_token(share_token)
         if context is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
@@ -450,16 +475,30 @@ class QuoteService:
         share_token: str,
     ) -> None:
         """Advance a shared public quote to viewed and log the first successful access."""
+        accessed_at = _utcnow()
         if context.status != QuoteStatus.SHARED.value:
+            await self._repository.touch_last_public_accessed_at_by_share_token(
+                share_token,
+                accessed_at=accessed_at,
+            )
+            await self._repository.commit()
             return
 
-        transition = await self._repository.transition_to_viewed_by_share_token(share_token)
+        transition = await self._repository.transition_to_viewed_by_share_token(
+            share_token,
+            accessed_at=accessed_at,
+        )
         if transition is not None:
             await self._repository.commit()
             self._log_public_quote_viewed(transition)
             context.status = QuoteStatus.VIEWED.value
             return
 
+        await self._repository.touch_last_public_accessed_at_by_share_token(
+            share_token,
+            accessed_at=accessed_at,
+        )
+        await self._repository.commit()
         refreshed_context = await self._repository.get_render_context_by_share_token(share_token)
         if refreshed_context is not None:
             context.status = refreshed_context.status
@@ -473,20 +512,53 @@ class QuoteService:
             customer_id=transition.customer_id,
         )
 
-    async def share_quote(self, user: User, quote_id: UUID) -> Document:
+    def _log_public_share_denied(
+        self,
+        share_record: PublicShareRecord,
+        *,
+        reason_code: Literal["revoked", "expired"],
+    ) -> None:
+        """Record the internal reason when a quote token is denied publicly."""
+        LOGGER.info(
+            "Public share access denied for quote %s (%s)",
+            share_record.document_id,
+            reason_code,
+        )
+
+    async def share_quote(
+        self,
+        user: User,
+        quote_id: UUID,
+        *,
+        regenerate: bool = False,
+    ) -> Document:
         """Set share token/timestamp and transition quote status to shared."""
         user_id = _resolve_user_id(user)
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status in _POST_SHARE_NON_REGRESSION_STATUSES:
+        now = _utcnow()
+        should_refresh_token = (
+            regenerate
+            or quote.share_token is None
+            or quote.share_token_revoked_at is not None
+            or _share_token_has_expired(quote.share_token_expires_at, now)
+        )
+        if quote.status in _POST_SHARE_NON_REGRESSION_STATUSES and not should_refresh_token:
             return quote
 
-        if quote.share_token is None:
+        if should_refresh_token:
             quote.share_token = str(uuid4())
+            quote.share_token_created_at = now
+            quote.share_token_expires_at = _build_share_token_expiry(now)
+            quote.share_token_revoked_at = None
 
-        quote.shared_at = _utcnow()
-        quote.status = QuoteStatus.SHARED
+        if quote.status not in _POST_SHARE_NON_REGRESSION_STATUSES:
+            quote.shared_at = now
+            quote.status = QuoteStatus.SHARED
+        elif quote.shared_at is None:
+            quote.shared_at = now
+
         await self._repository.commit()
         refreshed_quote = await self._repository.refresh(quote)
         log_event(
@@ -496,6 +568,18 @@ class QuoteService:
             customer_id=refreshed_quote.customer_id,
         )
         return refreshed_quote
+
+    async def revoke_public_share(self, user: User, quote_id: UUID) -> None:
+        """Revoke the currently active public share token for one quote."""
+        user_id = _resolve_user_id(user)
+        quote = await self._repository.get_by_id(quote_id, user_id)
+        if quote is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if quote.share_token is None or quote.share_token_revoked_at is not None:
+            return
+
+        quote.share_token_revoked_at = _utcnow()
+        await self._repository.commit()
 
     async def mark_quote_outcome(
         self,
@@ -585,6 +669,14 @@ def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _build_share_token_expiry(created_at: datetime) -> datetime:
+    return created_at + timedelta(days=get_settings().public_share_link_expire_days)
+
+
+def _share_token_has_expired(expires_at: datetime | None, now: datetime) -> bool:
+    return expires_at is not None and expires_at < now
 
 
 def _validate_document_pricing_for_quote(

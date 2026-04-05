@@ -173,13 +173,36 @@ async def share_invoice(
     invoice_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+    regenerate: Annotated[bool, Query()] = False,
 ) -> InvoiceResponse:
     """Create/reuse a share token and mark the invoice as sent."""
     try:
-        invoice = await invoice_service.share_invoice(user, invoice_id)
+        invoice = await invoice_service.share_invoice(
+            user,
+            invoice_id,
+            regenerate=regenerate,
+        )
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return InvoiceResponse.model_validate(invoice)
+
+
+@router.delete(
+    "/{invoice_id}/share",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def revoke_invoice_share(
+    invoice_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+) -> Response:
+    """Revoke the current public share token for one invoice."""
+    try:
+        await invoice_service.revoke_public_share(user, invoice_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
