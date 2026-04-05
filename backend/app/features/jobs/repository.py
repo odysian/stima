@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 
 _ALLOWED_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
@@ -59,6 +60,28 @@ class JobRepository:
             )
         )
         return int(active_count or 0)
+
+    async def create_extraction_job_with_capacity_limit(
+        self,
+        *,
+        user_id: UUID,
+        concurrency_limit: int,
+    ) -> JobRecord | None:
+        """Atomically create one extraction job when user active-job capacity allows it."""
+        user_row = await self._session.scalar(
+            select(User.id).where(User.id == user_id).with_for_update()
+        )
+        if user_row is None:
+            raise ValueError(f"User {user_id} does not exist")
+
+        active_count = await self.count_active_for_user(
+            user_id=user_id,
+            job_type=JobType.EXTRACTION,
+        )
+        if active_count >= concurrency_limit:
+            return None
+
+        return await self.create(user_id=user_id, job_type=JobType.EXTRACTION)
 
     async def get_by_id(self, job_id: UUID) -> JobRecord | None:
         """Return one job record by id when it exists."""
@@ -143,7 +166,7 @@ class JobRepository:
         reason: str,
         expected_job_type: JobType | None = None,
     ) -> JobRecord:
-        """Mark a failed or running job as terminal after retries are exhausted."""
+        """Mark a pending, failed, or running job as terminal with a durable reason."""
         record = await self._get_required(job_id, expected_job_type=expected_job_type)
         self._ensure_transition(record.status, JobStatus.TERMINAL)
         record.status = JobStatus.TERMINAL

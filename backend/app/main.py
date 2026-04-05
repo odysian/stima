@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -32,6 +33,8 @@ from app.shared.event_logger import configure_event_logging
 from app.shared.proxy_headers import TrustedProxyHeadersMiddleware
 from app.shared.rate_limit import extraction_controls, limiter
 from app.worker.runtime import build_arq_redis_settings
+
+LOGGER = logging.getLogger(__name__)
 
 
 class SecurityHeadersMiddleware:
@@ -73,7 +76,14 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     arq_pool: ArqRedis | None = None
     if settings.redis_url is not None:
-        arq_pool = await create_pool(build_arq_redis_settings(settings))
+        try:
+            arq_pool = await create_pool(build_arq_redis_settings(settings))
+        except Exception:
+            LOGGER.warning(
+                "ARQ Redis unavailable at startup; async jobs disabled "
+                "and sync extraction fallback remains enabled.",
+                exc_info=True,
+            )
     app.state.arq_pool = arq_pool
     yield
     if arq_pool is not None:

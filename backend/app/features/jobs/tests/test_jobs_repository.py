@@ -90,6 +90,26 @@ async def test_job_repository_allows_pending_jobs_to_become_terminal_on_enqueue_
     assert refreshed.terminal_error == "enqueue_failed"  # nosec B101 - pytest assertion
 
 
+async def test_create_extraction_job_with_capacity_limit_rejects_when_at_limit(
+    db_session: AsyncSession,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+
+    first = await repository.create_extraction_job_with_capacity_limit(
+        user_id=user.id,
+        concurrency_limit=1,
+    )
+    second = await repository.create_extraction_job_with_capacity_limit(
+        user_id=user.id,
+        concurrency_limit=1,
+    )
+    await db_session.commit()
+
+    assert first is not None  # nosec B101 - pytest assertion
+    assert second is None  # nosec B101 - pytest assertion
+
+
 async def _seed_user(db_session: AsyncSession) -> User:
     user = User(
         id=uuid4(),

@@ -28,7 +28,6 @@ from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.invoices.schemas import InvoiceResponse
 from app.features.invoices.service import InvoiceService
-from app.features.jobs.models import JobType
 from app.features.jobs.schemas import JobRecordResponse, job_record_to_response
 from app.features.jobs.service import JobService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
@@ -238,14 +237,15 @@ async def extract_combined(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     settings = get_settings()
-    active_jobs = await job_service.count_active_extraction_jobs(user.id)
-    if active_jobs >= settings.extraction_concurrency_limit:
+    job = await job_service.create_extraction_job_if_capacity_available(
+        user_id=user.id,
+        concurrency_limit=settings.extraction_concurrency_limit,
+    )
+    if job is None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Extraction quota or concurrency exhausted. Please retry later.",
         )
-
-    job = await job_service.create_job(user_id=user.id, job_type=JobType.EXTRACTION)
     try:
         queued_job = await arq_pool.enqueue_job(
             EXTRACTION_JOB_NAME,

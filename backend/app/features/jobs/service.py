@@ -31,6 +31,18 @@ class JobService:
             job_type=JobType.EXTRACTION,
         )
 
+    async def create_extraction_job_if_capacity_available(
+        self,
+        *,
+        user_id: UUID,
+        concurrency_limit: int,
+    ) -> JobRecord | None:
+        """Create one pending extraction job only when the user is below the active-job cap."""
+        return await self.repository.create_extraction_job_with_capacity_limit(
+            user_id=user_id,
+            concurrency_limit=concurrency_limit,
+        )
+
     async def get_job_for_user(self, *, job_id: UUID, user_id: UUID) -> JobRecord | None:
         """Return one durable job record when the caller owns it."""
         return await self.repository.get_by_id_for_user(job_id, user_id)
