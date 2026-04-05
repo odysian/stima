@@ -634,6 +634,9 @@ async def get_public_quote_logo(
     try:
         logo_bytes, content_type = await quote_service.get_public_logo(share_token)
     except QuoteServiceError as exc:
+        # Fall through to invoice only when the token is not recognisable as a quote token
+        # ("Not found" 404). A valid quote token that has no logo raises "Logo not found" 404
+        # which must not fall through — it is already the correct terminal response.
         if exc.status_code != 404 or exc.detail != "Not found":
             raise HTTPException(
                 status_code=exc.status_code,

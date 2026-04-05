@@ -12,7 +12,7 @@ import base64
 import logging
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
-from typing import Protocol, cast
+from typing import Literal, Protocol, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import inspect as sa_inspect
@@ -569,7 +569,7 @@ class InvoiceService:
         self,
         share_record: InvoicePublicShareRecord,
         *,
-        reason_code: str,
+        reason_code: Literal["revoked", "expired"],
     ) -> None:
         """Record the internal reason when an invoice token is denied publicly."""
         LOGGER.info(
