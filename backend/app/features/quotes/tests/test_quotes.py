@@ -6,6 +6,7 @@ import asyncio
 import json
 from collections.abc import Iterator, Sequence
 from datetime import date
+from types import SimpleNamespace
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -20,8 +21,12 @@ from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.event_logs.models import EventLog
-from app.features.invoices import email_delivery_service as invoice_email_delivery_service
+from app.features.invoices import (
+    email_delivery_service as invoice_email_delivery_service,
+)
 from app.features.invoices.repository import InvoiceRepository
+from app.features.jobs.models import JobRecord, JobStatus, JobType
+from app.features.jobs.repository import JobRepository
 from app.features.quotes import api as quote_api
 from app.features.quotes import email_delivery_service
 from app.features.quotes.extraction_service import ExtractionService
@@ -30,11 +35,7 @@ from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
 from app.features.quotes.service import QuoteService
 from app.integrations.audio import AudioClip, AudioError
-from app.integrations.email import (
-    EmailConfigurationError,
-    EmailMessage,
-    EmailSendError,
-)
+from app.integrations.email import EmailConfigurationError, EmailMessage, EmailSendError
 from app.integrations.extraction import ExtractionError
 from app.integrations.storage import StorageNotFoundError
 from app.integrations.transcription import TranscriptionError
@@ -193,6 +194,29 @@ class _InProgressIdempotencyStore:
 
     async def complete(self, **_: object) -> None:
         return None
+
+
+class _MockArqPool:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def enqueue_job(self, function: str, *args: object, **kwargs: object) -> object:
+        self.calls.append(
+            {
+                "function": function,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        )
+        return SimpleNamespace(job_id=kwargs.get("_job_id"))
+
+
+class _FailingArqPool:
+    async def enqueue_job(self, function: str, *args: object, **kwargs: object) -> object:
+        del function
+        del args
+        del kwargs
+        raise RuntimeError("redis unavailable")
 
 
 def _send_email_headers(csrf_token: str, *, idempotency_key: str | None = None) -> dict[str, str]:
@@ -414,7 +438,9 @@ async def test_update_quote_returns_404_for_nonexistent_id(client: AsyncClient) 
     assert response.json() == {"detail": "Not found"}
 
 
-async def test_create_quote_returns_404_for_nonexistent_customer(client: AsyncClient) -> None:
+async def test_create_quote_returns_404_for_nonexistent_customer(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
     response = await client.post(
@@ -494,13 +520,18 @@ async def test_update_quote_preserves_line_items_when_omitted(
 
     assert response.status_code == 200
     payload = response.json()
-    assert [item["description"] for item in payload["line_items"]] == ["Mulch", "Edging"]
+    assert [item["description"] for item in payload["line_items"]] == [
+        "Mulch",
+        "Edging",
+    ]
     assert [item["price"] for item in payload["line_items"]] == [120, 80]
     assert payload["notes"] == "Updated note only"
     assert payload["total_amount"] == 200
 
 
-async def test_update_quote_replaces_line_items_when_provided(client: AsyncClient) -> None:
+async def test_update_quote_replaces_line_items_when_provided(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
 
@@ -1480,7 +1511,12 @@ async def test_send_quote_email_allows_immediate_retry_after_provider_failure(
 
 
 @pytest.mark.parametrize(
-    ("raise_configuration_error", "raise_send_error", "expected_status", "expected_detail"),
+    (
+        "raise_configuration_error",
+        "raise_send_error",
+        "expected_status",
+        "expected_detail",
+    ),
     [
         (True, False, 503, "Email delivery is not configured right now."),
         (False, True, 502, "Email delivery failed. Please try again."),
@@ -2173,7 +2209,12 @@ async def test_send_invoice_email_allows_immediate_retry_after_provider_failure(
 
 
 @pytest.mark.parametrize(
-    ("raise_configuration_error", "raise_send_error", "expected_status", "expected_detail"),
+    (
+        "raise_configuration_error",
+        "raise_send_error",
+        "expected_status",
+        "expected_detail",
+    ),
     [
         (True, False, 503, "Email delivery is not configured right now."),
         (False, True, 502, "Email delivery failed. Please try again."),
@@ -2220,7 +2261,9 @@ async def test_send_invoice_email_surfaces_provider_failures_with_expected_statu
     assert detail_response.json()["share_token"] is not None
 
 
-async def test_convert_notes_returns_422_for_extraction_errors(client: AsyncClient) -> None:
+async def test_convert_notes_returns_422_for_extraction_errors(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
     response = await client.post(
@@ -2326,7 +2369,9 @@ async def test_update_quote_rejects_notes_over_limit(client: AsyncClient) -> Non
     assert response.status_code == 422
 
 
-async def test_create_direct_invoice_rejects_transcript_over_limit(client: AsyncClient) -> None:
+async def test_create_direct_invoice_rejects_transcript_over_limit(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
 
@@ -2556,7 +2601,9 @@ async def test_capture_audio_rejects_too_many_clips(client: AsyncClient) -> None
     }
 
 
-async def test_capture_audio_missing_clips_field_returns_422(client: AsyncClient) -> None:
+async def test_capture_audio_missing_clips_field_returns_422(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
     response = await client.post(
@@ -2580,7 +2627,9 @@ async def test_capture_audio_rejects_empty_clip_with_400(client: AsyncClient) ->
     assert response.json() == {"detail": "Audio clip is empty"}
 
 
-async def test_capture_audio_rejects_unsupported_clip_with_400(client: AsyncClient) -> None:
+async def test_capture_audio_rejects_unsupported_clip_with_400(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
     response = await client.post(
@@ -2630,7 +2679,9 @@ async def test_capture_audio_rejects_total_upload_limit(
     assert response.json() == {"detail": "Total audio upload too large"}
 
 
-async def test_capture_audio_transcription_failure_returns_502(client: AsyncClient) -> None:
+async def test_capture_audio_transcription_failure_returns_502(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
     response = await client.post(
@@ -2686,6 +2737,61 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     assert payload["confidence_notes"] == []
 
 
+async def test_extract_combined_falls_back_to_sync_when_no_arq_pool_is_available(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    job_count = await db_session.scalar(select(func.count(JobRecord.id)))
+
+    assert response.status_code == 200
+    assert response.json()["transcript"] == "mulch the front beds"
+    assert int(job_count or 0) == 0
+
+
+async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    jobs = (await db_session.scalars(select(JobRecord))).all()
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["job_type"] == "extraction"
+    assert payload["status"] == "pending"
+    assert payload["extraction_result"] is None
+    assert len(jobs) == 1
+    assert jobs[0].status == JobStatus.PENDING
+    assert pool.calls == [
+        {
+            "function": "jobs.extraction",
+            "args": (str(jobs[0].id),),
+            "kwargs": {
+                "_job_id": str(jobs[0].id),
+                "transcript": "mulch the front beds",
+            },
+        }
+    ]
+
+
 async def test_extract_combined_clips_only_success(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -2702,7 +2808,9 @@ async def test_extract_combined_clips_only_success(client: AsyncClient) -> None:
     assert payload["line_items"][0]["flag_reason"]
 
 
-async def test_extract_combined_rejects_empty_clip_with_400(client: AsyncClient) -> None:
+async def test_extract_combined_rejects_empty_clip_with_400(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
     response = await client.post(
@@ -2819,6 +2927,56 @@ async def test_extract_combined_rate_limit_returns_429(
     )
 
     assert response.status_code == 429
+
+
+async def test_extract_combined_rejects_when_async_job_limit_is_exhausted(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    app.state.arq_pool = _MockArqPool()
+    monkeypatch.setenv("EXTRACTION_CONCURRENCY_LIMIT", "1")
+    get_settings.cache_clear()
+
+    user = await _get_user_by_email(db_session, credentials["email"])
+    repository = JobRepository(db_session)
+    await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "detail": "Extraction quota or concurrency exhausted. Please retry later."
+    }
+
+
+async def test_extract_combined_marks_pending_job_terminal_when_enqueue_fails(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = _FailingArqPool()
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    jobs = (await db_session.scalars(select(JobRecord))).all()
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Unable to start extraction right now. Please try again."}
+    assert len(jobs) == 1
+    assert jobs[0].status == JobStatus.TERMINAL
+    assert jobs[0].terminal_error == "enqueue_failed"
 
 
 async def test_convert_notes_rate_limit_is_keyed_by_user_not_ip(
@@ -3326,7 +3484,9 @@ async def test_create_invoice_returns_404_for_different_users_customer(
     assert response.json() == {"detail": "Not found"}
 
 
-async def test_get_quote_returns_404_for_different_users_quote(client: AsyncClient) -> None:
+async def test_get_quote_returns_404_for_different_users_quote(
+    client: AsyncClient,
+) -> None:
     csrf_token_user_a = await _register_and_login(client, _credentials())
     customer_id_user_a = await _create_customer(client, csrf_token_user_a)
 
@@ -3352,7 +3512,9 @@ async def test_get_quote_returns_404_for_different_users_quote(client: AsyncClie
     assert response.json() == {"detail": "Not found"}
 
 
-async def test_patch_quote_returns_404_for_different_users_quote(client: AsyncClient) -> None:
+async def test_patch_quote_returns_404_for_different_users_quote(
+    client: AsyncClient,
+) -> None:
     csrf_token_user_a = await _register_and_login(client, _credentials())
     customer_id_user_a = await _create_customer(client, csrf_token_user_a)
 
@@ -3459,7 +3621,9 @@ async def test_delete_quote_returns_404_for_missing_quote(client: AsyncClient) -
     assert response.json() == {"detail": "Not found"}
 
 
-async def test_delete_quote_returns_404_for_different_users_quote(client: AsyncClient) -> None:
+async def test_delete_quote_returns_404_for_different_users_quote(
+    client: AsyncClient,
+) -> None:
     csrf_token_user_a = await _register_and_login(client, _credentials())
     customer_id_user_a = await _create_customer(client, csrf_token_user_a)
 

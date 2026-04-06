@@ -69,6 +69,66 @@ describe("quoteService integration (MSW)", () => {
     );
   });
 
+  it("extract returns async job metadata when the backend responds with 202", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.post("/api/quotes/extract", ({ request }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        return HttpResponse.json(
+          {
+            id: "job-1",
+            user_id: "user-1",
+            document_id: null,
+            job_type: "extraction",
+            status: "pending",
+            attempts: 0,
+            terminal_error: null,
+            extraction_result: null,
+            created_at: "2026-03-20T00:00:00.000Z",
+            updated_at: "2026-03-20T00:00:00.000Z",
+          },
+          { status: 202 },
+        );
+      }),
+    );
+
+    const result = await quoteService.extract({ notes: "Mulch and edging" });
+
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(result).toEqual({ type: "async", jobId: "job-1" });
+  });
+
+  it("extract preserves the sync fallback contract when the backend responds with 200", async () => {
+    setCsrfToken("integration-csrf-token");
+
+    server.use(
+      http.post("/api/quotes/extract", () =>
+        HttpResponse.json(
+          {
+            transcript: "Mulch and edging",
+            line_items: [],
+            total: null,
+            confidence_notes: [],
+          },
+          { status: 200 },
+        )),
+    );
+
+    const result = await quoteService.extract({ notes: "Mulch and edging" });
+
+    expect(result).toEqual({
+      type: "sync",
+      result: {
+        transcript: "Mulch and edging",
+        line_items: [],
+        total: null,
+        confidence_notes: [],
+      },
+    });
+  });
+
   it("createQuote returns created Quote and sends CSRF header", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;
@@ -411,7 +471,15 @@ describe("quoteService integration (MSW)", () => {
 
     expect(capturedCsrfHeader).toBe("integration-csrf-token");
     expect(capturedContentType).not.toContain("application/json");
-    expect(result.transcript).toBe("combined transcript");
+    expect(result).toEqual({
+      type: "sync",
+      result: {
+        transcript: "combined transcript",
+        line_items: [],
+        total: null,
+        confidence_notes: [],
+      },
+    });
   });
 
   it("extract sends notes without clips when notes-only", async () => {
@@ -432,7 +500,15 @@ describe("quoteService integration (MSW)", () => {
 
     const result = await quoteService.extract({ notes: "typed note only" });
 
-    expect(result.transcript).toBe("notes only transcript");
+    expect(result).toEqual({
+      type: "sync",
+      result: {
+        transcript: "notes only transcript",
+        line_items: [],
+        total: null,
+        confidence_notes: [],
+      },
+    });
   });
 
   it("extract omits notes field when clips-only", async () => {
@@ -455,7 +531,15 @@ describe("quoteService integration (MSW)", () => {
       clips: [new Blob(["clip-1"], { type: "audio/webm;codecs=opus" })],
     });
 
-    expect(result.transcript).toBe("clips only transcript");
+    expect(result).toEqual({
+      type: "sync",
+      result: {
+        transcript: "clips only transcript",
+        line_items: [],
+        total: null,
+        confidence_notes: [],
+      },
+    });
   });
 
   it("generatePdf returns Blob and sends CSRF header", async () => {

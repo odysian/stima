@@ -11,6 +11,7 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
+import { jobService } from "@/shared/lib/jobService";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import {
   MAX_AUDIO_CLIPS_PER_REQUEST,
@@ -19,6 +20,8 @@ import {
 } from "@/shared/lib/inputLimits";
 
 const EXTRACTION_STAGE_DELAY_MS = 2500;
+const EXTRACTION_POLL_INTERVAL_MS = 2000;
+const EXTRACTION_MAX_POLLS = 60;
 
 function formatElapsed(seconds: number): string {
   const mins = Math.floor(seconds / 60)
@@ -92,6 +95,11 @@ export function CaptureScreen(): React.ReactElement {
     extractionStageTimerRefs.current = [];
   }
 
+  function clearSubmissionErrors(): void {
+    setError(null);
+    clearError();
+  }
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -137,8 +145,7 @@ export function CaptureScreen(): React.ReactElement {
       return;
     }
 
-    setError(null);
-    clearError();
+    clearSubmissionErrors();
     if (clips.length > MAX_AUDIO_CLIPS_PER_REQUEST) {
       setError(`You can upload up to ${MAX_AUDIO_CLIPS_PER_REQUEST} clips at a time.`);
       return;
@@ -169,8 +176,14 @@ export function CaptureScreen(): React.ReactElement {
       if (!isMountedRef.current) {
         return;
       }
-      applyDraft(clips.length > 0 ? "voice" : "text", extraction);
-      navigate("/quotes/review");
+      const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
+      if (extraction.type === "sync") {
+        applyDraft(sourceType, extraction.result);
+        navigate("/quotes/review");
+        return;
+      }
+
+      await pollExtractionJob(extraction.jobId, sourceType);
     } catch (submitError) {
       if (!isMountedRef.current) {
         return;
@@ -184,6 +197,41 @@ export function CaptureScreen(): React.ReactElement {
         setExtractionStage(null);
       }
     }
+  }
+
+  async function pollExtractionJob(jobId: string, sourceType: QuoteSourceType): Promise<void> {
+    for (let pollCount = 0; pollCount < EXTRACTION_MAX_POLLS; pollCount += 1) {
+      const job = await jobService.getJobStatus(jobId);
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      if (job.status === "success") {
+        if (!job.extraction_result) {
+          throw new Error("Extraction completed without a result. Please try again.");
+        }
+        applyDraft(sourceType, job.extraction_result);
+        navigate("/quotes/review");
+        return;
+      }
+
+      if (job.status === "terminal") {
+        throw new Error("Extraction failed. Please try again.");
+      }
+
+      if (pollCount === EXTRACTION_MAX_POLLS - 1) {
+        break;
+      }
+
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, EXTRACTION_POLL_INTERVAL_MS);
+      });
+      if (!isMountedRef.current) {
+        return;
+      }
+    }
+
+    throw new Error("Extraction is taking longer than expected. Please try again.");
   }
 
   function hasUnsavedWork(): boolean {
@@ -223,8 +271,13 @@ export function CaptureScreen(): React.ReactElement {
 
       <section className="mx-auto w-full max-w-2xl px-4 pb-24 pt-20">
         {displayedError ? (
-          <div className="mb-4">
+          <div className="mb-4 space-y-3">
             <FeedbackMessage variant="error">{displayedError}</FeedbackMessage>
+            {error ? (
+              <Button type="button" onClick={clearSubmissionErrors}>
+                Try again
+              </Button>
+            ) : null}
           </div>
         ) : null}
 

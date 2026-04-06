@@ -6,10 +6,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import cache, lru_cache
 from hmac import compare_digest
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import Cookie, Depends, Header, HTTPException, status
+from arq.connections import ArqRedis
+from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -27,6 +28,8 @@ from app.features.customers.service import CustomerService
 from app.features.invoices.email_delivery_service import InvoiceEmailDeliveryService
 from app.features.invoices.repository import InvoiceRepository
 from app.features.invoices.service import InvoiceService
+from app.features.jobs.repository import JobRepository
+from app.features.jobs.service import JobService
 from app.features.profile.repository import ProfileRepository
 from app.features.profile.service import ProfileService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
@@ -139,6 +142,13 @@ def get_quote_service(
     )
 
 
+def get_job_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> JobService:
+    """Build a request-scoped durable job service wired to the DB session."""
+    return JobService(repository=JobRepository(db))
+
+
 def get_invoice_service(
     db: Annotated[AsyncSession, Depends(get_db)],
     storage_service: Annotated[StorageService, Depends(get_storage_service)],
@@ -202,6 +212,11 @@ def get_extraction_service() -> ExtractionService:
         audio_integration=AudioIntegration(),
         transcription_integration=get_transcription_integration(),
     )
+
+
+def get_arq_pool(request: Request) -> ArqRedis | None:
+    """Return the app-scoped ARQ pool when Redis-backed jobs are enabled."""
+    return cast(ArqRedis | None, getattr(request.app.state, "arq_pool", None))
 
 
 async def get_current_user(

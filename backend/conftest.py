@@ -87,6 +87,14 @@ def _disable_db_event_persistence_by_default() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
+def _reset_arq_pool_state() -> Iterator[None]:
+    """Keep shared app state from leaking fake ARQ pools across tests."""
+    app.state.arq_pool = None
+    yield
+    app.state.arq_pool = None
+
+
+@pytest.fixture(autouse=True)
 def _isolate_rate_limit_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[None]:

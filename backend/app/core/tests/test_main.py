@@ -137,3 +137,20 @@ async def test_app_lifespan_closes_extraction_controls(
 
     idempotency_aclose.assert_awaited_once()
     aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_app_lifespan_degrades_when_arq_pool_startup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    get_settings.cache_clear()
+    monkeypatch.setattr(
+        "app.main.create_pool",
+        AsyncMock(side_effect=RuntimeError("redis unavailable")),
+    )
+
+    app = create_app()
+
+    async with app.router.lifespan_context(app):
+        assert app.state.arq_pool is None

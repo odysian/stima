@@ -49,6 +49,11 @@ interface RequestOptions extends Omit<RequestInit, "body"> {
   skipRefresh?: boolean;
 }
 
+export interface ResponseWithMetadata<T> {
+  status: number;
+  data: T;
+}
+
 export class HttpRequestError extends Error {
   status: number;
   payload: unknown;
@@ -242,6 +247,16 @@ async function requestWithParser<T>(
 
 export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
   return requestWithParser(url, options, (_, payload) => payload as T);
+}
+
+export async function requestWithMetadata<T>(
+  url: string,
+  options: RequestOptions = {},
+): Promise<ResponseWithMetadata<T>> {
+  return requestWithParser(url, options, (response, payload) => ({
+    status: response.status,
+    data: payload as T,
+  }));
 }
 
 export async function requestBlob(url: string, options: RequestOptions = {}): Promise<Blob> {
