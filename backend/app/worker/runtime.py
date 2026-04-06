@@ -44,6 +44,14 @@ class RetryableJobError(RuntimeError):
     """Signal that a job failure is transient and should be retried."""
 
 
+class NonRetryableJobError(RuntimeError):
+    """Signal that a job failure should terminate immediately with a reason code."""
+
+    def __init__(self, message: str, *, terminal_reason: str = TERMINAL_ERROR_UNEXPECTED) -> None:
+        super().__init__(message)
+        self.terminal_reason = terminal_reason
+
+
 def build_arq_redis_settings(settings: Settings) -> RedisSettings:
     """Translate the app REDIS_URL into ARQ Redis settings."""
     redis_url = settings.redis_url
@@ -140,6 +148,15 @@ async def process_job[T](
                 max_jitter_seconds=runtime.retry_jitter_seconds,
             )
         ) from exc
+    except NonRetryableJobError as exc:
+        logger.warning("Job %s failed with a non-retryable exception: %s", job_id, exc)
+        await _set_terminal(
+            runtime,
+            job_id=job_id,
+            job_type=job_type,
+            reason=_terminal_error_code(exc),
+        )
+        raise
     except Exception as exc:
         logger.exception("Job %s failed with a terminal exception.", job_id)
         await _set_terminal(
@@ -232,4 +249,6 @@ async def _set_terminal(
 def _terminal_error_code(exc: Exception) -> str:
     if isinstance(exc, RetryableJobError):
         return TERMINAL_ERROR_RETRY_EXHAUSTED
+    if isinstance(exc, NonRetryableJobError):
+        return exc.terminal_reason
     return TERMINAL_ERROR_UNEXPECTED
