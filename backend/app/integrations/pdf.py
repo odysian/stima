@@ -22,6 +22,14 @@ class PdfRenderError(Exception):
     """Raised when document PDF rendering fails."""
 
 
+class PdfRenderValidationError(PdfRenderError):
+    """Raised when render context exceeds supported validation limits."""
+
+
+class PdfRenderUnexpectedError(PdfRenderError):
+    """Raised when renderer execution fails unexpectedly."""
+
+
 class PdfIntegration:
     """Render document PDF bytes from template context."""
 
@@ -47,19 +55,24 @@ class PdfIntegration:
         except PdfRenderError:
             raise
         except Exception as exc:  # noqa: BLE001
-            raise PdfRenderError("Unable to render document PDF") from exc
+            raise PdfRenderUnexpectedError("Unable to render document PDF") from exc
 
 
 def validate_render_context(context: QuoteRenderContext) -> None:
     if len(context.line_items) > DOCUMENT_LINE_ITEMS_MAX_ITEMS:
-        raise PdfRenderError("Document exceeds supported render limits")
+        raise PdfRenderValidationError("Document exceeds supported render limits")
     if context.customer_address and len(context.customer_address) > CUSTOMER_ADDRESS_MAX_CHARS:
-        raise PdfRenderError("Document exceeds supported render limits")
+        raise PdfRenderValidationError("Document exceeds supported render limits")
     if context.notes and len(context.notes) > DOCUMENT_NOTES_MAX_CHARS:
-        raise PdfRenderError("Document exceeds supported render limits")
+        raise PdfRenderValidationError("Document exceeds supported render limits")
 
     for line_item in context.line_items:
         if len(line_item.description) > LINE_ITEM_DESCRIPTION_MAX_CHARS:
-            raise PdfRenderError("Document exceeds supported render limits")
+            raise PdfRenderValidationError("Document exceeds supported render limits")
         if line_item.details and len(line_item.details) > LINE_ITEM_DETAILS_MAX_CHARS:
-            raise PdfRenderError("Document exceeds supported render limits")
+            raise PdfRenderValidationError("Document exceeds supported render limits")
+
+
+def is_retryable_pdf_error(exc: PdfRenderError) -> bool:
+    """Return true when a PDF render failure is transient and worth retrying."""
+    return isinstance(exc, PdfRenderUnexpectedError)

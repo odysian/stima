@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -11,8 +14,18 @@ from app.features.jobs.models import JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.schemas import ExtractionResult
 from app.integrations.extraction import ExtractionError, is_retryable_extraction_error
+from app.integrations.pdf import (
+    PdfRenderError,
+    PdfRenderValidationError,
+    is_retryable_pdf_error,
+)
+from app.integrations.storage import StorageNotFoundError
+from app.shared.dependencies import get_pdf_integration, get_storage_service
+from app.shared.image_signatures import detect_image_content_type
+from app.worker.pdf_repository import WorkerPdfRepository
 from app.worker.runtime import (
     DEFAULT_MAX_TRIES,
+    NonRetryableJobError,
     RetryableJobError,
     WorkerRuntimeSettings,
     process_job,
@@ -21,6 +34,9 @@ from app.worker.runtime import (
 EXTRACTION_JOB_NAME = "jobs.extraction"
 PDF_JOB_NAME = "jobs.pdf"
 EMAIL_JOB_NAME = "jobs.email"
+TERMINAL_ERROR_MISSING_DOCUMENT_ID = "missing_document_id"
+
+logger = logging.getLogger(__name__)
 
 
 async def extraction_job(ctx: dict[str, Any], job_id: str, *, transcript: str) -> None:
@@ -39,12 +55,12 @@ async def extraction_job(ctx: dict[str, Any], job_id: str, *, transcript: str) -
 
 
 async def pdf_job(ctx: dict[str, Any], job_id: str) -> None:
-    """Placeholder PDF job entrypoint for Task 6c."""
+    """Render one document PDF through the durable worker job lifecycle."""
     await process_job(
         ctx,
         job_id=UUID(job_id),
         job_type=JobType.PDF,
-        handler=lambda: _raise_not_implemented(JobType.PDF),
+        handler=lambda: _render_pdf(ctx, job_id=UUID(job_id)),
     )
 
 
@@ -87,6 +103,96 @@ async def _extract_quote_data(
         if is_retryable_extraction_error(exc):
             raise RetryableJobError(str(exc)) from exc
         raise
+
+
+async def _render_pdf(ctx: dict[str, Any], *, job_id: UUID) -> None:
+    runtime = _get_runtime(ctx)
+
+    async with runtime.session_maker() as session:
+        job_repository = JobRepository(session)
+        job_record = await job_repository.get_by_id(job_id)
+        if job_record is None:
+            raise NonRetryableJobError(f"Job {job_id} does not exist")
+        if job_record.document_id is None:
+            raise NonRetryableJobError(
+                "PDF job missing required document_id",
+                terminal_reason=TERMINAL_ERROR_MISSING_DOCUMENT_ID,
+            )
+
+        context = await WorkerPdfRepository(session).get_render_context(
+            document_id=job_record.document_id,
+            user_id=job_record.user_id,
+        )
+        if context is None:
+            raise NonRetryableJobError("Document not found for PDF job")
+
+    await _attach_logo_data_uri(ctx, context)
+
+    pdf_integration = _get_pdf_integration(ctx)
+    try:
+        await asyncio.to_thread(pdf_integration.render, context)
+    except PdfRenderValidationError as exc:
+        raise NonRetryableJobError(str(exc)) from exc
+    except PdfRenderError as exc:
+        if is_retryable_pdf_error(exc):
+            raise RetryableJobError(str(exc)) from exc
+        raise NonRetryableJobError(str(exc)) from exc
+
+
+async def _attach_logo_data_uri(ctx: dict[str, Any], context: Any) -> None:
+    logo_path = getattr(context, "logo_path", None)
+    if logo_path is None:
+        context.logo_data_uri = None
+        return
+
+    storage_service = _get_storage_service(ctx)
+    try:
+        logo_bytes = await asyncio.to_thread(storage_service.fetch_bytes, logo_path)
+    except StorageNotFoundError:
+        logger.warning("Document logo missing in storage; omitting from PDF render")
+        context.logo_data_uri = None
+        return
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "Failed to load document logo for PDF render; omitting logo",
+            exc_info=True,
+        )
+        context.logo_data_uri = None
+        return
+
+    content_type = detect_image_content_type(logo_bytes)
+    if content_type is None:
+        logger.warning("Document logo bytes were invalid; omitting from PDF render")
+        context.logo_data_uri = None
+        return
+
+    encoded_logo = base64.b64encode(logo_bytes).decode("ascii")
+    context.logo_data_uri = f"data:{content_type};base64,{encoded_logo}"
+
+
+def _get_runtime(ctx: dict[str, Any]) -> WorkerRuntimeSettings:
+    runtime = ctx.get("worker_runtime")
+    if not isinstance(runtime, WorkerRuntimeSettings):
+        raise RuntimeError("Worker runtime is not initialized; on_worker_startup must run first")
+    return runtime
+
+
+def _get_pdf_integration(ctx: dict[str, Any]) -> Any:
+    pdf_integration = ctx.get("pdf_integration")
+    if pdf_integration is None:
+        return get_pdf_integration()
+    if not hasattr(pdf_integration, "render"):
+        raise RuntimeError("Worker PDF integration is not initialized")
+    return pdf_integration
+
+
+def _get_storage_service(ctx: dict[str, Any]) -> Any:
+    storage_service = ctx.get("storage_service")
+    if storage_service is None:
+        return get_storage_service()
+    if not hasattr(storage_service, "fetch_bytes"):
+        raise RuntimeError("Worker storage service is not initialized")
+    return storage_service
 
 
 async def _store_extraction_result(
