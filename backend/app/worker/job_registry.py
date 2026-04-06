@@ -130,7 +130,9 @@ async def _render_pdf(ctx: dict[str, Any], *, job_id: UUID) -> None:
 
     pdf_integration = _get_pdf_integration(ctx)
     try:
-        await asyncio.to_thread(pdf_integration.render, context)
+        pdf_bytes = await asyncio.to_thread(pdf_integration.render, context)
+        if not isinstance(pdf_bytes, bytes):
+            raise NonRetryableJobError("PDF render returned invalid payload type")
     except PdfRenderValidationError as exc:
         raise NonRetryableJobError(str(exc)) from exc
     except PdfRenderError as exc:

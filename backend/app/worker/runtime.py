@@ -149,7 +149,7 @@ async def process_job[T](
             )
         ) from exc
     except NonRetryableJobError as exc:
-        logger.exception("Job %s failed with a non-retryable exception.", job_id)
+        logger.warning("Job %s failed with a non-retryable exception: %s", job_id, exc)
         await _set_terminal(
             runtime,
             job_id=job_id,
