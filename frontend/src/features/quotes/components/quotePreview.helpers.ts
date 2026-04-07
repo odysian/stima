@@ -70,7 +70,7 @@ export function getSendEmailErrorMessage(error: unknown): string {
       case 502:
         return "Email delivery failed. Please try again.";
       case 503:
-        return "Email delivery is not configured right now.";
+        return error.message || "Unable to start email delivery right now. Please try again.";
       default:
         break;
     }

@@ -1239,7 +1239,7 @@ async def test_send_quote_email_returns_429_when_duplicate_send_guard_triggers(
     assert mock_email_service.messages == []
 
 
-async def test_send_quote_email_returns_429_on_immediate_retry_after_success(
+async def test_send_quote_email_allows_new_idempotency_key_while_delivery_is_pending(
     client: AsyncClient,
     db_session: AsyncSession,
     mock_email_service: _MockEmailService,
@@ -2017,7 +2017,7 @@ async def test_send_invoice_email_returns_429_when_duplicate_send_guard_triggers
     assert mock_email_service.messages == []
 
 
-async def test_send_invoice_email_returns_429_on_immediate_retry_after_success(
+async def test_send_invoice_email_allows_new_idempotency_key_while_delivery_is_pending(
     client: AsyncClient,
     db_session: AsyncSession,
     mock_email_service: _MockEmailService,

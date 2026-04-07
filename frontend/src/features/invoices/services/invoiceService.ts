@@ -44,11 +44,11 @@ function shareInvoice(id: string): Promise<Invoice> {
   });
 }
 
-async function sendInvoiceEmail(id: string): Promise<JobStatusResponse> {
+async function sendInvoiceEmail(id: string, idempotencyKey?: string): Promise<JobStatusResponse> {
   const response = await requestWithMetadata<JobStatusResponse>(`/api/invoices/${id}/send-email`, {
     method: "POST",
     headers: {
-      "Idempotency-Key": buildIdempotencyKey(),
+      "Idempotency-Key": idempotencyKey ?? buildIdempotencyKey(),
     },
   });
 

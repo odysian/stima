@@ -128,11 +128,11 @@ function shareQuote(id: string): Promise<Quote> {
   });
 }
 
-async function sendQuoteEmail(id: string): Promise<JobStatusResponse> {
+async function sendQuoteEmail(id: string, idempotencyKey?: string): Promise<JobStatusResponse> {
   const response = await requestWithMetadata<JobStatusResponse>(`/api/quotes/${id}/send-email`, {
     method: "POST",
     headers: {
-      "Idempotency-Key": buildIdempotencyKey(),
+      "Idempotency-Key": idempotencyKey ?? buildIdempotencyKey(),
     },
   });
 

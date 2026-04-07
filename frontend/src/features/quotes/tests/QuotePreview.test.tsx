@@ -1087,12 +1087,27 @@ describe("QuotePreview", () => {
     expect(screen.getByText(/add a customer email to send this quote via email/i)).toBeInTheDocument();
   });
 
-  it("maps send-email API errors to user-friendly inline messages", async () => {
+  it.each([
+    {
+      status: 429,
+      detail: "provider failure",
+      expectedMessage: "This quote was emailed recently. Please wait a few minutes before resending.",
+    },
+    {
+      status: 503,
+      detail: "Unable to start email delivery right now. Please try again.",
+      expectedMessage: "Unable to start email delivery right now. Please try again.",
+    },
+  ])("maps send-email API errors to user-friendly inline messages ($status)", async ({
+    status,
+    detail,
+    expectedMessage,
+  }) => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
     );
     mockedQuoteService.sendQuoteEmail.mockRejectedValueOnce(
-      new HttpRequestError("provider failure", 429, { detail: "provider failure" }),
+      new HttpRequestError(detail, status, { detail }),
     );
 
     renderScreen();
@@ -1109,11 +1124,7 @@ describe("QuotePreview", () => {
       }),
     );
 
-    expect(
-      await screen.findByText(
-        "This quote was emailed recently. Please wait a few minutes before resending.",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(expectedMessage)).toBeInTheDocument();
   });
 
   it("shows a confirmation modal and deletes the quote before navigating home", async () => {
