@@ -84,7 +84,7 @@ class QuoteEmailDeliveryService:
         self,
         *,
         repository: QuoteEmailRepositoryProtocol,
-        quote_service: QuoteService,
+        quote_service: QuoteService | None,
         email_service: EmailService,
         frontend_url: str,
         template_dir: Path | None = None,
@@ -102,9 +102,49 @@ class QuoteEmailDeliveryService:
             lstrip_blocks=True,
         )
 
+    async def prepare_quote_email_job(self, user: User, quote_id: UUID) -> Document:
+        """Validate prerequisites, enforce duplicate guard, and ensure share state."""
+        user_id = _resolve_user_id(user)
+        await self._load_context(
+            quote_id=quote_id,
+            user_id=user_id,
+            enforce_duplicate_send_guard=True,
+        )
+        if self._quote_service is None:
+            raise QuoteServiceError(detail="Quote share service unavailable", status_code=500)
+
+        shared_quote = await self._quote_service.share_quote(user, quote_id)
+        if shared_quote.share_token is None:
+            raise QuoteServiceError(detail="Share link unavailable", status_code=500)
+        return shared_quote
+
+    async def send_quote_email_for_job(self, *, quote_id: UUID, user_id: UUID) -> None:
+        """Deliver one quote email from worker context using durable document ownership."""
+        context = await self._load_context(
+            quote_id=quote_id,
+            user_id=user_id,
+            enforce_duplicate_send_guard=False,
+        )
+        await self._send_with_context(context)
+
+    async def send_quote_email_from_context(self, context: QuoteEmailContext) -> None:
+        """Deliver one quote email from preloaded worker context."""
+        await self._send_with_context(context)
+
     async def send_quote_email(self, user: User, quote_id: UUID) -> Document:
         """Validate, share if needed, deliver the email, and log success."""
+        shared_quote = await self.prepare_quote_email_job(user, quote_id)
         user_id = _resolve_user_id(user)
+        await self.send_quote_email_for_job(quote_id=quote_id, user_id=user_id)
+        return shared_quote
+
+    async def _load_context(
+        self,
+        *,
+        quote_id: UUID,
+        user_id: UUID,
+        enforce_duplicate_send_guard: bool,
+    ) -> QuoteEmailContext:
         context = await self._repository.get_email_context(quote_id, user_id)
         if context is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
@@ -114,15 +154,14 @@ class QuoteEmailDeliveryService:
                 status_code=409,
             )
 
+        _validate_customer_email(context.customer_email)
+        if enforce_duplicate_send_guard:
+            await self._enforce_duplicate_send_guard(context)
+        return context
+
+    async def _send_with_context(self, context: QuoteEmailContext) -> None:
         customer_email = _validate_customer_email(context.customer_email)
-        await self._enforce_duplicate_send_guard(context)
-
-        try:
-            shared_quote = await self._quote_service.share_quote(user, quote_id)
-        except QuoteServiceError:
-            raise
-
-        share_token = shared_quote.share_token
+        share_token = context.share_token
         if share_token is None:
             raise QuoteServiceError(detail="Share link unavailable", status_code=500)
 
@@ -179,7 +218,6 @@ class QuoteEmailDeliveryService:
             customer_id=context.customer_id,
             persist_async=False,
         )
-        return shared_quote
 
     async def _enforce_duplicate_send_guard(self, context: QuoteEmailContext) -> None:
         latest_email_sent_at = await self._repository.get_latest_quote_event_at(

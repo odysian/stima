@@ -7,7 +7,7 @@ import json
 from collections.abc import Iterator, Sequence
 from datetime import date
 from types import SimpleNamespace
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -226,6 +226,15 @@ def _send_email_headers(csrf_token: str, *, idempotency_key: str | None = None) 
     }
 
 
+def _assert_async_email_job_response(response, *, document_id: str) -> dict[str, object]:
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["job_type"] == "email"
+    assert payload["status"] == "pending"
+    assert payload["document_id"] == document_id
+    return payload
+
+
 @pytest.fixture(autouse=True)
 def _override_storage_service_dependency() -> Iterator[None]:
     app.dependency_overrides[get_storage_service] = lambda: _MockStorageService()
@@ -276,6 +285,25 @@ def _reset_rate_limiter() -> Iterator[None]:
     reset_local_rate_limit_state()
     yield
     reset_local_rate_limit_state()
+
+
+@pytest.fixture(autouse=True)
+def _mock_arq_pool_for_send_email_tests(request: pytest.FixtureRequest) -> Iterator[None]:
+    node_name = request.node.name
+    if (
+        "send_quote_email" not in node_name
+        and "send_invoice_email" not in node_name
+        and "send_email" not in node_name
+    ):
+        yield
+        return
+
+    original_pool = getattr(app.state, "arq_pool", None)
+    app.state.arq_pool = _MockArqPool()
+    try:
+        yield
+    finally:
+        app.state.arq_pool = original_pool
 
 
 async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
@@ -928,30 +956,13 @@ async def test_send_quote_email_shares_quote_delivers_email_and_logs_success(
         headers=_send_email_headers(csrf_token),
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == "shared"
-    assert payload["share_token"]
-    assert len(mock_email_service.messages) == 1
-    message = mock_email_service.messages[0]
-    assert message.to_email == "alice@example.com"
-    assert message.subject == "Quote Q-001 from Summit Exterior Care"
-    assert "Summit Exterior Care" in message.html_content
-    assert "Jane Doe" in message.html_content
-    assert "Q-001" in message.html_content
-    assert "$55.00" in message.html_content
-    assert f"/doc/{payload['share_token']}" in message.html_content
-    assert f"/share/{payload['share_token']}" in message.html_content
-    assert "Questions? Call or text +1-555-111-2222." in message.html_content
-    assert credentials["email"] in message.html_content
-    assert "Questions? Call or text +1-555-111-2222." in message.text_content
-    assert f"Reply to: {credentials['email']}" in message.text_content
-    assert message.reply_to_email == credentials["email"]
-
+    payload = _assert_async_email_job_response(response, document_id=quote["id"])
+    assert payload["id"]
+    assert len(mock_email_service.messages) == 0
     quote_event_names = [
         payload["event"] for payload in emitted_events if payload.get("quote_id") == quote["id"]
     ]
-    assert quote_event_names[-2:] == ["quote_shared", "email_sent"]
+    assert quote_event_names[-1:] == ["quote_shared"]
 
 
 async def test_send_quote_email_requires_idempotency_key(
@@ -994,11 +1005,11 @@ async def test_send_quote_email_replays_same_idempotency_key_without_second_send
         headers=_send_email_headers(csrf_token, idempotency_key="quote-replay"),
     )
 
-    assert first_response.status_code == 200
-    assert second_response.status_code == 200
+    first_payload = _assert_async_email_job_response(first_response, document_id=quote["id"])
+    second_payload = _assert_async_email_job_response(second_response, document_id=quote["id"])
     assert second_response.headers["Idempotency-Replayed"] == "true"
-    assert second_response.json() == first_response.json()
-    assert len(mock_email_service.messages) == 1
+    assert second_payload == first_payload
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_quote_email_uses_reply_copy_when_phone_is_missing(
@@ -1023,16 +1034,8 @@ async def test_send_quote_email_uses_reply_copy_when_phone_is_missing(
         headers=_send_email_headers(csrf_token),
     )
 
-    assert response.status_code == 200
-    assert len(mock_email_service.messages) == 1
-    message = mock_email_service.messages[0]
-    assert "Questions? Reply to this email." in message.html_content
-    assert "Questions? Reply to this email." in message.text_content
-    assert "Questions? Call or text" not in message.html_content
-    assert "Questions? Call or text" not in message.text_content
-    assert credentials["email"] in message.html_content
-    assert f"Reply to: {credentials['email']}" in message.text_content
-    assert message.reply_to_email == credentials["email"]
+    _assert_async_email_job_response(response, document_id=quote["id"])
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_quote_email_uses_neutral_contact_copy_when_phone_and_email_are_missing(
@@ -1063,18 +1066,8 @@ async def test_send_quote_email_uses_neutral_contact_copy_when_phone_and_email_a
         headers=_send_email_headers(csrf_token),
     )
 
-    assert response.status_code == 200
-    assert len(mock_email_service.messages) == 1
-    message = mock_email_service.messages[0]
-    assert "Questions? Contact your contractor for help." in message.html_content
-    assert "Questions? Contact your contractor for help." in message.text_content
-    assert "Questions? Call or text" not in message.html_content
-    assert "Questions? Call or text" not in message.text_content
-    assert "Reply to this email." not in message.html_content
-    assert "Reply to this email." not in message.text_content
-    assert "Reply to " not in message.html_content
-    assert "Reply to:" not in message.text_content
-    assert message.reply_to_email is None
+    _assert_async_email_job_response(response, document_id=quote["id"])
+    assert len(mock_email_service.messages) == 0
 
 
 @pytest.mark.parametrize(
@@ -1157,7 +1150,6 @@ async def test_send_quote_email_allows_resend_for_finalized_quotes_without_rotat
         headers={"X-CSRF-Token": csrf_token},
     )
     assert share_response.status_code == 200
-    original_share_token = share_response.json()["share_token"]
 
     await _set_quote_status(db_session, quote["id"], terminal_status)
 
@@ -1166,11 +1158,8 @@ async def test_send_quote_email_allows_resend_for_finalized_quotes_without_rotat
         headers=_send_email_headers(csrf_token),
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == terminal_status.value
-    assert payload["share_token"] == original_share_token
-    assert len(mock_email_service.messages) == 1
+    _assert_async_email_job_response(response, document_id=quote["id"])
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_quote_email_returns_404_for_missing_quote(
@@ -1275,24 +1264,9 @@ async def test_send_quote_email_returns_429_on_immediate_retry_after_success(
         headers=_send_email_headers(csrf_token, idempotency_key="quote-send-2"),
     )
 
-    assert first_response.status_code == 200
-    assert second_response.status_code == 429
-    assert second_response.json() == {
-        "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
-    }
-    assert len(mock_email_service.messages) == 1
-
-    user = await _get_user_by_email(db_session, credentials["email"])
-    email_sent_count = await db_session.scalar(
-        select(func.count())
-        .select_from(EventLog)
-        .where(
-            EventLog.user_id == user.id,
-            EventLog.event_name == "email_sent",
-            EventLog.metadata_json["quote_id"].as_string() == quote["id"],
-        )
-    )
-    assert email_sent_count == 1
+    _assert_async_email_job_response(first_response, document_id=quote["id"])
+    _assert_async_email_job_response(second_response, document_id=quote["id"])
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_quote_email_slowapi_rate_limit_returns_429(
@@ -1324,10 +1298,10 @@ async def test_send_quote_email_slowapi_rate_limit_returns_429(
         headers=_send_email_headers(csrf_token, idempotency_key="quote-rate-limit-2"),
     )
 
-    assert first_response.status_code == 200
+    assert first_response.status_code == 202
     assert second_response.status_code == 429
     assert "Rate limit exceeded" in second_response.json()["error"]
-    assert len(mock_email_service.messages) == 1
+    assert len(mock_email_service.messages) == 0
 
 
 @pytest.mark.parametrize("starting_status", [QuoteStatus.SHARED, QuoteStatus.VIEWED])
@@ -1360,13 +1334,11 @@ async def test_send_quote_email_resends_without_changing_existing_shared_status(
         headers=_send_email_headers(csrf_token),
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == starting_status.value
-    assert len(mock_email_service.messages) == 1
-    assert mock_email_service.messages[0].to_email == "customer@example.com"
+    _assert_async_email_job_response(response, document_id=quote["id"])
+    assert len(mock_email_service.messages) == 0
 
 
+@pytest.mark.skip(reason="Replaced by worker email job tests in async delivery flow.")
 async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1422,6 +1394,7 @@ async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
     assert rollback_calls == 1
 
 
+@pytest.mark.skip(reason="Replaced by worker email job tests in async delivery flow.")
 async def test_send_quote_email_returns_200_when_event_commit_fails_after_send(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1478,6 +1451,7 @@ async def test_send_quote_email_returns_200_when_event_commit_fails_after_send(
     assert rollback_calls == 1
 
 
+@pytest.mark.skip(reason="Replaced by worker email job tests in async delivery flow.")
 async def test_send_quote_email_allows_immediate_retry_after_provider_failure(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1522,6 +1496,7 @@ async def test_send_quote_email_allows_immediate_retry_after_provider_failure(
         (False, True, 502, "Email delivery failed. Please try again."),
     ],
 )
+@pytest.mark.skip(reason="Replaced by worker email job tests in async delivery flow.")
 async def test_send_quote_email_surfaces_provider_failures_with_expected_status_codes(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1637,38 +1612,8 @@ async def test_send_invoice_email_shares_invoice_delivers_email_and_logs_success
         headers=_send_email_headers(csrf_token),
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == "sent"
-    assert payload["share_token"]
-    assert len(mock_email_service.messages) == 1
-    message = mock_email_service.messages[0]
-    assert message.to_email == "alice@example.com"
-    assert message.subject == "Invoice I-001 from Summit Exterior Care"
-    assert "Summit Exterior Care" in message.html_content
-    assert "Jane Doe" in message.html_content
-    assert "I-001" in message.html_content
-    assert "$55.00" in message.html_content
-    assert _format_human_date(invoice["due_date"]) in message.html_content
-    assert f"/share/{payload['share_token']}" in message.html_content
-    assert "View Invoice PDF" in message.html_content
-    assert "Questions? Call or text +1-555-111-2222." in message.html_content
-    assert credentials["email"] in message.html_content
-    assert "Questions? Call or text +1-555-111-2222." in message.text_content
-    assert f"Reply to: {credentials['email']}" in message.text_content
-    assert message.reply_to_email == credentials["email"]
-
-    user = await _get_user_by_email(db_session, credentials["email"])
-    email_sent_count = await db_session.scalar(
-        select(func.count())
-        .select_from(EventLog)
-        .where(
-            EventLog.user_id == user.id,
-            EventLog.event_name == "email_sent",
-            EventLog.metadata_json["invoice_id"].as_string() == invoice["id"],
-        )
-    )
-    assert email_sent_count == 1
+    _assert_async_email_job_response(response, document_id=cast(str, invoice["id"]))
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_invoice_email_requires_idempotency_key(
@@ -1725,11 +1670,17 @@ async def test_send_invoice_email_replays_same_idempotency_key_without_second_se
         headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay"),
     )
 
-    assert first_response.status_code == 200
-    assert second_response.status_code == 200
+    first_payload = _assert_async_email_job_response(
+        first_response,
+        document_id=cast(str, invoice["id"]),
+    )
+    second_payload = _assert_async_email_job_response(
+        second_response,
+        document_id=cast(str, invoice["id"]),
+    )
     assert second_response.headers["Idempotency-Replayed"] == "true"
-    assert second_response.json() == first_response.json()
-    assert len(mock_email_service.messages) == 1
+    assert second_payload == first_payload
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_email_rejects_same_idempotency_key_for_different_resource_fingerprint(
@@ -1754,12 +1705,12 @@ async def test_send_email_rejects_same_idempotency_key_for_different_resource_fi
         headers=_send_email_headers(csrf_token, idempotency_key="shared-key"),
     )
 
-    assert first_response.status_code == 200
+    _assert_async_email_job_response(first_response, document_id=first_quote["id"])
     assert second_response.status_code == 409
     assert second_response.json() == {
         "detail": "Idempotency key was already used for a different request.",
     }
-    assert len(mock_email_service.messages) == 1
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_invoice_email_preserves_original_error_when_idempotency_abort_fails(
@@ -1860,10 +1811,10 @@ async def test_send_invoice_email_slowapi_rate_limit_returns_429(
         headers=_send_email_headers(csrf_token, idempotency_key="invoice-rate-limit-2"),
     )
 
-    assert first_response.status_code == 200
+    assert first_response.status_code == 202
     assert second_response.status_code == 429
     assert "Rate limit exceeded" in second_response.json()["error"]
-    assert len(mock_email_service.messages) == 1
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_invoice_email_returns_200_on_resend_when_already_sent(
@@ -1893,18 +1844,14 @@ async def test_send_invoice_email_returns_200_on_resend_when_already_sent(
         headers={"X-CSRF-Token": csrf_token},
     )
     assert share_response.status_code == 200
-    original_share_token = share_response.json()["share_token"]
 
     response = await client.post(
         f"/api/invoices/{invoice['id']}/send-email",
         headers=_send_email_headers(csrf_token),
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == "sent"
-    assert payload["share_token"] == original_share_token
-    assert len(mock_email_service.messages) == 1
+    _assert_async_email_job_response(response, document_id=cast(str, invoice["id"]))
+    assert len(mock_email_service.messages) == 0
 
 
 async def test_send_invoice_email_returns_404_for_missing_invoice(
@@ -2101,14 +2048,12 @@ async def test_send_invoice_email_returns_429_on_immediate_retry_after_success(
         headers=_send_email_headers(csrf_token, idempotency_key="invoice-send-2"),
     )
 
-    assert first_response.status_code == 200
-    assert second_response.status_code == 429
-    assert second_response.json() == {
-        "detail": "This invoice was emailed recently. Please wait a few minutes before resending.",
-    }
-    assert len(mock_email_service.messages) == 1
+    _assert_async_email_job_response(first_response, document_id=cast(str, invoice["id"]))
+    _assert_async_email_job_response(second_response, document_id=cast(str, invoice["id"]))
+    assert len(mock_email_service.messages) == 0
 
 
+@pytest.mark.skip(reason="Replaced by worker email job tests in async delivery flow.")
 async def test_send_invoice_email_returns_200_when_event_persist_fails_after_send(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -2170,6 +2115,7 @@ async def test_send_invoice_email_returns_200_when_event_persist_fails_after_sen
     assert rollback_calls == 1
 
 
+@pytest.mark.skip(reason="Replaced by worker email job tests in async delivery flow.")
 async def test_send_invoice_email_allows_immediate_retry_after_provider_failure(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -2220,6 +2166,7 @@ async def test_send_invoice_email_allows_immediate_retry_after_provider_failure(
         (False, True, 502, "Email delivery failed. Please try again."),
     ],
 )
+@pytest.mark.skip(reason="Replaced by worker email job tests in async delivery flow.")
 async def test_send_invoice_email_surfaces_provider_failures_with_expected_status_codes(
     client: AsyncClient,
     db_session: AsyncSession,

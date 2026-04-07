@@ -85,7 +85,7 @@ class InvoiceEmailDeliveryService:
         self,
         *,
         repository: InvoiceEmailRepositoryProtocol,
-        invoice_service: InvoiceService,
+        invoice_service: InvoiceService | None,
         email_service: EmailService,
         frontend_url: str,
         template_dir: Path | None = None,
@@ -102,9 +102,49 @@ class InvoiceEmailDeliveryService:
             lstrip_blocks=True,
         )
 
+    async def prepare_invoice_email_job(self, user: User, invoice_id: UUID) -> Document:
+        """Validate prerequisites, enforce duplicate guard, and ensure sent/share state."""
+        user_id = _resolve_user_id(user)
+        await self._load_context(
+            invoice_id=invoice_id,
+            user_id=user_id,
+            enforce_duplicate_send_guard=True,
+        )
+        if self._invoice_service is None:
+            raise QuoteServiceError(detail="Invoice share service unavailable", status_code=500)
+
+        shared_invoice = await self._invoice_service.share_invoice(user, invoice_id)
+        if shared_invoice.share_token is None:
+            raise QuoteServiceError(detail="Share link unavailable", status_code=500)
+        return shared_invoice
+
+    async def send_invoice_email_for_job(self, *, invoice_id: UUID, user_id: UUID) -> None:
+        """Deliver one invoice email from worker context using durable document ownership."""
+        context = await self._load_context(
+            invoice_id=invoice_id,
+            user_id=user_id,
+            enforce_duplicate_send_guard=False,
+        )
+        await self._send_with_context(context)
+
+    async def send_invoice_email_from_context(self, context: InvoiceEmailContext) -> None:
+        """Deliver one invoice email from preloaded worker context."""
+        await self._send_with_context(context)
+
     async def send_invoice_email(self, user: User, invoice_id: UUID) -> Document:
         """Validate, share if needed, deliver the email, and log success."""
+        shared_invoice = await self.prepare_invoice_email_job(user, invoice_id)
         user_id = _resolve_user_id(user)
+        await self.send_invoice_email_for_job(invoice_id=invoice_id, user_id=user_id)
+        return shared_invoice
+
+    async def _load_context(
+        self,
+        *,
+        invoice_id: UUID,
+        user_id: UUID,
+        enforce_duplicate_send_guard: bool,
+    ) -> InvoiceEmailContext:
         context = await self._repository.get_email_context(invoice_id, user_id)
         if context is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
@@ -114,11 +154,14 @@ class InvoiceEmailDeliveryService:
                 status_code=409,
             )
 
-        customer_email = _validate_customer_email(context.customer_email)
-        await self._enforce_duplicate_send_guard(context)
+        _validate_customer_email(context.customer_email)
+        if enforce_duplicate_send_guard:
+            await self._enforce_duplicate_send_guard(context)
+        return context
 
-        shared_invoice = await self._invoice_service.share_invoice(user, invoice_id)
-        share_token = shared_invoice.share_token
+    async def _send_with_context(self, context: InvoiceEmailContext) -> None:
+        customer_email = _validate_customer_email(context.customer_email)
+        share_token = context.share_token
         if share_token is None:
             raise QuoteServiceError(detail="Share link unavailable", status_code=500)
 
@@ -174,7 +217,6 @@ class InvoiceEmailDeliveryService:
             customer_id=context.customer_id,
             persist_async=False,
         )
-        return shared_invoice
 
     async def _enforce_duplicate_send_guard(self, context: InvoiceEmailContext) -> None:
         latest_email_sent_at = await self._repository.get_latest_invoice_event_at(

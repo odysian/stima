@@ -9,6 +9,7 @@ import type {
   QuoteListItem,
   QuoteUpdateRequest,
 } from "@/features/quotes/types/quote.types";
+import { buildIdempotencyKey } from "@/shared/lib/idempotency";
 import { request, requestBlob, requestWithMetadata } from "@/shared/lib/http";
 
 function resolveAudioExtensionFromMimeType(mimeType: string): string {
@@ -127,10 +128,15 @@ function shareQuote(id: string): Promise<Quote> {
   });
 }
 
-function sendQuoteEmail(id: string): Promise<Quote> {
-  return request<Quote>(`/api/quotes/${id}/send-email`, {
+async function sendQuoteEmail(id: string): Promise<JobStatusResponse> {
+  const response = await requestWithMetadata<JobStatusResponse>(`/api/quotes/${id}/send-email`, {
     method: "POST",
+    headers: {
+      "Idempotency-Key": buildIdempotencyKey(),
+    },
   });
+
+  return response.data;
 }
 
 function markQuoteWon(id: string): Promise<Quote> {

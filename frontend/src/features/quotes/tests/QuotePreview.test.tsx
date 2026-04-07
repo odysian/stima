@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QuotePreview } from "@/features/quotes/components/QuotePreview";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { Quote, QuoteDetail } from "@/features/quotes/types/quote.types";
+import type { JobStatusResponse, Quote, QuoteDetail } from "@/features/quotes/types/quote.types";
 import { HttpRequestError } from "@/shared/lib/http";
+import { jobService } from "@/shared/lib/jobService";
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
@@ -25,7 +26,14 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   },
 }));
 
+vi.mock("@/shared/lib/jobService", () => ({
+  jobService: {
+    getJobStatus: vi.fn(),
+  },
+}));
+
 const mockedQuoteService = vi.mocked(quoteService);
+const mockedJobService = vi.mocked(jobService);
 const createObjectUrlMock = vi.fn();
 const revokeObjectUrlMock = vi.fn();
 
@@ -121,13 +129,31 @@ async function openOverflowMenu(): Promise<void> {
 }
 
 beforeEach(() => {
+  const pendingEmailJob: JobStatusResponse = {
+    id: "job-email-quote-1",
+    user_id: "user-1",
+    document_id: "quote-1",
+    job_type: "email",
+    status: "pending",
+    attempts: 0,
+    terminal_error: null,
+    extraction_result: null,
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T00:00:00.000Z",
+  };
+  const successfulEmailJob: JobStatusResponse = {
+    ...pendingEmailJob,
+    status: "success",
+    attempts: 1,
+  };
+
   mockedQuoteService.getQuote.mockResolvedValue(makeQuoteDetail());
   mockedQuoteService.generatePdf.mockResolvedValue(
     new Blob(["pdf-binary"], { type: "application/pdf" }),
   );
   mockedQuoteService.deleteQuote.mockResolvedValue(undefined);
   mockedQuoteService.shareQuote.mockResolvedValue(makeQuoteResponse());
-  mockedQuoteService.sendQuoteEmail.mockResolvedValue(makeQuoteResponse());
+  mockedQuoteService.sendQuoteEmail.mockResolvedValue(pendingEmailJob);
   mockedQuoteService.markQuoteWon.mockResolvedValue(
     makeQuoteResponse({ status: "approved" }),
   );
@@ -162,6 +188,7 @@ beforeEach(() => {
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
   });
+  mockedJobService.getJobStatus.mockResolvedValue(successfulEmailJob);
   createObjectUrlMock.mockReturnValue("blob:quote-preview");
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
@@ -737,21 +764,47 @@ describe("QuotePreview", () => {
   });
 
   it("preserves existing customer detail fields when email send response omits them", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({
-        status: "ready",
-        customer_name: "Preserved Customer",
-        customer_email: "preserved@example.com",
-        customer_phone: "+1-555-0199",
-      }),
-    );
-    mockedQuoteService.sendQuoteEmail.mockResolvedValueOnce(
-      makeQuoteResponse({
-        status: "shared",
-        shared_at: "2026-03-20T02:00:00.000Z",
-        share_token: "share-token-2",
-      }),
-    );
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "ready",
+          customer_name: "Preserved Customer",
+          customer_email: "preserved@example.com",
+          customer_phone: "+1-555-0199",
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "shared",
+          shared_at: "2026-03-20T02:00:00.000Z",
+          share_token: "share-token-2",
+          customer_name: "Preserved Customer",
+          customer_email: null,
+          customer_phone: "+1-555-0199",
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "shared",
+          shared_at: "2026-03-20T02:00:00.000Z",
+          share_token: "share-token-2",
+          customer_name: "Preserved Customer",
+          customer_email: null,
+          customer_phone: "+1-555-0199",
+        }),
+      );
+    mockedQuoteService.sendQuoteEmail.mockResolvedValueOnce({
+      id: "job-email-quote-1",
+      user_id: "user-1",
+      document_id: "quote-1",
+      job_type: "email",
+      status: "pending",
+      attempts: 0,
+      terminal_error: null,
+      extraction_result: null,
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-20T00:00:00.000Z",
+    });
 
     renderScreen();
 
@@ -982,9 +1035,24 @@ describe("QuotePreview", () => {
   });
 
   it("requires confirmation before sending quote email", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
-    );
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(
+        makeQuoteDetail({ status: "ready", customer_email: "customer@example.com" }),
+      )
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "shared",
+          customer_email: "customer@example.com",
+          share_token: "share-token-1",
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "shared",
+          customer_email: "customer@example.com",
+          share_token: "share-token-1",
+        }),
+      );
 
     renderScreen();
 

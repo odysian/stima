@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { InvoiceDetailScreen } from "@/features/invoices/components/InvoiceDetailScreen";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
+import type { JobStatusResponse } from "@/features/quotes/types/quote.types";
 import type { Invoice, InvoiceDetail } from "@/features/invoices/types/invoice.types";
+import { jobService } from "@/shared/lib/jobService";
 
 vi.mock("@/features/invoices/services/invoiceService", () => ({
   invoiceService: {
@@ -16,7 +18,14 @@ vi.mock("@/features/invoices/services/invoiceService", () => ({
   },
 }));
 
+vi.mock("@/shared/lib/jobService", () => ({
+  jobService: {
+    getJobStatus: vi.fn(),
+  },
+}));
+
 const mockedInvoiceService = vi.mocked(invoiceService);
+const mockedJobService = vi.mocked(jobService);
 const createObjectUrlMock = vi.fn(() => "blob:invoice-preview");
 const revokeObjectUrlMock = vi.fn();
 
@@ -105,6 +114,24 @@ function renderScreen(path = "/invoices/invoice-1"): void {
 }
 
 beforeEach(() => {
+  const pendingEmailJob: JobStatusResponse = {
+    id: "job-email-invoice-1",
+    user_id: "user-1",
+    document_id: "invoice-1",
+    job_type: "email",
+    status: "pending",
+    attempts: 0,
+    terminal_error: null,
+    extraction_result: null,
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T00:00:00.000Z",
+  };
+  const successfulEmailJob: JobStatusResponse = {
+    ...pendingEmailJob,
+    status: "success",
+    attempts: 1,
+  };
+
   vi.clearAllMocks();
   mockedInvoiceService.getInvoice.mockResolvedValue(makeInvoiceDetail());
   mockedInvoiceService.generatePdf.mockResolvedValue(
@@ -118,14 +145,8 @@ beforeEach(() => {
       updated_at: "2026-03-20T00:15:00.000Z",
     }),
   );
-  mockedInvoiceService.sendInvoiceEmail.mockResolvedValue(
-    makeInvoice({
-      status: "sent",
-      share_token: "invoice-share-token-1",
-      shared_at: "2026-03-20T00:15:00.000Z",
-      updated_at: "2026-03-20T00:15:00.000Z",
-    }),
-  );
+  mockedInvoiceService.sendInvoiceEmail.mockResolvedValue(pendingEmailJob);
+  mockedJobService.getJobStatus.mockResolvedValue(successfulEmailJob);
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
     writable: true,
@@ -394,14 +415,29 @@ describe("InvoiceDetailScreen", () => {
   });
 
   it("sends invoice email after confirmation, shows in-flight state, and updates local invoice state", async () => {
-    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
-      makeInvoiceDetail({
-        status: "ready",
-      }),
-    );
+    mockedInvoiceService.getInvoice
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          status: "ready",
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          status: "sent",
+          share_token: "invoice-share-token-1",
+          shared_at: "2026-03-20T00:15:00.000Z",
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          status: "sent",
+          share_token: "invoice-share-token-1",
+          shared_at: "2026-03-20T00:15:00.000Z",
+        }),
+      );
 
-    let resolveSend!: (invoice: Invoice) => void;
-    const sendPromise = new Promise<Invoice>((resolve) => {
+    let resolveSend!: (job: JobStatusResponse) => void;
+    const sendPromise = new Promise<JobStatusResponse>((resolve) => {
       resolveSend = resolve;
     });
     mockedInvoiceService.sendInvoiceEmail.mockReturnValueOnce(sendPromise);
@@ -417,12 +453,18 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.queryByText(/alice@example\.com/i)).not.toBeInTheDocument();
 
     resolveSend(
-      makeInvoice({
-        status: "sent",
-        share_token: "invoice-share-token-2",
-        shared_at: "2026-03-20T00:20:00.000Z",
-        updated_at: "2026-03-20T00:20:00.000Z",
-      }),
+      {
+        id: "job-email-invoice-1",
+        user_id: "user-1",
+        document_id: "invoice-1",
+        job_type: "email",
+        status: "pending",
+        attempts: 0,
+        terminal_error: null,
+        extraction_result: null,
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
     );
 
     await waitFor(() => {
