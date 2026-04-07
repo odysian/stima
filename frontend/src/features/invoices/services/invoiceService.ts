@@ -5,7 +5,9 @@ import type {
   InvoiceListItem,
   InvoiceUpdateRequest,
 } from "@/features/invoices/types/invoice.types";
-import { request, requestBlob } from "@/shared/lib/http";
+import type { JobStatusResponse } from "@/features/quotes/types/quote.types";
+import { request, requestBlob, requestWithMetadata } from "@/shared/lib/http";
+import { buildIdempotencyKey } from "@/shared/lib/idempotency";
 
 function createInvoice(data: InvoiceCreateRequest): Promise<Invoice> {
   return request<Invoice>("/api/invoices", {
@@ -42,10 +44,15 @@ function shareInvoice(id: string): Promise<Invoice> {
   });
 }
 
-function sendInvoiceEmail(id: string): Promise<Invoice> {
-  return request<Invoice>(`/api/invoices/${id}/send-email`, {
+async function sendInvoiceEmail(id: string, idempotencyKey?: string): Promise<JobStatusResponse> {
+  const response = await requestWithMetadata<JobStatusResponse>(`/api/invoices/${id}/send-email`, {
     method: "POST",
+    headers: {
+      "Idempotency-Key": idempotencyKey ?? buildIdempotencyKey(),
+    },
   });
+
+  return response.data;
 }
 
 export const invoiceService = {

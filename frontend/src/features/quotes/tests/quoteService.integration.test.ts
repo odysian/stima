@@ -293,52 +293,40 @@ describe("quoteService integration (MSW)", () => {
     expect(invoice.due_date).toBe("2026-04-19");
   });
 
-  it("sendQuoteEmail posts to the email delivery endpoint and returns the updated quote", async () => {
+  it("sendQuoteEmail posts to the email delivery endpoint with Idempotency-Key and returns job metadata", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;
+    let capturedIdempotencyKeyHeader: string | null = null;
 
     server.use(
       http.post("/api/quotes/:id/send-email", ({ request, params }) => {
         capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        capturedIdempotencyKeyHeader = request.headers.get("Idempotency-Key");
         return HttpResponse.json(
           {
-            id: String(params.id),
-            customer_id: "cust-1",
-            doc_number: "Q-001",
-            title: null,
-            status: "shared",
-            source_type: "text",
-            transcript: "Mulch and edging",
-            total_amount: 120,
-            tax_rate: null,
-            discount_type: null,
-            discount_value: null,
-            deposit_amount: null,
-            notes: "Thank you",
-            shared_at: "2026-03-20T00:05:00.000Z",
-            share_token: "share-token-1",
-            line_items: [
-              {
-                id: "line-1",
-                description: "Mulch",
-                details: "5 yards",
-                price: 120,
-                sort_order: 0,
-              },
-            ],
+            id: `job-email-quote-${String(params.id)}`,
+            user_id: "user-1",
+            document_id: String(params.id),
+            job_type: "email",
+            status: "pending",
+            attempts: 0,
+            terminal_error: null,
+            extraction_result: null,
             created_at: "2026-03-20T00:00:00.000Z",
-            updated_at: "2026-03-20T00:05:00.000Z",
+            updated_at: "2026-03-20T00:00:00.000Z",
           },
-          { status: 200 },
+          { status: 202 },
         );
       }),
     );
 
-    const quote = await quoteService.sendQuoteEmail("quote-1");
+    const job = await quoteService.sendQuoteEmail("quote-1");
 
     expect(capturedCsrfHeader).toBe("integration-csrf-token");
-    expect(quote.status).toBe("shared");
-    expect(quote.share_token).toBe("share-token-1");
+    expect(capturedIdempotencyKeyHeader).toBeTruthy();
+    expect(job.id).toContain("job-email-quote-");
+    expect(job.job_type).toBe("email");
+    expect(job.status).toBe("pending");
   });
 
   it("listQuotes returns quote summary contract including customer_name", async () => {

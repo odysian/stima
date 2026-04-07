@@ -20,9 +20,14 @@ class JobService:
         *,
         user_id: UUID,
         job_type: JobType,
+        document_id: UUID | None = None,
     ) -> JobRecord:
         """Persist a new pending job row."""
-        return await self.repository.create(user_id=user_id, job_type=job_type)
+        return await self.repository.create(
+            user_id=user_id,
+            job_type=job_type,
+            document_id=document_id,
+        )
 
     async def count_active_extraction_jobs(self, user_id: UUID) -> int:
         """Count active extraction jobs for one user."""
@@ -47,10 +52,10 @@ class JobService:
         """Return one durable job record when the caller owns it."""
         return await self.repository.get_by_id_for_user(job_id, user_id)
 
-    async def mark_enqueue_failed(self, job_id: UUID) -> JobRecord:
-        """Finalize a newly created pending extraction job when queue submission fails."""
+    async def mark_enqueue_failed(self, job_id: UUID, *, job_type: JobType) -> JobRecord:
+        """Finalize a newly created pending job when queue submission fails."""
         return await self.repository.set_terminal(
             job_id,
             reason="enqueue_failed",
-            expected_job_type=JobType.EXTRACTION,
+            expected_job_type=job_type,
         )

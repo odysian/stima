@@ -238,7 +238,7 @@ Rules:
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes, or `404 { detail: "Not found" }` |
 | `/quotes/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Quote`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, and preserves terminal quote status on resend |
 | `/quotes/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current quote share token without leaking token state publicly |
-| `/quotes/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `200 Quote` after ensuring the quote is shared and emailing the customer link; replayed `200` responses include `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when quote is missing/not owned, `409` when still `draft`, when the same key is reused for a different quote, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
+| `/quotes/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `202 JobRecordResponse` after ensuring the quote is shared, creating a durable `email` job row, and enqueueing worker delivery; replayed same-key responses return the same `202` payload with `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when quote is missing/not owned, `409` when still `draft`, when the same key is reused for a different quote, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, or `503 { detail: "Unable to start email delivery right now. Please try again." }` when enqueue fails after job creation |
 | `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
 | `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
 | `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "An invoice already exists for this quote" }` |
@@ -260,7 +260,7 @@ Quote extraction guardrails:
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
 | `/invoices/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Invoice`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, and transitions invoice to `sent` |
 | `/invoices/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current invoice share token without leaking token state publicly |
-| `/invoices/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `200 Invoice` after ensuring the invoice is shared and emailing the customer PDF link; replayed `200` responses include `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when invoice is missing/not owned, `409` when still `draft`, when the same key is reused for a different invoice, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, `502` when the provider send fails, or `503` when email delivery runtime config is missing |
+| `/invoices/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `202 JobRecordResponse` after ensuring the invoice is shared, creating a durable `email` job row, and enqueueing worker delivery; replayed same-key responses return the same `202` payload with `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when invoice is missing/not owned, `409` when still `draft`, when the same key is reused for a different invoice, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, or `503 { detail: "Unable to start email delivery right now. Please try again." }` when enqueue fails after job creation |
 
 ### Public document landing endpoints
 
@@ -294,20 +294,22 @@ Public landing-page rules:
 
 `POST /quotes/{id}/send-email` behavior:
 - `Idempotency-Key` is mandatory; missing keys return `400 { "detail": "Idempotency-Key header is required" }`.
-- Successful same-key retries replay the original `200` response with `Idempotency-Replayed: true` and do not send a second email.
+- Successful same-key retries replay the original `202 JobRecordResponse` with `Idempotency-Replayed: true` and do not create a second `email` job.
 - Reusing the same key for a different quote, or while the original request is still in progress, returns `409`.
-- The quote is shared before the provider call, so a `502` or `503` can still leave the quote in `shared` state on a subsequent `GET`.
+- The quote is shared before enqueue, so a `503` enqueue failure can still leave the quote in `shared` state on a subsequent `GET`.
+- Provider delivery now executes in the worker; delivery failures surface through `GET /jobs/{job_id}` terminal status and `terminal_error`, not as synchronous `send-email` endpoint responses.
 - Ready, shared, viewed, approved, and declined quotes can all send or resend email without rotating the existing share token; if the existing token is expired or revoked, the share step regenerates a fresh one before delivery.
-- The duplicate-send guard allows an immediate retry after provider failure because no `email_sent` throttle event is recorded on failed sends.
+- The API duplicate-send guard runs during job preparation only; worker retries for the same job are not blocked by the recent-send throttle.
 
 `POST /invoices/{id}/send-email` behavior:
 - `Idempotency-Key` is mandatory; missing keys return `400 { "detail": "Idempotency-Key header is required" }`.
-- Successful same-key retries replay the original `200` response with `Idempotency-Replayed: true` and do not send a second email.
+- Successful same-key retries replay the original `202 JobRecordResponse` with `Idempotency-Replayed: true` and do not create a second `email` job.
 - Reusing the same key for a different invoice, or while the original request is still in progress, returns `409`.
-- The invoice is shared before the provider call, so a `502` or `503` can still leave the invoice in `sent` state with a reusable `share_token` on a subsequent `GET`.
+- The invoice is shared before enqueue, so a `503` enqueue failure can still leave the invoice in `sent` state with a reusable `share_token` on a subsequent `GET`.
+- Provider delivery now executes in the worker; delivery failures surface through `GET /jobs/{job_id}` terminal status and `terminal_error`, not as synchronous `send-email` endpoint responses.
 - Ready and sent invoices can both send or resend email without rotating the existing share token; if the existing token is expired or revoked, the share step regenerates a fresh one before delivery. Draft invoices are rejected until the PDF is generated.
 - Invoice email CTAs now use the public frontend `/doc/{share_token}` landing page as the primary customer route, with `/share/{share_token}` remaining the raw PDF download path.
-- The duplicate-send guard allows an immediate retry after provider failure because no `email_sent` throttle event is recorded on failed sends.
+- The API duplicate-send guard runs during job preparation only; worker retries for the same job are not blocked by the recent-send throttle.
 
 `QuoteListItem` fields:
 - `id`

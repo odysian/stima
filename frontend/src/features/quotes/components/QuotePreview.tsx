@@ -23,6 +23,8 @@ import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { jobService } from "@/shared/lib/jobService";
+import { pollJobUntilSuccess } from "@/shared/lib/jobPolling";
 import { canNavigateBack } from "@/shared/lib/navigation";
 
 export function QuotePreview(): React.ReactElement {
@@ -235,8 +237,16 @@ export function QuotePreview(): React.ReactElement {
     setIsSendingEmail(true);
 
     try {
-      const updatedQuote = await quoteService.sendQuoteEmail(id);
-      applyQuoteUpdate(updatedQuote);
+      const job = await quoteService.sendQuoteEmail(id);
+      await refetchQuote(id);
+      setShareMessage("Quote email is sending. We’ll update this status shortly.");
+      await pollJobUntilSuccess({
+        jobId: job.id,
+        getJobStatus: (jobId) => jobService.getJobStatus(jobId),
+        terminalErrorMessage: "Quote email failed. Please try again.",
+        timeoutErrorMessage: "Quote email is taking longer than expected. Refresh to check delivery status.",
+      });
+      await refetchQuote(id);
       setShareMessage("Quote email sent.");
     } catch (error) {
       setShareError(getSendEmailErrorMessage(error));

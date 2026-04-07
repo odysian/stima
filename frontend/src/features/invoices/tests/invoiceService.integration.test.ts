@@ -258,52 +258,40 @@ describe("invoiceService integration (MSW)", () => {
     expect(invoice.share_token).toBe("invoice-share-token-1");
   });
 
-  it("sendInvoiceEmail sends CSRF and returns the sent invoice", async () => {
+  it("sendInvoiceEmail sends CSRF + Idempotency-Key and returns job metadata", async () => {
     setCsrfToken("invoice-csrf-token");
     let capturedCsrfHeader: string | null = null;
+    let capturedIdempotencyKeyHeader: string | null = null;
 
     server.use(
       http.post("/api/invoices/:id/send-email", ({ request, params }) => {
         capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        capturedIdempotencyKeyHeader = request.headers.get("Idempotency-Key");
 
         return HttpResponse.json(
           {
-            id: String(params.id),
-            customer_id: "cust-1",
-            doc_number: "I-001",
-            title: "Spring cleanup",
-            status: "sent",
-            total_amount: 120,
-            tax_rate: null,
-            discount_type: null,
-            discount_value: null,
-            deposit_amount: null,
-            notes: "Thanks for your business",
-            due_date: "2026-04-19",
-            shared_at: "2026-03-20T00:20:00.000Z",
-            share_token: "invoice-share-token-2",
-            source_document_id: "quote-1",
-            line_items: [
-              {
-                id: "line-1",
-                description: "Brown mulch",
-                details: "5 yards",
-                price: 120,
-                sort_order: 0,
-              },
-            ],
+            id: `job-email-invoice-${String(params.id)}`,
+            user_id: "user-1",
+            document_id: String(params.id),
+            job_type: "email",
+            status: "pending",
+            attempts: 0,
+            terminal_error: null,
+            extraction_result: null,
             created_at: "2026-03-20T00:00:00.000Z",
-            updated_at: "2026-03-20T00:20:00.000Z",
+            updated_at: "2026-03-20T00:00:00.000Z",
           },
-          { status: 200 },
+          { status: 202 },
         );
       }),
     );
 
-    const invoice = await invoiceService.sendInvoiceEmail("invoice-1");
+    const job = await invoiceService.sendInvoiceEmail("invoice-1");
 
     expect(capturedCsrfHeader).toBe("invoice-csrf-token");
-    expect(invoice.status).toBe("sent");
-    expect(invoice.share_token).toBe("invoice-share-token-2");
+    expect(capturedIdempotencyKeyHeader).toBeTruthy();
+    expect(job.id).toContain("job-email-invoice-");
+    expect(job.job_type).toBe("email");
+    expect(job.status).toBe("pending");
   });
 });

@@ -28,6 +28,7 @@ from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.invoices.schemas import InvoiceResponse
 from app.features.invoices.service import InvoiceService
+from app.features.jobs.models import JobType
 from app.features.jobs.schemas import JobRecordResponse, job_record_to_response
 from app.features.jobs.service import JobService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
@@ -68,7 +69,7 @@ from app.shared.input_limits import (
     NOTE_INPUT_MAX_CHARS,
 )
 from app.shared.rate_limit import get_ip_key, get_user_key, limiter
-from app.worker.job_registry import EXTRACTION_JOB_NAME
+from app.worker.job_registry import EMAIL_JOB_NAME, EXTRACTION_JOB_NAME
 
 router = APIRouter(prefix="/quotes", tags=["quotes"])
 public_router = APIRouter(tags=["quotes"])
@@ -79,6 +80,7 @@ _PRIVATE_RESPONSE_HEADERS = {
 }
 LOGGER = logging.getLogger(__name__)
 _QUEUE_FAILURE_DETAIL = "Unable to start extraction right now. Please try again."
+_EMAIL_QUEUE_FAILURE_DETAIL = "Unable to start email delivery right now. Please try again."
 
 
 class _BusinessNameContext(Protocol):
@@ -257,7 +259,7 @@ async def extract_combined(
             raise RuntimeError("ARQ did not accept the extraction job")
     except Exception as exc:
         LOGGER.warning("Failed to enqueue extraction job %s", job.id, exc_info=True)
-        await job_service.mark_enqueue_failed(job.id)
+        await job_service.mark_enqueue_failed(job.id, job_type=JobType.EXTRACTION)
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -419,7 +421,8 @@ async def revoke_quote_share(
 
 @router.post(
     "/{quote_id}/send-email",
-    response_model=QuoteResponse,
+    response_model=JobRecordResponse,
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(lambda: get_settings().quote_email_send_rate_limit, key_func=get_user_key)
@@ -432,9 +435,12 @@ async def send_quote_email(
         QuoteEmailDeliveryService,
         Depends(get_quote_email_delivery_service),
     ],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
+    job_service: Annotated[JobService, Depends(get_job_service)],
     idempotency_store: Annotated[IdempotencyStore, Depends(get_idempotency_store)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
-) -> QuoteResponse:
+) -> JobRecordResponse:
     """Send a quote email to the customer contact on file."""
     del request
     try:
@@ -451,7 +457,7 @@ async def send_quote_email(
     if replay.kind == "replay" and replay.response is not None:
         response.headers["Idempotency-Replayed"] = "true"
         response.status_code = replay.response.status_code
-        return QuoteResponse.model_validate(replay.response.payload)
+        return JobRecordResponse.model_validate(replay.response.payload)
     if replay.kind == "conflict":
         raise HTTPException(
             status_code=409,
@@ -464,7 +470,7 @@ async def send_quote_email(
         )
 
     try:
-        quote = await email_delivery_service.send_quote_email(user, quote_id)
+        await email_delivery_service.prepare_quote_email_job(user, quote_id)
     except QuoteServiceError as exc:
         try:
             await idempotency_store.abort(
@@ -494,22 +500,78 @@ async def send_quote_email(
             )
         raise
 
-    quote_response = QuoteResponse.model_validate(quote)
+    job = await job_service.create_job(
+        user_id=user.id,
+        job_type=JobType.EMAIL,
+        document_id=quote_id,
+    )
+    if arq_pool is None:
+        await job_service.mark_enqueue_failed(job.id, job_type=JobType.EMAIL)
+        await db.commit()
+        try:
+            await idempotency_store.abort(
+                endpoint_slug="quote-send-email",
+                user_id=user.id,
+                resource_id=quote_id,
+                idempotency_key=normalized_idempotency_key,
+            )
+        except Exception:  # pragma: no cover - degraded Redis persistence path
+            LOGGER.warning(
+                "quote email idempotency abort failed after missing arq pool",
+                extra={"quote_id": str(quote_id), "user_id": str(user.id)},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_EMAIL_QUEUE_FAILURE_DETAIL,
+        )
+
+    try:
+        queued_job = await arq_pool.enqueue_job(
+            EMAIL_JOB_NAME,
+            str(job.id),
+            _job_id=str(job.id),
+        )
+        if queued_job is None:
+            raise RuntimeError("ARQ did not accept the email job")
+    except Exception as exc:
+        LOGGER.warning("Failed to enqueue quote email job %s", job.id, exc_info=True)
+        await job_service.mark_enqueue_failed(job.id, job_type=JobType.EMAIL)
+        await db.commit()
+        try:
+            await idempotency_store.abort(
+                endpoint_slug="quote-send-email",
+                user_id=user.id,
+                resource_id=quote_id,
+                idempotency_key=normalized_idempotency_key,
+            )
+        except Exception:  # pragma: no cover - degraded Redis persistence path
+            LOGGER.warning(
+                "quote email idempotency abort failed after enqueue failure",
+                extra={"quote_id": str(quote_id), "user_id": str(user.id)},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_EMAIL_QUEUE_FAILURE_DETAIL,
+        ) from exc
+
+    await db.commit()
+    job_response = job_record_to_response(job)
+    response.status_code = status.HTTP_202_ACCEPTED
     try:
         await idempotency_store.complete(
             endpoint_slug="quote-send-email",
             user_id=user.id,
             resource_id=quote_id,
             idempotency_key=normalized_idempotency_key,
-            status_code=status.HTTP_200_OK,
-            payload=quote_response.model_dump(mode="json"),
+            status_code=status.HTTP_202_ACCEPTED,
+            payload=job_response.model_dump(mode="json"),
         )
     except Exception:  # pragma: no cover - degraded Redis persistence path
         LOGGER.warning(
-            "quote email sent without persisted idempotency replay state",
+            "quote email job enqueued without persisted idempotency replay state",
             extra={"quote_id": str(quote_id), "user_id": str(user.id)},
         )
-    return quote_response
+    return job_response
 
 
 @router.post(

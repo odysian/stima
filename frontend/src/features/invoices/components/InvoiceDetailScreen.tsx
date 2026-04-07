@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
+import { mergeInvoiceDetailWithUpdate } from "@/features/invoices/components/invoiceDetail.helpers";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { Invoice, InvoiceDetail } from "@/features/invoices/types/invoice.types";
 import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
@@ -23,6 +23,8 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatDate } from "@/shared/lib/formatters";
+import { jobService } from "@/shared/lib/jobService";
+import { pollJobUntilSuccess } from "@/shared/lib/jobPolling";
 import { canNavigateBack } from "@/shared/lib/navigation";
 
 export function InvoiceDetailScreen(): React.ReactElement {
@@ -43,6 +45,20 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
 
+  async function loadInvoiceDetail(invoiceId: string): Promise<void> {
+    setIsLoadingInvoice(true);
+    setLoadError(null);
+    try {
+      const fetchedInvoice = await invoiceService.getInvoice(invoiceId);
+      setInvoice(fetchedInvoice);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to load invoice";
+      setLoadError(message);
+    } finally {
+      setIsLoadingInvoice(false);
+    }
+  }
+
   useEffect(() => {
     if (!id) {
       setLoadError("Missing invoice id.");
@@ -50,10 +66,8 @@ export function InvoiceDetailScreen(): React.ReactElement {
       return;
     }
     const invoiceId = id;
-
     let isActive = true;
-
-    async function fetchInvoice(): Promise<void> {
+    void (async () => {
       setIsLoadingInvoice(true);
       setLoadError(null);
       try {
@@ -72,9 +86,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
           setIsLoadingInvoice(false);
         }
       }
-    }
-
-    void fetchInvoice();
+    })();
     return () => {
       isActive = false;
     };
@@ -111,24 +123,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
   function applyInvoiceUpdate(updatedInvoice: Invoice): void {
     invalidateLocalPdf();
-    setInvoice((currentInvoice) => {
-      if (!currentInvoice) {
-        return currentInvoice;
-      }
-
-      return {
-        ...currentInvoice,
-        title: updatedInvoice.title,
-        status: updatedInvoice.status,
-        due_date: updatedInvoice.due_date,
-        total_amount: updatedInvoice.total_amount,
-        notes: updatedInvoice.notes,
-        shared_at: updatedInvoice.shared_at,
-        share_token: updatedInvoice.share_token,
-        updated_at: updatedInvoice.updated_at,
-        line_items: updatedInvoice.line_items,
-      };
-    });
+    setInvoice((currentInvoice) => mergeInvoiceDetailWithUpdate(currentInvoice, updatedInvoice));
   }
 
   async function onGeneratePdf(): Promise<void> {
@@ -228,8 +223,16 @@ export function InvoiceDetailScreen(): React.ReactElement {
     setIsSendingEmail(true);
 
     try {
-      const updatedInvoice = await invoiceService.sendInvoiceEmail(id);
-      applyInvoiceUpdate(updatedInvoice);
+      const job = await invoiceService.sendInvoiceEmail(id);
+      await loadInvoiceDetail(id);
+      setEmailMessage("Invoice email is sending. We’ll update this status shortly.");
+      await pollJobUntilSuccess({
+        jobId: job.id,
+        getJobStatus: (jobId) => jobService.getJobStatus(jobId),
+        terminalErrorMessage: "Invoice email failed. Please try again.",
+        timeoutErrorMessage: "Invoice email is taking longer than expected. Refresh to check delivery status.",
+      });
+      await loadInvoiceDetail(id);
       setEmailMessage("Invoice sent by email.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to send invoice email";
