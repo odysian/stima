@@ -95,6 +95,39 @@ async def test_email_job_retry_path_is_not_blocked_by_duplicate_send_guard(
     assert email_service.send_calls == 2  # nosec B101 - pytest assertion
 
 
+async def test_invoice_email_job_succeeds_even_when_recent_email_sent_event_exists(
+    db_session: AsyncSession,
+) -> None:
+    user, document = await _seed_invoice_document(db_session)
+    db_session.add(
+        EventLog(
+            user_id=user.id,
+            event_name="email_sent",
+            metadata_json={
+                "invoice_id": str(document.id),
+                "customer_id": str(document.customer_id),
+            },
+        )
+    )
+    await db_session.flush()
+    job_record = await _seed_email_job(db_session, user_id=user.id, document_id=document.id)
+
+    email_service = _FlakyEmailService(failures_before_success=0)
+    await email_job(
+        _worker_context(
+            db_session,
+            email_service=email_service,
+            job_try=1,
+        ),
+        str(job_record.id),
+    )
+
+    refreshed = await _load_job_record(db_session, job_record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
+    assert email_service.send_calls == 1  # nosec B101 - pytest assertion
+
+
 class _FlakyEmailService:
     def __init__(self, *, failures_before_success: int) -> None:
         self._failures_before_success = failures_before_success
@@ -139,6 +172,46 @@ async def _seed_quote_document(db_session: AsyncSession) -> tuple[User, Document
         status=QuoteStatus.SHARED,
         source_type="text",
         transcript="Deliver quote by email",
+        share_token=share_token,
+    )
+    db_session.add(document)
+    await db_session.flush()
+
+    return user, document
+
+
+async def _seed_invoice_document(db_session: AsyncSession) -> tuple[User, Document]:
+    user = User(
+        id=uuid4(),
+        email=f"{uuid4().hex}@example.com",
+        password_hash="hashed-password",  # nosec B106 - test-only stub value
+        business_name="Summit Exterior Care",
+        first_name="Jane",
+        last_name="Doe",
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    customer = Customer(
+        id=uuid4(),
+        user_id=user.id,
+        name="Acme Customer",
+        email="customer@example.com",
+    )
+    db_session.add(customer)
+    await db_session.flush()
+
+    share_token = f"invoice-share-{uuid4().hex}"
+    document = Document(
+        id=uuid4(),
+        user_id=user.id,
+        customer_id=customer.id,
+        doc_type="invoice",
+        doc_sequence=1,
+        doc_number="I-0001",
+        status=QuoteStatus.SENT,
+        source_type="text",
+        transcript="Deliver invoice by email",
         share_token=share_token,
     )
     db_session.add(document)
