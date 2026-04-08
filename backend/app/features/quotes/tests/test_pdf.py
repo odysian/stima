@@ -465,6 +465,99 @@ async def test_profile_update_invalidates_ready_quote_pdf_artifact_and_bumps_rev
     assert next_job["document_revision"] == initial_job["document_revision"] + 1
 
 
+async def test_logo_upload_invalidates_ready_quote_pdf_artifact_and_bumps_revision(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    initial_job = await _generate_ready_quote_pdf(
+        client,
+        db_session,
+        csrf_token=csrf_token,
+        quote_id=quote["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+    assert initial_job["document_revision"] is not None
+
+    await _upload_logo(client, csrf_token)
+
+    detail_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["pdf_artifact"] == {
+        "status": "missing",
+        "job_id": None,
+        "download_url": None,
+        "terminal_error": None,
+    }
+
+    artifact_response = await client.get(f"/api/quotes/{quote['id']}/pdf")
+    assert artifact_response.status_code == 409
+    assert artifact_response.json() == {"detail": PDF_ARTIFACT_NOT_READY_DETAIL}
+
+    next_job_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    next_job = _assert_async_pdf_job_response(next_job_response, document_id=quote["id"])
+    assert next_job["document_revision"] == initial_job["document_revision"] + 1
+
+
+async def test_logo_delete_invalidates_ready_quote_pdf_artifact_and_bumps_revision(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    await _upload_logo(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    initial_job = await _generate_ready_quote_pdf(
+        client,
+        db_session,
+        csrf_token=csrf_token,
+        quote_id=quote["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+    assert initial_job["document_revision"] is not None
+
+    delete_response = await client.delete(
+        "/api/profile/logo",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert delete_response.status_code == 204
+
+    detail_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["pdf_artifact"] == {
+        "status": "missing",
+        "job_id": None,
+        "download_url": None,
+        "terminal_error": None,
+    }
+
+    artifact_response = await client.get(f"/api/quotes/{quote['id']}/pdf")
+    assert artifact_response.status_code == 409
+    assert artifact_response.json() == {"detail": PDF_ARTIFACT_NOT_READY_DETAIL}
+
+    next_job_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    next_job = _assert_async_pdf_job_response(next_job_response, document_id=quote["id"])
+    assert next_job["document_revision"] == initial_job["document_revision"] + 1
+
+
 async def test_customer_update_invalidates_ready_quote_pdf_artifact_and_bumps_revision(
     client: AsyncClient,
     db_session: AsyncSession,
