@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from app.features.jobs.models import JobRecord, JobType
@@ -60,4 +61,16 @@ class JobService:
             job_id,
             reason="enqueue_failed",
             expected_job_type=job_type,
+        )
+
+    async def reap_stale_extraction_jobs(
+        self,
+        *,
+        older_than: datetime,
+        reason: str,
+    ) -> int:
+        """Finalize stale extraction jobs so users can retry instead of polling forever."""
+        return await self.repository.reap_stale_extraction_jobs(
+            older_than=older_than,
+            reason=reason,
         )

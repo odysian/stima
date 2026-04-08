@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 from app.features.auth.models import User
-from app.features.jobs.models import JobStatus, JobType
+from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.asyncio
@@ -108,6 +110,47 @@ async def test_create_extraction_job_with_capacity_limit_rejects_when_at_limit(
 
     assert first is not None  # nosec B101 - pytest assertion
     assert second is None  # nosec B101 - pytest assertion
+
+
+async def test_reap_stale_extraction_jobs_terminalizes_only_stale_active_extraction_rows(
+    db_session: AsyncSession,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    stale_cutoff = datetime.now(UTC) - timedelta(minutes=5)
+
+    stale_pending = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    stale_pending.created_at = stale_cutoff - timedelta(minutes=1)
+
+    stale_running = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await repository.set_running(stale_running.id, expected_job_type=JobType.EXTRACTION)
+    stale_running.created_at = stale_cutoff - timedelta(minutes=2)
+
+    fresh_pending = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    fresh_pending.created_at = stale_cutoff + timedelta(minutes=1)
+
+    stale_pdf = await repository.create(user_id=user.id, job_type=JobType.PDF)
+    stale_pdf.created_at = stale_cutoff - timedelta(minutes=3)
+
+    await db_session.flush()
+
+    reaped_count = await repository.reap_stale_extraction_jobs(
+        older_than=stale_cutoff,
+        reason="job_not_picked_up",
+    )
+    await db_session.commit()
+
+    records = {record.id: record for record in (await db_session.scalars(select(JobRecord))).all()}
+
+    assert reaped_count == 2  # nosec B101 - pytest assertion
+    assert records[stale_pending.id].status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
+    assert records[stale_pending.id].terminal_error == "job_not_picked_up"  # nosec B101 - pytest assertion
+    assert records[stale_running.id].status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
+    assert records[stale_running.id].terminal_error == "job_not_picked_up"  # nosec B101 - pytest assertion
+    assert records[fresh_pending.id].status == JobStatus.PENDING  # nosec B101 - pytest assertion
+    assert records[fresh_pending.id].terminal_error is None  # nosec B101 - pytest assertion
+    assert records[stale_pdf.id].status == JobStatus.PENDING  # nosec B101 - pytest assertion
+    assert records[stale_pdf.id].terminal_error is None  # nosec B101 - pytest assertion
 
 
 async def _seed_user(db_session: AsyncSession) -> User:

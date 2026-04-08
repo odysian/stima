@@ -140,6 +140,14 @@ class Settings(BaseSettings):
         default=900,
         validation_alias="EXTRACTION_CONCURRENCY_TTL_SECONDS",
     )
+    extraction_job_reaper_interval_seconds: int = Field(
+        default=120,
+        validation_alias="EXTRACTION_JOB_REAPER_INTERVAL_SECONDS",
+    )
+    extraction_job_stale_ttl_seconds: int = Field(
+        default=300,
+        validation_alias="EXTRACTION_JOB_STALE_TTL_SECONDS",
+    )
     worker_concurrency: int = Field(
         default=10,
         validation_alias="WORKER_CONCURRENCY",
@@ -326,6 +334,17 @@ class Settings(BaseSettings):
         """Require at least one worker slot."""
         if value < 1:
             raise ValueError("WORKER_CONCURRENCY must be at least 1")
+        return value
+
+    @field_validator(
+        "extraction_job_reaper_interval_seconds",
+        "extraction_job_stale_ttl_seconds",
+    )
+    @classmethod
+    def validate_positive_job_reaper_timing(cls, value: int) -> int:
+        """Require positive extraction job reaper timing values."""
+        if value < 1:
+            raise ValueError("Extraction job reaper timing values must be at least 1 second")
         return value
 
     @model_validator(mode="after")

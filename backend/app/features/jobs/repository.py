@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.auth.models import User
@@ -84,6 +85,30 @@ class JobRepository:
             return None
 
         return await self.create(user_id=user_id, job_type=JobType.EXTRACTION)
+
+    async def reap_stale_extraction_jobs(
+        self,
+        *,
+        older_than: datetime,
+        reason: str,
+    ) -> int:
+        """Mark stale extraction jobs terminal so they stop consuming concurrency."""
+        result = await self._session.execute(
+            update(JobRecord)
+            .where(
+                JobRecord.job_type == JobType.EXTRACTION,
+                JobRecord.status.in_((JobStatus.PENDING, JobStatus.RUNNING)),
+                JobRecord.created_at < older_than,
+            )
+            .values(
+                status=JobStatus.TERMINAL,
+                terminal_error=reason,
+                result_json=None,
+                updated_at=func.now(),
+            )
+            .returning(JobRecord.id)
+        )
+        return len(result.scalars().all())
 
     async def get_by_id(self, job_id: UUID) -> JobRecord | None:
         """Return one job record by id when it exists."""

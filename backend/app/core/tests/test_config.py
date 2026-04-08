@@ -62,6 +62,23 @@ def test_worker_concurrency_must_be_positive(monkeypatch) -> None:
         get_settings()
 
 
+def test_extraction_job_reaper_settings_use_expected_defaults() -> None:
+    settings = get_settings()
+
+    assert settings.extraction_job_reaper_interval_seconds == 120
+    assert settings.extraction_job_stale_ttl_seconds == 300
+
+
+def test_extraction_job_reaper_settings_must_be_positive(monkeypatch) -> None:
+    monkeypatch.setenv("EXTRACTION_JOB_REAPER_INTERVAL_SECONDS", "0")
+
+    with pytest.raises(
+        ValidationError,
+        match="Extraction job reaper timing values must be at least 1 second",
+    ):
+        get_settings()
+
+
 def test_allowed_origins_csv_parses_to_list(monkeypatch) -> None:
     monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:5173, https://app.stima.dev")
 

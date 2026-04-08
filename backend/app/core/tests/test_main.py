@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator, Iterator
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -154,3 +155,29 @@ async def test_app_lifespan_degrades_when_arq_pool_startup_fails(
 
     async with app.router.lifespan_context(app):
         assert app.state.arq_pool is None
+
+
+@pytest.mark.asyncio
+async def test_app_lifespan_starts_and_cancels_stale_job_reaper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def _fake_reaper(**_: object) -> None:
+        started.set()
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    monkeypatch.setattr("app.main.run_stale_extraction_job_reaper", _fake_reaper)
+
+    app = create_app()
+
+    async with app.router.lifespan_context(app):
+        await asyncio.wait_for(started.wait(), timeout=1)
+        assert app.state.stale_job_reaper_task is not None
+
+    assert cancelled.is_set()
