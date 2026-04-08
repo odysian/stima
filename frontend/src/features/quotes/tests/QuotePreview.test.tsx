@@ -570,6 +570,43 @@ describe("QuotePreview", () => {
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
   });
 
+  it("clears existing share feedback before marking the quote won", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: { writeText: writeTextMock },
+    });
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(makeQuoteDetail({ status: "shared", share_token: "share-token-1" }))
+      .mockResolvedValueOnce(
+        makeQuoteDetail({ status: "approved", share_token: "share-token-1" }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith("http://localhost:3000/doc/share-token-1");
+    });
+    expect(await screen.findByText("Share link copied to clipboard.")).toBeInTheDocument();
+
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /mark as won/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /mark quote as won\?/i })).getByRole("button", {
+        name: /mark as won/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.markQuoteWon).toHaveBeenCalledWith("quote-1");
+    });
+    expect(screen.queryByText("Share link copied to clipboard.")).not.toBeInTheDocument();
+  });
+
   it("navigates to the edit route from the header action", async () => {
     renderScreen();
 

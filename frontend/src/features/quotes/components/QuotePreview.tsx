@@ -65,6 +65,7 @@ export function QuotePreview(): React.ReactElement {
     manualCopyUrl,
     showSendEmailConfirm,
     setShowSendEmailConfirm,
+    clearShareFeedback,
     onGeneratePdf,
     onRequestSendEmail,
     onConfirmSendEmail,
@@ -96,6 +97,7 @@ export function QuotePreview(): React.ReactElement {
     refetchQuote,
     navigate,
     clearInvoiceError,
+    clearShareFeedback,
   });
   const resolvedPdfError = pdfError ?? (
     quote?.pdf_artifact.status === "failed"

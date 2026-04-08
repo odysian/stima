@@ -11,6 +11,7 @@ interface UseQuoteOutcomeActionsArgs {
   refetchQuote: (quoteId: string) => Promise<void>;
   navigate: NavigateFunction;
   clearInvoiceError: () => void;
+  clearShareFeedback: () => void;
 }
 
 interface UseQuoteOutcomeActionsResult {
@@ -36,6 +37,7 @@ export function useQuoteOutcomeActions({
   refetchQuote,
   navigate,
   clearInvoiceError,
+  clearShareFeedback,
 }: UseQuoteOutcomeActionsArgs): UseQuoteOutcomeActionsResult {
   const [isMarkingWon, setIsMarkingWon] = useState(false);
   const [isMarkingLost, setIsMarkingLost] = useState(false);
@@ -52,6 +54,7 @@ export function useQuoteOutcomeActions({
     }
 
     setOutcomeError(null);
+    clearShareFeedback();
     clearInvoiceError();
     setShowMarkWonConfirm(false);
     setIsMarkingWon(true);
@@ -72,6 +75,7 @@ export function useQuoteOutcomeActions({
     }
 
     setOutcomeError(null);
+    clearShareFeedback();
     clearInvoiceError();
     setShowMarkLostConfirm(false);
     setIsMarkingLost(true);

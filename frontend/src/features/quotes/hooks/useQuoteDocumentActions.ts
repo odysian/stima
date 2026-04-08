@@ -1,7 +1,10 @@
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
-import { getSendEmailErrorMessage } from "@/features/quotes/components/quotePreview.helpers";
+import {
+  getSendEmailErrorMessage,
+  isShareAbortError,
+} from "@/features/quotes/components/quotePreview.helpers";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 import { usePendingPdfArtifactResume } from "@/shared/hooks/usePendingPdfArtifactResume";
@@ -25,6 +28,7 @@ interface UseQuoteDocumentActionsResult {
   manualCopyUrl: string | null;
   showSendEmailConfirm: boolean;
   setShowSendEmailConfirm: Dispatch<SetStateAction<boolean>>;
+  clearShareFeedback: () => void;
   onGeneratePdf: () => Promise<void>;
   onRequestSendEmail: (args: {
     hasCustomerEmail: boolean;
@@ -49,6 +53,12 @@ export function useQuoteDocumentActions({
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
 
+  function clearShareFeedback(): void {
+    setShareError(null);
+    setShareMessage(null);
+    setManualCopyUrl(null);
+  }
+
   usePendingPdfArtifactResume({
     artifact: quote?.pdf_artifact,
     enabled: Boolean(quoteId) && !isGeneratingPdf,
@@ -72,9 +82,7 @@ export function useQuoteDocumentActions({
     }
 
     setPdfError(null);
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
+    clearShareFeedback();
     setIsGeneratingPdf(true);
     try {
       const job = await quoteService.generatePdf(quoteId);
@@ -131,9 +139,7 @@ export function useQuoteDocumentActions({
   }
 
   async function onCopyLink(): Promise<void> {
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
+    clearShareFeedback();
     setIsSharing(true);
 
     try {
@@ -195,9 +201,7 @@ export function useQuoteDocumentActions({
     }
 
     setShowSendEmailConfirm(false);
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
+    clearShareFeedback();
     setIsSendingEmail(true);
 
     try {
@@ -229,13 +233,10 @@ export function useQuoteDocumentActions({
     manualCopyUrl,
     showSendEmailConfirm,
     setShowSendEmailConfirm,
+    clearShareFeedback,
     onGeneratePdf,
     onRequestSendEmail,
     onConfirmSendEmail,
     onCopyLink,
   };
-}
-
-function isShareAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
 }

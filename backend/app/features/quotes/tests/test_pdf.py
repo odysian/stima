@@ -98,7 +98,7 @@ class _MockArqPool:
 class _PdfJobResponse(TypedDict):
     id: str
     document_id: str
-    document_revision: int | None
+    document_revision: int
     job_type: str
     status: str
     attempts: int
