@@ -501,6 +501,9 @@ class InvoiceService:
         except StorageNotFoundError as exc:
             invoice.pdf_artifact_path = None
             invoice.pdf_artifact_job_id = None
+            # Keep the artifact revision unchanged here: storage-loss recovery should
+            # regenerate and overwrite the same revision path, while true content
+            # invalidation paths are the only flows that bump revision.
             await self._invoice_repository.commit()
             raise QuoteServiceError(detail=PDF_ARTIFACT_NOT_READY_DETAIL, status_code=409) from exc
         except Exception as exc:  # noqa: BLE001

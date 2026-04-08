@@ -69,8 +69,10 @@ class _ConfigurablePdfIntegration:
     def __init__(self) -> None:
         self.should_fail = False
         self.last_context: QuoteRenderContext | None = None
+        self.render_calls = 0
 
     def render(self, context: QuoteRenderContext) -> bytes:
+        self.render_calls += 1
         self.last_context = context
         if self.should_fail:
             raise PdfRenderError("Unable to render quote PDF")
@@ -281,6 +283,80 @@ async def test_generate_pdf_includes_logo_data_uri_when_logo_exists(
     assert _override_quote_service_dependency.last_context.logo_data_uri.startswith(
         "data:image/png;base64,"
     )
+
+
+async def test_generate_pdf_reuses_persisted_artifact_without_rerendering(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    first_job = _assert_async_pdf_job_response(first_response, document_id=quote["id"])
+    await _run_pdf_job(
+        db_session,
+        job_id=first_job["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+    assert _override_quote_service_dependency.render_calls == 1
+
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_job = _assert_async_pdf_job_response(second_response, document_id=quote["id"])
+    assert second_job["id"] != first_job["id"]
+
+    await _run_pdf_job(
+        db_session,
+        job_id=second_job["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+    assert _override_quote_service_dependency.render_calls == 1
+
+    artifact_response = await client.get(f"/api/quotes/{quote['id']}/pdf")
+    assert artifact_response.status_code == 200
+    assert artifact_response.content == b"PDF for Q-001"
+
+
+async def test_generate_pdf_reuses_existing_pending_job_instead_of_enqueuing_duplicate(
+    client: AsyncClient,
+    _arq_pool_dependency: _MockArqPool,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    first_job = _assert_async_pdf_job_response(first_response, document_id=quote["id"])
+
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_job = _assert_async_pdf_job_response(second_response, document_id=quote["id"])
+
+    assert second_job["id"] == first_job["id"]
+    assert _arq_pool_dependency.calls == [
+        {
+            "function": "jobs.pdf",
+            "args": (first_job["id"],),
+            "kwargs": {"_job_id": first_job["id"]},
+        }
+    ]
 
 
 async def test_generate_pdf_handles_sparse_quote_context(

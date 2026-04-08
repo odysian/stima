@@ -47,4 +47,7 @@ def resolve_pdf_artifact_state(
             terminal_error=terminal_error,
         )
 
+    # SUCCESS with no artifact path means the durable pointer is missing or stale.
+    # Treat it as "missing" so clients can trigger a fresh render instead of
+    # surfacing a misleading ready/failed state for an artifact that cannot load.
     return PdfArtifactState(status="missing", job_id=None, terminal_error=None)
