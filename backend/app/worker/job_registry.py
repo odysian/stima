@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -28,6 +29,7 @@ from app.integrations.pdf import (
 )
 from app.integrations.storage import StorageNotFoundError
 from app.shared.dependencies import get_email_service, get_pdf_integration, get_storage_service
+from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
 from app.worker.email_repository import WorkerEmailRepository
 from app.worker.pdf_repository import WorkerPdfRepository
@@ -43,8 +45,21 @@ EXTRACTION_JOB_NAME = "jobs.extraction"
 PDF_JOB_NAME = "jobs.pdf"
 EMAIL_JOB_NAME = "jobs.email"
 TERMINAL_ERROR_MISSING_DOCUMENT_ID = "missing_document_id"
+TERMINAL_ERROR_STALE_DOCUMENT_REVISION = "stale_document_revision"
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class _RenderedPdfArtifact:
+    """Rendered PDF bytes plus the document snapshot used to persist them safely."""
+
+    document_id: UUID
+    user_id: UUID
+    doc_type: str
+    doc_number: str
+    expected_revision: int
+    pdf_bytes: bytes | None
 
 
 async def extraction_job(ctx: dict[str, Any], job_id: str, *, transcript: str) -> None:
@@ -69,6 +84,12 @@ async def pdf_job(ctx: dict[str, Any], job_id: str) -> None:
         job_id=UUID(job_id),
         job_type=JobType.PDF,
         handler=lambda: _render_pdf(ctx, job_id=UUID(job_id)),
+        on_success=lambda runtime, result: _store_pdf_artifact(
+            runtime,
+            ctx,
+            job_id=UUID(job_id),
+            result=result,
+        ),
     )
 
 
@@ -172,7 +193,7 @@ async def _extract_quote_data(
         raise
 
 
-async def _render_pdf(ctx: dict[str, Any], *, job_id: UUID) -> None:
+async def _render_pdf(ctx: dict[str, Any], *, job_id: UUID) -> _RenderedPdfArtifact:
     runtime = _get_runtime(ctx)
 
     async with runtime.session_maker() as session:
@@ -186,7 +207,31 @@ async def _render_pdf(ctx: dict[str, Any], *, job_id: UUID) -> None:
                 terminal_reason=TERMINAL_ERROR_MISSING_DOCUMENT_ID,
             )
 
-        context = await WorkerPdfRepository(session).get_render_context(
+        worker_repository = WorkerPdfRepository(session)
+        document_snapshot = await worker_repository.get_document_snapshot(
+            document_id=job_record.document_id,
+            user_id=job_record.user_id,
+        )
+        if document_snapshot is None:
+            raise NonRetryableJobError("Document not found for PDF job")
+        if job_record.document_revision is None:
+            raise NonRetryableJobError("PDF job missing required document_revision")
+        if document_snapshot.pdf_artifact_revision != job_record.document_revision:
+            raise NonRetryableJobError(
+                "PDF job became stale before rendering started",
+                terminal_reason=TERMINAL_ERROR_STALE_DOCUMENT_REVISION,
+            )
+        if document_snapshot.pdf_artifact_path is not None:
+            return _RenderedPdfArtifact(
+                document_id=document_snapshot.document_id,
+                user_id=document_snapshot.user_id,
+                doc_type=document_snapshot.doc_type,
+                doc_number=document_snapshot.doc_number,
+                expected_revision=document_snapshot.pdf_artifact_revision,
+                pdf_bytes=None,
+            )
+
+        context = await worker_repository.get_render_context(
             document_id=job_record.document_id,
             user_id=job_record.user_id,
         )
@@ -206,6 +251,15 @@ async def _render_pdf(ctx: dict[str, Any], *, job_id: UUID) -> None:
         if is_retryable_pdf_error(exc):
             raise RetryableJobError(str(exc)) from exc
         raise NonRetryableJobError(str(exc)) from exc
+
+    return _RenderedPdfArtifact(
+        document_id=document_snapshot.document_id,
+        user_id=document_snapshot.user_id,
+        doc_type=document_snapshot.doc_type,
+        doc_number=document_snapshot.doc_number,
+        expected_revision=document_snapshot.pdf_artifact_revision,
+        pdf_bytes=pdf_bytes,
+    )
 
 
 async def _attach_logo_data_uri(ctx: dict[str, Any], context: Any) -> None:
@@ -259,7 +313,7 @@ def _get_storage_service(ctx: dict[str, Any]) -> Any:
     storage_service = ctx.get("storage_service")
     if storage_service is None:
         return get_storage_service()
-    if not hasattr(storage_service, "fetch_bytes"):
+    if not hasattr(storage_service, "fetch_bytes") or not hasattr(storage_service, "upload"):
         raise RuntimeError("Worker storage service is not initialized")
     return storage_service
 
@@ -287,3 +341,65 @@ async def _store_extraction_result(
             expected_job_type=JobType.EXTRACTION,
         )
         await session.commit()
+
+
+async def _store_pdf_artifact(
+    runtime: WorkerRuntimeSettings,
+    ctx: dict[str, Any],
+    *,
+    job_id: UUID,
+    result: _RenderedPdfArtifact,
+) -> None:
+    if result.pdf_bytes is None:
+        async with runtime.session_maker() as session:
+            repository = JobRepository(session)
+            await repository.set_success(job_id, expected_job_type=JobType.PDF)
+            await session.commit()
+        return
+
+    storage_service = _get_storage_service(ctx)
+    try:
+        artifact_path = await asyncio.to_thread(
+            storage_service.upload,
+            prefix=f"pdf-artifacts/{result.user_id}/{result.doc_type}/{result.document_id}",
+            filename=f"r{result.expected_revision}.pdf",
+            data=result.pdf_bytes,
+            content_type="application/pdf",
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise RetryableJobError("Unable to persist PDF artifact") from exc
+
+    async with runtime.session_maker() as session:
+        persistence_result = await WorkerPdfRepository(session).persist_generated_artifact(
+            document_id=result.document_id,
+            user_id=result.user_id,
+            job_id=job_id,
+            expected_revision=result.expected_revision,
+            artifact_path=artifact_path,
+        )
+        if not persistence_result.applied:
+            try:
+                await asyncio.to_thread(storage_service.delete, artifact_path)
+            except Exception:  # noqa: BLE001
+                logger.warning("Failed to delete stale PDF artifact upload", exc_info=True)
+            raise NonRetryableJobError(
+                "PDF job became stale before persistence completed",
+                terminal_reason=TERMINAL_ERROR_STALE_DOCUMENT_REVISION,
+            )
+
+        repository = JobRepository(session)
+        await repository.set_success(job_id, expected_job_type=JobType.PDF)
+        await session.commit()
+
+    if result.doc_type == "quote":
+        log_event(
+            "quote_pdf_generated",
+            user_id=result.user_id,
+            quote_id=result.document_id,
+        )
+
+    if persistence_result.previous_path and persistence_result.previous_path != artifact_path:
+        try:
+            await asyncio.to_thread(storage_service.delete, persistence_result.previous_path)
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to delete superseded PDF artifact", exc_info=True)

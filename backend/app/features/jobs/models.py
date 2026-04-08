@@ -46,6 +46,7 @@ class JobRecord(Base):
         nullable=True,
         index=True,
     )
+    document_revision: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     job_type: Mapped[JobType] = mapped_column(
         sa.Enum(
             JobType,

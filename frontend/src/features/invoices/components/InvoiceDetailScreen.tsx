@@ -13,6 +13,7 @@ import {
   DocumentActionError,
   DocumentActionHint,
   DocumentActionManualCopyField,
+  DocumentActionStatus,
   DocumentActionSuccessMessage,
   DocumentActionSurface,
   documentActionPrimaryButtonClassName,
@@ -35,7 +36,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
@@ -92,15 +92,8 @@ export function InvoiceDetailScreen(): React.ReactElement {
     };
   }, [id]);
 
-  useEffect(() => () => {
-    if (pdfUrl) {
-      URL.revokeObjectURL(pdfUrl);
-    }
-  }, [pdfUrl]);
-
   const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
-  const rawShareUrl = invoice?.share_token ? `${apiBase}/share/${invoice.share_token}` : null;
-  const openPdfUrl = pdfUrl ?? rawShareUrl;
+  const openPdfUrl = invoice?.pdf_artifact.download_url ?? null;
   const hasSourceQuote = Boolean(invoice?.source_document_id && invoice.source_quote_number);
   const hasCustomerEmail = Boolean(invoice?.customer.email?.trim());
   const customerEmail = invoice?.customer.email?.trim() || null;
@@ -112,9 +105,12 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const clientContact = invoice?.customer.phone?.trim()
     || invoice?.customer.email?.trim()
     || "No contact details";
-  function invalidateLocalPdf(): void {
-    setPdfUrl(null);
-  }
+  const isPdfBusy = isGeneratingPdf || invoice?.pdf_artifact.status === "pending";
+  const resolvedPdfError = pdfError ?? (
+    invoice?.pdf_artifact.status === "failed"
+      ? "Invoice PDF failed. Please try again."
+      : null
+  );
 
   function handleBack(): void {
     if (canNavigateBack()) return void navigate(-1);
@@ -122,15 +118,11 @@ export function InvoiceDetailScreen(): React.ReactElement {
   }
 
   function applyInvoiceUpdate(updatedInvoice: Invoice): void {
-    invalidateLocalPdf();
     setInvoice((currentInvoice) => mergeInvoiceDetailWithUpdate(currentInvoice, updatedInvoice));
   }
 
   async function onGeneratePdf(): Promise<void> {
-    if (!id) {
-      return;
-    }
-
+    if (!id) return;
     setPdfError(null);
     setEmailError(null);
     setEmailMessage(null);
@@ -139,19 +131,15 @@ export function InvoiceDetailScreen(): React.ReactElement {
     setManualCopyUrl(null);
     setIsGeneratingPdf(true);
     try {
-      const blob = await invoiceService.generatePdf(id);
-      const nextPdfUrl = URL.createObjectURL(blob);
-      setPdfUrl((currentPdfUrl) => {
-        if (currentPdfUrl) {
-          URL.revokeObjectURL(currentPdfUrl);
-        }
-        return nextPdfUrl;
+      const job = await invoiceService.generatePdf(id);
+      await loadInvoiceDetail(id);
+      await pollJobUntilSuccess({
+        jobId: job.id,
+        getJobStatus: (jobId) => jobService.getJobStatus(jobId),
+        terminalErrorMessage: "Invoice PDF failed. Please try again.",
+        timeoutErrorMessage: "Invoice PDF is taking longer than expected. Refresh to check its status.",
       });
-      setInvoice((currentInvoice) => (
-        currentInvoice && currentInvoice.status === "draft"
-          ? { ...currentInvoice, status: "ready" }
-          : currentInvoice
-      ));
+      await loadInvoiceDetail(id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to generate invoice PDF";
       setPdfError(message);
@@ -161,10 +149,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
   }
 
   async function onCopyLink(): Promise<void> {
-    if (!id) {
-      return;
-    }
-
+    if (!id) return;
     setEmailError(null);
     setEmailMessage(null);
     setShareError(null);
@@ -200,10 +185,16 @@ export function InvoiceDetailScreen(): React.ReactElement {
   }
 
   function onRequestSendEmail(): void {
-    if (!emailActionLabel || !hasCustomerEmail || isGeneratingPdf || isSharing || isSendingEmail) {
+    if (
+      !emailActionLabel
+      || !hasCustomerEmail
+      || isPdfBusy
+      || isSharing
+      || isSendingEmail
+      || invoice?.pdf_artifact.status === "pending"
+    ) {
       return;
     }
-
     setEmailError(null);
     setEmailMessage(null);
     setShowSendEmailConfirm(true);
@@ -241,6 +232,12 @@ export function InvoiceDetailScreen(): React.ReactElement {
       setIsSendingEmail(false);
     }
   }
+
+  const statusCopy = isPdfBusy
+    ? "Generating PDF preview. This can take a few moments."
+    : isSendingEmail ? "Sending invoice email..."
+    : isSharing ? "Copying share link..."
+    : null;
 
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
@@ -361,11 +358,11 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 <Button
                   type="button"
                   className={documentActionPrimaryButtonClassName}
-                  disabled={isSharing || isSendingEmail}
+                  disabled={isSharing || isSendingEmail || isPdfBusy}
                   onClick={() => {
                     void onGeneratePdf();
                   }}
-                  isLoading={isGeneratingPdf}
+                  isLoading={isPdfBusy}
                 >
                   Generate PDF
                 </Button>
@@ -376,7 +373,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     <button
                       type="button"
                       className={documentActionUtilityButtonClassName}
-                      disabled={!hasCustomerEmail || isGeneratingPdf || isSharing || isSendingEmail}
+                      disabled={!hasCustomerEmail || isPdfBusy || isSharing || isSendingEmail}
                       onClick={onRequestSendEmail}
                     >
                       <span className="material-symbols-outlined text-base">mail</span>
@@ -387,7 +384,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   <button
                     type="button"
                     className={documentActionUtilityButtonClassName}
-                    disabled={isSharing || isGeneratingPdf || isSendingEmail}
+                    disabled={isSharing || isPdfBusy || isSendingEmail}
                     onClick={() => {
                       void onCopyLink();
                     }}
@@ -404,9 +401,10 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   Add a customer email to send this invoice via email. Copy Link still works.
                 </DocumentActionHint>
               ) : null}
+              status={statusCopy ? <DocumentActionStatus>{statusCopy}</DocumentActionStatus> : null}
               feedback={(
                 <>
-                  {pdfError ? <DocumentActionError>{pdfError}</DocumentActionError> : null}
+                  {resolvedPdfError ? <DocumentActionError>{resolvedPdfError}</DocumentActionError> : null}
                   {emailError ? <DocumentActionError>{emailError}</DocumentActionError> : null}
                   {shareError ? <DocumentActionError>{shareError}</DocumentActionError> : null}
                   {manualCopyUrl ? (

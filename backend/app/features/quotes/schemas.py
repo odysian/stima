@@ -188,6 +188,15 @@ class LinkedInvoiceResponse(BaseModel):
     created_at: datetime
 
 
+class PdfArtifactResponse(BaseModel):
+    """Durable authenticated PDF artifact state returned in detail payloads."""
+
+    status: Literal["missing", "pending", "ready", "failed"]
+    job_id: UUID | None
+    download_url: str | None
+    terminal_error: str | None
+
+
 class QuoteDetailResponse(QuoteResponse):
     """Quote detail payload including customer display fields."""
 
@@ -195,6 +204,7 @@ class QuoteDetailResponse(QuoteResponse):
     customer_email: str | None
     customer_phone: str | None
     linked_invoice: LinkedInvoiceResponse | None
+    pdf_artifact: PdfArtifactResponse
 
 
 class PublicQuoteResponse(BaseModel):

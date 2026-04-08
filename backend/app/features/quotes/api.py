@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Protocol, cast
+from typing import Annotated, Literal, Protocol, cast
 from uuid import UUID
 
 from arq.connections import ArqRedis
@@ -28,7 +28,7 @@ from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.invoices.schemas import InvoiceResponse
 from app.features.invoices.service import InvoiceService
-from app.features.jobs.models import JobType
+from app.features.jobs.models import JobStatus, JobType
 from app.features.jobs.schemas import JobRecordResponse, job_record_to_response
 from app.features.jobs.service import JobService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
@@ -37,6 +37,9 @@ from app.features.quotes.schemas import (
     ConvertNotesRequest,
     DiscountType,
     ExtractionResult,
+    LineItemResponse,
+    LinkedInvoiceResponse,
+    PdfArtifactResponse,
     PublicDocumentResponse,
     PublicInvoiceResponse,
     PublicLineItemResponse,
@@ -68,6 +71,7 @@ from app.shared.input_limits import (
     MAX_AUDIO_TOTAL_BYTES,
     NOTE_INPUT_MAX_CHARS,
 )
+from app.shared.pdf_artifacts import resolve_pdf_artifact_state
 from app.shared.rate_limit import get_ip_key, get_user_key, limiter
 from app.worker.job_registry import EMAIL_JOB_NAME, EXTRACTION_JOB_NAME
 
@@ -284,6 +288,7 @@ async def list_quotes(
 
 @router.get("/{quote_id}", response_model=QuoteDetailResponse)
 async def get_quote(
+    request: Request,
     quote_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
@@ -293,7 +298,41 @@ async def get_quote(
         quote = await quote_service.get_quote_detail(user, quote_id)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    return QuoteDetailResponse.model_validate(quote)
+    return QuoteDetailResponse(
+        id=quote.id,
+        customer_id=quote.customer_id,
+        doc_number=quote.doc_number,
+        title=quote.title,
+        status=cast(str, quote.status),
+        source_type=cast(Literal["text", "voice"], quote.source_type),
+        transcript=quote.transcript,
+        total_amount=float(quote.total_amount) if quote.total_amount is not None else None,
+        tax_rate=float(quote.tax_rate) if quote.tax_rate is not None else None,
+        discount_type=cast(DiscountType | None, quote.discount_type),
+        discount_value=(float(quote.discount_value) if quote.discount_value is not None else None),
+        deposit_amount=(float(quote.deposit_amount) if quote.deposit_amount is not None else None),
+        notes=quote.notes,
+        shared_at=quote.shared_at,
+        share_token=quote.share_token,
+        line_items=[LineItemResponse.model_validate(line_item) for line_item in quote.line_items],
+        created_at=quote.created_at,
+        updated_at=quote.updated_at,
+        customer_name=quote.customer_name,
+        customer_email=quote.customer_email,
+        customer_phone=quote.customer_phone,
+        linked_invoice=(
+            LinkedInvoiceResponse.model_validate(quote.linked_invoice)
+            if quote.linked_invoice is not None
+            else None
+        ),
+        pdf_artifact=_build_authenticated_pdf_artifact_response(
+            download_url=str(request.url_for("get_quote_pdf_artifact", quote_id=quote.id)),
+            artifact_path=quote.pdf_artifact_path,
+            job_id=quote.pdf_artifact_job_id,
+            job_status=quote.pdf_artifact_job_status,
+            terminal_error=quote.pdf_artifact_terminal_error,
+        ),
+    )
 
 
 @router.patch(
@@ -353,6 +392,8 @@ async def convert_quote_to_invoice(
 
 @router.post(
     "/{quote_id}/pdf",
+    response_model=JobRecordResponse,
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(
@@ -361,19 +402,42 @@ async def convert_quote_to_invoice(
 )
 async def generate_quote_pdf(
     request: Request,
+    response: Response,
     quote_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
-) -> StreamingResponse:
-    """Render a user-owned quote to PDF and stream bytes inline."""
+    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
+    job_service: Annotated[JobService, Depends(get_job_service)],
+) -> JobRecordResponse:
+    """Start or reuse one durable quote PDF generation job."""
     del request
     try:
-        doc_number, pdf_bytes = await quote_service.generate_pdf(user, quote_id)
+        job = await quote_service.start_pdf_generation(
+            user,
+            quote_id,
+            job_service=job_service,
+            arq_pool=arq_pool,
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    response.status_code = status.HTTP_202_ACCEPTED
+    return job_record_to_response(job)
+
+
+@router.get("/{quote_id}/pdf")
+async def get_quote_pdf_artifact(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> Response:
+    """Stream one persisted authenticated quote PDF artifact when ready."""
+    try:
+        doc_number, pdf_bytes = await quote_service.get_pdf_artifact(user, quote_id)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    return StreamingResponse(
-        iter((pdf_bytes,)),
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Cache-Control": "no-store",
@@ -792,3 +856,25 @@ def _resolve_public_business_name(quote: _BusinessNameContext) -> str | None:
         value.strip() for value in (quote.first_name, quote.last_name) if value and value.strip()
     )
     return fallback_name or None
+
+
+def _build_authenticated_pdf_artifact_response(
+    *,
+    download_url: str,
+    artifact_path: str | None,
+    job_id: UUID | None,
+    job_status: JobStatus | None,
+    terminal_error: str | None,
+) -> PdfArtifactResponse:
+    state = resolve_pdf_artifact_state(
+        artifact_path=artifact_path,
+        job_id=job_id,
+        job_status=job_status,
+        terminal_error=terminal_error,
+    )
+    return PdfArtifactResponse(
+        status=state.status,
+        job_id=state.job_id,
+        download_url=download_url if state.status == "ready" else None,
+        terminal_error=state.terminal_error,
+    )

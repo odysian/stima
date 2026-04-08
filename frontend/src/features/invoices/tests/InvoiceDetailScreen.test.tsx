@@ -26,8 +26,18 @@ vi.mock("@/shared/lib/jobService", () => ({
 
 const mockedInvoiceService = vi.mocked(invoiceService);
 const mockedJobService = vi.mocked(jobService);
-const createObjectUrlMock = vi.fn(() => "blob:invoice-preview");
-const revokeObjectUrlMock = vi.fn();
+
+function makePdfArtifact(
+  overrides: Partial<InvoiceDetail["pdf_artifact"]> = {},
+): InvoiceDetail["pdf_artifact"] {
+  return {
+    status: "missing",
+    job_id: null,
+    download_url: null,
+    terminal_error: null,
+    ...overrides,
+  };
+}
 
 function makeInvoiceDetail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
   return {
@@ -47,6 +57,7 @@ function makeInvoiceDetail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetai
     share_token: null,
     source_document_id: "quote-1",
     source_quote_number: "Q-001",
+    pdf_artifact: makePdfArtifact(),
     customer: {
       id: "cust-1",
       name: "Alice Johnson",
@@ -118,6 +129,7 @@ beforeEach(() => {
     id: "job-email-invoice-1",
     user_id: "user-1",
     document_id: "invoice-1",
+    document_revision: null,
     job_type: "email",
     status: "pending",
     attempts: 0,
@@ -126,17 +138,21 @@ beforeEach(() => {
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
   };
-  const successfulEmailJob: JobStatusResponse = {
+  const pendingPdfJob: JobStatusResponse = {
     ...pendingEmailJob,
+    id: "job-pdf-invoice-1",
+    document_revision: 0,
+    job_type: "pdf",
+  };
+  const successfulPdfJob: JobStatusResponse = {
+    ...pendingPdfJob,
     status: "success",
     attempts: 1,
   };
 
   vi.clearAllMocks();
   mockedInvoiceService.getInvoice.mockResolvedValue(makeInvoiceDetail());
-  mockedInvoiceService.generatePdf.mockResolvedValue(
-    new Blob(["invoice-pdf"], { type: "application/pdf" }),
-  );
+  mockedInvoiceService.generatePdf.mockResolvedValue(pendingPdfJob);
   mockedInvoiceService.shareInvoice.mockResolvedValue(
     makeInvoice({
       status: "sent",
@@ -146,18 +162,7 @@ beforeEach(() => {
     }),
   );
   mockedInvoiceService.sendInvoiceEmail.mockResolvedValue(pendingEmailJob);
-  mockedJobService.getJobStatus.mockResolvedValue(successfulEmailJob);
-  Object.defineProperty(URL, "createObjectURL", {
-    configurable: true,
-    writable: true,
-    value: createObjectUrlMock,
-  });
-  Object.defineProperty(URL, "revokeObjectURL", {
-    configurable: true,
-    writable: true,
-    value: revokeObjectUrlMock,
-  });
-
+  mockedJobService.getJobStatus.mockResolvedValue(successfulPdfJob);
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     writable: true,
@@ -375,23 +380,29 @@ describe("InvoiceDetailScreen", () => {
     expect(await screen.findByText("Copy this share link manually.")).toBeInTheDocument();
   });
 
-  it("clears a generated local PDF after sharing the invoice", async () => {
+  it("preserves the ready PDF link after sharing the invoice", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        pdf_artifact: makePdfArtifact({
+          status: "ready",
+          download_url: "/api/invoices/invoice-1/pdf",
+        }),
+      }),
+    );
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Generate PDF" }));
-
     const openPdfLink = (await screen.findByText("Open PDF")).closest("a");
-    expect(openPdfLink).toHaveAttribute("href", "blob:invoice-preview");
+    expect(openPdfLink).toHaveAttribute("href", "/api/invoices/invoice-1/pdf");
 
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     await waitFor(() => {
       expect(mockedInvoiceService.shareInvoice).toHaveBeenCalledWith("invoice-1");
     });
-    await waitFor(() => {
-      expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:invoice-preview");
-    });
-    expect(screen.queryByRole("link", { name: "Open PDF" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
+      "href",
+      "/api/invoices/invoice-1/pdf",
+    );
   });
 
   it("opens a confirmation modal before sending and closes it on cancel", async () => {
@@ -457,6 +468,7 @@ describe("InvoiceDetailScreen", () => {
         id: "job-email-invoice-1",
         user_id: "user-1",
         document_id: "invoice-1",
+        document_revision: null,
         job_type: "email",
         status: "pending",
         attempts: 0,

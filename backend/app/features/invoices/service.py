@@ -15,6 +15,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Literal, Protocol, cast
 from uuid import UUID, uuid4
 
+from arq.connections import ArqRedis
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
@@ -29,14 +30,17 @@ from app.features.invoices.repository import (
     build_default_due_date,
 )
 from app.features.invoices.schemas import InvoiceCreateRequest, InvoiceUpdateRequest
+from app.features.jobs.models import JobRecord, JobStatus, JobType
+from app.features.jobs.service import JobService
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext
 from app.features.quotes.schemas import LineItemDraft
 from app.features.quotes.service import QuoteRepositoryProtocol, QuoteServiceError
 from app.integrations.pdf import PdfRenderError
-from app.integrations.storage import StorageNotFoundError, StorageReaderProtocol
+from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
+from app.shared.pdf_artifacts import PDF_ARTIFACT_NOT_READY_DETAIL
 from app.shared.pricing import (
     PricingValidationError,
     derive_document_subtotal_from_line_items,
@@ -47,6 +51,8 @@ from app.shared.pricing import (
 
 LOGGER = logging.getLogger(__name__)
 _EDITABLE_INVOICE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY, QuoteStatus.SENT})
+_PDF_JOB_NAME = "jobs.pdf"
+_PDF_QUEUE_FAILURE_DETAIL = "Unable to start PDF generation right now. Please try again."
 
 
 class InvoiceRepositoryProtocol(Protocol):
@@ -154,6 +160,8 @@ class InvoiceRepositoryProtocol(Protocol):
         update_due_date: bool,
     ) -> Document: ...
 
+    async def invalidate_pdf_artifact(self, invoice: Document) -> str | None: ...
+
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None: ...
 
     async def commit(self) -> None: ...
@@ -178,7 +186,7 @@ class InvoiceService:
         invoice_repository: InvoiceRepositoryProtocol,
         quote_repository: QuoteRepositoryProtocol,
         pdf_integration: PdfIntegrationProtocol,
-        storage_service: StorageReaderProtocol,
+        storage_service: StorageServiceProtocol,
     ) -> None:
         self._invoice_repository = invoice_repository
         self._quote_repository = quote_repository
@@ -416,25 +424,89 @@ class InvoiceService:
             due_date=data.due_date,
             update_due_date="due_date" in data.model_fields_set,
         )
+        obsolete_artifact_path = await self._invoice_repository.invalidate_pdf_artifact(
+            updated_invoice
+        )
         await self._invoice_repository.commit()
+        await self._delete_obsolete_artifact(obsolete_artifact_path)
         return await self._invoice_repository.refresh(updated_invoice)
 
-    async def generate_pdf(self, user: User, invoice_id: UUID) -> tuple[str, bytes]:
-        """Render and return invoice PDF bytes while applying ready transition rules."""
+    async def start_pdf_generation(
+        self,
+        user: User,
+        invoice_id: UUID,
+        *,
+        job_service: JobService,
+        arq_pool: ArqRedis | None,
+    ) -> JobRecord:
+        """Create or reuse a durable invoice PDF job for the current artifact revision."""
         user_id = _resolve_user_id(user)
-        context = await self._invoice_repository.get_render_context(invoice_id, user_id)
-        if context is None:
+        invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
+        if invoice is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        await self._attach_logo_data_uri(context)
+
+        existing_job = await self._get_reusable_pdf_job(
+            job_service=job_service,
+            user_id=user_id,
+            document=invoice,
+        )
+        if existing_job is not None:
+            return existing_job
+
+        attach_job_to_document = invoice.pdf_artifact_path is None
+        job = await job_service.create_job(
+            user_id=user_id,
+            job_type=JobType.PDF,
+            document_id=invoice.id,
+            document_revision=invoice.pdf_artifact_revision,
+        )
+        if attach_job_to_document:
+            invoice.pdf_artifact_job_id = job.id
 
         try:
-            pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
-        except PdfRenderError as exc:
-            raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+            if arq_pool is None:
+                raise RuntimeError("ARQ pool is not available")
+            queued_job = await arq_pool.enqueue_job(
+                _PDF_JOB_NAME,
+                str(job.id),
+                _job_id=str(job.id),
+            )
+            if queued_job is None:
+                raise RuntimeError("ARQ did not accept the PDF job")
+        except Exception as exc:
+            LOGGER.warning("Failed to enqueue invoice PDF job %s", job.id, exc_info=True)
+            if attach_job_to_document:
+                invoice.pdf_artifact_job_id = None
+            await job_service.mark_enqueue_failed(job.id, job_type=JobType.PDF)
+            await self._invoice_repository.commit()
+            raise QuoteServiceError(detail=_PDF_QUEUE_FAILURE_DETAIL, status_code=503) from exc
 
-        await self._invoice_repository.mark_ready_if_draft(invoice_id=invoice_id, user_id=user_id)
         await self._invoice_repository.commit()
-        return context.doc_number, pdf_bytes
+        return job
+
+    async def get_pdf_artifact(self, user: User, invoice_id: UUID) -> tuple[str, bytes]:
+        """Return one persisted invoice PDF artifact or a stable not-ready error."""
+        user_id = _resolve_user_id(user)
+        invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
+        if invoice is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if invoice.pdf_artifact_path is None:
+            raise QuoteServiceError(detail=PDF_ARTIFACT_NOT_READY_DETAIL, status_code=409)
+
+        try:
+            pdf_bytes = await asyncio.to_thread(
+                self._storage_service.fetch_bytes,
+                invoice.pdf_artifact_path,
+            )
+        except StorageNotFoundError as exc:
+            invoice.pdf_artifact_path = None
+            invoice.pdf_artifact_job_id = None
+            await self._invoice_repository.commit()
+            raise QuoteServiceError(detail=PDF_ARTIFACT_NOT_READY_DETAIL, status_code=409) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise QuoteServiceError(detail="Unable to load PDF artifact", status_code=500) from exc
+
+        return invoice.doc_number, pdf_bytes
 
     async def share_invoice(
         self,
@@ -565,6 +637,29 @@ class InvoiceService:
             raise QuoteServiceError(detail="Not found", status_code=404)
         return context
 
+    async def _get_reusable_pdf_job(
+        self,
+        *,
+        job_service: JobService,
+        user_id: UUID,
+        document: Document,
+    ) -> JobRecord | None:
+        if document.pdf_artifact_job_id is None:
+            return None
+
+        job = await job_service.get_job_for_user(
+            job_id=document.pdf_artifact_job_id,
+            user_id=user_id,
+        )
+        if (
+            job is None
+            or job.job_type != JobType.PDF
+            or job.document_revision != document.pdf_artifact_revision
+            or job.status not in {JobStatus.PENDING, JobStatus.RUNNING}
+        ):
+            return None
+        return job
+
     def _log_public_share_denied(
         self,
         share_record: InvoicePublicShareRecord,
@@ -608,6 +703,14 @@ class InvoiceService:
 
         encoded_logo = base64.b64encode(logo_bytes).decode("ascii")
         context.logo_data_uri = f"data:{content_type};base64,{encoded_logo}"
+
+    async def _delete_obsolete_artifact(self, object_path: str | None) -> None:
+        if object_path is None:
+            return
+        try:
+            await asyncio.to_thread(self._storage_service.delete, object_path)
+        except Exception:  # noqa: BLE001
+            LOGGER.warning("Failed to delete invalidated invoice PDF artifact", exc_info=True)
 
 
 def get_invoice_repository(db_repository: InvoiceRepository) -> InvoiceRepository:

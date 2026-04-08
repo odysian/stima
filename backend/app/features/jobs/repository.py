@@ -31,11 +31,13 @@ class JobRepository:
         user_id: UUID,
         job_type: JobType,
         document_id: UUID | None = None,
+        document_revision: int | None = None,
     ) -> JobRecord:
         """Persist a newly enqueued job in pending state."""
         record = JobRecord(
             user_id=user_id,
             document_id=document_id,
+            document_revision=document_revision,
             job_type=job_type,
             status=JobStatus.PENDING,
             attempts=0,

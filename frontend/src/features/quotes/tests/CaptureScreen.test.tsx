@@ -7,7 +7,7 @@ import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { ExtractionResult } from "@/features/quotes/types/quote.types";
+import type { ExtractionResult, JobStatusResponse } from "@/features/quotes/types/quote.types";
 import { jobService } from "@/shared/lib/jobService";
 import {
   MAX_AUDIO_CLIPS_PER_REQUEST,
@@ -87,6 +87,25 @@ const clipFixture: VoiceClip = {
   url: "blob:clip-1",
   durationSeconds: 4,
 };
+
+function makeJobStatusResponse(
+  overrides: Partial<JobStatusResponse> = {},
+): JobStatusResponse {
+  return {
+    id: "job-1",
+    user_id: "user-1",
+    document_id: null,
+    document_revision: null,
+    job_type: "extraction",
+    status: "pending",
+    attempts: 0,
+    terminal_error: null,
+    extraction_result: null,
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 function mockVoiceCapture(overrides: Partial<ReturnType<typeof useVoiceCapture>> = {}): void {
   mockedUseVoiceCapture.mockReturnValue({
@@ -538,30 +557,15 @@ describe("CaptureScreen", () => {
     vi.useFakeTimers();
     mockedQuoteService.extract.mockResolvedValueOnce({ type: "async", jobId: "job-1" });
     mockedJobService.getJobStatus
-      .mockResolvedValueOnce({
-        id: "job-1",
-        user_id: "user-1",
-        document_id: null,
-        job_type: "extraction",
-        status: "pending",
-        attempts: 0,
-        terminal_error: null,
-        extraction_result: null,
-        created_at: "2026-03-20T00:00:00.000Z",
-        updated_at: "2026-03-20T00:00:00.000Z",
-      })
-      .mockResolvedValueOnce({
-        id: "job-1",
-        user_id: "user-1",
-        document_id: null,
-        job_type: "extraction",
-        status: "success",
-        attempts: 1,
-        terminal_error: null,
-        extraction_result: extractionFixture,
-        created_at: "2026-03-20T00:00:00.000Z",
-        updated_at: "2026-03-20T00:00:02.000Z",
-      });
+      .mockResolvedValueOnce(makeJobStatusResponse())
+      .mockResolvedValueOnce(
+        makeJobStatusResponse({
+          status: "success",
+          attempts: 1,
+          extraction_result: extractionFixture,
+          updated_at: "2026-03-20T00:00:02.000Z",
+        }),
+      );
 
     renderScreen();
 
@@ -588,18 +592,14 @@ describe("CaptureScreen", () => {
 
   it("shows a retry affordance when an async extraction job reaches terminal failure", async () => {
     mockedQuoteService.extract.mockResolvedValueOnce({ type: "async", jobId: "job-1" });
-    mockedJobService.getJobStatus.mockResolvedValueOnce({
-      id: "job-1",
-      user_id: "user-1",
-      document_id: null,
-      job_type: "extraction",
-      status: "terminal",
-      attempts: 3,
-      terminal_error: "retry_exhausted",
-      extraction_result: null,
-      created_at: "2026-03-20T00:00:00.000Z",
-      updated_at: "2026-03-20T00:00:02.000Z",
-    });
+    mockedJobService.getJobStatus.mockResolvedValueOnce(
+      makeJobStatusResponse({
+        status: "terminal",
+        attempts: 3,
+        terminal_error: "retry_exhausted",
+        updated_at: "2026-03-20T00:00:02.000Z",
+      }),
+    );
 
     renderScreen();
 
@@ -619,18 +619,7 @@ describe("CaptureScreen", () => {
   it("shows a timeout error when async extraction polling exceeds the max attempts", async () => {
     vi.useFakeTimers();
     mockedQuoteService.extract.mockResolvedValueOnce({ type: "async", jobId: "job-1" });
-    mockedJobService.getJobStatus.mockResolvedValue({
-      id: "job-1",
-      user_id: "user-1",
-      document_id: null,
-      job_type: "extraction",
-      status: "pending",
-      attempts: 0,
-      terminal_error: null,
-      extraction_result: null,
-      created_at: "2026-03-20T00:00:00.000Z",
-      updated_at: "2026-03-20T00:00:00.000Z",
-    });
+    mockedJobService.getJobStatus.mockResolvedValue(makeJobStatusResponse());
 
     renderScreen();
 

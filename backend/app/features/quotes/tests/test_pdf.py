@@ -7,14 +7,15 @@ import base64
 import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from types import SimpleNamespace
+from typing import Annotated, TypedDict, cast
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi import Depends
 from httpx import AsyncClient
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
@@ -23,6 +24,7 @@ from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.invoices.repository import InvoiceRepository
 from app.features.invoices.service import InvoiceService
+from app.features.jobs.models import JobStatus
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.service import QuoteService
@@ -30,9 +32,23 @@ from app.integrations.pdf import PdfRenderError, validate_render_context
 from app.integrations.storage import StorageNotFoundError
 from app.main import app
 from app.shared import event_logger
-from app.shared.dependencies import get_invoice_service, get_quote_service, get_storage_service
+from app.shared.dependencies import (
+    get_arq_pool,
+    get_invoice_service,
+    get_quote_service,
+    get_storage_service,
+)
 from app.shared.input_limits import DOCUMENT_LINE_ITEMS_MAX_ITEMS
+from app.shared.pdf_artifacts import PDF_ARTIFACT_NOT_READY_DETAIL
 from app.shared.rate_limit import reset_local_rate_limit_state
+from app.worker.job_registry import pdf_job
+from app.worker.runtime import (
+    DEFAULT_MAX_TRIES,
+    DEFAULT_RETRY_BASE_SECONDS,
+    DEFAULT_RETRY_JITTER_SECONDS,
+    NonRetryableJobError,
+    WorkerRuntimeSettings,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -60,6 +76,30 @@ class _ConfigurablePdfIntegration:
             raise PdfRenderError("Unable to render quote PDF")
         validate_render_context(context)
         return f"PDF for {context.doc_number}".encode()
+
+
+class _MockArqPool:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def enqueue_job(self, function: str, *args: object, **kwargs: object) -> object:
+        self.calls.append(
+            {
+                "function": function,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        )
+        return SimpleNamespace(job_id=kwargs.get("_job_id"))
+
+
+class _PdfJobResponse(TypedDict):
+    id: str
+    document_id: str
+    job_type: str
+    status: str
+    attempts: int
+    terminal_error: str | None
 
 
 class _FakeStorageService:
@@ -99,6 +139,14 @@ def _storage_service_dependency() -> Iterator[_FakeStorageService]:
     app.dependency_overrides.pop(get_storage_service, None)
 
 
+@pytest.fixture()
+def _arq_pool_dependency() -> Iterator[_MockArqPool]:
+    arq_pool = _MockArqPool()
+    app.dependency_overrides[get_arq_pool] = lambda: arq_pool
+    yield arq_pool
+    app.dependency_overrides.pop(get_arq_pool, None)
+
+
 @pytest.fixture(autouse=True)
 def _override_quote_service_dependency(
     _storage_service_dependency: _FakeStorageService,
@@ -131,7 +179,13 @@ def _override_quote_service_dependency(
     app.dependency_overrides.pop(get_invoice_service, None)
 
 
-async def test_generate_pdf_returns_pdf_and_sets_ready(client: AsyncClient) -> None:
+async def test_generate_pdf_returns_pdf_and_sets_ready(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
     quote = await _create_quote(client, csrf_token, customer_id)
@@ -141,19 +195,68 @@ async def test_generate_pdf_returns_pdf_and_sets_ready(client: AsyncClient) -> N
         headers={"X-CSRF-Token": csrf_token},
     )
 
+    job_payload = _assert_async_pdf_job_response(response, document_id=quote["id"])
+    assert _arq_pool_dependency.calls == [
+        {
+            "function": "jobs.pdf",
+            "args": (job_payload["id"],),
+            "kwargs": {"_job_id": job_payload["id"]},
+        }
+    ]
+
+    job_detail_before = await client.get(f"/api/jobs/{job_payload['id']}")
+    assert job_detail_before.status_code == 200
+    assert job_detail_before.json()["status"] == JobStatus.PENDING.value
+
+    artifact_before = await client.get(f"/api/quotes/{quote['id']}/pdf")
+    assert artifact_before.status_code == 409
+    assert artifact_before.json() == {"detail": PDF_ARTIFACT_NOT_READY_DETAIL}
+
+    detail_before = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_before.status_code == 200
+    assert detail_before.json()["status"] == "draft"
+    assert detail_before.json()["pdf_artifact"] == {
+        "status": "pending",
+        "job_id": job_payload["id"],
+        "download_url": None,
+        "terminal_error": None,
+    }
+
+    await _run_pdf_job(
+        db_session,
+        job_id=job_payload["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+
+    response = await client.get(f"/api/quotes/{quote['id']}/pdf")
+
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/pdf")
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["content-disposition"] == 'inline; filename="quote-Q-001.pdf"'
     assert response.content == b"PDF for Q-001"
 
+    job_detail_after = await client.get(f"/api/jobs/{job_payload['id']}")
+    assert job_detail_after.status_code == 200
+    assert job_detail_after.json()["status"] == JobStatus.SUCCESS.value
+
     detail = await client.get(f"/api/quotes/{quote['id']}")
     assert detail.status_code == 200
     assert detail.json()["status"] == "ready"
+    assert detail.json()["pdf_artifact"] == {
+        "status": "ready",
+        "job_id": None,
+        "download_url": f"http://testserver/api/quotes/{quote['id']}/pdf",
+        "terminal_error": None,
+    }
 
 
 async def test_generate_pdf_includes_logo_data_uri_when_logo_exists(
     client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
     _override_quote_service_dependency: _ConfigurablePdfIntegration,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -166,7 +269,13 @@ async def test_generate_pdf_includes_logo_data_uri_when_logo_exists(
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert response.status_code == 200
+    job_payload = _assert_async_pdf_job_response(response, document_id=quote["id"])
+    await _run_pdf_job(
+        db_session,
+        job_id=job_payload["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
     assert _override_quote_service_dependency.last_context is not None
     assert _override_quote_service_dependency.last_context.logo_data_uri is not None
     assert _override_quote_service_dependency.last_context.logo_data_uri.startswith(
@@ -176,6 +285,9 @@ async def test_generate_pdf_includes_logo_data_uri_when_logo_exists(
 
 async def test_generate_pdf_handles_sparse_quote_context(
     client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
     _override_quote_service_dependency: _ConfigurablePdfIntegration,
 ) -> None:
     credentials = _credentials()
@@ -204,7 +316,13 @@ async def test_generate_pdf_handles_sparse_quote_context(
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert response.status_code == 200
+    job_payload = _assert_async_pdf_job_response(response, document_id=quote["id"])
+    await _run_pdf_job(
+        db_session,
+        job_id=job_payload["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
     assert _override_quote_service_dependency.last_context is not None
     assert _override_quote_service_dependency.last_context.title is None
     assert _override_quote_service_dependency.last_context.logo_data_uri is None
@@ -214,7 +332,13 @@ async def test_generate_pdf_handles_sparse_quote_context(
     assert _override_quote_service_dependency.last_context.line_items[0].details is None
 
 
-async def test_generate_pdf_does_not_downgrade_shared_quote(client: AsyncClient) -> None:
+async def test_generate_pdf_does_not_downgrade_shared_quote(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
     quote = await _create_quote(client, csrf_token, customer_id)
@@ -230,7 +354,13 @@ async def test_generate_pdf_does_not_downgrade_shared_quote(client: AsyncClient)
         f"/api/quotes/{quote['id']}/pdf",
         headers={"X-CSRF-Token": csrf_token},
     )
-    assert pdf_response.status_code == 200
+    job_payload = _assert_async_pdf_job_response(pdf_response, document_id=quote["id"])
+    await _run_pdf_job(
+        db_session,
+        job_id=job_payload["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
 
     detail = await client.get(f"/api/quotes/{quote['id']}")
     assert detail.status_code == 200
@@ -244,6 +374,9 @@ async def test_generate_pdf_does_not_downgrade_shared_quote(client: AsyncClient)
 async def test_generate_pdf_does_not_downgrade_post_share_quote_statuses(
     client: AsyncClient,
     db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
     status: QuoteStatus,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -261,7 +394,13 @@ async def test_generate_pdf_does_not_downgrade_post_share_quote_statuses(
         f"/api/quotes/{quote['id']}/pdf",
         headers={"X-CSRF-Token": csrf_token},
     )
-    assert pdf_response.status_code == 200
+    job_payload = _assert_async_pdf_job_response(pdf_response, document_id=quote["id"])
+    await _run_pdf_job(
+        db_session,
+        job_id=job_payload["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
 
     detail = await client.get(f"/api/quotes/{quote['id']}")
     assert detail.status_code == 200
@@ -346,6 +485,9 @@ async def test_share_does_not_regress_viewed_or_finalized_quotes(
 
 async def test_generate_pdf_returns_422_when_render_fails(
     client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
     _override_quote_service_dependency: _ConfigurablePdfIntegration,
 ) -> None:
     _override_quote_service_dependency.should_fail = True
@@ -358,13 +500,37 @@ async def test_generate_pdf_returns_422_when_render_fails(
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert response.status_code == 422
-    assert response.json() == {"detail": "Unable to render quote PDF"}
+    job_payload = _assert_async_pdf_job_response(response, document_id=quote["id"])
+    with pytest.raises(NonRetryableJobError, match="Unable to render quote PDF"):
+        await _run_pdf_job(
+            db_session,
+            job_id=job_payload["id"],
+            pdf_integration=_override_quote_service_dependency,
+            storage_service=_storage_service_dependency,
+        )
+
+    job_detail = await client.get(f"/api/jobs/{job_payload['id']}")
+    assert job_detail.status_code == 200
+    assert job_detail.json()["status"] == JobStatus.TERMINAL.value
+
+    detail = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["pdf_artifact"]["status"] == "failed"
+    assert detail.json()["pdf_artifact"]["job_id"] == job_payload["id"]
+    assert detail.json()["pdf_artifact"]["download_url"] is None
+    assert detail.json()["pdf_artifact"]["terminal_error"] is not None
+
+    artifact_response = await client.get(f"/api/quotes/{quote['id']}/pdf")
+    assert artifact_response.status_code == 409
+    assert artifact_response.json() == {"detail": PDF_ARTIFACT_NOT_READY_DETAIL}
 
 
 async def test_generate_pdf_rejects_documents_that_exceed_render_limits(
     client: AsyncClient,
     db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -392,8 +558,24 @@ async def test_generate_pdf_rejects_documents_that_exceed_render_limits(
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert response.status_code == 422
-    assert response.json() == {"detail": "Document exceeds supported render limits"}
+    job_payload = _assert_async_pdf_job_response(response, document_id=quote["id"])
+    with pytest.raises(NonRetryableJobError, match="Document exceeds supported render limits"):
+        await _run_pdf_job(
+            db_session,
+            job_id=job_payload["id"],
+            pdf_integration=_override_quote_service_dependency,
+            storage_service=_storage_service_dependency,
+        )
+
+    detail = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["pdf_artifact"]["status"] == "failed"
+    assert detail.json()["pdf_artifact"]["job_id"] == job_payload["id"]
+    assert detail.json()["pdf_artifact"]["terminal_error"] is not None
+
+    artifact_response = await client.get(f"/api/quotes/{quote['id']}/pdf")
+    assert artifact_response.status_code == 409
+    assert artifact_response.json() == {"detail": PDF_ARTIFACT_NOT_READY_DETAIL}
 
 
 async def test_generate_pdf_returns_404_for_nonexistent_quote(client: AsyncClient) -> None:
@@ -434,6 +616,7 @@ async def test_pdf_endpoint_requires_csrf(client: AsyncClient) -> None:
 async def test_generate_quote_pdf_slowapi_rate_limit_returns_429(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
+    _arq_pool_dependency: _MockArqPool,
 ) -> None:
     monkeypatch.setattr(app.state.limiter, "enabled", True)
     monkeypatch.setenv("AUTHENTICATED_PDF_GENERATION_RATE_LIMIT", "1/minute")
@@ -451,7 +634,7 @@ async def test_generate_quote_pdf_slowapi_rate_limit_returns_429(
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert first_response.status_code == 200
+    assert first_response.status_code == 202
     assert second_response.status_code == 429
     assert "Rate limit exceeded" in second_response.json()["error"]
 
@@ -1085,7 +1268,9 @@ async def test_public_logo_endpoint_returns_500_for_storage_failures(
 
 async def test_generate_pdf_logs_and_omits_logo_when_storage_fetch_fails(
     client: AsyncClient,
+    db_session: AsyncSession,
     caplog: pytest.LogCaptureFixture,
+    _arq_pool_dependency: _MockArqPool,
     _storage_service_dependency: _FakeStorageService,
     _override_quote_service_dependency: _ConfigurablePdfIntegration,
 ) -> None:
@@ -1095,13 +1280,19 @@ async def test_generate_pdf_logs_and_omits_logo_when_storage_fetch_fails(
     customer_id = await _create_customer(client, csrf_token)
     quote = await _create_quote(client, csrf_token, customer_id)
 
-    with caplog.at_level("WARNING", logger="app.features.quotes.service"):
+    with caplog.at_level("WARNING", logger="app.worker.job_registry"):
         response = await client.post(
             f"/api/quotes/{quote['id']}/pdf",
             headers={"X-CSRF-Token": csrf_token},
         )
+        job_payload = _assert_async_pdf_job_response(response, document_id=quote["id"])
+        await _run_pdf_job(
+            db_session,
+            job_id=job_payload["id"],
+            pdf_integration=_override_quote_service_dependency,
+            storage_service=_storage_service_dependency,
+        )
 
-    assert response.status_code == 200
     assert _override_quote_service_dependency.last_context is not None
     assert _override_quote_service_dependency.last_context.logo_data_uri is None
     assert any("omitting logo" in record.message for record in caplog.records)
@@ -1110,6 +1301,8 @@ async def test_generate_pdf_logs_and_omits_logo_when_storage_fetch_fails(
 async def test_invoice_pdf_generation_sets_ready_and_renders_invoice_context(
     client: AsyncClient,
     db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
     _override_quote_service_dependency: _ConfigurablePdfIntegration,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -1129,6 +1322,16 @@ async def test_invoice_pdf_generation_sets_ready_and_renders_invoice_context(
         headers={"X-CSRF-Token": csrf_token},
     )
 
+    job_payload = _assert_async_pdf_job_response(response, document_id=invoice_id)
+    await _run_pdf_job(
+        db_session,
+        job_id=job_payload["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+
+    response = await client.get(f"/api/invoices/{invoice_id}/pdf")
+
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["content-disposition"] == 'inline; filename="invoice-I-001.pdf"'
@@ -1146,6 +1349,7 @@ async def test_generate_invoice_pdf_slowapi_rate_limit_returns_429(
     client: AsyncClient,
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
+    _arq_pool_dependency: _MockArqPool,
 ) -> None:
     monkeypatch.setattr(app.state.limiter, "enabled", True)
     monkeypatch.setenv("AUTHENTICATED_PDF_GENERATION_RATE_LIMIT", "1/minute")
@@ -1171,7 +1375,7 @@ async def test_generate_invoice_pdf_slowapi_rate_limit_returns_429(
         headers={"X-CSRF-Token": csrf_token},
     )
 
-    assert first_response.status_code == 200
+    assert first_response.status_code == 202
     assert second_response.status_code == 429
     assert "Rate limit exceeded" in second_response.json()["error"]
 
@@ -1561,6 +1765,46 @@ async def _upload_logo(client: AsyncClient, csrf_token: str) -> None:
         headers={"X-CSRF-Token": csrf_token},
     )
     assert response.status_code == 200
+
+
+def _assert_async_pdf_job_response(response, *, document_id: str) -> _PdfJobResponse:
+    assert response.status_code == 202
+    payload = cast(_PdfJobResponse, response.json())
+    assert payload["job_type"] == "pdf"
+    assert payload["status"] == "pending"
+    assert payload["document_id"] == document_id
+    assert payload["attempts"] == 0
+    assert payload["terminal_error"] is None
+    return payload
+
+
+async def _run_pdf_job(
+    db_session: AsyncSession,
+    *,
+    job_id: str,
+    pdf_integration: _ConfigurablePdfIntegration,
+    storage_service: _FakeStorageService,
+) -> None:
+    session_maker = async_sessionmaker(
+        bind=db_session.bind,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    runtime = WorkerRuntimeSettings(
+        session_maker=session_maker,
+        max_tries=DEFAULT_MAX_TRIES,
+        retry_base_seconds=DEFAULT_RETRY_BASE_SECONDS,
+        retry_jitter_seconds=DEFAULT_RETRY_JITTER_SECONDS,
+    )
+    await pdf_job(
+        {
+            "job_try": 1,
+            "worker_runtime": runtime,
+            "pdf_integration": pdf_integration,
+            "storage_service": storage_service,
+        },
+        job_id,
+    )
 
 
 def _credentials() -> dict[str, str]:

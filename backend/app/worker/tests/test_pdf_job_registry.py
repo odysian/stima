@@ -229,6 +229,21 @@ class _StubStorageService:
     def fetch_bytes(self, object_path: str) -> bytes:
         raise AssertionError(f"Unexpected storage read in test: {object_path}")
 
+    def upload(
+        self,
+        *,
+        prefix: str,
+        filename: str,
+        data: bytes,
+        content_type: str,
+    ) -> str:
+        del data
+        del content_type
+        return f"{prefix.strip('/')}/{filename.lstrip('/')}"
+
+    def delete(self, object_path: str) -> None:
+        del object_path
+
 
 class _LogoStorageService:
     _PNG_BYTES = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x00IEND\xaeB`\x82"
@@ -236,6 +251,21 @@ class _LogoStorageService:
     def fetch_bytes(self, object_path: str) -> bytes:
         assert object_path == "logos/user.png"  # nosec B101 - pytest assertion
         return self._PNG_BYTES
+
+    def upload(
+        self,
+        *,
+        prefix: str,
+        filename: str,
+        data: bytes,
+        content_type: str,
+    ) -> str:
+        del data
+        del content_type
+        return f"{prefix.strip('/')}/{filename.lstrip('/')}"
+
+    def delete(self, object_path: str) -> None:
+        del object_path
 
 
 async def _seed_user(db_session: AsyncSession) -> User:
@@ -337,11 +367,18 @@ async def _seed_pdf_job(
     user_id: UUID,
     document_id: UUID | None,
 ) -> JobRecord:
+    document_revision: int | None = None
+    if document_id is not None:
+        document = await db_session.get(Document, document_id)
+        assert document is not None  # nosec B101 - pytest assertion
+        document_revision = document.pdf_artifact_revision
+
     repository = JobRepository(db_session)
     record = await repository.create(
         user_id=user_id,
         job_type=JobType.PDF,
         document_id=document_id,
+        document_revision=document_revision,
     )
     await db_session.commit()
     return record

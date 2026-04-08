@@ -47,10 +47,7 @@ class PdfIntegration:
         try:
             validate_render_context(context)
             template = self._environment.get_template("quote.html")
-            rendered_html = template.render(
-                **asdict(context),
-                show_updated_date=context.has_meaningful_update,
-            )
+            rendered_html = template.render(**asdict(context))
             return HTML(string=rendered_html, base_url=str(self._template_dir)).write_pdf()
         except PdfRenderError:
             raise

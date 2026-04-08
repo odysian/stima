@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Protocol
 from uuid import UUID
 
 from app.features.auth.models import User
 from app.features.customers.models import Customer
 from app.features.customers.schemas import CustomerCreateRequest, CustomerUpdateRequest
+from app.integrations.storage import StorageServiceProtocol
 from app.shared.event_logger import log_event
+
+LOGGER = logging.getLogger(__name__)
 
 
 class CustomerServiceError(Exception):
@@ -42,11 +47,25 @@ class CustomerRepositoryProtocol(Protocol):
     async def commit(self) -> None: ...
 
 
+class PdfArtifactRepositoryProtocol(Protocol):
+    """Structural protocol for cross-document artifact invalidation."""
+
+    async def invalidate_for_customer(self, *, user_id: UUID, customer_id: UUID) -> list[str]: ...
+
+
 class CustomerService:
     """Coordinate customer domain rules with persistence operations."""
 
-    def __init__(self, repository: CustomerRepositoryProtocol) -> None:
+    def __init__(
+        self,
+        repository: CustomerRepositoryProtocol,
+        *,
+        pdf_artifact_repository: PdfArtifactRepositoryProtocol,
+        storage_service: StorageServiceProtocol,
+    ) -> None:
         self._repository = repository
+        self._pdf_artifact_repository = pdf_artifact_repository
+        self._storage_service = storage_service
 
     async def list_customers(self, user: User) -> list[Customer]:
         """Return all customers belonging to the authenticated user."""
@@ -89,5 +108,30 @@ class CustomerService:
 
         update_fields = data.model_dump(exclude_unset=True)
         updated_customer = await self._repository.update(customer, **update_fields)
+        artifact_paths_to_delete: list[str] = []
+        if _customer_render_inputs_changed(customer=customer, update_fields=update_fields):
+            artifact_paths_to_delete = await self._pdf_artifact_repository.invalidate_for_customer(
+                user_id=user.id,
+                customer_id=customer_id,
+            )
         await self._repository.commit()
+        await self._delete_artifacts(artifact_paths_to_delete)
         return updated_customer
+
+    async def _delete_artifacts(self, object_paths: list[str]) -> None:
+        for object_path in object_paths:
+            try:
+                await asyncio.to_thread(self._storage_service.delete, object_path)
+            except Exception:  # noqa: BLE001
+                LOGGER.warning("Failed to delete invalidated customer PDF artifact", exc_info=True)
+
+
+def _customer_render_inputs_changed(
+    *,
+    customer: Customer,
+    update_fields: dict[str, str | None],
+) -> bool:
+    return any(
+        field in update_fields and getattr(customer, field) != update_fields[field]
+        for field in ("name", "phone", "address")
+    )

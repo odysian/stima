@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -27,7 +27,7 @@ def _make_context(
     doc_label: str = "Quote",
     doc_number: str = "Q-201",
     due_date: str | None = None,
-    updated_at: datetime,
+    updated_at: datetime | None = None,
     line_item_price: Decimal | None,
     total: Decimal | None,
     logo_data_uri: str | None = None,
@@ -88,23 +88,13 @@ def _make_context(
             )
         ],
         created_at=created_at,
-        updated_at=updated_at,
+        updated_at=updated_at or datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
         issued_date="Mar 01, 2026",
-        updated_date=updated_at.strftime("%b %d, %Y"),
     )
 
 
-@pytest.mark.parametrize(
-    ("delta_seconds", "should_show_updated"),
-    [
-        (300, False),
-        (301, True),
-    ],
-)
-def test_render_shows_updated_date_only_when_delta_exceeds_threshold(
+def test_render_does_not_show_generic_updated_date_metadata(
     monkeypatch: pytest.MonkeyPatch,
-    delta_seconds: int,
-    should_show_updated: bool,
 ) -> None:
     captured_html: list[str] = []
 
@@ -119,11 +109,9 @@ def test_render_shows_updated_date_only_when_delta_exceeds_threshold(
     monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
     template_dir = Path(__file__).resolve().parents[3] / "templates"
     integration = PdfIntegration(template_dir=template_dir)
-    updated_at = datetime(2026, 3, 1, 12, 0, tzinfo=UTC) + timedelta(seconds=delta_seconds)
 
     result = integration.render(
         _make_context(
-            updated_at=updated_at,
             line_item_price=Decimal("120.00"),
             total=Decimal("120.00"),
         )
@@ -131,19 +119,8 @@ def test_render_shows_updated_date_only_when_delta_exceeds_threshold(
 
     assert result == b"fake-pdf"
     assert len(captured_html) == 1
-    assert ("Updated" in captured_html[0]) is should_show_updated
+    assert "Updated" not in captured_html[0]
     assert "Revised" not in captured_html[0]
-    if should_show_updated:
-        assert re.search(
-            (
-                r"<tr>\s*<td class=\"meta-label-inline\">Issued:</td>\s*"
-                r"<td class=\"meta-value-inline\">Mar 01, 2026</td>\s*</tr>\s*"
-                r"<tr>\s*<td class=\"meta-label-inline\">Updated:</td>\s*"
-                r"<td class=\"meta-value-inline\">Mar 01, 2026</td>\s*</tr>"
-            ),
-            captured_html[0],
-            re.DOTALL,
-        )
 
 
 def test_render_shows_em_dash_for_null_line_item_and_total_prices(
@@ -162,11 +139,8 @@ def test_render_shows_em_dash_for_null_line_item_and_total_prices(
     monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
     template_dir = Path(__file__).resolve().parents[3] / "templates"
     integration = PdfIntegration(template_dir=template_dir)
-    updated_at = datetime(2026, 3, 1, 12, 6, tzinfo=UTC)
-
     result = integration.render(
         _make_context(
-            updated_at=updated_at,
             line_item_price=None,
             total=None,
         )
@@ -209,11 +183,8 @@ def test_render_shows_conditional_pricing_breakdown_rows(
     monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
     template_dir = Path(__file__).resolve().parents[3] / "templates"
     integration = PdfIntegration(template_dir=template_dir)
-    updated_at = datetime(2026, 3, 1, 12, 6, tzinfo=UTC)
-
     result = integration.render(
         _make_context(
-            updated_at=updated_at,
             line_item_price=Decimal("120.00"),
             subtotal_amount=Decimal("120.00"),
             discount_type="fixed",
@@ -680,7 +651,6 @@ def test_build_render_context_formats_dates_in_business_timezone() -> None:
     )
 
     assert context.issued_date == "Mar 24, 2026"
-    assert context.updated_date == "Mar 24, 2026"
     assert context.title == "Front Yard Refresh"
     assert context.phone_number is None
     assert context.contractor_email == "owner@example.com"

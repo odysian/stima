@@ -105,6 +105,10 @@ class _RetryingInvoiceRepository:
         invoice = kwargs["invoice"]
         return invoice
 
+    async def invalidate_pdf_artifact(self, invoice):  # noqa: ANN001
+        del invoice
+        return None
+
     async def mark_ready_if_draft(self, *, invoice_id, user_id):  # noqa: ANN001
         del invoice_id
         del user_id
@@ -138,6 +142,14 @@ class _UnusedPdfIntegration:
 
 class _UnusedStorageService:
     def fetch_bytes(self, object_path: str) -> bytes:
+        del object_path
+        raise AssertionError("Storage should not be used in this test")
+
+    def upload(self, *, prefix: str, filename: str, data: bytes, content_type: str) -> str:
+        del prefix, filename, data, content_type
+        raise AssertionError("Storage should not be used in this test")
+
+    def delete(self, object_path: str) -> None:
         del object_path
         raise AssertionError("Storage should not be used in this test")
 
@@ -220,6 +232,10 @@ class _DirectInvoiceCollisionRepository:
     async def update(self, **kwargs):  # noqa: ANN001
         invoice = kwargs["invoice"]
         return invoice
+
+    async def invalidate_pdf_artifact(self, invoice):  # noqa: ANN001
+        del invoice
+        return None
 
     async def mark_ready_if_draft(self, *, invoice_id, user_id):  # noqa: ANN001
         del invoice_id

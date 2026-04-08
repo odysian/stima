@@ -25,7 +25,6 @@ export function readOptionalQuoteText(
 
 export function resolveActionState(
   quote: QuoteDetail | null,
-  hasLocalPdf: boolean,
 ): QuotePreviewActionState {
   if (
     quote?.status === "shared"
@@ -36,7 +35,7 @@ export function resolveActionState(
     return quote.status;
   }
 
-  if (quote?.status === "ready" || hasLocalPdf) {
+  if (quote?.status === "ready") {
     return "ready";
   }
 

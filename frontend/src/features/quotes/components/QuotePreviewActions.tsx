@@ -65,7 +65,7 @@ export function QuotePreviewActions({
     statusCopy = "Recording quote as lost...";
   }
 
-  const openPdfHref = openPdfUrl ?? shareUrl;
+  const openPdfHref = openPdfUrl;
   const showEmailAction = emailActionLabel !== null;
   const showUtilities = showEmailAction || Boolean(openPdfHref);
 

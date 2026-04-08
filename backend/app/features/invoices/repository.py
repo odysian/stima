@@ -21,6 +21,7 @@ from sqlalchemy.orm import aliased, selectinload
 from app.features.auth.models import User
 from app.features.customers.models import Customer
 from app.features.event_logs.models import EventLog
+from app.features.jobs.models import JobRecord, JobStatus
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRenderLineItem
 from app.features.quotes.schemas import LineItemDraft
@@ -61,6 +62,11 @@ class InvoiceDetailRow:
     line_items: list[LineItem]
     created_at: datetime
     updated_at: datetime
+    pdf_artifact_path: str | None
+    pdf_artifact_revision: int
+    pdf_artifact_job_id: UUID | None
+    pdf_artifact_job_status: JobStatus | None
+    pdf_artifact_terminal_error: str | None
 
 
 @dataclass(slots=True)
@@ -222,13 +228,20 @@ class InvoiceRepository:
         """Return one invoice detail row with customer and source quote fields."""
         source_quote = aliased(Document)
         result = await self._session.execute(
-            select(Document, Customer, source_quote)
+            select(
+                Document,
+                Customer,
+                source_quote,
+                JobRecord.status,
+                JobRecord.terminal_error,
+            )
             .join(Customer, Customer.id == Document.customer_id)
             .outerjoin(
                 source_quote,
                 (source_quote.id == Document.source_document_id)
                 & (source_quote.doc_type == "quote"),
             )
+            .outerjoin(JobRecord, JobRecord.id == Document.pdf_artifact_job_id)
             .where(
                 Document.id == invoice_id,
                 Document.user_id == user_id,
@@ -240,7 +253,7 @@ class InvoiceRepository:
         if row is None:
             return None
 
-        document, customer, quote = row
+        document, customer, quote, pdf_artifact_job_status, pdf_artifact_terminal_error = row
         return InvoiceDetailRow(
             id=document.id,
             customer_id=document.customer_id,
@@ -268,6 +281,11 @@ class InvoiceRepository:
             line_items=document.line_items,
             created_at=document.created_at,
             updated_at=document.updated_at,
+            pdf_artifact_path=document.pdf_artifact_path,
+            pdf_artifact_revision=document.pdf_artifact_revision,
+            pdf_artifact_job_id=document.pdf_artifact_job_id,
+            pdf_artifact_job_status=pdf_artifact_job_status,
+            pdf_artifact_terminal_error=pdf_artifact_terminal_error,
         )
 
     async def get_email_context(
@@ -588,6 +606,15 @@ class InvoiceRepository:
         await self.refresh(invoice)
         return invoice
 
+    async def invalidate_pdf_artifact(self, invoice: Document) -> str | None:
+        """Invalidate one invoice artifact by clearing durable state and bumping revision."""
+        previous_path = invoice.pdf_artifact_path
+        invoice.pdf_artifact_path = None
+        invoice.pdf_artifact_job_id = None
+        invoice.pdf_artifact_revision += 1
+        await self._session.flush()
+        return previous_path
+
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None:
         """Transition invoice status to ready when previewing a draft invoice."""
         await self._session.execute(
@@ -752,7 +779,6 @@ def _build_render_context(
         created_at=document.created_at,
         updated_at=document.updated_at,
         issued_date=_format_timestamp(document.created_at, user.timezone),
-        updated_date=_format_timestamp(document.updated_at, user.timezone),
     )
 
 

@@ -2,6 +2,7 @@ import type { InvoiceStatus } from "@/features/invoices/types/invoice-status";
 import type {
   LineItem,
   LineItemDraft,
+  PdfArtifact,
   QuoteSourceType,
 } from "@/features/quotes/types/quote.types";
 import type { DiscountType } from "@/shared/lib/pricing";
@@ -62,6 +63,7 @@ export interface InvoiceDetail extends Invoice {
     email: string | null;
     phone: string | null;
   };
+  pdf_artifact: PdfArtifact;
 }
 
 export interface InvoiceUpdateRequest {

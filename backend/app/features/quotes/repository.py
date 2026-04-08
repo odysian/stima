@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.features.auth.models import User
 from app.features.customers.models import Customer
 from app.features.event_logs.models import EventLog
+from app.features.jobs.models import JobRecord, JobStatus
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.schemas import LineItemDraft
 from app.shared.pricing import (
@@ -92,12 +93,6 @@ class QuoteRenderContext:
     created_at: datetime
     updated_at: datetime
     issued_date: str
-    updated_date: str
-
-    @property
-    def has_meaningful_update(self) -> bool:
-        """Return true when updated timestamp differs from created by > 5 minutes."""
-        return (self.updated_at - self.created_at).total_seconds() > 300
 
 
 @dataclass(slots=True)
@@ -141,6 +136,11 @@ class QuoteDetailRow:
     created_at: datetime
     updated_at: datetime
     linked_invoice: LinkedInvoiceSummary | None
+    pdf_artifact_path: str | None
+    pdf_artifact_revision: int
+    pdf_artifact_job_id: UUID | None
+    pdf_artifact_job_status: JobStatus | None
+    pdf_artifact_terminal_error: str | None
 
 
 @dataclass(slots=True)
@@ -270,8 +270,9 @@ class QuoteRepository:
     async def get_detail_by_id(self, quote_id: UUID, user_id: UUID) -> QuoteDetailRow | None:
         """Return one quote detail row with customer contact fields."""
         result = await self._session.execute(
-            select(Document, Customer)
+            select(Document, Customer, JobRecord.status, JobRecord.terminal_error)
             .join(Customer, Customer.id == Document.customer_id)
+            .outerjoin(JobRecord, JobRecord.id == Document.pdf_artifact_job_id)
             .where(
                 Document.id == quote_id,
                 Document.user_id == user_id,
@@ -283,7 +284,7 @@ class QuoteRepository:
         if row is None:
             return None
 
-        document, customer = row
+        document, customer, pdf_artifact_job_status, pdf_artifact_terminal_error = row
         linked_invoice = await self.get_linked_invoice_summary(
             source_document_id=document.id,
             user_id=user_id,
@@ -316,6 +317,11 @@ class QuoteRepository:
             created_at=document.created_at,
             updated_at=document.updated_at,
             linked_invoice=linked_invoice,
+            pdf_artifact_path=document.pdf_artifact_path,
+            pdf_artifact_revision=document.pdf_artifact_revision,
+            pdf_artifact_job_id=document.pdf_artifact_job_id,
+            pdf_artifact_job_status=pdf_artifact_job_status,
+            pdf_artifact_terminal_error=pdf_artifact_terminal_error,
         )
 
     async def get_email_context(self, quote_id: UUID, user_id: UUID) -> QuoteEmailContext | None:
@@ -650,6 +656,15 @@ class QuoteRepository:
         await self._session.refresh(document, attribute_names=["line_items"])
         return document
 
+    async def invalidate_pdf_artifact(self, document: Document) -> str | None:
+        """Invalidate one quote artifact by clearing durable state and bumping revision."""
+        previous_path = document.pdf_artifact_path
+        document.pdf_artifact_path = None
+        document.pdf_artifact_job_id = None
+        document.pdf_artifact_revision += 1
+        await self._session.flush()
+        return previous_path
+
     async def commit(self) -> None:
         """Commit pending quote writes."""
         await self._session.commit()
@@ -796,7 +811,6 @@ def _build_render_context(
         created_at=document.created_at,
         updated_at=document.updated_at,
         issued_date=_format_quote_date(document.created_at, user.timezone),
-        updated_date=_format_quote_date(document.updated_at, user.timezone),
     )
 
 

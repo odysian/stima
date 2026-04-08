@@ -51,6 +51,12 @@ function makeInvoiceDetail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetai
     share_token: null,
     source_document_id: "quote-1",
     source_quote_number: "Q-001",
+    pdf_artifact: {
+      status: "missing",
+      job_id: null,
+      download_url: null,
+      terminal_error: null,
+    },
     customer: {
       id: "cust-1",
       name: "Test Customer",

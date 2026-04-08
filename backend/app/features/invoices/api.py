@@ -8,7 +8,6 @@ from uuid import UUID
 
 from arq.connections import ArqRedis
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -24,10 +23,10 @@ from app.features.invoices.schemas import (
     InvoiceUpdateRequest,
 )
 from app.features.invoices.service import InvoiceService
-from app.features.jobs.models import JobType
+from app.features.jobs.models import JobStatus, JobType
 from app.features.jobs.schemas import JobRecordResponse, job_record_to_response
 from app.features.jobs.service import JobService
-from app.features.quotes.schemas import LineItemResponse
+from app.features.quotes.schemas import LineItemResponse, PdfArtifactResponse
 from app.features.quotes.service import QuoteServiceError
 from app.shared.dependencies import (
     get_arq_pool,
@@ -39,6 +38,7 @@ from app.shared.dependencies import (
     require_csrf,
 )
 from app.shared.idempotency import IdempotencyStore, validate_idempotency_key
+from app.shared.pdf_artifacts import resolve_pdf_artifact_state
 from app.shared.pricing import DiscountType
 from app.shared.rate_limit import get_user_key, limiter
 from app.worker.job_registry import EMAIL_JOB_NAME
@@ -80,6 +80,7 @@ async def list_invoices(
 
 @router.get("/{invoice_id}", response_model=InvoiceDetailResponse)
 async def get_invoice(
+    request: Request,
     invoice_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
@@ -120,6 +121,13 @@ async def get_invoice(
         ),
         created_at=invoice.created_at,
         updated_at=invoice.updated_at,
+        pdf_artifact=_build_authenticated_pdf_artifact_response(
+            download_url=str(request.url_for("get_invoice_pdf_artifact", invoice_id=invoice.id)),
+            artifact_path=invoice.pdf_artifact_path,
+            job_id=invoice.pdf_artifact_job_id,
+            job_status=invoice.pdf_artifact_job_status,
+            terminal_error=invoice.pdf_artifact_terminal_error,
+        ),
     )
 
 
@@ -144,6 +152,8 @@ async def update_invoice(
 
 @router.post(
     "/{invoice_id}/pdf",
+    response_model=JobRecordResponse,
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(
@@ -152,19 +162,42 @@ async def update_invoice(
 )
 async def generate_invoice_pdf(
     request: Request,
+    response: Response,
     invoice_id: UUID,
     user: Annotated[User, Depends(get_current_user)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
-) -> StreamingResponse:
-    """Render a user-owned invoice to PDF and stream bytes inline."""
+    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
+    job_service: Annotated[JobService, Depends(get_job_service)],
+) -> JobRecordResponse:
+    """Start or reuse one durable invoice PDF generation job."""
     del request
     try:
-        doc_number, pdf_bytes = await invoice_service.generate_pdf(user, invoice_id)
+        job = await invoice_service.start_pdf_generation(
+            user,
+            invoice_id,
+            job_service=job_service,
+            arq_pool=arq_pool,
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    response.status_code = status.HTTP_202_ACCEPTED
+    return job_record_to_response(job)
+
+
+@router.get("/{invoice_id}/pdf")
+async def get_invoice_pdf_artifact(
+    invoice_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+) -> Response:
+    """Stream one persisted authenticated invoice PDF artifact when ready."""
+    try:
+        doc_number, pdf_bytes = await invoice_service.get_pdf_artifact(user, invoice_id)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    return StreamingResponse(
-        iter((pdf_bytes,)),
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Cache-Control": "no-store",
@@ -368,3 +401,25 @@ async def send_invoice_email(
             extra={"invoice_id": str(invoice_id), "user_id": str(user.id)},
         )
     return job_response
+
+
+def _build_authenticated_pdf_artifact_response(
+    *,
+    download_url: str,
+    artifact_path: str | None,
+    job_id: UUID | None,
+    job_status: JobStatus | None,
+    terminal_error: str | None,
+) -> PdfArtifactResponse:
+    state = resolve_pdf_artifact_state(
+        artifact_path=artifact_path,
+        job_id=job_id,
+        job_status=job_status,
+        terminal_error=terminal_error,
+    )
+    return PdfArtifactResponse(
+        status=state.status,
+        job_id=state.job_id,
+        download_url=download_url if state.status == "ready" else None,
+        terminal_error=state.terminal_error,
+    )

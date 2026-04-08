@@ -31,6 +31,7 @@ export interface JobRecord {
   id: string;
   user_id: string;
   document_id: string | null;
+  document_revision: number | null;
   job_type: JobType;
   status: JobStatus;
   attempts: number;
@@ -46,6 +47,15 @@ export interface JobStatusResponse extends JobRecord {
 export type QuoteExtractResponse =
   | { type: "async"; jobId: string }
   | { type: "sync"; result: ExtractionResult };
+
+export type PdfArtifactStatus = "missing" | "pending" | "ready" | "failed";
+
+export interface PdfArtifact {
+  status: PdfArtifactStatus;
+  job_id: string | null;
+  download_url: string | null;
+  terminal_error: string | null;
+}
 
 export interface LineItem {
   id: string;
@@ -107,6 +117,7 @@ export interface QuoteDetail extends Quote {
   customer_email: string | null;
   customer_phone: string | null;
   linked_invoice: LinkedInvoiceSummary | null;
+  pdf_artifact: PdfArtifact;
 }
 
 export interface QuoteListItem {

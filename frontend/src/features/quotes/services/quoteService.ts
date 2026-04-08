@@ -10,7 +10,7 @@ import type {
   QuoteUpdateRequest,
 } from "@/features/quotes/types/quote.types";
 import { buildIdempotencyKey } from "@/shared/lib/idempotency";
-import { request, requestBlob, requestWithMetadata } from "@/shared/lib/http";
+import { request, requestWithMetadata } from "@/shared/lib/http";
 
 function resolveAudioExtensionFromMimeType(mimeType: string): string {
   const normalizedMimeType = mimeType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
@@ -116,8 +116,8 @@ function deleteQuote(id: string): Promise<void> {
   }).then(() => undefined);
 }
 
-function generatePdf(id: string): Promise<Blob> {
-  return requestBlob(`/api/quotes/${id}/pdf`, {
+function generatePdf(id: string): Promise<JobStatusResponse> {
+  return request<JobStatusResponse>(`/api/quotes/${id}/pdf`, {
     method: "POST",
   });
 }
