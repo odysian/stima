@@ -36,5 +36,5 @@ cd backend
 
 ## Related runbooks
 
-- [redis-provisioning-config.md](/home/odys/stima/docs/runbooks/redis-provisioning-config.md)
-- [production-readiness-checklist.md](/home/odys/stima/docs/runbooks/production-readiness-checklist.md)
+- [redis-provisioning-config.md](./redis-provisioning-config.md)
+- [production-readiness-checklist.md](./production-readiness-checklist.md)

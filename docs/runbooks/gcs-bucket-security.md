@@ -23,4 +23,4 @@ Contractor logos are stored in GCS and must remain private-by-default.
 
 ## Related runbooks
 
-- [production-readiness-checklist.md](/home/odys/stima/docs/runbooks/production-readiness-checklist.md)
+- [production-readiness-checklist.md](./production-readiness-checklist.md)

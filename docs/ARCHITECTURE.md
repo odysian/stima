@@ -54,13 +54,13 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 - Required structured event families include auth throttle hits, login failures, idempotency replays, revoked/expired public-token access attempts, provider `429` retry cycles, and async job terminal failures.
 
 Runbooks:
-- [redis-provisioning-config.md](/home/odys/stima/docs/runbooks/redis-provisioning-config.md)
-- [worker-startup-monitoring.md](/home/odys/stima/docs/runbooks/worker-startup-monitoring.md)
-- [gcs-bucket-security.md](/home/odys/stima/docs/runbooks/gcs-bucket-security.md)
-- [proxy-header-alignment.md](/home/odys/stima/docs/runbooks/proxy-header-alignment.md)
-- [emergency-share-token-revoke.md](/home/odys/stima/docs/runbooks/emergency-share-token-revoke.md)
-- [dependency-security-review-cadence.md](/home/odys/stima/docs/runbooks/dependency-security-review-cadence.md)
-- [production-readiness-checklist.md](/home/odys/stima/docs/runbooks/production-readiness-checklist.md)
+- [redis-provisioning-config.md](./runbooks/redis-provisioning-config.md)
+- [worker-startup-monitoring.md](./runbooks/worker-startup-monitoring.md)
+- [gcs-bucket-security.md](./runbooks/gcs-bucket-security.md)
+- [proxy-header-alignment.md](./runbooks/proxy-header-alignment.md)
+- [emergency-share-token-revoke.md](./runbooks/emergency-share-token-revoke.md)
+- [dependency-security-review-cadence.md](./runbooks/dependency-security-review-cadence.md)
+- [production-readiness-checklist.md](./runbooks/production-readiness-checklist.md)
 
 ## Database Schema
 
@@ -422,9 +422,3 @@ Boundary hardening notes:
 - GCS logo storage is private-by-default: uniform bucket-level access enabled, public access prevention enabled, least-privilege runtime IAM only, and no object ACL reliance in app or runbook flows.
 - Backend emits baseline security headers for backend-served responses; static-host CSP headers remain owned by the frontend host/CDN layer.
 - The SPA shell is compatible with `script-src 'self'`; Google Fonts and Material Symbols still require explicit font/style allowlisting until they are self-hosted.
-- Runbook set:
-  - [redis-provisioning-config.md](/home/odys/stima/docs/runbooks/redis-provisioning-config.md)
-  - [worker-startup-monitoring.md](/home/odys/stima/docs/runbooks/worker-startup-monitoring.md)
-  - [gcs-bucket-security.md](/home/odys/stima/docs/runbooks/gcs-bucket-security.md)
-  - [proxy-header-alignment.md](/home/odys/stima/docs/runbooks/proxy-header-alignment.md)
-  - [production-readiness-checklist.md](/home/odys/stima/docs/runbooks/production-readiness-checklist.md)

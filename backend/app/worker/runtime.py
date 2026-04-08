@@ -22,6 +22,7 @@ from app.features.jobs.repository import JobRepository
 from app.shared.dependencies import get_extraction_integration
 from app.shared.observability import (
     bind_worker_correlation,
+    configure_security_logging,
     log_security_event,
     reset_correlation,
     reset_request_context,
@@ -87,6 +88,7 @@ async def on_worker_startup(ctx: dict[str, Any]) -> None:
     if redis_url is None:
         raise ValueError("REDIS_URL must be set for worker execution")
 
+    configure_security_logging()
     await ping_worker_redis(redis_url)
     ctx["worker_runtime"] = WorkerRuntimeSettings(
         session_maker=get_session_maker(),

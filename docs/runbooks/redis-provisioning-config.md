@@ -32,5 +32,5 @@ Redis is a required runtime dependency for distributed rate limiting, idempotenc
 
 ## Related runbooks
 
-- [worker-startup-monitoring.md](/home/odys/stima/docs/runbooks/worker-startup-monitoring.md)
-- [production-readiness-checklist.md](/home/odys/stima/docs/runbooks/production-readiness-checklist.md)
+- [worker-startup-monitoring.md](./worker-startup-monitoring.md)
+- [production-readiness-checklist.md](./production-readiness-checklist.md)

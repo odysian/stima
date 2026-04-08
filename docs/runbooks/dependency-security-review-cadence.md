@@ -22,4 +22,4 @@ Dependency review cadence is operational policy even before automated scanning i
 
 ## Related runbooks
 
-- [production-readiness-checklist.md](/home/odys/stima/docs/runbooks/production-readiness-checklist.md)
+- [production-readiness-checklist.md](./production-readiness-checklist.md)

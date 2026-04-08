@@ -25,4 +25,4 @@ Production runs on same-site subdomains under `.stima.odysian.dev`, so proxy for
 
 ## Related runbooks
 
-- [production-readiness-checklist.md](/home/odys/stima/docs/runbooks/production-readiness-checklist.md)
+- [production-readiness-checklist.md](./production-readiness-checklist.md)

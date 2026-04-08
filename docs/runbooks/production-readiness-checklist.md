@@ -26,9 +26,9 @@ Use this as the final deployment gate for the current post-hardening system.
 
 ## Runbook index
 
-- [redis-provisioning-config.md](/home/odys/stima/docs/runbooks/redis-provisioning-config.md)
-- [worker-startup-monitoring.md](/home/odys/stima/docs/runbooks/worker-startup-monitoring.md)
-- [gcs-bucket-security.md](/home/odys/stima/docs/runbooks/gcs-bucket-security.md)
-- [proxy-header-alignment.md](/home/odys/stima/docs/runbooks/proxy-header-alignment.md)
-- [emergency-share-token-revoke.md](/home/odys/stima/docs/runbooks/emergency-share-token-revoke.md)
-- [dependency-security-review-cadence.md](/home/odys/stima/docs/runbooks/dependency-security-review-cadence.md)
+- [redis-provisioning-config.md](./redis-provisioning-config.md)
+- [worker-startup-monitoring.md](./worker-startup-monitoring.md)
+- [gcs-bucket-security.md](./gcs-bucket-security.md)
+- [proxy-header-alignment.md](./proxy-header-alignment.md)
+- [emergency-share-token-revoke.md](./emergency-share-token-revoke.md)
+- [dependency-security-review-cadence.md](./dependency-security-review-cadence.md)

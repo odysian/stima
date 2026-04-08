@@ -28,4 +28,4 @@ If the authenticated API path is unavailable, set `share_token_revoked_at` on th
 
 ## Related runbooks
 
-- [production-readiness-checklist.md](/home/odys/stima/docs/runbooks/production-readiness-checklist.md)
+- [production-readiness-checklist.md](./production-readiness-checklist.md)

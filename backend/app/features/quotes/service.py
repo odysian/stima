@@ -35,7 +35,11 @@ from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
-from app.shared.observability import log_security_event
+from app.shared.observability import (
+    current_request_context,
+    hash_token_reference,
+    log_security_event,
+)
 from app.shared.pdf_artifacts import PDF_ARTIFACT_NOT_READY_DETAIL
 from app.shared.pricing import (
     PricingValidationError,
@@ -650,7 +654,11 @@ class QuoteService:
             status_code=404,
             reason=reason_code,
             token_ref=share_token,
-            rate_limit_key=f"public-share:quote:{reason_code}:{share_token}",
+            rate_limit_key=_build_public_share_denial_rate_limit_key(
+                document_type="quote",
+                reason_code=reason_code,
+                share_token=share_token,
+            ),
             rate_limit_seconds=60,
             document_id=str(share_record.document_id),
             document_type="quote",
@@ -808,6 +816,21 @@ def _build_share_token_expiry(created_at: datetime) -> datetime:
 
 def _share_token_has_expired(expires_at: datetime | None, now: datetime) -> bool:
     return expires_at is not None and expires_at < now
+
+
+def _build_public_share_denial_rate_limit_key(
+    *,
+    document_type: str,
+    reason_code: str,
+    share_token: str,
+) -> str:
+    request_context = current_request_context()
+    source = (
+        request_context.client_ip_hash
+        if request_context is not None
+        else hash_token_reference(share_token)
+    )
+    return f"public-share:{document_type}:{reason_code}:{source}"
 
 
 def _validate_document_pricing_for_quote(
