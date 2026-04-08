@@ -313,7 +313,11 @@ def _get_storage_service(ctx: dict[str, Any]) -> Any:
     storage_service = ctx.get("storage_service")
     if storage_service is None:
         return get_storage_service()
-    if not hasattr(storage_service, "fetch_bytes") or not hasattr(storage_service, "upload"):
+    if (
+        not hasattr(storage_service, "fetch_bytes")
+        or not hasattr(storage_service, "upload")
+        or not hasattr(storage_service, "delete")
+    ):
         raise RuntimeError("Worker storage service is not initialized")
     return storage_service
 

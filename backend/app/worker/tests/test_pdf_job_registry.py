@@ -14,6 +14,7 @@ from app.integrations.pdf import PdfRenderUnexpectedError, PdfRenderValidationEr
 from app.worker.job_registry import (
     TERMINAL_ERROR_MISSING_DOCUMENT_ID,
     TERMINAL_ERROR_STALE_DOCUMENT_REVISION,
+    _get_storage_service,
     pdf_job,
 )
 from app.worker.pdf_repository import PersistedPdfArtifactResult, WorkerPdfRepository
@@ -272,6 +273,27 @@ async def test_pdf_job_discards_stale_revision_and_newer_job_succeeds(
     assert fresh_record is not None  # nosec B101 - pytest assertion
     assert fresh_record.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
     assert len(storage_service.deleted_paths) == 1  # nosec B101 - pytest assertion
+
+
+async def test_get_storage_service_rejects_runtime_without_delete_method() -> None:
+    class _MissingDeleteStorageService:
+        def fetch_bytes(self, object_path: str) -> bytes:
+            del object_path
+            return b""
+
+        def upload(
+            self,
+            *,
+            prefix: str,
+            filename: str,
+            data: bytes,
+            content_type: str,
+        ) -> str:
+            del prefix, filename, data, content_type
+            return "artifacts/path.pdf"
+
+    with pytest.raises(RuntimeError, match="Worker storage service is not initialized"):
+        _get_storage_service({"storage_service": _MissingDeleteStorageService()})
 
 
 class _SuccessfulPdfIntegration:

@@ -392,6 +392,21 @@ class InvoiceService:
                 else document_field_float_or_none(invoice.deposit_amount)
             ),
         )
+        rendered_fields_changed = _invoice_render_inputs_changed(
+            invoice=invoice,
+            update_fields=data.model_fields_set,
+            next_line_items=next_line_items,
+            next_total_amount=document_field_float_or_none(current_pricing.total_amount),
+            next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+            next_discount_type=current_pricing.discount_type,
+            next_discount_value=document_field_float_or_none(current_pricing.discount_value),
+            next_deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+            next_title=data.title if "title" in data.model_fields_set else invoice.title,
+            next_notes=data.notes if "notes" in data.model_fields_set else invoice.notes,
+            next_due_date=(
+                data.due_date if "due_date" in data.model_fields_set else invoice.due_date
+            ),
+        )
 
         updated_invoice = await self._invoice_repository.update(
             invoice=invoice,
@@ -424,9 +439,11 @@ class InvoiceService:
             due_date=data.due_date,
             update_due_date="due_date" in data.model_fields_set,
         )
-        obsolete_artifact_path = await self._invoice_repository.invalidate_pdf_artifact(
-            updated_invoice
-        )
+        obsolete_artifact_path = None
+        if rendered_fields_changed:
+            obsolete_artifact_path = await self._invoice_repository.invalidate_pdf_artifact(
+                updated_invoice
+            )
         await self._invoice_repository.commit()
         await self._delete_obsolete_artifact(obsolete_artifact_path)
         return await self._invoice_repository.refresh(updated_invoice)
@@ -766,3 +783,46 @@ def _validate_document_pricing_for_invoice(
         )
     except PricingValidationError as exc:
         raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+
+
+def _invoice_render_inputs_changed(
+    *,
+    invoice: Document,
+    update_fields: set[str],
+    next_line_items: Sequence[object] | None,
+    next_total_amount: float | None,
+    next_tax_rate: float | None,
+    next_discount_type: str | None,
+    next_discount_value: float | None,
+    next_deposit_amount: float | None,
+    next_title: str | None,
+    next_notes: str | None,
+    next_due_date: date | None,
+) -> bool:
+    return any(
+        (
+            invoice.title != next_title,
+            invoice.notes != next_notes,
+            invoice.due_date != next_due_date,
+            document_field_float_or_none(invoice.total_amount) != next_total_amount,
+            document_field_float_or_none(invoice.tax_rate) != next_tax_rate,
+            invoice.discount_type != next_discount_type,
+            document_field_float_or_none(invoice.discount_value) != next_discount_value,
+            document_field_float_or_none(invoice.deposit_amount) != next_deposit_amount,
+            "line_items" in update_fields
+            and _line_item_snapshots(invoice.line_items) != _line_item_snapshots(next_line_items),
+        )
+    )
+
+
+def _line_item_snapshots(
+    line_items: Sequence[object] | None,
+) -> list[tuple[str | None, str | None, float | None]]:
+    return [
+        (
+            cast(str | None, getattr(line_item, "description", None)),
+            cast(str | None, getattr(line_item, "details", None)),
+            document_field_float_or_none(getattr(line_item, "price", None)),
+        )
+        for line_item in (line_items or ())
+    ]

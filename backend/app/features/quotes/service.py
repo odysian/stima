@@ -340,6 +340,18 @@ class QuoteService:
                 else document_field_float_or_none(quote.deposit_amount)
             ),
         )
+        rendered_fields_changed = _quote_render_inputs_changed(
+            quote=quote,
+            update_fields=data.model_fields_set,
+            next_line_items=next_line_items,
+            next_total_amount=document_field_float_or_none(current_pricing.total_amount),
+            next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+            next_discount_type=current_pricing.discount_type,
+            next_discount_value=document_field_float_or_none(current_pricing.discount_value),
+            next_deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+            next_title=data.title if "title" in data.model_fields_set else quote.title,
+            next_notes=data.notes if "notes" in data.model_fields_set else quote.notes,
+        )
 
         updated_quote = await self._repository.update(
             document=quote,
@@ -370,7 +382,9 @@ class QuoteService:
             line_items=data.line_items,
             replace_line_items="line_items" in data.model_fields_set,
         )
-        obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
+        obsolete_artifact_path = None
+        if rendered_fields_changed:
+            obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
         await self._repository.commit()
         await self._delete_obsolete_artifact(obsolete_artifact_path)
         log_event(
@@ -799,3 +813,44 @@ def _validate_document_pricing_for_quote(
         )
     except PricingValidationError as exc:
         raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+
+
+def _quote_render_inputs_changed(
+    *,
+    quote: Document,
+    update_fields: set[str],
+    next_line_items: Sequence[object] | None,
+    next_total_amount: float | None,
+    next_tax_rate: float | None,
+    next_discount_type: str | None,
+    next_discount_value: float | None,
+    next_deposit_amount: float | None,
+    next_title: str | None,
+    next_notes: str | None,
+) -> bool:
+    return any(
+        (
+            quote.title != next_title,
+            quote.notes != next_notes,
+            document_field_float_or_none(quote.total_amount) != next_total_amount,
+            document_field_float_or_none(quote.tax_rate) != next_tax_rate,
+            quote.discount_type != next_discount_type,
+            document_field_float_or_none(quote.discount_value) != next_discount_value,
+            document_field_float_or_none(quote.deposit_amount) != next_deposit_amount,
+            "line_items" in update_fields
+            and _line_item_snapshots(quote.line_items) != _line_item_snapshots(next_line_items),
+        )
+    )
+
+
+def _line_item_snapshots(
+    line_items: Sequence[object] | None,
+) -> list[tuple[str | None, str | None, float | None]]:
+    return [
+        (
+            cast(str | None, getattr(line_item, "description", None)),
+            cast(str | None, getattr(line_item, "details", None)),
+            document_field_float_or_none(getattr(line_item, "price", None)),
+        )
+        for line_item in (line_items or ())
+    ]

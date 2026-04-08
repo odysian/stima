@@ -107,9 +107,13 @@ class CustomerService:
             raise CustomerServiceError(detail="Not found", status_code=404)
 
         update_fields = data.model_dump(exclude_unset=True)
+        invalidate_artifacts = _customer_render_inputs_changed(
+            customer=customer,
+            update_fields=update_fields,
+        )
         updated_customer = await self._repository.update(customer, **update_fields)
         artifact_paths_to_delete: list[str] = []
-        if _customer_render_inputs_changed(customer=customer, update_fields=update_fields):
+        if invalidate_artifacts:
             artifact_paths_to_delete = await self._pdf_artifact_repository.invalidate_for_customer(
                 user_id=user.id,
                 customer_id=customer_id,
