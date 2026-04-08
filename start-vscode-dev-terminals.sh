@@ -95,12 +95,26 @@ ensure_dev_stack_task() {
       "problemMatcher": []
     },
     {
+      "label": "dev:worker",
+      "type": "shell",
+      "command": "bash -lc 'test -x .venv/bin/arq || { echo \"Missing backend/.venv. Run: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt\"; exit 1; }; for i in {1..60}; do (echo >/dev/tcp/127.0.0.1/6379) >/dev/null 2>&1 && break; sleep 1; done; exec .venv/bin/arq app.worker.arq_worker.WorkerSettings'",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "dev:stack",
       "dependsOn": [
         "dev:db",
         "dev:backend",
         "dev:frontend",
-        "dev:db-shell"
+        "dev:db-shell",
+        "dev:worker"
       ],
       "dependsOrder": "parallel",
       "group": {
