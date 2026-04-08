@@ -29,6 +29,7 @@ async def test_reap_stale_extraction_jobs_once_uses_isolated_session(
         status=JobStatus.PENDING,
         attempts=0,
         created_at=datetime.now(UTC) - timedelta(minutes=10),
+        updated_at=datetime.now(UTC) - timedelta(minutes=10),
     )
     db_session.add(record)
     await db_session.commit()

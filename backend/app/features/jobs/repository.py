@@ -98,7 +98,7 @@ class JobRepository:
             .where(
                 JobRecord.job_type == JobType.EXTRACTION,
                 JobRecord.status.in_((JobStatus.PENDING, JobStatus.RUNNING)),
-                JobRecord.created_at < older_than,
+                JobRecord.updated_at < older_than,
             )
             .values(
                 status=JobStatus.TERMINAL,

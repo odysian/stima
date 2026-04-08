@@ -121,16 +121,20 @@ async def test_reap_stale_extraction_jobs_terminalizes_only_stale_active_extract
 
     stale_pending = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
     stale_pending.created_at = stale_cutoff - timedelta(minutes=1)
+    stale_pending.updated_at = stale_cutoff - timedelta(minutes=1)
 
     stale_running = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
     await repository.set_running(stale_running.id, expected_job_type=JobType.EXTRACTION)
     stale_running.created_at = stale_cutoff - timedelta(minutes=2)
+    stale_running.updated_at = stale_cutoff - timedelta(minutes=2)
 
     fresh_pending = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
     fresh_pending.created_at = stale_cutoff + timedelta(minutes=1)
+    fresh_pending.updated_at = stale_cutoff + timedelta(minutes=1)
 
     stale_pdf = await repository.create(user_id=user.id, job_type=JobType.PDF)
     stale_pdf.created_at = stale_cutoff - timedelta(minutes=3)
+    stale_pdf.updated_at = stale_cutoff - timedelta(minutes=3)
 
     await db_session.flush()
 
