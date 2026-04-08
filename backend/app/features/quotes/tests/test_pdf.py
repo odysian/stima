@@ -31,7 +31,7 @@ from app.features.quotes.service import QuoteService
 from app.integrations.pdf import PdfRenderError, validate_render_context
 from app.integrations.storage import StorageNotFoundError
 from app.main import app
-from app.shared import event_logger
+from app.shared import event_logger, observability
 from app.shared.dependencies import (
     get_arq_pool,
     get_invoice_service,
@@ -996,6 +996,48 @@ async def test_revoked_public_quote_token_returns_generic_404(
     assert quote_row.share_token_revoked_at is not None
 
 
+async def test_revoked_public_quote_token_emits_structured_denial_log(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def _capture(payload: dict[str, object], *, level: int) -> None:
+        captured.append(payload)
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture)
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    revoke_response = await client.delete(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert revoke_response.status_code == 204
+
+    client.cookies.clear()
+    response = await client.get(f"/api/public/doc/{share_token}")
+
+    assert response.status_code == 404
+    denial_event = next(
+        payload for payload in captured if payload.get("event") == "public_share.token_denied"
+    )
+    assert denial_event["reason"] == "revoked"
+    assert denial_event["status_code"] == 404
+    assert denial_event["document_type"] == "quote"
+    assert denial_event["route_template"] == "/api/public/doc/{token}"
+    assert isinstance(denial_event["token_ref_hash"], str)
+    assert share_token not in json.dumps(denial_event, sort_keys=True)
+
+
 async def test_expired_public_quote_token_returns_generic_404(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1080,6 +1122,48 @@ async def test_public_share_pdf_rate_limit_returns_429(
 
     assert first_response.status_code == 200
     assert second_response.status_code == 429
+
+
+async def test_public_share_access_logs_redact_raw_tokens(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def _capture(payload: dict[str, object], *, level: int) -> None:
+        captured.append(payload)
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture)
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    client.cookies.clear()
+    public_doc_response = await client.get(f"/api/public/doc/{share_token}")
+    public_pdf_response = await client.get(f"/share/{share_token}")
+
+    assert public_doc_response.status_code == 200
+    assert public_pdf_response.status_code in {200, 422}
+
+    access_events = [
+        payload
+        for payload in captured
+        if payload.get("event") == "http.request.completed"
+        and payload.get("route_template") in {"/api/public/doc/{token}", "/share/{token}"}
+    ]
+    assert len(access_events) >= 2
+    assert {payload["route_template"] for payload in access_events} == {
+        "/api/public/doc/{token}",
+        "/share/{token}",
+    }
+    assert all(share_token not in json.dumps(payload, sort_keys=True) for payload in access_events)
 
 
 async def test_public_quote_json_rate_limit_returns_429(

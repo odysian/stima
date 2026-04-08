@@ -9,6 +9,8 @@ from typing import Any, cast
 import openai
 from openai import AsyncOpenAI
 
+from app.shared.observability import log_provider_quota_exhausted, log_provider_retry
+
 _RETRY_BASE_DELAY_SECONDS = 0.25
 _RETRY_MAX_DELAY_SECONDS = 2.0
 
@@ -73,9 +75,26 @@ class TranscriptionIntegration:
                 )
             except Exception as exc:
                 last_error = exc
+                upstream_status = _provider_status_code(exc)
                 if attempt >= self._max_attempts or not _is_retryable_provider_error(exc):
+                    if upstream_status == 429:
+                        log_provider_quota_exhausted(
+                            provider="openai",
+                            upstream_status=upstream_status,
+                            attempt=attempt,
+                            max_attempts=self._max_attempts,
+                        )
                     break
-                await asyncio.sleep(_retry_delay_seconds(attempt))
+                retry_delay_seconds = _retry_delay_seconds(attempt)
+                if upstream_status == 429:
+                    log_provider_retry(
+                        provider="openai",
+                        upstream_status=upstream_status,
+                        attempt=attempt,
+                        max_attempts=self._max_attempts,
+                        backoff_ms=int(retry_delay_seconds * 1000),
+                    )
+                await asyncio.sleep(retry_delay_seconds)
 
         if last_error is None:  # pragma: no cover - defensive invariant
             raise TranscriptionError("OpenAI transcription request failed")
@@ -115,6 +134,15 @@ def _is_retryable_provider_error(exc: Exception) -> bool:
     if isinstance(exc, openai.APIStatusError):
         return getattr(exc, "status_code", 0) >= 500
     return False
+
+
+def _provider_status_code(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+    if isinstance(exc, openai.RateLimitError):
+        return 429
+    return None
 
 
 def _retry_delay_seconds(attempt: int) -> float:

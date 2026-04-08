@@ -40,7 +40,7 @@ from app.integrations.extraction import ExtractionError
 from app.integrations.storage import StorageNotFoundError
 from app.integrations.transcription import TranscriptionError
 from app.main import app
-from app.shared import event_logger
+from app.shared import event_logger, observability
 from app.shared.dependencies import (
     get_email_service,
     get_extraction_service,
@@ -1026,6 +1026,44 @@ async def test_send_quote_email_replays_same_idempotency_key_without_second_send
     assert len(mock_email_service.messages) == 0
 
 
+async def test_send_quote_email_idempotency_replay_emits_structured_log(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_email_service: _MockEmailService,
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def _capture(payload: dict[str, object], *, level: int) -> None:
+        captured.append(payload)
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture)
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    quote = await _create_quote(client, csrf_token, customer_id)
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-replay-observed"),
+    )
+    second_response = await client.post(
+        f"/api/quotes/{quote['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="quote-replay-observed"),
+    )
+
+    _assert_async_email_job_response(first_response, document_id=quote["id"])
+    _assert_async_email_job_response(second_response, document_id=quote["id"])
+    replay_event = next(
+        payload for payload in captured if payload.get("event") == "idempotency.replay"
+    )
+    assert replay_event["reason"] == "replayed_response"
+    assert replay_event["status_code"] == 202
+    assert replay_event["endpoint_slug"] == "quote-send-email"
+    assert replay_event["resource_id"] == quote["id"]
+
+
 async def test_send_quote_email_uses_reply_copy_when_phone_is_missing(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -1695,6 +1733,51 @@ async def test_send_invoice_email_replays_same_idempotency_key_without_second_se
     assert second_response.headers["Idempotency-Replayed"] == "true"
     assert second_payload == first_payload
     assert len(mock_email_service.messages) == 0
+
+
+async def test_send_invoice_email_idempotency_replay_emits_structured_log(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_email_service: _MockEmailService,
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def _capture(payload: dict[str, object], *, level: int) -> None:
+        captured.append(payload)
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture)
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay-observed"),
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay-observed"),
+    )
+
+    _assert_async_email_job_response(first_response, document_id=cast(str, invoice["id"]))
+    _assert_async_email_job_response(second_response, document_id=cast(str, invoice["id"]))
+    replay_event = next(
+        payload for payload in captured if payload.get("event") == "idempotency.replay"
+    )
+    assert replay_event["reason"] == "replayed_response"
+    assert replay_event["status_code"] == 202
+    assert replay_event["endpoint_slug"] == "invoice-send-email"
+    assert replay_event["resource_id"] == invoice["id"]
 
 
 async def test_send_email_rejects_same_idempotency_key_for_different_resource_fingerprint(

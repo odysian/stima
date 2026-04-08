@@ -30,6 +30,23 @@ Record conventions that already exist in code.
 - Multi-device: multiple active refresh tokens per user are allowed.
 - Rate limiting on auth endpoints via `slowapi` with proxy-aware IP extraction.
 
+## Observability (Backend)
+- Use `stima.events` for pilot analytics events that may also persist to `event_logs`.
+- Use `stima.security` for stdout-only security and operational logs; do not write those events to `event_logs`.
+- Every structured security/ops log includes `event`, `timestamp`, `level`, `logger`, `correlation_id`, and `outcome`.
+- Request-scoped logs also include `method`, `route_template`, `status_code`, and `client_ip_hash`.
+- Token-derived references must use keyed HMAC-SHA256 hashes (`token_ref_hash`), never raw token material.
+- Token-bearing access logs must redact route templates for `/api/public/doc/{token}`, `/share/{token}`, and `/doc/{token}`.
+- Repeated identical security events should be emission-rate-limited to avoid log floods.
+- Keep operational guidance linked from docs, not hidden in code comments:
+  - [redis-provisioning-config.md](./runbooks/redis-provisioning-config.md)
+  - [worker-startup-monitoring.md](./runbooks/worker-startup-monitoring.md)
+  - [gcs-bucket-security.md](./runbooks/gcs-bucket-security.md)
+  - [proxy-header-alignment.md](./runbooks/proxy-header-alignment.md)
+  - [emergency-share-token-revoke.md](./runbooks/emergency-share-token-revoke.md)
+  - [dependency-security-review-cadence.md](./runbooks/dependency-security-review-cadence.md)
+  - [production-readiness-checklist.md](./runbooks/production-readiness-checklist.md)
+
 ## Auth Transport (Frontend)
 - CSRF token is stored as a module-level variable in `http.ts` — not React state (avoids re-renders), not `localStorage` (XSS-accessible).
 - `credentials: 'include'` on every `fetch` call.

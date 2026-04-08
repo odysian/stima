@@ -38,6 +38,7 @@ from app.shared.dependencies import (
     require_csrf,
 )
 from app.shared.idempotency import IdempotencyStore, validate_idempotency_key
+from app.shared.observability import log_security_event
 from app.shared.pdf_artifacts import resolve_pdf_artifact_state
 from app.shared.pricing import DiscountType
 from app.shared.rate_limit import get_user_key, limiter
@@ -284,6 +285,15 @@ async def send_invoice_email(
         idempotency_key=normalized_idempotency_key,
     )
     if replay.kind == "replay" and replay.response is not None:
+        log_security_event(
+            "idempotency.replay",
+            outcome="replayed",
+            level=logging.INFO,
+            status_code=replay.response.status_code,
+            reason="replayed_response",
+            endpoint_slug="invoice-send-email",
+            resource_id=str(invoice_id),
+        )
         response.headers["Idempotency-Replayed"] = "true"
         response.status_code = replay.response.status_code
         return JobRecordResponse.model_validate(replay.response.payload)

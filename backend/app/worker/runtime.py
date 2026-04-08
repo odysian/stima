@@ -20,6 +20,14 @@ from app.core.database import get_session_maker
 from app.features.jobs.models import JobType
 from app.features.jobs.repository import JobRepository
 from app.shared.dependencies import get_extraction_integration
+from app.shared.observability import (
+    bind_worker_correlation,
+    configure_security_logging,
+    log_security_event,
+    reset_correlation,
+    reset_request_context,
+    suspend_request_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +88,7 @@ async def on_worker_startup(ctx: dict[str, Any]) -> None:
     if redis_url is None:
         raise ValueError("REDIS_URL must be set for worker execution")
 
+    configure_security_logging()
     await ping_worker_redis(redis_url)
     ctx["worker_runtime"] = WorkerRuntimeSettings(
         session_maker=get_session_maker(),
@@ -108,16 +117,20 @@ async def process_job[T](
     *,
     job_id: UUID,
     job_type: JobType,
+    job_name: str | None = None,
     handler: Callable[[], Awaitable[T]],
     on_success: Callable[[WorkerRuntimeSettings, T], Awaitable[None]] | None = None,
 ) -> None:
     """Wrap domain handlers with durable job status transitions and retry policy."""
     runtime = _get_runtime(ctx)
     attempt_number = max(int(ctx.get("job_try", 1)), 1)
-
-    await _set_running(runtime, job_id=job_id, job_type=job_type)
+    resolved_job_name = job_name or job_type.value
+    correlation_token = bind_worker_correlation(job_name=resolved_job_name, job_id=str(job_id))
+    request_context_token = suspend_request_context()
 
     try:
+        await _set_running(runtime, job_id=job_id, job_type=job_type)
+
         result = await handler()
         if on_success is None:
             await _set_success(runtime, job_id=job_id, job_type=job_type)
@@ -130,6 +143,15 @@ async def process_job[T](
                 "Job %s exhausted retry budget and is transitioning to terminal state.",
                 job_id,
                 exc_info=True,
+            )
+            log_security_event(
+                "jobs.terminal_failure",
+                outcome="terminal",
+                level=logging.ERROR,
+                reason=_terminal_error_code(exc),
+                job_name=resolved_job_name,
+                job_id=str(job_id),
+                error_class=_error_class_name(exc),
             )
             await _set_terminal(
                 runtime,
@@ -150,6 +172,15 @@ async def process_job[T](
         ) from exc
     except NonRetryableJobError as exc:
         logger.warning("Job %s failed with a non-retryable exception: %s", job_id, exc)
+        log_security_event(
+            "jobs.terminal_failure",
+            outcome="terminal",
+            level=logging.ERROR,
+            reason=_terminal_error_code(exc),
+            job_name=resolved_job_name,
+            job_id=str(job_id),
+            error_class=_error_class_name(exc),
+        )
         await _set_terminal(
             runtime,
             job_id=job_id,
@@ -159,6 +190,15 @@ async def process_job[T](
         raise
     except Exception as exc:
         logger.exception("Job %s failed with a terminal exception.", job_id)
+        log_security_event(
+            "jobs.terminal_failure",
+            outcome="terminal",
+            level=logging.ERROR,
+            reason=_terminal_error_code(exc),
+            job_name=resolved_job_name,
+            job_id=str(job_id),
+            error_class=_error_class_name(exc),
+        )
         await _set_terminal(
             runtime,
             job_id=job_id,
@@ -166,6 +206,9 @@ async def process_job[T](
             reason=_terminal_error_code(exc),
         )
         raise
+    finally:
+        reset_request_context(request_context_token)
+        reset_correlation(correlation_token)
 
 
 def calculate_retry_delay_seconds(
@@ -252,3 +295,8 @@ def _terminal_error_code(exc: Exception) -> str:
     if isinstance(exc, NonRetryableJobError):
         return exc.terminal_reason
     return TERMINAL_ERROR_UNEXPECTED
+
+
+def _error_class_name(exc: Exception) -> str:
+    cause = exc.__cause__
+    return type(cause if isinstance(cause, Exception) else exc).__name__

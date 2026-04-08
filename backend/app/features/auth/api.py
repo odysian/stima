@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
@@ -23,6 +24,7 @@ from app.features.auth.service import (
     AuthServiceError,
 )
 from app.shared.dependencies import get_auth_service, get_current_user, require_csrf
+from app.shared.observability import log_security_event
 from app.shared.rate_limit import get_ip_key, limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -67,6 +69,14 @@ async def login(
             password=payload.password,
         )
     except AuthServiceError as exc:
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            log_security_event(
+                "auth.login_failed",
+                outcome="denied",
+                level=logging.WARNING,
+                status_code=exc.status_code,
+                reason="invalid_credentials",
+            )
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     _set_auth_cookies(

@@ -19,6 +19,7 @@ from app.shared.input_limits import (
     LINE_ITEM_DESCRIPTION_MAX_CHARS,
     LINE_ITEM_DETAILS_MAX_CHARS,
 )
+from app.shared.observability import log_provider_quota_exhausted, log_provider_retry
 
 EXTRACTION_TOOL_NAME = "extract_quote"
 
@@ -158,9 +159,26 @@ class ExtractionIntegration:
                 )
             except Exception as exc:
                 last_error = exc
+                upstream_status = _provider_status_code(exc)
                 if attempt >= self._max_attempts or not _is_retryable_provider_error(exc):
+                    if upstream_status == 429:
+                        log_provider_quota_exhausted(
+                            provider="anthropic",
+                            upstream_status=upstream_status,
+                            attempt=attempt,
+                            max_attempts=self._max_attempts,
+                        )
                     break
-                await asyncio.sleep(_retry_delay_seconds(attempt))
+                retry_delay_seconds = _retry_delay_seconds(attempt)
+                if upstream_status == 429:
+                    log_provider_retry(
+                        provider="anthropic",
+                        upstream_status=upstream_status,
+                        attempt=attempt,
+                        max_attempts=self._max_attempts,
+                        backoff_ms=int(retry_delay_seconds * 1000),
+                    )
+                await asyncio.sleep(retry_delay_seconds)
 
         if last_error is None:  # pragma: no cover - defensive invariant
             raise ExtractionError("Claude request failed")
@@ -218,10 +236,19 @@ def _is_retryable_provider_error(exc: Exception) -> bool:
         return True
     if isinstance(exc, anthropic.APIStatusError):
         return getattr(exc, "status_code", 0) >= 500
-    status_code = getattr(exc, "status_code", None)
+    status_code = _provider_status_code(exc)
     if isinstance(status_code, int):
         return status_code == 429 or status_code >= 500
     return False
+
+
+def _provider_status_code(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+    if isinstance(exc, anthropic.RateLimitError):
+        return 429
+    return None
 
 
 def _retry_delay_seconds(attempt: int) -> float:

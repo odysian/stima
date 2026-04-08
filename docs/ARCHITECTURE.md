@@ -13,7 +13,7 @@ backend/app/
   core/          — config, database, security primitives
   features/      — feature modules (auth, quotes, customers, profile)
     registry.py  — central model import for Alembic discovery
-  shared/        — cross-cutting: dependencies, rate limiting, exceptions
+  shared/        — cross-cutting: dependencies, rate limiting, exceptions, observability
   integrations/  — external service adapters (audio, transcription, pdf)
   worker/        — ARQ worker settings and background job entrypoints
 ```
@@ -42,6 +42,25 @@ Cookie-based authentication with CSRF double-submit and refresh token rotation.
 **Security**: Argon2id password hashing. Refresh token stored as SHA-256 hash. Replay of revoked token revokes entire token family. Redis-backed distributed rate limiting protects auth, public document, PDF/email, and extraction routes; public routes stay IP-keyed while authenticated hot paths use per-user keys. Provider-backed extraction routes also enforce Redis-backed per-user daily quota and concurrency guards before upstream calls. Proxy-aware IP extraction remains the fallback key source for unauthenticated routes.
 
 **Multi-device**: multiple active refresh tokens per user are allowed.
+
+## Observability And Runbooks
+
+- Pilot analytics events continue through `stima.events` and the `event_logs` table.
+- Security and operational events emit through stdout-only structured logging on `stima.security`; they do not write to `event_logs`.
+- Structured event base fields are `event`, `timestamp`, `level`, `logger`, `correlation_id`, and `outcome`.
+- Request-scoped structured events also carry `method`, `route_template`, `status_code`, and `client_ip_hash`.
+- Request correlation IDs are generated in middleware. Worker jobs generate their own correlation IDs at job start so provider retries and terminal failures share one job-local trace.
+- Token-derived references use keyed HMAC-SHA256 (`token_ref_hash`). Raw tokens, auth headers, provider credentials, and raw token-bearing URLs must never appear in logs.
+- Required structured event families include auth throttle hits, login failures, idempotency replays, revoked/expired public-token access attempts, provider `429` retry cycles, and async job terminal failures.
+
+Runbooks:
+- [redis-provisioning-config.md](./runbooks/redis-provisioning-config.md)
+- [worker-startup-monitoring.md](./runbooks/worker-startup-monitoring.md)
+- [gcs-bucket-security.md](./runbooks/gcs-bucket-security.md)
+- [proxy-header-alignment.md](./runbooks/proxy-header-alignment.md)
+- [emergency-share-token-revoke.md](./runbooks/emergency-share-token-revoke.md)
+- [dependency-security-review-cadence.md](./runbooks/dependency-security-review-cadence.md)
+- [production-readiness-checklist.md](./runbooks/production-readiness-checklist.md)
 
 ## Database Schema
 
@@ -283,6 +302,7 @@ Public landing-page rules:
 - revoked, expired, and unknown tokens all return the same external `404`; internal logs retain the reason code for revoked/expired cases
 - public JSON, logo, and PDF responses are IP-keyed rate-limited and return `429` on limit exhaustion
 - public JSON, logo, and PDF responses send `X-Robots-Tag: noindex`
+- structured access logs must use redacted route templates for token-bearing paths and never emit raw share tokens
 
 `PATCH /quotes/{id}` behavior:
 - If `title` is present, blank or whitespace-only values are normalized to `null`.

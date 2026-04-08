@@ -8,10 +8,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from arq.connections import ArqRedis, create_pool
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.datastructures import MutableHeaders
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -32,6 +31,12 @@ from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
 from app.shared.dependencies import get_idempotency_store
 from app.shared.event_logger import configure_event_logging
+from app.shared.observability import (
+    RequestObservabilityMiddleware,
+    bind_request_context,
+    configure_security_logging,
+    security_rate_limit_handler,
+)
 from app.shared.proxy_headers import TrustedProxyHeadersMiddleware
 from app.shared.rate_limit import extraction_controls, limiter
 from app.worker.runtime import build_arq_redis_settings
@@ -113,12 +118,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     init_sentry(dsn=settings.sentry_dsn, environment=settings.environment)
     configure_event_logging(session_factory=get_session_maker())
+    configure_security_logging()
 
     app = FastAPI(title="Stima API", lifespan=_lifespan)
     app.state.limiter = limiter
     app.state.arq_pool = None
     app.state.stale_job_reaper_task = None
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(RateLimitExceeded, security_rate_limit_handler)  # type: ignore[arg-type]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
@@ -140,15 +146,24 @@ def create_app() -> FastAPI:
         TrustedProxyHeadersMiddleware,
         trusted_proxy_ips=settings.trusted_proxy_ips,
     )
-    app.include_router(auth_router, prefix="/api")
-    app.include_router(profile_router, prefix="/api")
-    app.include_router(customer_router, prefix="/api")
-    app.include_router(invoice_router, prefix="/api")
-    app.include_router(jobs_router, prefix="/api")
-    app.include_router(quote_router, prefix="/api")
-    app.include_router(quote_public_router)
+    app.add_middleware(RequestObservabilityMiddleware)
+    app.include_router(auth_router, prefix="/api", dependencies=[Depends(bind_request_context)])
+    app.include_router(profile_router, prefix="/api", dependencies=[Depends(bind_request_context)])
+    app.include_router(
+        customer_router,
+        prefix="/api",
+        dependencies=[Depends(bind_request_context)],
+    )
+    app.include_router(invoice_router, prefix="/api", dependencies=[Depends(bind_request_context)])
+    app.include_router(jobs_router, prefix="/api", dependencies=[Depends(bind_request_context)])
+    app.include_router(quote_router, prefix="/api", dependencies=[Depends(bind_request_context)])
+    app.include_router(quote_public_router, dependencies=[Depends(bind_request_context)])
     if settings.admin_api_key is not None:
-        app.include_router(admin_router, prefix="/api")
+        app.include_router(
+            admin_router,
+            prefix="/api",
+            dependencies=[Depends(bind_request_context)],
+        )
 
     @app.get("/health", include_in_schema=False)
     async def health() -> JSONResponse:
