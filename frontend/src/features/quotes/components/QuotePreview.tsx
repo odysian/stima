@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
@@ -10,49 +9,29 @@ import { QuotePreviewDialogs } from "@/features/quotes/components/QuotePreviewDi
 import {
   buildOverflowItems,
   getEmailActionLabel,
-  getSendEmailErrorMessage,
-  isShareAbortError,
   readOptionalQuoteText,
   resolveActionState,
 } from "@/features/quotes/components/quotePreview.helpers";
-import { quoteService } from "@/features/quotes/services/quoteService";
 import { useQuoteDetail } from "@/features/quotes/hooks/useQuoteDetail";
+import { useQuoteDocumentActions } from "@/features/quotes/hooks/useQuoteDocumentActions";
 import { useQuoteInvoiceConversion } from "@/features/quotes/hooks/useQuoteInvoiceConversion";
-import type { Quote } from "@/features/quotes/types/quote.types";
+import { useQuoteOutcomeActions } from "@/features/quotes/hooks/useQuoteOutcomeActions";
 import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { jobService } from "@/shared/lib/jobService";
-import { pollJobUntilSuccess } from "@/shared/lib/jobPolling";
 import { canNavigateBack } from "@/shared/lib/navigation";
 
 export function QuotePreview(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const {
-    quote,
     setQuote,
+    quote,
     isLoadingQuote,
     loadError,
     refetchQuote,
   } = useQuoteDetail(id);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [isSharing, setIsSharing] = useState(false);
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [shareMessage, setShareMessage] = useState<string | null>(null);
-  const [shareError, setShareError] = useState<string | null>(null);
-  const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
-  const [isMarkingWon, setIsMarkingWon] = useState(false);
-  const [isMarkingLost, setIsMarkingLost] = useState(false);
-  const [outcomeError, setOutcomeError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showMarkWonConfirm, setShowMarkWonConfirm] = useState(false);
-  const [showMarkLostConfirm, setShowMarkLostConfirm] = useState(false);
-  const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
 
   const shareUrl = quote?.share_token ? `${window.location.origin}/doc/${quote.share_token}` : null;
   const actionState = resolveActionState(quote);
@@ -64,11 +43,6 @@ export function QuotePreview(): React.ReactElement {
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact = readOptionalQuoteText(quote, "customer_phone") ?? readOptionalQuoteText(quote, "customer_email") ?? "No contact details";
-  const resolvedPdfError = pdfError ?? (
-    quote?.pdf_artifact.status === "failed"
-      ? "Quote PDF failed. Please try again."
-      : null
-  );
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
   const showDraftInvoicePromptBelowActions = Boolean(quote && actionState === "draft" && !quote.linked_invoice);
   const {
@@ -81,226 +55,61 @@ export function QuotePreview(): React.ReactElement {
     navigate,
     setQuote,
   });
+  const {
+    isGeneratingPdf,
+    pdfError,
+    isSharing,
+    isSendingEmail,
+    shareMessage,
+    shareError,
+    manualCopyUrl,
+    showSendEmailConfirm,
+    setShowSendEmailConfirm,
+    clearShareFeedback,
+    onGeneratePdf,
+    onRequestSendEmail,
+    onConfirmSendEmail,
+    onCopyLink,
+  } = useQuoteDocumentActions({
+    quoteId: id,
+    quote,
+    setQuote,
+    refetchQuote,
+  });
+  const {
+    isMarkingWon,
+    isMarkingLost,
+    outcomeError,
+    isDeleting,
+    deleteError,
+    showDeleteConfirm,
+    showMarkWonConfirm,
+    showMarkLostConfirm,
+    setShowDeleteConfirm,
+    setShowMarkWonConfirm,
+    setShowMarkLostConfirm,
+    onConfirmMarkWon,
+    onConfirmMarkLost,
+    onDelete,
+  } = useQuoteOutcomeActions({
+    quoteId: id,
+    quote,
+    refetchQuote,
+    navigate,
+    clearInvoiceError,
+    clearShareFeedback,
+  });
+  const resolvedPdfError = pdfError ?? (
+    quote?.pdf_artifact.status === "failed"
+      ? "Quote PDF failed. Please try again."
+      : null
+  );
   const isPdfBusy = isGeneratingPdf || quote?.pdf_artifact.status === "pending";
   const isBusy = isPdfBusy || isSharing || isSendingEmail || isMarkingWon || isMarkingLost || isDeleting || isConvertingInvoice;
 
   function handleBack(): void {
     if (canNavigateBack()) return void navigate(-1);
     navigate("/", { replace: true });
-  }
-
-  async function onGeneratePdf(): Promise<void> {
-    if (!id) {
-      return;
-    }
-
-    setPdfError(null);
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
-    setIsGeneratingPdf(true);
-    try {
-      const job = await quoteService.generatePdf(id);
-      await refetchQuote(id);
-      await pollJobUntilSuccess({
-        jobId: job.id,
-        getJobStatus: (jobId) => jobService.getJobStatus(jobId),
-        terminalErrorMessage: "Quote PDF failed. Please try again.",
-        timeoutErrorMessage: "Quote PDF is taking longer than expected. Refresh to check its status.",
-      });
-      await refetchQuote(id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to generate PDF";
-      setPdfError(message);
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  }
-
-  function applyQuoteUpdate(updatedQuote: Quote): void {
-    setQuote((currentQuote) => {
-      if (!currentQuote) {
-        return currentQuote;
-      }
-
-      return {
-        ...currentQuote,
-        title: updatedQuote.title,
-        status: updatedQuote.status,
-        shared_at: updatedQuote.shared_at,
-        share_token: updatedQuote.share_token,
-        updated_at: updatedQuote.updated_at,
-      };
-    });
-  }
-
-  async function ensureShareUrl(): Promise<{ url: string; shareTitle: string }> {
-    if (!id || !quote) {
-      throw new Error("Share link unavailable");
-    }
-
-    if (quote.share_token) {
-      return {
-        url: `${window.location.origin}/doc/${quote.share_token}`,
-        shareTitle: quote.title ?? `Quote ${quote.doc_number}`,
-      };
-    }
-
-    const updatedQuote = await quoteService.shareQuote(id);
-    applyQuoteUpdate(updatedQuote);
-    if (!updatedQuote.share_token) {
-      throw new Error("Share link unavailable");
-    }
-    return {
-      url: `${window.location.origin}/doc/${updatedQuote.share_token}`,
-      shareTitle: updatedQuote.title ?? `Quote ${updatedQuote.doc_number}`,
-    };
-  }
-
-  async function onCopyLink(): Promise<void> {
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
-    setIsSharing(true);
-
-    try {
-      const { url: nextSharedUrl, shareTitle } = await ensureShareUrl();
-      const maybeNavigator = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
-
-      if (typeof maybeNavigator.share === "function") {
-        try {
-          await maybeNavigator.share({
-            title: shareTitle,
-            url: nextSharedUrl,
-          });
-          setShareMessage("Quote link shared.");
-          setManualCopyUrl(null);
-          return;
-        } catch (error) {
-          if (isShareAbortError(error)) {
-            return;
-          }
-          throw error;
-        }
-      }
-
-      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
-        setManualCopyUrl(nextSharedUrl);
-        setShareMessage("Copy this share link manually.");
-        return;
-      }
-
-      await navigator.clipboard.writeText(nextSharedUrl);
-      setManualCopyUrl(null);
-      setShareMessage("Share link copied to clipboard.");
-    } catch (error) {
-      setManualCopyUrl(null);
-      const message = error instanceof Error ? error.message : "Unable to copy share link";
-      setShareError(message);
-    } finally {
-      setIsSharing(false);
-    }
-  }
-
-  function onRequestSendEmail(): void {
-    if (!hasCustomerEmail || !emailActionLabel) {
-      return;
-    }
-
-    setShowSendEmailConfirm(true);
-  }
-
-  async function onConfirmSendEmail(): Promise<void> {
-    if (!id || !quote) {
-      return;
-    }
-
-    setShowSendEmailConfirm(false);
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
-    setIsSendingEmail(true);
-
-    try {
-      const job = await quoteService.sendQuoteEmail(id);
-      await refetchQuote(id);
-      setShareMessage("Quote email is sending. We’ll update this status shortly.");
-      await pollJobUntilSuccess({
-        jobId: job.id,
-        getJobStatus: (jobId) => jobService.getJobStatus(jobId),
-        terminalErrorMessage: "Quote email failed. Please try again.",
-        timeoutErrorMessage: "Quote email is taking longer than expected. Refresh to check delivery status.",
-      });
-      await refetchQuote(id);
-      setShareMessage("Quote email sent.");
-    } catch (error) {
-      setShareError(getSendEmailErrorMessage(error));
-    } finally {
-      setIsSendingEmail(false);
-    }
-  }
-
-  async function onConfirmMarkWon(): Promise<void> {
-    if (!id || !quote) {
-      return;
-    }
-
-    setOutcomeError(null);
-    setShareError(null);
-    setShareMessage(null);
-    clearInvoiceError();
-    setShowMarkWonConfirm(false);
-    setIsMarkingWon(true);
-    try {
-      await quoteService.markQuoteWon(id);
-      await refetchQuote(id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to mark quote as won";
-      setOutcomeError(message);
-    } finally {
-      setIsMarkingWon(false);
-    }
-  }
-
-  async function onConfirmMarkLost(): Promise<void> {
-    if (!id || !quote) {
-      return;
-    }
-
-    setOutcomeError(null);
-    setShareError(null);
-    setShareMessage(null);
-    clearInvoiceError();
-    setShowMarkLostConfirm(false);
-    setIsMarkingLost(true);
-    try {
-      await quoteService.markQuoteLost(id);
-      await refetchQuote(id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to mark quote as lost";
-      setOutcomeError(message);
-    } finally {
-      setIsMarkingLost(false);
-    }
-  }
-
-  async function onDelete(): Promise<void> {
-    if (!id || !quote) {
-      return;
-    }
-
-    setDeleteError(null);
-    setShowDeleteConfirm(false);
-    setIsDeleting(true);
-    try {
-      await quoteService.deleteQuote(id);
-      navigate("/", { replace: true });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to delete quote";
-      setDeleteError(message);
-    } finally {
-      setIsDeleting(false);
-    }
   }
 
   const overflowItems = buildOverflowItems({
@@ -366,7 +175,7 @@ export function QuotePreview(): React.ReactElement {
               emailActionLabel={emailActionLabel}
               hasCustomerEmail={hasCustomerEmail}
               onGeneratePdf={onGeneratePdf}
-              onRequestSendEmail={onRequestSendEmail}
+              onRequestSendEmail={() => onRequestSendEmail({ hasCustomerEmail, emailActionLabel })}
               onCopyLink={onCopyLink}
               openPdfUrl={openPdfUrl}
               shareUrl={shareUrl}

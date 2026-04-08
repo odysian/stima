@@ -56,12 +56,25 @@ export function getEmailActionLabel(actionState: QuotePreviewActionState): strin
   return null;
 }
 export function getSendEmailErrorMessage(error: unknown): string {
-  if (isHttpRequestError(error)) {
-    switch (error.status) {
+  const fallbackMessage = error instanceof Error ? error.message : "Unable to send quote email";
+  const status = (
+    isHttpRequestError(error)
+    || (
+      typeof error === "object"
+      && error !== null
+      && "status" in error
+      && typeof (error as { status?: unknown }).status === "number"
+    )
+  )
+    ? (error as { status: number }).status
+    : null;
+
+  if (status !== null) {
+    switch (status) {
       case 404:
         return "This quote could not be found. Refresh and try again.";
       case 409:
-        return error.message;
+        return fallbackMessage;
       case 422:
         return "Add a valid customer email before sending this quote.";
       case 429:
@@ -69,13 +82,13 @@ export function getSendEmailErrorMessage(error: unknown): string {
       case 502:
         return "Email delivery failed. Please try again.";
       case 503:
-        return error.message || "Unable to start email delivery right now. Please try again.";
+        return fallbackMessage || "Unable to start email delivery right now. Please try again.";
       default:
         break;
     }
   }
 
-  return error instanceof Error ? error.message : "Unable to send quote email";
+  return fallbackMessage;
 }
 
 interface BuildOverflowItemsArgs {

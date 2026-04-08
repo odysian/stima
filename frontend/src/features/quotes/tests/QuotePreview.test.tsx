@@ -570,6 +570,43 @@ describe("QuotePreview", () => {
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
   });
 
+  it("clears existing share feedback before marking the quote won", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      writable: true,
+      value: { writeText: writeTextMock },
+    });
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(makeQuoteDetail({ status: "shared", share_token: "share-token-1" }))
+      .mockResolvedValueOnce(
+        makeQuoteDetail({ status: "approved", share_token: "share-token-1" }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith("http://localhost:3000/doc/share-token-1");
+    });
+    expect(await screen.findByText("Share link copied to clipboard.")).toBeInTheDocument();
+
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /mark as won/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /mark quote as won\?/i })).getByRole("button", {
+        name: /mark as won/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.markQuoteWon).toHaveBeenCalledWith("quote-1");
+    });
+    expect(screen.queryByText("Share link copied to clipboard.")).not.toBeInTheDocument();
+  });
+
   it("navigates to the edit route from the header action", async () => {
     renderScreen();
 
@@ -750,6 +787,83 @@ describe("QuotePreview", () => {
     expect(screen.queryByLabelText(/quote status/i)).not.toBeInTheDocument();
     await openOverflowMenu();
     expect(screen.getByRole("menuitem", { name: /delete quote/i })).toBeInTheDocument();
+  });
+
+  it("resumes a pending PDF job on mount and refreshes the quote to ready", async () => {
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          customer_email: "customer@example.com",
+          pdf_artifact: makePdfArtifact({ status: "pending", job_id: "job-pdf-quote-1" }),
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "ready",
+          customer_email: "customer@example.com",
+          share_token: "share-token-1",
+          pdf_artifact: makePdfArtifact({
+            status: "ready",
+            download_url: "/api/quotes/quote-1/pdf",
+          }),
+        }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+
+    await waitFor(() => {
+      expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-pdf-quote-1");
+    });
+
+    expect(await screen.findByRole("link", { name: /open pdf/i })).toHaveAttribute(
+      "href",
+      "/api/quotes/quote-1/pdf",
+    );
+  });
+
+  it("resumes a pending PDF job on mount and refreshes the quote to failed", async () => {
+    mockedJobService.getJobStatus.mockResolvedValueOnce({
+      id: "job-pdf-quote-1",
+      user_id: "user-1",
+      document_id: "quote-1",
+      document_revision: 0,
+      job_type: "pdf",
+      status: "terminal",
+      attempts: 1,
+      terminal_error: "render_failed",
+      extraction_result: null,
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-20T00:01:00.000Z",
+    });
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          customer_email: "customer@example.com",
+          pdf_artifact: makePdfArtifact({ status: "pending", job_id: "job-pdf-quote-1" }),
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          customer_email: "customer@example.com",
+          pdf_artifact: makePdfArtifact({
+            status: "failed",
+            job_id: "job-pdf-quote-1",
+            terminal_error: "render_failed",
+          }),
+        }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+
+    await waitFor(() => {
+      expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-pdf-quote-1");
+    });
+
+    expect(await screen.findByText("Quote PDF failed. Please try again.")).toBeInTheDocument();
   });
 
   it("shows an error when PDF generation fails", async () => {
