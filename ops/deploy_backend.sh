@@ -10,6 +10,7 @@ IMAGE_TAG="${1:-}"
 ENV_FILE="${ENV_FILE:-/opt/stima/env/backend.env}"
 INFRA_ENV="/opt/stima/env/infra.env"
 CONTAINER_NAME="stima-backend"
+WORKER_CONTAINER_NAME="stima-worker"
 NGINX_SITE="/etc/nginx/sites-available/stima-backend"
 ACME_WEBROOT="/var/www/acme-challenge"
 CERTBOT_CMD="/opt/certbot-venv/bin/certbot"
@@ -40,9 +41,11 @@ docker pull "$IMAGE_TAG"
 echo "Running migrations..."
 docker run --rm --env-file "$ENV_FILE" "$IMAGE_TAG" alembic upgrade head
 
-echo "Swapping container..."
+echo "Swapping containers..."
 docker stop "$CONTAINER_NAME" 2>/dev/null || true
 docker rm   "$CONTAINER_NAME" 2>/dev/null || true
+docker stop "$WORKER_CONTAINER_NAME" 2>/dev/null || true
+docker rm   "$WORKER_CONTAINER_NAME" 2>/dev/null || true
 
 docker run -d \
   --name "$CONTAINER_NAME" \
@@ -50,6 +53,16 @@ docker run -d \
   --env-file "$ENV_FILE" \
   --restart unless-stopped \
   "$IMAGE_TAG"
+
+docker run -d \
+  --name "$WORKER_CONTAINER_NAME" \
+  --env-file "$ENV_FILE" \
+  --restart unless-stopped \
+  "$IMAGE_TAG" \
+  arq app.worker.arq_worker.WorkerSettings
+
+echo "Recent worker logs:"
+docker logs "$WORKER_CONTAINER_NAME" --tail=10
 
 docker image prune -f >/dev/null || true
 
