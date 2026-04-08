@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { mergeInvoiceDetailWithUpdate } from "@/features/invoices/components/invoiceDetail.helpers";
-import { invoiceService } from "@/features/invoices/services/invoiceService";
-import type { Invoice, InvoiceDetail } from "@/features/invoices/types/invoice.types";
+import { useInvoiceDetailActions } from "@/features/invoices/hooks/useInvoiceDetailActions";
+import { useInvoiceDetail } from "@/features/invoices/hooks/useInvoiceDetail";
 import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
@@ -24,75 +22,40 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatDate } from "@/shared/lib/formatters";
-import { jobService } from "@/shared/lib/jobService";
-import { pollJobUntilSuccess } from "@/shared/lib/jobPolling";
 import { canNavigateBack } from "@/shared/lib/navigation";
 
 export function InvoiceDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
-  const [isLoadingInvoice, setIsLoadingInvoice] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [isSharing, setIsSharing] = useState(false);
-  const [shareError, setShareError] = useState<string | null>(null);
-  const [shareMessage, setShareMessage] = useState<string | null>(null);
-  const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
-  const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [emailMessage, setEmailMessage] = useState<string | null>(null);
-
-  async function loadInvoiceDetail(invoiceId: string): Promise<void> {
-    setIsLoadingInvoice(true);
-    setLoadError(null);
-    try {
-      const fetchedInvoice = await invoiceService.getInvoice(invoiceId);
-      setInvoice(fetchedInvoice);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load invoice";
-      setLoadError(message);
-    } finally {
-      setIsLoadingInvoice(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!id) {
-      setLoadError("Missing invoice id.");
-      setIsLoadingInvoice(false);
-      return;
-    }
-    const invoiceId = id;
-    let isActive = true;
-    void (async () => {
-      setIsLoadingInvoice(true);
-      setLoadError(null);
-      try {
-        const fetchedInvoice = await invoiceService.getInvoice(invoiceId);
-        if (!isActive) {
-          return;
-        }
-        setInvoice(fetchedInvoice);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unable to load invoice";
-        if (isActive) {
-          setLoadError(message);
-        }
-      } finally {
-        if (isActive) {
-          setIsLoadingInvoice(false);
-        }
-      }
-    })();
-    return () => {
-      isActive = false;
-    };
-  }, [id]);
-
-  const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
+  const {
+    invoice,
+    setInvoice,
+    isLoadingInvoice,
+    loadError,
+    loadInvoiceDetail,
+  } = useInvoiceDetail(id);
+  const {
+    isGeneratingPdf,
+    pdfError,
+    isSharing,
+    shareError,
+    shareMessage,
+    manualCopyUrl,
+    showSendEmailConfirm,
+    isSendingEmail,
+    emailError,
+    emailMessage,
+    setShowSendEmailConfirm,
+    onGeneratePdf,
+    onCopyLink,
+    onRequestSendEmail,
+    onConfirmSendEmail,
+  } = useInvoiceDetailActions({
+    invoiceId: id,
+    invoice,
+    setInvoice,
+    loadInvoiceDetail,
+  });
   const openPdfUrl = invoice?.pdf_artifact.download_url ?? null;
   const hasSourceQuote = Boolean(invoice?.source_document_id && invoice.source_quote_number);
   const hasCustomerEmail = Boolean(invoice?.customer.email?.trim());
@@ -115,122 +78,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
   function handleBack(): void {
     if (canNavigateBack()) return void navigate(-1);
     navigate("/", { replace: true });
-  }
-
-  function applyInvoiceUpdate(updatedInvoice: Invoice): void {
-    setInvoice((currentInvoice) => mergeInvoiceDetailWithUpdate(currentInvoice, updatedInvoice));
-  }
-
-  async function onGeneratePdf(): Promise<void> {
-    if (!id) return;
-    setPdfError(null);
-    setEmailError(null);
-    setEmailMessage(null);
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
-    setIsGeneratingPdf(true);
-    try {
-      const job = await invoiceService.generatePdf(id);
-      await loadInvoiceDetail(id);
-      await pollJobUntilSuccess({
-        jobId: job.id,
-        getJobStatus: (jobId) => jobService.getJobStatus(jobId),
-        terminalErrorMessage: "Invoice PDF failed. Please try again.",
-        timeoutErrorMessage: "Invoice PDF is taking longer than expected. Refresh to check its status.",
-      });
-      await loadInvoiceDetail(id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to generate invoice PDF";
-      setPdfError(message);
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  }
-
-  async function onCopyLink(): Promise<void> {
-    if (!id) return;
-    setEmailError(null);
-    setEmailMessage(null);
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
-    setIsSharing(true);
-    try {
-      const updatedInvoice = invoice?.share_token ? invoice : await invoiceService.shareInvoice(id);
-      if (!invoice?.share_token) {
-        applyInvoiceUpdate(updatedInvoice);
-      }
-      if (!updatedInvoice.share_token) {
-        throw new Error("Share link unavailable");
-      }
-
-      const nextShareUrl = `${apiBase}/share/${updatedInvoice.share_token}`;
-      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
-        setManualCopyUrl(nextShareUrl);
-        setShareMessage("Copy this share link manually.");
-        return;
-      }
-
-      await navigator.clipboard.writeText(nextShareUrl);
-      setManualCopyUrl(null);
-      setShareMessage("Invoice link copied to clipboard.");
-    } catch (error) {
-      setManualCopyUrl(null);
-      const message = error instanceof Error ? error.message : "Unable to copy invoice link";
-      setShareError(message);
-    } finally {
-      setIsSharing(false);
-    }
-  }
-
-  function onRequestSendEmail(): void {
-    if (
-      !emailActionLabel
-      || !hasCustomerEmail
-      || isPdfBusy
-      || isSharing
-      || isSendingEmail
-      || invoice?.pdf_artifact.status === "pending"
-    ) {
-      return;
-    }
-    setEmailError(null);
-    setEmailMessage(null);
-    setShowSendEmailConfirm(true);
-  }
-
-  async function onConfirmSendEmail(): Promise<void> {
-    if (!id) {
-      return;
-    }
-
-    setShowSendEmailConfirm(false);
-    setEmailError(null);
-    setEmailMessage(null);
-    setShareError(null);
-    setShareMessage(null);
-    setManualCopyUrl(null);
-    setIsSendingEmail(true);
-
-    try {
-      const job = await invoiceService.sendInvoiceEmail(id);
-      await loadInvoiceDetail(id);
-      setEmailMessage("Invoice email is sending. We’ll update this status shortly.");
-      await pollJobUntilSuccess({
-        jobId: job.id,
-        getJobStatus: (jobId) => jobService.getJobStatus(jobId),
-        terminalErrorMessage: "Invoice email failed. Please try again.",
-        timeoutErrorMessage: "Invoice email is taking longer than expected. Refresh to check delivery status.",
-      });
-      await loadInvoiceDetail(id);
-      setEmailMessage("Invoice sent by email.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to send invoice email";
-      setEmailError(message);
-    } finally {
-      setIsSendingEmail(false);
-    }
   }
 
   const statusCopy = isPdfBusy
@@ -374,7 +221,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                       type="button"
                       className={documentActionUtilityButtonClassName}
                       disabled={!hasCustomerEmail || isPdfBusy || isSharing || isSendingEmail}
-                      onClick={onRequestSendEmail}
+                      onClick={() => onRequestSendEmail({ emailActionLabel, hasCustomerEmail, isPdfBusy })}
                     >
                       <span className="material-symbols-outlined text-base">mail</span>
                       {isSendingEmail ? "Sending..." : emailActionLabel}

@@ -505,6 +505,78 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.queryByText(/alice@example\.com/i)).not.toBeInTheDocument();
   });
 
+  it("resumes a pending PDF job on mount and refreshes the invoice to ready", async () => {
+    mockedInvoiceService.getInvoice
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          pdf_artifact: makePdfArtifact({ status: "pending", job_id: "job-pdf-invoice-1" }),
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          status: "ready",
+          pdf_artifact: makePdfArtifact({
+            status: "ready",
+            download_url: "/api/invoices/invoice-1/pdf",
+          }),
+        }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Spring cleanup" });
+
+    await waitFor(() => {
+      expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-pdf-invoice-1");
+    });
+
+    expect(await screen.findByRole("link", { name: /open pdf/i })).toHaveAttribute(
+      "href",
+      "/api/invoices/invoice-1/pdf",
+    );
+  });
+
+  it("resumes a pending PDF job on mount and refreshes the invoice to failed", async () => {
+    mockedJobService.getJobStatus.mockResolvedValueOnce({
+      id: "job-pdf-invoice-1",
+      user_id: "user-1",
+      document_id: "invoice-1",
+      document_revision: 0,
+      job_type: "pdf",
+      status: "terminal",
+      attempts: 1,
+      terminal_error: "render_failed",
+      extraction_result: null,
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-20T00:01:00.000Z",
+    });
+    mockedInvoiceService.getInvoice
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          pdf_artifact: makePdfArtifact({ status: "pending", job_id: "job-pdf-invoice-1" }),
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          pdf_artifact: makePdfArtifact({
+            status: "failed",
+            job_id: "job-pdf-invoice-1",
+            terminal_error: "render_failed",
+          }),
+        }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Spring cleanup" });
+
+    await waitFor(() => {
+      expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-pdf-invoice-1");
+    });
+
+    expect(await screen.findByText("Invoice PDF failed. Please try again.")).toBeInTheDocument();
+  });
+
   it("falls back to the quote list when back navigation is unsafe", async () => {
     window.history.replaceState({ idx: 0 }, "");
 
