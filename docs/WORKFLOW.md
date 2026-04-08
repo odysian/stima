@@ -211,6 +211,9 @@ Run the relevant checks before claiming completion.
 
 Agent execution note:
 - Do not run live/provider-backed verification targets from agent sessions (for example `make extraction-live`); ask the human operator to run them manually and share output.
+- Do not run bare `pytest` from agent sessions. Use `make backend-verify` for broad backend verification, or `cd backend && .venv/bin/pytest ...` for targeted backend tests so the repo venv is used consistently.
+- Backend pytest depends on host-local services in this repo's test harness (see `backend/conftest.py`). When backend tests are needed from an agent session, prefer an escalated run outside the sandbox over repeated retries inside the network-isolated sandbox.
+- If sandboxed backend pytest hangs during startup, collection, or before first assertion, treat sandbox/service access as the default suspect and verify that path before debugging application code.
 
 ### Makefile Verification Contract (Recommended)
 

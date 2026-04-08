@@ -153,6 +153,9 @@ Required completion gate:
 - Do **not** run `make db-verify` from agent sessions. It can hang/long-run in this environment and block execution.
 - Do **not** run `make extraction-live` from agent sessions. If live validation is needed, request the human operator to run it manually and share the output.
 - For Task verification in agent runs, use `make backend-verify` and/or `make frontend-verify` per issue scope.
+- Do **not** run bare `pytest` from agent sessions. For targeted backend tests, use `cd backend && .venv/bin/pytest ...` so the repo venv is always used.
+- Backend pytest in this repo depends on host-local services configured by `backend/conftest.py` (for example the local Postgres test DB). If backend tests are required for the task, request escalated permissions and run them outside the sandbox instead of retrying inside the network-isolated sandbox.
+- If a sandboxed backend pytest run hangs before reaching assertions or during startup/collection, suspect sandbox-to-local-service access before assuming an application bug.
 - Only run DB migration verification when explicitly requested by a human operator outside agent flow.
 
 ### Full
