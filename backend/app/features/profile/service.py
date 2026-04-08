@@ -12,8 +12,8 @@ from uuid import UUID
 from app.features.auth.models import User
 from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.image_signatures import detect_image_content_type
+from app.shared.input_limits import MAX_LOGO_SIZE_BYTES
 
-MAX_LOGO_BYTES = 2 * 1024 * 1024
 _LOGO_FILENAME = "logo"
 LOGGER = logging.getLogger(__name__)
 
@@ -132,8 +132,11 @@ class ProfileService:
 
     async def upload_logo(self, user: User, *, content: bytes) -> User:
         """Validate, store, and persist the authenticated user's logo."""
-        if len(content) > MAX_LOGO_BYTES:
-            raise ProfileServiceError(detail="Logo must be 2 MB or smaller", status_code=422)
+        if len(content) > MAX_LOGO_SIZE_BYTES:
+            raise ProfileServiceError(
+                detail=f"Logo must be {_format_byte_limit(MAX_LOGO_SIZE_BYTES)} or smaller",
+                status_code=422,
+            )
 
         content_type = detect_image_content_type(content)
         if content_type is None:
@@ -240,3 +243,11 @@ def _profile_render_inputs_changed(
             update_timezone and user.timezone != timezone,
         )
     )
+
+
+def _format_byte_limit(byte_limit: int) -> str:
+    megabytes = byte_limit / (1024 * 1024)
+    if megabytes.is_integer():
+        return f"{int(megabytes)} MB"
+
+    return f"{megabytes:.1f} MB"

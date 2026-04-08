@@ -13,6 +13,7 @@ from app.features.auth.service import CSRF_COOKIE_NAME
 from app.integrations.storage import StorageNotFoundError
 from app.main import app
 from app.shared.dependencies import get_storage_service
+from app.shared.input_limits import MAX_LOGO_SIZE_BYTES
 
 pytestmark = pytest.mark.asyncio
 
@@ -142,7 +143,7 @@ async def test_upload_logo_rejects_files_larger_than_2mb(client: AsyncClient) ->
         files={
             "file": (
                 "logo.png",
-                _PNG_BYTES + (b"0" * (2 * 1024 * 1024 + 1)),
+                _PNG_BYTES + (b"0" * (MAX_LOGO_SIZE_BYTES + 1)),
                 "image/png",
             )
         },
@@ -150,7 +151,9 @@ async def test_upload_logo_rejects_files_larger_than_2mb(client: AsyncClient) ->
     )
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "Logo must be 2 MB or smaller"}
+    assert response.json() == {
+        "detail": f"Logo must be {_format_byte_limit(MAX_LOGO_SIZE_BYTES)} or smaller"
+    }
 
 
 async def test_get_logo_returns_bytes_content_type_and_no_store_header(
@@ -250,3 +253,11 @@ def _credentials() -> dict[str, str]:
         "email": f"logo-user-{suffix}@example.com",
         "password": "StrongPass123!",
     }
+
+
+def _format_byte_limit(byte_limit: int) -> str:
+    megabytes = byte_limit / (1024 * 1024)
+    if megabytes.is_integer():
+        return f"{int(megabytes)} MB"
+
+    return f"{megabytes:.1f} MB"
