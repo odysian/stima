@@ -1735,6 +1735,51 @@ async def test_send_invoice_email_replays_same_idempotency_key_without_second_se
     assert len(mock_email_service.messages) == 0
 
 
+async def test_send_invoice_email_idempotency_replay_emits_structured_log(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_email_service: _MockEmailService,
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def _capture(payload: dict[str, object], *, level: int) -> None:
+        captured.append(payload)
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture)
+    csrf_token = await _register_and_login(client, _credentials())
+    await _set_profile_for_email_delivery(client, csrf_token)
+    customer_id = await _create_customer(client, csrf_token, email="customer@example.com")
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Spring cleanup",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+    await _set_invoice_status(db_session, invoice["id"], QuoteStatus.READY)
+
+    first_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay-observed"),
+    )
+    second_response = await client.post(
+        f"/api/invoices/{invoice['id']}/send-email",
+        headers=_send_email_headers(csrf_token, idempotency_key="invoice-replay-observed"),
+    )
+
+    _assert_async_email_job_response(first_response, document_id=cast(str, invoice["id"]))
+    _assert_async_email_job_response(second_response, document_id=cast(str, invoice["id"]))
+    replay_event = next(
+        payload for payload in captured if payload.get("event") == "idempotency.replay"
+    )
+    assert replay_event["reason"] == "replayed_response"
+    assert replay_event["status_code"] == 202
+    assert replay_event["endpoint_slug"] == "invoice-send-email"
+    assert replay_event["resource_id"] == invoice["id"]
+
+
 async def test_send_email_rejects_same_idempotency_key_for_different_resource_fingerprint(
     client: AsyncClient,
     db_session: AsyncSession,

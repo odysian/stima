@@ -202,19 +202,6 @@ def current_correlation_id() -> str:
     return generated
 
 
-def bind_request_context_var(request: Request) -> contextvars.Token[RequestLogContext | None]:
-    """Bind route-aware request context for the current execution context."""
-    context = RequestLogContext(
-        method=request.method.upper(),
-        route_template=_resolve_route_template(request),
-        client_ip_hash=hash_client_ip(get_ip_key(request)),
-    )
-    request.state.observability_method = context.method
-    request.state.observability_route_template = context.route_template
-    request.state.observability_client_ip_hash = context.client_ip_hash
-    return _request_context_var.set(context)
-
-
 def log_security_event(
     event: str,
     *,
