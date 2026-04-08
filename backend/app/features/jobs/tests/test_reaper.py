@@ -13,7 +13,6 @@ from app.features.jobs.reaper import (
     reap_stale_extraction_jobs_once,
     run_stale_extraction_job_reaper,
 )
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 pytestmark = pytest.mark.asyncio
@@ -39,11 +38,10 @@ async def test_reap_stale_extraction_jobs_once_uses_isolated_session(
         stale_ttl_seconds=300,
     )
 
-    refreshed = await db_session.scalar(select(JobRecord).where(JobRecord.id == record.id))
-    assert refreshed is not None  # nosec B101 - pytest assertion
     assert reaped_count == 1  # nosec B101 - pytest assertion
-    assert refreshed.status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
-    assert refreshed.terminal_error == "job_not_picked_up"  # nosec B101 - pytest assertion
+    await db_session.refresh(record)
+    assert record.status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
+    assert record.terminal_error == "job_not_picked_up"  # nosec B101 - pytest assertion
 
 
 async def test_run_stale_extraction_job_reaper_retries_after_failures(
