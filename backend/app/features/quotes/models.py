@@ -87,6 +87,17 @@ class Document(Base):
     notes: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     due_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
     pdf_url: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    pdf_artifact_path: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    pdf_artifact_revision: Mapped[int] = mapped_column(
+        sa.Integer,
+        nullable=False,
+        server_default=sa.text("0"),
+    )
+    pdf_artifact_job_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid,
+        nullable=True,
+        index=True,
+    )
     share_token: Mapped[str | None] = mapped_column(sa.Text, nullable=True, unique=True)
     shared_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True),

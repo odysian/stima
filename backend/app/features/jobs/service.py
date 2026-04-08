@@ -21,12 +21,14 @@ class JobService:
         user_id: UUID,
         job_type: JobType,
         document_id: UUID | None = None,
+        document_revision: int | None = None,
     ) -> JobRecord:
         """Persist a new pending job row."""
         return await self.repository.create(
             user_id=user_id,
             job_type=job_type,
             document_id=document_id,
+            document_revision=document_revision,
         )
 
     async def count_active_extraction_jobs(self, user_id: UUID) -> int:

@@ -8,7 +8,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.features.quotes.schemas import DiscountType, LineItemDraft, LineItemResponse
+from app.features.quotes.schemas import (
+    DiscountType,
+    LineItemDraft,
+    LineItemResponse,
+    PdfArtifactResponse,
+)
 from app.shared.input_limits import (
     DOCUMENT_LINE_ITEMS_MAX_ITEMS,
     DOCUMENT_NOTES_MAX_CHARS,
@@ -101,6 +106,7 @@ class InvoiceDetailResponse(InvoiceResponse):
 
     source_quote_number: str | None
     customer: InvoiceCustomerResponse
+    pdf_artifact: PdfArtifactResponse
 
 
 class InvoiceUpdateRequest(BaseModel):

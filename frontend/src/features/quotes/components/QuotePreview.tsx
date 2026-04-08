@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
@@ -39,7 +39,6 @@ export function QuotePreview(): React.ReactElement {
   } = useQuoteDetail(id);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
@@ -55,24 +54,21 @@ export function QuotePreview(): React.ReactElement {
   const [showMarkLostConfirm, setShowMarkLostConfirm] = useState(false);
   const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
 
-  useEffect(() => () => {
-    if (pdfUrl) {
-      URL.revokeObjectURL(pdfUrl);
-    }
-  }, [pdfUrl]);
-
-  const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
   const shareUrl = quote?.share_token ? `${window.location.origin}/doc/${quote.share_token}` : null;
-  const hasLocalPdf = Boolean(pdfUrl);
-  const actionState = resolveActionState(quote, hasLocalPdf);
+  const actionState = resolveActionState(quote);
   const emailActionLabel = getEmailActionLabel(actionState);
   const hasCustomerEmail = Boolean(readOptionalQuoteText(quote, "customer_email"));
   const customerEmail = readOptionalQuoteText(quote, "customer_email");
-  const openPdfUrl = pdfUrl ?? (quote?.share_token ? `${apiBase}/share/${quote.share_token}` : null);
+  const openPdfUrl = quote?.pdf_artifact.download_url ?? null;
   const quoteTitle = readOptionalQuoteText(quote, "title");
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact = readOptionalQuoteText(quote, "customer_phone") ?? readOptionalQuoteText(quote, "customer_email") ?? "No contact details";
+  const resolvedPdfError = pdfError ?? (
+    quote?.pdf_artifact.status === "failed"
+      ? "Quote PDF failed. Please try again."
+      : null
+  );
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
   const showDraftInvoicePromptBelowActions = Boolean(quote && actionState === "draft" && !quote.linked_invoice);
   const {
@@ -85,7 +81,8 @@ export function QuotePreview(): React.ReactElement {
     navigate,
     setQuote,
   });
-  const isBusy = isGeneratingPdf || isSharing || isSendingEmail || isMarkingWon || isMarkingLost || isDeleting || isConvertingInvoice;
+  const isPdfBusy = isGeneratingPdf || quote?.pdf_artifact.status === "pending";
+  const isBusy = isPdfBusy || isSharing || isSendingEmail || isMarkingWon || isMarkingLost || isDeleting || isConvertingInvoice;
 
   function handleBack(): void {
     if (canNavigateBack()) return void navigate(-1);
@@ -103,27 +100,15 @@ export function QuotePreview(): React.ReactElement {
     setManualCopyUrl(null);
     setIsGeneratingPdf(true);
     try {
-      const blob = await quoteService.generatePdf(id);
-      const nextPdfUrl = URL.createObjectURL(blob);
-      setPdfUrl((currentPdfUrl) => {
-        if (currentPdfUrl) {
-          URL.revokeObjectURL(currentPdfUrl);
-        }
-        return nextPdfUrl;
+      const job = await quoteService.generatePdf(id);
+      await refetchQuote(id);
+      await pollJobUntilSuccess({
+        jobId: job.id,
+        getJobStatus: (jobId) => jobService.getJobStatus(jobId),
+        terminalErrorMessage: "Quote PDF failed. Please try again.",
+        timeoutErrorMessage: "Quote PDF is taking longer than expected. Refresh to check its status.",
       });
-      setQuote((currentQuote) => {
-        if (
-          !currentQuote
-          || currentQuote.status === "shared"
-          || currentQuote.status === "viewed"
-          || currentQuote.status === "approved"
-          || currentQuote.status === "declined"
-        ) {
-          return currentQuote;
-        }
-
-        return { ...currentQuote, status: "ready" };
-      });
+      await refetchQuote(id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to generate PDF";
       setPdfError(message);
@@ -386,13 +371,13 @@ export function QuotePreview(): React.ReactElement {
               openPdfUrl={openPdfUrl}
               shareUrl={shareUrl}
               manualCopyUrl={manualCopyUrl}
-              isGeneratingPdf={isGeneratingPdf}
+              isGeneratingPdf={isPdfBusy}
               isSendingEmail={isSendingEmail}
               isCopyingLink={isSharing}
               isMarkingWon={isMarkingWon}
               isMarkingLost={isMarkingLost}
               disabled={isLoadingQuote || !!loadError}
-              pdfError={pdfError}
+              pdfError={resolvedPdfError}
               shareError={shareError}
               outcomeError={outcomeError}
               shareMessage={shareMessage}

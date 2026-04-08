@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Protocol
@@ -14,6 +15,7 @@ from app.shared.image_signatures import detect_image_content_type
 
 MAX_LOGO_BYTES = 2 * 1024 * 1024
 _LOGO_FILENAME = "logo"
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +61,12 @@ class ProfileRepositoryProtocol(Protocol):
     async def commit(self) -> None: ...
 
 
+class PdfArtifactRepositoryProtocol(Protocol):
+    """Structural protocol for cross-document artifact invalidation."""
+
+    async def invalidate_for_user(self, *, user_id: UUID) -> list[str]: ...
+
+
 class ProfileService:
     """Coordinate profile domain rules with persistence operations."""
 
@@ -66,9 +74,11 @@ class ProfileService:
         self,
         *,
         repository: ProfileRepositoryProtocol,
+        pdf_artifact_repository: PdfArtifactRepositoryProtocol,
         storage_service: StorageServiceProtocol,
     ) -> None:
         self._repository = repository
+        self._pdf_artifact_repository = pdf_artifact_repository
         self._storage_service = storage_service
 
     async def get_profile(self, user: User) -> User:
@@ -89,6 +99,14 @@ class ProfileService:
         update_default_tax_rate: bool,
     ) -> User:
         """Persist onboarding fields and return the updated user profile."""
+        invalidate_artifacts = _profile_render_inputs_changed(
+            user=user,
+            business_name=business_name,
+            first_name=first_name,
+            last_name=last_name,
+            timezone=timezone,
+            update_timezone=update_timezone,
+        )
         updated_profile = await self._repository.update_user_fields(
             user_id=user.id,
             business_name=business_name,
@@ -103,7 +121,13 @@ class ProfileService:
         if updated_profile is None:
             raise ProfileServiceError(detail="Profile not found", status_code=404)
 
+        artifact_paths_to_delete: list[str] = []
+        if invalidate_artifacts:
+            artifact_paths_to_delete = await self._pdf_artifact_repository.invalidate_for_user(
+                user_id=user.id
+            )
         await self._repository.commit()
+        await self._delete_artifacts(artifact_paths_to_delete)
         return updated_profile
 
     async def upload_logo(self, user: User, *, content: bytes) -> User:
@@ -129,7 +153,11 @@ class ProfileService:
         if updated_profile is None:
             raise ProfileServiceError(detail="Profile not found", status_code=404)
 
+        artifact_paths_to_delete = await self._pdf_artifact_repository.invalidate_for_user(
+            user_id=user.id
+        )
         await self._repository.commit()
+        await self._delete_artifacts(artifact_paths_to_delete)
         return updated_profile
 
     async def delete_logo(self, user: User) -> None:
@@ -146,7 +174,11 @@ class ProfileService:
         updated_profile = await self._repository.clear_logo_path(user_id=user.id)
         if updated_profile is None:
             raise ProfileServiceError(detail="Profile not found", status_code=404)
+        artifact_paths_to_delete = await self._pdf_artifact_repository.invalidate_for_user(
+            user_id=user.id
+        )
         await self._repository.commit()
+        await self._delete_artifacts(artifact_paths_to_delete)
 
     async def get_logo(self, user: User) -> ProfileLogo:
         """Fetch and validate the authenticated user's logo bytes."""
@@ -174,6 +206,13 @@ class ProfileService:
             raise ProfileServiceError(detail="Profile not found", status_code=404)
         return profile
 
+    async def _delete_artifacts(self, object_paths: list[str]) -> None:
+        for object_path in object_paths:
+            try:
+                await asyncio.to_thread(self._storage_service.delete, object_path)
+            except Exception:  # noqa: BLE001
+                LOGGER.warning("Failed to delete invalidated profile PDF artifact", exc_info=True)
+
 
 def _normalize_default_tax_rate(value: float | None) -> Decimal | None:
     if value is None:
@@ -182,3 +221,22 @@ def _normalize_default_tax_rate(value: float | None) -> Decimal | None:
     if normalized == Decimal("0"):
         return None
     return normalized
+
+
+def _profile_render_inputs_changed(
+    *,
+    user: User,
+    business_name: str,
+    first_name: str,
+    last_name: str,
+    timezone: str | None,
+    update_timezone: bool,
+) -> bool:
+    return any(
+        (
+            user.business_name != business_name,
+            user.first_name != first_name,
+            user.last_name != last_name,
+            update_timezone and user.timezone != timezone,
+        )
+    )

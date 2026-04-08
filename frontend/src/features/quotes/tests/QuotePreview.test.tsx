@@ -34,8 +34,18 @@ vi.mock("@/shared/lib/jobService", () => ({
 
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedJobService = vi.mocked(jobService);
-const createObjectUrlMock = vi.fn();
-const revokeObjectUrlMock = vi.fn();
+
+function makePdfArtifact(
+  overrides: Partial<QuoteDetail["pdf_artifact"]> = {},
+): QuoteDetail["pdf_artifact"] {
+  return {
+    status: "missing",
+    job_id: null,
+    download_url: null,
+    terminal_error: null,
+    ...overrides,
+  };
+}
 
 function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
   return {
@@ -58,6 +68,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     shared_at: null,
     share_token: null,
     linked_invoice: null,
+    pdf_artifact: makePdfArtifact(),
     line_items: [
       {
         id: "line-1",
@@ -133,6 +144,7 @@ beforeEach(() => {
     id: "job-email-quote-1",
     user_id: "user-1",
     document_id: "quote-1",
+    document_revision: null,
     job_type: "email",
     status: "pending",
     attempts: 0,
@@ -141,16 +153,20 @@ beforeEach(() => {
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
   };
-  const successfulEmailJob: JobStatusResponse = {
+  const pendingPdfJob: JobStatusResponse = {
     ...pendingEmailJob,
+    id: "job-pdf-quote-1",
+    document_revision: 0,
+    job_type: "pdf",
+  };
+  const successfulPdfJob: JobStatusResponse = {
+    ...pendingPdfJob,
     status: "success",
     attempts: 1,
   };
 
   mockedQuoteService.getQuote.mockResolvedValue(makeQuoteDetail());
-  mockedQuoteService.generatePdf.mockResolvedValue(
-    new Blob(["pdf-binary"], { type: "application/pdf" }),
-  );
+  mockedQuoteService.generatePdf.mockResolvedValue(pendingPdfJob);
   mockedQuoteService.deleteQuote.mockResolvedValue(undefined);
   mockedQuoteService.shareQuote.mockResolvedValue(makeQuoteResponse());
   mockedQuoteService.sendQuoteEmail.mockResolvedValue(pendingEmailJob);
@@ -188,18 +204,7 @@ beforeEach(() => {
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
   });
-  mockedJobService.getJobStatus.mockResolvedValue(successfulEmailJob);
-  createObjectUrlMock.mockReturnValue("blob:quote-preview");
-  Object.defineProperty(URL, "createObjectURL", {
-    configurable: true,
-    writable: true,
-    value: createObjectUrlMock,
-  });
-  Object.defineProperty(URL, "revokeObjectURL", {
-    configurable: true,
-    writable: true,
-    value: revokeObjectUrlMock,
-  });
+  mockedJobService.getJobStatus.mockResolvedValue(successfulPdfJob);
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     writable: true,
@@ -239,6 +244,10 @@ describe("QuotePreview", () => {
           status,
           share_token: "share-token-1",
           customer_email: "customer@example.com",
+          pdf_artifact: makePdfArtifact({
+            status: "ready",
+            download_url: "/api/quotes/quote-1/pdf",
+          }),
         }),
       );
 
@@ -469,9 +478,16 @@ describe("QuotePreview", () => {
     expect(screen.getByText("Q-001")).toBeInTheDocument();
   });
 
-  it("falls back to the shared PDF link for shared quotes without a local blob", async () => {
+  it("uses the durable artifact download URL for shared quotes", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "shared", share_token: "share-token-1" }),
+      makeQuoteDetail({
+        status: "shared",
+        share_token: "share-token-1",
+        pdf_artifact: makePdfArtifact({
+          status: "ready",
+          download_url: "/api/quotes/quote-1/pdf",
+        }),
+      }),
     );
 
     renderScreen();
@@ -479,7 +495,7 @@ describe("QuotePreview", () => {
     await screen.findByRole("heading", { name: "Test Customer" });
     expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
       "href",
-      "http://localhost:3000/share/share-token-1",
+      "/api/quotes/quote-1/pdf",
     );
     expect(screen.queryByText("http://localhost:3000/doc/share-token-1")).not.toBeInTheDocument();
   });
@@ -692,9 +708,25 @@ describe("QuotePreview", () => {
   });
 
   it("keeps generate pdf primary on draft and unlocks send email after generation", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ customer_email: "customer@example.com" }),
-    );
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(makeQuoteDetail({ customer_email: "customer@example.com" }))
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          customer_email: "customer@example.com",
+          pdf_artifact: makePdfArtifact({ status: "pending", job_id: "job-pdf-quote-1" }),
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "ready",
+          customer_email: "customer@example.com",
+          share_token: "share-token-1",
+          pdf_artifact: makePdfArtifact({
+            status: "ready",
+            download_url: "/api/quotes/quote-1/pdf",
+          }),
+        }),
+      );
 
     renderScreen();
 
@@ -706,7 +738,6 @@ describe("QuotePreview", () => {
 
     await waitFor(() => {
       expect(mockedQuoteService.generatePdf).toHaveBeenCalledWith("quote-1");
-      expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
     });
 
     const utilities = screen.getByRole("group", { name: /quote utilities/i });
@@ -714,7 +745,7 @@ describe("QuotePreview", () => {
     expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeEnabled();
     expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
       "href",
-      "blob:quote-preview",
+      "/api/quotes/quote-1/pdf",
     );
     expect(screen.queryByLabelText(/quote status/i)).not.toBeInTheDocument();
     await openOverflowMenu();
@@ -740,7 +771,7 @@ describe("QuotePreview", () => {
   it("shows loading feedback while generating a PDF and clears it after failure", async () => {
     let rejectGeneratePdf: ((reason?: unknown) => void) | undefined;
     mockedQuoteService.generatePdf.mockReturnValueOnce(
-      new Promise<Blob>((_, reject) => {
+      new Promise<JobStatusResponse>((_, reject) => {
         rejectGeneratePdf = reject;
       }),
     );
@@ -797,6 +828,7 @@ describe("QuotePreview", () => {
       id: "job-email-quote-1",
       user_id: "user-1",
       document_id: "quote-1",
+      document_revision: null,
       job_type: "email",
       status: "pending",
       attempts: 0,

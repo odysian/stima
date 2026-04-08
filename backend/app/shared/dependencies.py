@@ -43,6 +43,7 @@ from app.integrations.pdf import PdfIntegration
 from app.integrations.storage import StorageService
 from app.integrations.transcription import TranscriptionIntegration
 from app.shared.idempotency import IdempotencyStore, build_idempotency_store
+from app.shared.pdf_artifact_repository import PdfArtifactRepository
 from app.shared.rate_limit import limiter, reserve_extraction_capacity
 
 
@@ -119,15 +120,21 @@ def get_profile_service(
     """Build a request-scoped profile service wired to the DB session."""
     return ProfileService(
         repository=ProfileRepository(db),
+        pdf_artifact_repository=PdfArtifactRepository(db),
         storage_service=storage_service,
     )
 
 
 def get_customer_service(
     db: Annotated[AsyncSession, Depends(get_db)],
+    storage_service: Annotated[StorageService, Depends(get_storage_service)],
 ) -> CustomerService:
     """Build a request-scoped customer service wired to the DB session."""
-    return CustomerService(repository=CustomerRepository(db))
+    return CustomerService(
+        repository=CustomerRepository(db),
+        pdf_artifact_repository=PdfArtifactRepository(db),
+        storage_service=storage_service,
+    )
 
 
 def get_quote_service(

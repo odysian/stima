@@ -6,7 +6,7 @@ import type {
   InvoiceUpdateRequest,
 } from "@/features/invoices/types/invoice.types";
 import type { JobStatusResponse } from "@/features/quotes/types/quote.types";
-import { request, requestBlob, requestWithMetadata } from "@/shared/lib/http";
+import { request, requestWithMetadata } from "@/shared/lib/http";
 import { buildIdempotencyKey } from "@/shared/lib/idempotency";
 
 function createInvoice(data: InvoiceCreateRequest): Promise<Invoice> {
@@ -32,8 +32,8 @@ function updateInvoice(id: string, data: InvoiceUpdateRequest): Promise<Invoice>
   });
 }
 
-function generatePdf(id: string): Promise<Blob> {
-  return requestBlob(`/api/invoices/${id}/pdf`, {
+function generatePdf(id: string): Promise<JobStatusResponse> {
+  return request<JobStatusResponse>(`/api/invoices/${id}/pdf`, {
     method: "POST",
   });
 }

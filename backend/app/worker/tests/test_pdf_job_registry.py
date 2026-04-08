@@ -11,7 +11,13 @@ from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.integrations.pdf import PdfRenderUnexpectedError, PdfRenderValidationError
-from app.worker.job_registry import TERMINAL_ERROR_MISSING_DOCUMENT_ID, pdf_job
+from app.worker.job_registry import (
+    TERMINAL_ERROR_MISSING_DOCUMENT_ID,
+    TERMINAL_ERROR_STALE_DOCUMENT_REVISION,
+    _get_storage_service,
+    pdf_job,
+)
+from app.worker.pdf_repository import PersistedPdfArtifactResult, WorkerPdfRepository
 from app.worker.runtime import (
     TERMINAL_ERROR_RETRY_EXHAUSTED,
     TERMINAL_ERROR_UNEXPECTED,
@@ -192,6 +198,104 @@ async def test_pdf_job_attaches_logo_data_uri_when_logo_exists(
     assert pdf_integration.last_logo_data_uri.startswith("data:image/png;base64,")  # nosec B101 - pytest assertion
 
 
+async def test_pdf_job_discards_stale_revision_and_newer_job_succeeds(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user, document = await _seed_quote_document(db_session)
+    stale_job = await _seed_pdf_job(db_session, user_id=user.id, document_id=document.id)
+    storage_service = _RecordingStorageService()
+
+    original_persist = WorkerPdfRepository.persist_generated_artifact
+    stale_applied = False
+
+    async def _persist_with_forced_stale_result(
+        self: WorkerPdfRepository,
+        *,
+        document_id: UUID,
+        user_id: UUID,
+        job_id: UUID,
+        expected_revision: int,
+        artifact_path: str,
+    ) -> PersistedPdfArtifactResult:
+        nonlocal stale_applied
+        if not stale_applied:
+            stale_applied = True
+            stale_document = await self._session.get(Document, document_id)
+            assert stale_document is not None  # nosec B101 - pytest assertion
+            stale_document.pdf_artifact_revision = stale_document.pdf_artifact_revision + 1
+            await self._session.flush()
+            return PersistedPdfArtifactResult(
+                applied=False,
+                previous_path=stale_document.pdf_artifact_path,
+            )
+        return await original_persist(
+            self,
+            document_id=document_id,
+            user_id=user_id,
+            job_id=job_id,
+            expected_revision=expected_revision,
+            artifact_path=artifact_path,
+        )
+
+    monkeypatch.setattr(
+        WorkerPdfRepository,
+        "persist_generated_artifact",
+        _persist_with_forced_stale_result,
+    )
+
+    with pytest.raises(NonRetryableJobError):
+        await pdf_job(
+            _worker_context(
+                db_session,
+                pdf_integration=_SuccessfulPdfIntegration(),
+                storage_service=storage_service,
+            ),
+            str(stale_job.id),
+        )
+
+    stale_record = await _load_job_record(db_session, stale_job.id)
+    assert stale_record is not None  # nosec B101 - pytest assertion
+    assert stale_record.status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
+    assert stale_record.terminal_error == TERMINAL_ERROR_STALE_DOCUMENT_REVISION  # nosec B101 - pytest assertion
+
+    fresh_job = await _seed_pdf_job(db_session, user_id=user.id, document_id=document.id)
+    await pdf_job(
+        _worker_context(
+            db_session,
+            pdf_integration=_SuccessfulPdfIntegration(),
+            storage_service=storage_service,
+        ),
+        str(fresh_job.id),
+    )
+
+    fresh_record = await _load_job_record(db_session, fresh_job.id)
+    assert fresh_record is not None  # nosec B101 - pytest assertion
+    assert fresh_record.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
+    assert len(storage_service.deleted_paths) == 1  # nosec B101 - pytest assertion
+
+
+async def test_get_storage_service_rejects_runtime_without_delete_method() -> None:
+    class _MissingDeleteStorageService:
+        def fetch_bytes(self, object_path: str) -> bytes:
+            del object_path
+            return b""
+
+        def upload(
+            self,
+            *,
+            prefix: str,
+            filename: str,
+            data: bytes,
+            content_type: str,
+        ) -> str:
+            del prefix, filename, data, content_type
+            return "artifacts/path.pdf"
+
+    with pytest.raises(RuntimeError, match="Worker storage service is not initialized"):
+        _get_storage_service({"storage_service": _MissingDeleteStorageService()})
+
+
 class _SuccessfulPdfIntegration:
     def render(self, context: object) -> bytes:
         del context
@@ -229,6 +333,21 @@ class _StubStorageService:
     def fetch_bytes(self, object_path: str) -> bytes:
         raise AssertionError(f"Unexpected storage read in test: {object_path}")
 
+    def upload(
+        self,
+        *,
+        prefix: str,
+        filename: str,
+        data: bytes,
+        content_type: str,
+    ) -> str:
+        del data
+        del content_type
+        return f"{prefix.strip('/')}/{filename.lstrip('/')}"
+
+    def delete(self, object_path: str) -> None:
+        del object_path
+
 
 class _LogoStorageService:
     _PNG_BYTES = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x00IEND\xaeB`\x82"
@@ -236,6 +355,29 @@ class _LogoStorageService:
     def fetch_bytes(self, object_path: str) -> bytes:
         assert object_path == "logos/user.png"  # nosec B101 - pytest assertion
         return self._PNG_BYTES
+
+    def upload(
+        self,
+        *,
+        prefix: str,
+        filename: str,
+        data: bytes,
+        content_type: str,
+    ) -> str:
+        del data
+        del content_type
+        return f"{prefix.strip('/')}/{filename.lstrip('/')}"
+
+    def delete(self, object_path: str) -> None:
+        del object_path
+
+
+class _RecordingStorageService(_StubStorageService):
+    def __init__(self) -> None:
+        self.deleted_paths: list[str] = []
+
+    def delete(self, object_path: str) -> None:
+        self.deleted_paths.append(object_path)
 
 
 async def _seed_user(db_session: AsyncSession) -> User:
@@ -337,11 +479,18 @@ async def _seed_pdf_job(
     user_id: UUID,
     document_id: UUID | None,
 ) -> JobRecord:
+    document_revision: int | None = None
+    if document_id is not None:
+        document = await db_session.get(Document, document_id)
+        assert document is not None  # nosec B101 - pytest assertion
+        document_revision = document.pdf_artifact_revision
+
     repository = JobRepository(db_session)
     record = await repository.create(
         user_id=user_id,
         job_type=JobType.PDF,
         document_id=document_id,
+        document_revision=document_revision,
     )
     await db_session.commit()
     return record

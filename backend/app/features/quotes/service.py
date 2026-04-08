@@ -10,11 +10,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol, cast
 from uuid import UUID, uuid4
 
+from arq.connections import ArqRedis
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
 from app.features.auth.models import User
+from app.features.jobs.models import JobRecord, JobStatus, JobType
+from app.features.jobs.service import JobService
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import (
     PublicShareRecord,
@@ -29,9 +32,10 @@ from app.features.quotes.schemas import (
     QuoteUpdateRequest,
 )
 from app.integrations.pdf import PdfRenderError
-from app.integrations.storage import StorageNotFoundError, StorageReaderProtocol
+from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
+from app.shared.pdf_artifacts import PDF_ARTIFACT_NOT_READY_DETAIL
 from app.shared.pricing import (
     PricingValidationError,
     derive_document_subtotal_from_line_items,
@@ -41,6 +45,8 @@ from app.shared.pricing import (
 )
 
 LOGGER = logging.getLogger(__name__)
+_PDF_JOB_NAME = "jobs.pdf"
+_PDF_QUEUE_FAILURE_DETAIL = "Unable to start PDF generation right now. Please try again."
 _NON_DELETABLE_QUOTE_STATUSES = frozenset(
     {
         QuoteStatus.SHARED,
@@ -165,6 +171,8 @@ class QuoteRepositoryProtocol(Protocol):
         replace_line_items: bool,
     ) -> Document: ...
 
+    async def invalidate_pdf_artifact(self, document: Document) -> str | None: ...
+
     async def delete(self, document_id: UUID) -> None: ...
 
     async def commit(self) -> None: ...
@@ -188,7 +196,7 @@ class QuoteService:
         *,
         repository: QuoteRepositoryProtocol,
         pdf_integration: PdfIntegrationProtocol,
-        storage_service: StorageReaderProtocol,
+        storage_service: StorageServiceProtocol,
     ) -> None:
         self._repository = repository
         self._pdf = pdf_integration
@@ -332,6 +340,18 @@ class QuoteService:
                 else document_field_float_or_none(quote.deposit_amount)
             ),
         )
+        rendered_fields_changed = _quote_render_inputs_changed(
+            quote=quote,
+            update_fields=data.model_fields_set,
+            next_line_items=next_line_items,
+            next_total_amount=document_field_float_or_none(current_pricing.total_amount),
+            next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+            next_discount_type=current_pricing.discount_type,
+            next_discount_value=document_field_float_or_none(current_pricing.discount_value),
+            next_deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+            next_title=data.title if "title" in data.model_fields_set else quote.title,
+            next_notes=data.notes if "notes" in data.model_fields_set else quote.notes,
+        )
 
         updated_quote = await self._repository.update(
             document=quote,
@@ -362,7 +382,11 @@ class QuoteService:
             line_items=data.line_items,
             replace_line_items="line_items" in data.model_fields_set,
         )
+        obsolete_artifact_path = None
+        if rendered_fields_changed:
+            obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
         await self._repository.commit()
+        await self._delete_obsolete_artifact(obsolete_artifact_path)
         log_event(
             "quote.updated",
             user_id=user_id,
@@ -392,23 +416,82 @@ class QuoteService:
             customer_id=quote.customer_id,
         )
 
-    async def generate_pdf(self, user: User, quote_id: UUID) -> tuple[str, bytes]:
-        """Render and return quote PDF bytes while applying ready transition rules."""
+    async def start_pdf_generation(
+        self,
+        user: User,
+        quote_id: UUID,
+        *,
+        job_service: JobService,
+        arq_pool: ArqRedis | None,
+    ) -> JobRecord:
+        """Create or reuse a durable quote PDF job for the current artifact revision."""
         user_id = _resolve_user_id(user)
-        context = await self._repository.get_render_context(quote_id, user_id)
-        if context is None:
+        quote = await self._repository.get_by_id(quote_id, user_id)
+        if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        await self._attach_logo_data_uri(context)
+
+        existing_job = await self._get_reusable_pdf_job(
+            job_service=job_service,
+            user_id=user_id,
+            document=quote,
+        )
+        if existing_job is not None:
+            return existing_job
+
+        attach_job_to_document = quote.pdf_artifact_path is None
+        job = await job_service.create_job(
+            user_id=user_id,
+            job_type=JobType.PDF,
+            document_id=quote.id,
+            document_revision=quote.pdf_artifact_revision,
+        )
+        if attach_job_to_document:
+            quote.pdf_artifact_job_id = job.id
 
         try:
-            pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
-        except PdfRenderError as exc:
-            raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+            if arq_pool is None:
+                raise RuntimeError("ARQ pool is not available")
+            queued_job = await arq_pool.enqueue_job(
+                _PDF_JOB_NAME,
+                str(job.id),
+                _job_id=str(job.id),
+            )
+            if queued_job is None:
+                raise RuntimeError("ARQ did not accept the PDF job")
+        except Exception as exc:
+            LOGGER.warning("Failed to enqueue quote PDF job %s", job.id, exc_info=True)
+            if attach_job_to_document:
+                quote.pdf_artifact_job_id = None
+            await job_service.mark_enqueue_failed(job.id, job_type=JobType.PDF)
+            await self._repository.commit()
+            raise QuoteServiceError(detail=_PDF_QUEUE_FAILURE_DETAIL, status_code=503) from exc
 
-        await self._repository.mark_ready_if_not_shared(quote_id=quote_id, user_id=user_id)
         await self._repository.commit()
-        log_event("quote_pdf_generated", user_id=user_id, quote_id=quote_id)
-        return context.doc_number, pdf_bytes
+        return job
+
+    async def get_pdf_artifact(self, user: User, quote_id: UUID) -> tuple[str, bytes]:
+        """Return one persisted quote PDF artifact or a stable not-ready error."""
+        quote = await self.get_quote(user, quote_id)
+        if quote.pdf_artifact_path is None:
+            raise QuoteServiceError(detail=PDF_ARTIFACT_NOT_READY_DETAIL, status_code=409)
+
+        try:
+            pdf_bytes = await asyncio.to_thread(
+                self._storage_service.fetch_bytes,
+                quote.pdf_artifact_path,
+            )
+        except StorageNotFoundError as exc:
+            quote.pdf_artifact_path = None
+            quote.pdf_artifact_job_id = None
+            # Keep the artifact revision unchanged here: storage-loss recovery should
+            # regenerate and overwrite the same revision path, while true content
+            # invalidation paths are the only flows that bump revision.
+            await self._repository.commit()
+            raise QuoteServiceError(detail=PDF_ARTIFACT_NOT_READY_DETAIL, status_code=409) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise QuoteServiceError(detail="Unable to load PDF artifact", status_code=500) from exc
+
+        return quote.doc_number, pdf_bytes
 
     async def generate_shared_pdf(self, share_token: str) -> tuple[str, bytes]:
         """Render and return a publicly shared quote PDF by token."""
@@ -502,6 +585,37 @@ class QuoteService:
         refreshed_context = await self._repository.get_render_context_by_share_token(share_token)
         if refreshed_context is not None:
             context.status = refreshed_context.status
+
+    async def _get_reusable_pdf_job(
+        self,
+        *,
+        job_service: JobService,
+        user_id: UUID,
+        document: Document,
+    ) -> JobRecord | None:
+        if document.pdf_artifact_job_id is None:
+            return None
+
+        job = await job_service.get_job_for_user(
+            job_id=document.pdf_artifact_job_id,
+            user_id=user_id,
+        )
+        if (
+            job is None
+            or job.job_type != JobType.PDF
+            or job.document_revision != document.pdf_artifact_revision
+            or job.status not in {JobStatus.PENDING, JobStatus.RUNNING}
+        ):
+            return None
+        return job
+
+    async def _delete_obsolete_artifact(self, object_path: str | None) -> None:
+        if object_path is None:
+            return
+        try:
+            await asyncio.to_thread(self._storage_service.delete, object_path)
+        except Exception:  # noqa: BLE001
+            LOGGER.warning("Failed to delete invalidated quote PDF artifact", exc_info=True)
 
     def _log_public_quote_viewed(self, transition: QuoteViewTransition) -> None:
         """Emit the first public quote view event."""
@@ -699,3 +813,44 @@ def _validate_document_pricing_for_quote(
         )
     except PricingValidationError as exc:
         raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+
+
+def _quote_render_inputs_changed(
+    *,
+    quote: Document,
+    update_fields: set[str],
+    next_line_items: Sequence[object] | None,
+    next_total_amount: float | None,
+    next_tax_rate: float | None,
+    next_discount_type: str | None,
+    next_discount_value: float | None,
+    next_deposit_amount: float | None,
+    next_title: str | None,
+    next_notes: str | None,
+) -> bool:
+    return any(
+        (
+            quote.title != next_title,
+            quote.notes != next_notes,
+            document_field_float_or_none(quote.total_amount) != next_total_amount,
+            document_field_float_or_none(quote.tax_rate) != next_tax_rate,
+            quote.discount_type != next_discount_type,
+            document_field_float_or_none(quote.discount_value) != next_discount_value,
+            document_field_float_or_none(quote.deposit_amount) != next_deposit_amount,
+            "line_items" in update_fields
+            and _line_item_snapshots(quote.line_items) != _line_item_snapshots(next_line_items),
+        )
+    )
+
+
+def _line_item_snapshots(
+    line_items: Sequence[object] | None,
+) -> list[tuple[str | None, str | None, float | None]]:
+    return [
+        (
+            cast(str | None, getattr(line_item, "description", None)),
+            cast(str | None, getattr(line_item, "details", None)),
+            document_field_float_or_none(getattr(line_item, "price", None)),
+        )
+        for line_item in (line_items or ())
+    ]

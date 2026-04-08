@@ -14,7 +14,7 @@ import pytest
 from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
 from app.core.database import get_db
@@ -60,6 +60,13 @@ from app.shared.input_limits import (
     NOTE_INPUT_MAX_CHARS,
 )
 from app.shared.rate_limit import reset_local_rate_limit_state
+from app.worker.job_registry import pdf_job
+from app.worker.runtime import (
+    DEFAULT_MAX_TRIES,
+    DEFAULT_RETRY_BASE_SECONDS,
+    DEFAULT_RETRY_JITTER_SECONDS,
+    WorkerRuntimeSettings,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -812,6 +819,7 @@ async def test_quote_patch_tax_rate_only_recomputes_total_from_reverse_subtotal(
 
 async def test_business_events_are_logged_for_quote_customer_and_extraction_flows(
     client: AsyncClient,
+    db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     emitted_events: list[dict[str, str]] = []
@@ -860,11 +868,17 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
     )
     assert update_response.status_code == 200
 
-    pdf_response = await client.post(
-        f"/api/quotes/{quote_payload['id']}/pdf",
-        headers={"X-CSRF-Token": csrf_token},
-    )
-    assert pdf_response.status_code == 200
+    original_pool = getattr(app.state, "arq_pool", None)
+    app.state.arq_pool = _MockArqPool()
+    try:
+        pdf_response = await client.post(
+            f"/api/quotes/{quote_payload['id']}/pdf",
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert pdf_response.status_code == 202
+        await _run_pdf_job(db_session, job_id=pdf_response.json()["id"])
+    finally:
+        app.state.arq_pool = original_pool
 
     share_response = await client.post(
         f"/api/quotes/{quote_payload['id']}/share",
@@ -3524,15 +3538,7 @@ async def test_delete_quote_returns_204_for_owned_draft_and_ready_quotes_and_cas
     assert int(initial_line_item_count or 0) == 2
 
     if make_ready:
-        pdf_response = await client.post(
-            f"/api/quotes/{quote_id}/pdf",
-            headers={"X-CSRF-Token": csrf_token},
-        )
-        assert pdf_response.status_code == 200
-
-        detail_response = await client.get(f"/api/quotes/{quote_id}")
-        assert detail_response.status_code == 200
-        assert detail_response.json()["status"] == "ready"
+        await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
 
     delete_response = await client.delete(
         f"/api/quotes/{quote_id}",
@@ -3601,6 +3607,7 @@ async def test_delete_quote_returns_404_for_different_users_quote(
 
 async def test_patch_ready_quote_preserves_ready_status_even_when_values_do_not_change(
     client: AsyncClient,
+    db_session: AsyncSession,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -3620,15 +3627,7 @@ async def test_patch_ready_quote_preserves_ready_status_even_when_values_do_not_
     assert create_response.status_code == 201
     quote_id = create_response.json()["id"]
 
-    pdf_response = await client.post(
-        f"/api/quotes/{quote_id}/pdf",
-        headers={"X-CSRF-Token": csrf_token},
-    )
-    assert pdf_response.status_code == 200
-
-    detail_after_pdf = await client.get(f"/api/quotes/{quote_id}")
-    assert detail_after_pdf.status_code == 200
-    assert detail_after_pdf.json()["status"] == "ready"
+    await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
 
     patch_response = await client.patch(
         f"/api/quotes/{quote_id}",
@@ -3766,11 +3765,7 @@ async def test_mark_quote_outcome_updates_status_and_persists_event_log(
         assert share_response.status_code == 200
 
     if starting_status is QuoteStatus.READY:
-        pdf_response = await client.post(
-            f"/api/quotes/{quote_id}/pdf",
-            headers={"X-CSRF-Token": csrf_token},
-        )
-        assert pdf_response.status_code == 200
+        await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
     elif starting_status is not QuoteStatus.DRAFT and starting_status is not QuoteStatus.SHARED:
         await _set_quote_status(db_session, quote_id, starting_status)
 
@@ -4014,11 +4009,7 @@ async def test_convert_quote_to_invoice_creates_linked_invoice_and_keeps_quote_l
         assert share_response.status_code == 200
 
     if starting_status is QuoteStatus.READY:
-        pdf_response = await client.post(
-            f"/api/quotes/{quote_id}/pdf",
-            headers={"X-CSRF-Token": csrf_token},
-        )
-        assert pdf_response.status_code == 200
+        await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
     elif starting_status is not QuoteStatus.DRAFT and starting_status is not QuoteStatus.SHARED:
         await _set_quote_status(db_session, quote_id, starting_status)
 
@@ -4371,6 +4362,7 @@ async def test_list_invoices_can_filter_by_customer_id(client: AsyncClient) -> N
 
 async def test_invoice_patch_preserves_omitted_fields_and_ready_status_for_direct_invoice(
     client: AsyncClient,
+    db_session: AsyncSession,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -4384,11 +4376,7 @@ async def test_invoice_patch_preserves_omitted_fields_and_ready_status_for_direc
     )
     invoice_id = direct_invoice["id"]
 
-    preview_response = await client.post(
-        f"/api/invoices/{invoice_id}/pdf",
-        headers={"X-CSRF-Token": csrf_token},
-    )
-    assert preview_response.status_code == 200
+    await _set_invoice_status(db_session, invoice_id, QuoteStatus.READY)
 
     patch_response = await client.patch(
         f"/api/invoices/{invoice_id}",
@@ -4676,11 +4664,7 @@ async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_preserves_s
         assert share_response.status_code == 200
 
     if starting_status is QuoteStatus.READY:
-        pdf_response = await client.post(
-            f"/api/quotes/{quote_id}/pdf",
-            headers={"X-CSRF-Token": csrf_token},
-        )
-        assert pdf_response.status_code == 200
+        await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
     elif starting_status is not QuoteStatus.DRAFT and starting_status is not QuoteStatus.SHARED:
         await _set_quote_status(db_session, quote_id, starting_status)
 
@@ -4940,6 +4924,30 @@ async def _set_invoice_status(
     assert invoice is not None
     invoice.status = status
     await db_session.commit()
+
+
+async def _run_pdf_job(db_session: AsyncSession, *, job_id: object) -> None:
+    assert isinstance(job_id, str)
+    session_maker = async_sessionmaker(
+        bind=db_session.bind,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    runtime = WorkerRuntimeSettings(
+        session_maker=session_maker,
+        max_tries=DEFAULT_MAX_TRIES,
+        retry_base_seconds=DEFAULT_RETRY_BASE_SECONDS,
+        retry_jitter_seconds=DEFAULT_RETRY_JITTER_SECONDS,
+    )
+    await pdf_job(
+        {
+            "job_try": 1,
+            "worker_runtime": runtime,
+            "pdf_integration": _MockPdfIntegration(),
+            "storage_service": _MockStorageService(),
+        },
+        job_id,
+    )
 
 
 def _format_human_date(value: object) -> str:

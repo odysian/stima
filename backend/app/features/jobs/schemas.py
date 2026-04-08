@@ -19,6 +19,7 @@ class JobRecordResponse(BaseModel):
     id: UUID
     user_id: UUID
     document_id: UUID | None
+    document_revision: int | None
     job_type: JobType
     status: JobStatus
     attempts: int

@@ -57,6 +57,12 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     shared_at: null,
     share_token: null,
     linked_invoice: null,
+    pdf_artifact: {
+      status: "missing",
+      job_id: null,
+      download_url: null,
+      terminal_error: null,
+    },
     line_items: [
       {
         id: "line-1",

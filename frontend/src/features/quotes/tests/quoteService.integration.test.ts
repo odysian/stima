@@ -81,6 +81,7 @@ describe("quoteService integration (MSW)", () => {
             id: "job-1",
             user_id: "user-1",
             document_id: null,
+            document_revision: null,
             job_type: "extraction",
             status: "pending",
             attempts: 0,
@@ -227,6 +228,12 @@ describe("quoteService integration (MSW)", () => {
       shared_at: null,
       share_token: null,
       linked_invoice: null,
+      pdf_artifact: {
+        status: "missing",
+        job_id: null,
+        download_url: null,
+        terminal_error: null,
+      },
       line_items: [
         { id: "line-1", description: "Mulch", details: "5 yards", price: 120, sort_order: 0 },
       ],
@@ -307,6 +314,7 @@ describe("quoteService integration (MSW)", () => {
             id: `job-email-quote-${String(params.id)}`,
             user_id: "user-1",
             document_id: String(params.id),
+            document_revision: null,
             job_type: "email",
             status: "pending",
             attempts: 0,
@@ -530,24 +538,41 @@ describe("quoteService integration (MSW)", () => {
     });
   });
 
-  it("generatePdf returns Blob and sends CSRF header", async () => {
+  it("generatePdf returns the async job contract and sends CSRF header", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;
 
     server.use(
       http.post("/api/quotes/:id/pdf", ({ request }) => {
         capturedCsrfHeader = request.headers.get("X-CSRF-Token");
-        return new HttpResponse("mock-pdf-content", {
-          status: 200,
-          headers: { "Content-Type": "application/pdf" },
+        return HttpResponse.json({
+          id: "job-pdf-quote-1",
+          user_id: "user-1",
+          document_id: "quote-1",
+          document_revision: 0,
+          job_type: "pdf",
+          status: "pending",
+          attempts: 0,
+          terminal_error: null,
+          extraction_result: null,
+          created_at: "2026-03-20T00:00:00.000Z",
+          updated_at: "2026-03-20T00:00:00.000Z",
+        }, {
+          status: 202,
         });
       }),
     );
 
-    const blob = await quoteService.generatePdf("quote-1");
+    const job = await quoteService.generatePdf("quote-1");
 
     expect(capturedCsrfHeader).toBe("integration-csrf-token");
-    expect(await blob.text()).toBe("mock-pdf-content");
+    expect(job).toMatchObject({
+      id: "job-pdf-quote-1",
+      job_type: "pdf",
+      status: "pending",
+      document_id: "quote-1",
+      document_revision: 0,
+    });
   });
 
   it("deleteQuote sends CSRF header and resolves on 204", async () => {
