@@ -61,6 +61,20 @@ docker run -d \
   "$IMAGE_TAG" \
   arq app.worker.arq_worker.WorkerSettings
 
+echo "Waiting for worker to stay running (up to 10s)..."
+for i in $(seq 1 10); do
+  if [[ "$(docker inspect -f '{{.State.Running}}' "$WORKER_CONTAINER_NAME" 2>/dev/null || true)" == "true" ]]; then
+    echo "Worker is running."
+    break
+  fi
+  if [[ "$i" -eq 10 ]]; then
+    echo "ERROR: Worker failed to stay running."
+    docker logs "$WORKER_CONTAINER_NAME" --tail=40
+    exit 1
+  fi
+  sleep 1
+done
+
 echo "Recent worker logs:"
 docker logs "$WORKER_CONTAINER_NAME" --tail=10
 
