@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
 from uuid import uuid4
 
 import pytest
@@ -11,7 +12,7 @@ from app.features.auth.models import User
 from app.features.quotes import service as quote_service_module
 from app.features.quotes.models import QuoteStatus
 from app.features.quotes.schemas import QuoteUpdateRequest
-from app.features.quotes.service import QuoteService
+from app.features.quotes.service import QuoteRepositoryProtocol, QuoteService
 
 pytestmark = pytest.mark.asyncio
 
@@ -108,7 +109,7 @@ async def test_update_quote_with_unchanged_rendered_values_preserves_pdf_artifac
     )
     repository = _QuoteRepository(quote)
     service = QuoteService(
-        repository=repository,
+        repository=cast(QuoteRepositoryProtocol, repository),
         pdf_integration=_UnusedPdfIntegration(),
         storage_service=_UnusedStorageService(),
     )

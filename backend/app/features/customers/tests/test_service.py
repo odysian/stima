@@ -18,10 +18,18 @@ class _CustomerRepository:
     def __init__(self, customer: SimpleNamespace) -> None:
         self._customer = customer
 
+    async def list_by_user(self, user_id):  # noqa: ANN001
+        del user_id
+        raise AssertionError("list_by_user should not be used in this test")
+
     async def get_by_id(self, customer_id, user_id):  # noqa: ANN001
         if customer_id == self._customer.id and user_id == self._customer.user_id:
             return self._customer
         return None
+
+    async def create(self, **kwargs):  # noqa: ANN001
+        del kwargs
+        raise AssertionError("create should not be used in this test")
 
     async def update(self, customer, **fields):  # noqa: ANN001
         for key, value in fields.items():
@@ -44,6 +52,14 @@ class _PdfArtifactRepository:
 class _StorageService:
     def __init__(self) -> None:
         self.deleted_paths: list[str] = []
+
+    def fetch_bytes(self, object_path: str) -> bytes:
+        del object_path
+        raise AssertionError("fetch_bytes should not be used in this test")
+
+    def upload(self, *, prefix: str, filename: str, data: bytes, content_type: str) -> str:
+        del prefix, filename, data, content_type
+        raise AssertionError("upload should not be used in this test")
 
     def delete(self, object_path: str) -> None:
         self.deleted_paths.append(object_path)

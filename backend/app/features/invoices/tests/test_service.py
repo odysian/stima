@@ -11,7 +11,7 @@ import pytest
 from app.features.auth.models import User
 from app.features.invoices import service as invoice_service_module
 from app.features.invoices.schemas import InvoiceCreateRequest, InvoiceUpdateRequest
-from app.features.invoices.service import InvoiceService
+from app.features.invoices.service import InvoiceRepositoryProtocol, InvoiceService
 from app.features.quotes.models import QuoteStatus
 from app.features.quotes.service import QuoteRepositoryProtocol
 from sqlalchemy.exc import IntegrityError
@@ -401,7 +401,7 @@ async def test_update_invoice_empty_patch_preserves_existing_pdf_artifact() -> N
     )
     invoice_repository = _UpdatingInvoiceRepository(invoice)
     service = InvoiceService(
-        invoice_repository=invoice_repository,
+        invoice_repository=cast(InvoiceRepositoryProtocol, invoice_repository),
         quote_repository=cast(QuoteRepositoryProtocol, _QuoteRepository(None)),
         pdf_integration=_UnusedPdfIntegration(),
         storage_service=_UnusedStorageService(),
