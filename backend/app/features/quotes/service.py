@@ -35,6 +35,7 @@ from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
+from app.shared.observability import log_security_event
 from app.shared.pdf_artifacts import PDF_ARTIFACT_NOT_READY_DETAIL
 from app.shared.pricing import (
     PricingValidationError,
@@ -541,10 +542,18 @@ class QuoteService:
         if share_record is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
         if share_record.share_token_revoked_at is not None:
-            self._log_public_share_denied(share_record, reason_code="revoked")
+            self._log_public_share_denied(
+                share_record,
+                share_token=share_token,
+                reason_code="revoked",
+            )
             raise QuoteServiceError(detail="Not found", status_code=404)
         if _share_token_has_expired(share_record.share_token_expires_at, now):
-            self._log_public_share_denied(share_record, reason_code="expired")
+            self._log_public_share_denied(
+                share_record,
+                share_token=share_token,
+                reason_code="expired",
+            )
             raise QuoteServiceError(detail="Not found", status_code=404)
 
         context = await self._repository.get_render_context_by_share_token(share_token)
@@ -630,13 +639,21 @@ class QuoteService:
         self,
         share_record: PublicShareRecord,
         *,
+        share_token: str,
         reason_code: Literal["revoked", "expired"],
     ) -> None:
         """Record the internal reason when a quote token is denied publicly."""
-        LOGGER.info(
-            "Public share access denied for quote %s (%s)",
-            share_record.document_id,
-            reason_code,
+        log_security_event(
+            "public_share.token_denied",
+            outcome="denied",
+            level=logging.WARNING,
+            status_code=404,
+            reason=reason_code,
+            token_ref=share_token,
+            rate_limit_key=f"public-share:quote:{reason_code}:{share_token}",
+            rate_limit_seconds=60,
+            document_id=str(share_record.document_id),
+            document_type="quote",
         )
 
     async def share_quote(

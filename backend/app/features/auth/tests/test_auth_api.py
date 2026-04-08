@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from datetime import timedelta
 from uuid import UUID, uuid4
@@ -17,6 +18,7 @@ from app.core.security import create_refresh_token, hash_token
 from app.features.auth.models import RefreshToken, User
 from app.features.auth.service import ACCESS_COOKIE_NAME, CSRF_COOKIE_NAME, REFRESH_COOKIE_NAME
 from app.main import app
+from app.shared import observability
 from app.shared.rate_limit import reset_local_rate_limit_state
 
 pytestmark = pytest.mark.asyncio
@@ -213,6 +215,38 @@ async def test_login_rejects_wrong_password(client: AsyncClient) -> None:
     assert login_response.json() == {"detail": "Invalid credentials"}
 
 
+async def test_login_failure_emits_structured_security_log(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def _capture(payload: dict[str, object], *, level: int) -> None:
+        captured.append({**payload, "_level": level})
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture)
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+
+    response = await client.post(
+        "/api/auth/login",
+        json={"email": credentials["email"], "password": "WrongPass123!"},
+    )
+
+    assert response.status_code == 401
+    login_failure = next(
+        payload for payload in captured if payload.get("event") == "auth.login_failed"
+    )
+    assert login_failure["reason"] == "invalid_credentials"
+    assert login_failure["status_code"] == 401
+    assert login_failure["method"] == "POST"
+    assert login_failure["route_template"] == "/api/auth/login"
+    assert isinstance(login_failure["client_ip_hash"], str)
+    assert isinstance(login_failure["correlation_id"], str)
+    assert login_failure["_level"] == logging.WARNING
+
+
 async def test_login_rejects_nonexistent_email(client: AsyncClient) -> None:
     response = await client.post(
         "/api/auth/login",
@@ -239,6 +273,40 @@ async def test_login_rate_limit_enforced(
     response = await client.post("/api/auth/login", json=credentials)
 
     assert response.status_code == 429
+
+
+async def test_login_rate_limit_emits_structured_auth_throttle_event(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[dict[str, object]] = []
+
+    def _capture(payload: dict[str, object], *, level: int) -> None:
+        captured.append({**payload, "_level": level})
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture)
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("AUTH_LOGIN_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+
+    first_response = await client.post("/api/auth/login", json=credentials)
+    second_response = await client.post("/api/auth/login", json=credentials)
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    throttle_event = next(
+        payload for payload in captured if payload.get("event") == "auth.throttle"
+    )
+    assert throttle_event["reason"] == "rate_limit_exceeded"
+    assert throttle_event["status_code"] == 429
+    assert throttle_event["method"] == "POST"
+    assert throttle_event["route_template"] == "/api/auth/login"
+    assert isinstance(throttle_event["client_ip_hash"], str)
+    assert throttle_event["_level"] == logging.WARNING
 
 
 async def test_refresh_rejects_missing_csrf_header(client: AsyncClient) -> None:

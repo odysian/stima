@@ -68,6 +68,7 @@ async def extraction_job(ctx: dict[str, Any], job_id: str, *, transcript: str) -
         ctx,
         job_id=UUID(job_id),
         job_type=JobType.EXTRACTION,
+        job_name=EXTRACTION_JOB_NAME,
         handler=lambda: _extract_quote_data(ctx, transcript),
         on_success=lambda runtime, result: _store_extraction_result(
             runtime,
@@ -83,6 +84,7 @@ async def pdf_job(ctx: dict[str, Any], job_id: str) -> None:
         ctx,
         job_id=UUID(job_id),
         job_type=JobType.PDF,
+        job_name=PDF_JOB_NAME,
         handler=lambda: _render_pdf(ctx, job_id=UUID(job_id)),
         on_success=lambda runtime, result: _store_pdf_artifact(
             runtime,
@@ -99,6 +101,7 @@ async def email_job(ctx: dict[str, Any], job_id: str) -> None:
         ctx,
         job_id=UUID(job_id),
         job_type=JobType.EMAIL,
+        job_name=EMAIL_JOB_NAME,
         handler=lambda: _deliver_email(ctx, job_id=UUID(job_id)),
     )
 

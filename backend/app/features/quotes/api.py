@@ -71,6 +71,7 @@ from app.shared.input_limits import (
     MAX_AUDIO_TOTAL_BYTES,
     NOTE_INPUT_MAX_CHARS,
 )
+from app.shared.observability import log_security_event
 from app.shared.pdf_artifacts import resolve_pdf_artifact_state
 from app.shared.rate_limit import get_ip_key, get_user_key, limiter
 from app.worker.job_registry import EMAIL_JOB_NAME, EXTRACTION_JOB_NAME
@@ -519,6 +520,15 @@ async def send_quote_email(
         idempotency_key=normalized_idempotency_key,
     )
     if replay.kind == "replay" and replay.response is not None:
+        log_security_event(
+            "idempotency.replay",
+            outcome="replayed",
+            level=logging.INFO,
+            status_code=replay.response.status_code,
+            reason="replayed_response",
+            endpoint_slug="quote-send-email",
+            resource_id=str(quote_id),
+        )
         response.headers["Idempotency-Replayed"] = "true"
         response.status_code = replay.response.status_code
         return JobRecordResponse.model_validate(replay.response.payload)
