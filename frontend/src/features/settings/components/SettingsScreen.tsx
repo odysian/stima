@@ -15,6 +15,7 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { useTheme } from "@/shared/hooks/useTheme";
+import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
 import { parseTaxPercentInput, toTaxPercentDisplay } from "@/shared/lib/pricing";
 import type { ThemePreference } from "@/shared/lib/theme";
@@ -29,6 +30,7 @@ export function SettingsScreen(): React.ReactElement {
   const { logout, refreshUser } = useAuth();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const logoPreviewSrc = `${import.meta.env.VITE_API_URL ?? ""}/api/profile/logo`;
+  const logoSizeLimitLabel = formatByteLimit(MAX_LOGO_SIZE_BYTES);
 
   const [businessName, setBusinessName] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -99,7 +101,7 @@ export function SettingsScreen(): React.ReactElement {
     }
 
     if (file.size > MAX_LOGO_SIZE_BYTES) {
-      setLogoError("Logo must be 2 MB or smaller.");
+      setLogoError(`Logo must be ${logoSizeLimitLabel} or smaller.`);
       return;
     }
 
@@ -241,7 +243,7 @@ export function SettingsScreen(): React.ReactElement {
                         className="flex min-w-0 flex-col gap-2"
                       >
                         <p className="text-xs text-on-surface-variant">
-                          JPEG or PNG, up to 2 MB. Appears on quote PDFs.
+                          {`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`}
                         </p>
                         <div className="flex flex-col items-start gap-2">
                           <label

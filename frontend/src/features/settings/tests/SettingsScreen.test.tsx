@@ -11,6 +11,8 @@ import {
 } from "@/features/profile/types/profile.types";
 import { SettingsScreen } from "@/features/settings/components/SettingsScreen";
 import { ThemeProvider } from "@/shared/components/ThemeProvider";
+import { formatByteLimit } from "@/shared/lib/formatters";
+import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
 import { THEME_STORAGE_KEY } from "@/shared/lib/theme";
 
 vi.mock("@/features/auth/hooks/useAuth", () => ({
@@ -105,6 +107,8 @@ afterEach(() => {
 });
 
 describe("SettingsScreen", () => {
+  const logoSizeLimitLabel = formatByteLimit(MAX_LOGO_SIZE_BYTES);
+
   it("renders the top-level settings shell with grouped fields and inline save", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({
@@ -132,7 +136,9 @@ describe("SettingsScreen", () => {
       "text-outline",
     );
     expect(screen.getByText("Stima")).toBeInTheDocument();
-    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
+    expect(
+      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("settings-name-row")).toHaveClass(
       "grid",
       "grid-cols-1",
@@ -448,7 +454,9 @@ describe("SettingsScreen", () => {
       "rounded-xl",
       "bg-surface-container-lowest",
     );
-    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
+    expect(
+      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
+    ).toBeInTheDocument();
     expect(await screen.findByAltText(/business logo preview/i)).toHaveClass(
       "max-h-full",
       "max-w-full",
@@ -492,7 +500,9 @@ describe("SettingsScreen", () => {
       "rounded-xl",
       "bg-surface-container-lowest",
     );
-    expect(screen.getByText("JPEG or PNG, up to 2 MB. Appears on quote PDFs.")).toBeInTheDocument();
+    expect(
+      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
+    ).toBeInTheDocument();
     expect(within(previewTile).getByText("No logo")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
@@ -554,11 +564,13 @@ describe("SettingsScreen", () => {
 
     const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
     const file = new File(["fake-logo"], "logo.png", { type: "image/png" });
-    Object.defineProperty(file, "size", { value: 2 * 1024 * 1024 + 1 });
+    Object.defineProperty(file, "size", { value: MAX_LOGO_SIZE_BYTES + 1 });
 
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Logo must be 2 MB or smaller.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      `Logo must be ${logoSizeLimitLabel} or smaller.`,
+    );
     expect(mockedProfileService.uploadLogo).not.toHaveBeenCalled();
   });
 

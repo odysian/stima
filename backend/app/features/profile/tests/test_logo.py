@@ -13,6 +13,7 @@ from app.features.auth.service import CSRF_COOKIE_NAME
 from app.integrations.storage import StorageNotFoundError
 from app.main import app
 from app.shared.dependencies import get_storage_service
+from app.shared.input_limits import MAX_LOGO_SIZE_BYTES
 
 pytestmark = pytest.mark.asyncio
 
@@ -142,7 +143,7 @@ async def test_upload_logo_rejects_files_larger_than_2mb(client: AsyncClient) ->
         files={
             "file": (
                 "logo.png",
-                _PNG_BYTES + (b"0" * (2 * 1024 * 1024 + 1)),
+                _PNG_BYTES + (b"0" * (MAX_LOGO_SIZE_BYTES + 1)),
                 "image/png",
             )
         },
