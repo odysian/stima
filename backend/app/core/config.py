@@ -152,6 +152,10 @@ class Settings(BaseSettings):
         default=10,
         validation_alias="WORKER_CONCURRENCY",
     )
+    worker_poll_delay_seconds: float = Field(
+        default=15.0,
+        validation_alias="WORKER_POLL_DELAY_SECONDS",
+    )
     sentry_dsn: str | None = Field(default=None, validation_alias="SENTRY_DSN")
     admin_api_key: str | None = Field(default=None, validation_alias="ADMIN_API_KEY")
     frontend_url: str = Field(
@@ -334,6 +338,14 @@ class Settings(BaseSettings):
         """Require at least one worker slot."""
         if value < 1:
             raise ValueError("WORKER_CONCURRENCY must be at least 1")
+        return value
+
+    @field_validator("worker_poll_delay_seconds")
+    @classmethod
+    def validate_worker_poll_delay_seconds(cls, value: float) -> float:
+        """Require a positive poll delay to avoid hammering Redis."""
+        if value <= 0:
+            raise ValueError("WORKER_POLL_DELAY_SECONDS must be greater than 0")
         return value
 
     @field_validator(

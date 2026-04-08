@@ -17,3 +17,4 @@ class WorkerSettings:
     max_tries = DEFAULT_MAX_TRIES
     max_jobs = _settings.worker_concurrency
     redis_settings = build_arq_redis_settings(_settings)
+    poll_delay = _settings.worker_poll_delay_seconds
