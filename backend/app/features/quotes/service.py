@@ -309,12 +309,12 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
-        has_linked_invoice = await self._repository.has_linked_invoice(
-            source_document_id=quote.id,
-            user_id=user_id,
-        )
         next_customer_id = quote.customer_id
         if "customer_id" in data.model_fields_set:
+            has_linked_invoice = await self._repository.has_linked_invoice(
+                source_document_id=quote.id,
+                user_id=user_id,
+            )
             next_customer_id = await self._resolve_next_customer_id(
                 user_id=user_id,
                 quote=quote,
