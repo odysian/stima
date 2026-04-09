@@ -148,7 +148,8 @@ describe("QuoteList", () => {
     expect(await screen.findByText(/Q-001/)).toBeInTheDocument();
     expect(screen.getByText("1 active · 1 pending")).toBeInTheDocument();
     expect(screen.getByText("Spring Cleanup")).toBeInTheDocument();
-    expect(screen.getByText(/Bob Brown\s*·\s*Q-002\s*·\s*Mar 20, 2026\s*·\s*3 items/)).toBeInTheDocument();
+    expect(screen.getByText("Bob Brown")).toBeInTheDocument();
+    expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026\s*·\s*3 items/)).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getAllByText("$120.00")).toHaveLength(2);
   });
@@ -265,7 +266,8 @@ describe("QuoteList", () => {
     expect(await screen.findByRole("heading", { name: "Invoices" })).toBeInTheDocument();
     expect(screen.getByText("1 active · 1 pending")).toBeInTheDocument();
     expect(screen.getByText("Front Bed Refresh")).toBeInTheDocument();
-    expect(screen.getByText(/Bob Brown\s*·\s*I-002\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("Bob Brown")).toBeInTheDocument();
+    expect(screen.getByText(/I-002\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getAllByText("$220.00")).toHaveLength(1);
   });
@@ -290,7 +292,8 @@ describe("QuoteList", () => {
 
     expect(screen.queryByText("Alice Johnson")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /bob brown/i })).toBeInTheDocument();
-    expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026\s*·\s*1 item/)).toBeInTheDocument();
+    expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("1 item")).toBeInTheDocument();
   });
 
   it("filters rows by quote title", async () => {
@@ -457,7 +460,8 @@ describe("QuoteList", () => {
     renderScreen();
 
     expect(await screen.findByRole("button", { name: /alice johnson/i })).toBeInTheDocument();
-    expect(screen.getByText(/Q-001\s*·\s*Mar 24, 2026\s*·\s*1 item/)).toBeInTheDocument();
+    expect(screen.getByText(/Q-001\s*·\s*Mar 24, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("1 item")).toBeInTheDocument();
   });
 
   it("renders an em dash when total_amount is null", async () => {

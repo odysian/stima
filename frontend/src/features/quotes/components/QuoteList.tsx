@@ -19,7 +19,8 @@ type DocumentStatus = QuoteListItem["status"] | InvoiceListItem["status"];
 interface DocumentRow {
   id: string;
   primaryLabel: string;
-  supportingDetails: string;
+  secondaryDetails: string;
+  tertiaryDetails: string;
   totalAmount: number | null;
   status: DocumentStatus;
   destination: string;
@@ -65,9 +66,12 @@ function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionPro
                     {formatCurrency(row.totalAmount)}
                   </p>
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-3">
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  {row.secondaryDetails}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-3">
                   <p className="text-sm text-on-surface-variant">
-                    {row.supportingDetails}
+                    {row.tertiaryDetails}
                   </p>
                   {row.needsCustomerAssignment ? (
                     <span className={needsCustomerBadgeClasses}>Needs customer</span>
@@ -232,11 +236,11 @@ export function QuoteList(): React.ReactElement {
     () => draftQuotes.map((quote) => ({
       id: quote.id,
       primaryLabel: quote.customer_name ?? "Unassigned",
-      supportingDetails: [
+      secondaryDetails: [
         quote.doc_number,
         formatDate(quote.created_at, timezone),
-        `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
       ].join(" · "),
+      tertiaryDetails: `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/quotes/${quote.id}/review`,
@@ -251,8 +255,8 @@ export function QuoteList(): React.ReactElement {
     () => nonDraftQuotes.map((quote) => ({
       id: quote.id,
       primaryLabel: quote.title ?? quote.doc_number,
-      supportingDetails: [
-        quote.customer_name ?? "Unassigned customer",
+      secondaryDetails: quote.customer_name ?? "Unassigned customer",
+      tertiaryDetails: [
         ...(quote.title ? [quote.doc_number] : []),
         formatDate(quote.created_at, timezone),
         `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
@@ -268,8 +272,8 @@ export function QuoteList(): React.ReactElement {
     () => filteredInvoices.map((invoice) => ({
       id: invoice.id,
       primaryLabel: invoice.title ?? invoice.doc_number,
-      supportingDetails: [
-        invoice.customer_name,
+      secondaryDetails: invoice.customer_name,
+      tertiaryDetails: [
         ...(invoice.title ? [invoice.doc_number] : []),
         formatDate(invoice.created_at, timezone),
       ].join(" · "),
