@@ -7,7 +7,7 @@ import json
 from collections.abc import Iterator, Sequence
 from datetime import date
 from types import SimpleNamespace
-from typing import Annotated, cast
+from typing import Annotated, TypedDict, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -204,8 +204,13 @@ class _InProgressIdempotencyStore:
 
 
 class _MockArqPool:
+    class _EnqueueCall(TypedDict):
+        function: str
+        args: tuple[object, ...]
+        kwargs: dict[str, object]
+
     def __init__(self) -> None:
-        self.calls: list[dict[str, object]] = []
+        self.calls: list[_MockArqPool._EnqueueCall] = []
 
     async def enqueue_job(self, function: str, *args: object, **kwargs: object) -> object:
         self.calls.append(
