@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
+import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -15,6 +16,7 @@ import {
 } from "@/shared/lib/inputLimits";
 
 const navigateMock = vi.fn();
+const setDraftMock = vi.fn();
 const useParamsMock = vi.fn((): { customerId?: string } => ({ customerId: "cust-1" }));
 
 const startRecordingMock = vi.fn(async () => undefined);
@@ -33,6 +35,10 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("@/features/quotes/hooks/useVoiceCapture", () => ({
   useVoiceCapture: vi.fn(),
+}));
+
+vi.mock("@/features/quotes/hooks/useQuoteDraft", () => ({
+  useQuoteDraft: vi.fn(),
 }));
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
@@ -56,6 +62,7 @@ vi.mock("@/shared/lib/jobService", () => ({
 }));
 
 const mockedUseVoiceCapture = vi.mocked(useVoiceCapture);
+const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedJobService = vi.mocked(jobService);
 
@@ -135,6 +142,13 @@ function renderScreen({
 }
 
 beforeEach(() => {
+  mockedUseQuoteDraft.mockReturnValue({
+    draft: null,
+    setDraft: setDraftMock,
+    updateLineItem: vi.fn(),
+    removeLineItem: vi.fn(),
+    clearDraft: vi.fn(),
+  });
   mockVoiceCapture();
   mockedQuoteService.extract.mockResolvedValue({ type: "sync", quoteId: "quote-1", result: extractionFixture });
   mockedJobService.getJobStatus.mockReset();
@@ -341,6 +355,12 @@ describe("CaptureScreen", () => {
       });
     });
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review");
+    expect(setDraftMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quoteId: "quote-1",
+        customerId: "cust-1",
+      }),
+    );
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
   });
 
@@ -349,6 +369,7 @@ describe("CaptureScreen", () => {
     mockedJobService.getJobStatus.mockResolvedValueOnce(
       makeJobStatusResponse({
         status: "running",
+        extraction_result: extractionFixture,
         quote_id: "quote-home",
       }),
     );
@@ -368,6 +389,12 @@ describe("CaptureScreen", () => {
     });
     expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-home");
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-home/review");
+    expect(setDraftMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quoteId: "quote-home",
+        customerId: "",
+      }),
+    );
   });
 
   it("routes notes-only sync extraction to persisted review id", async () => {
@@ -384,6 +411,12 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-notes/review"));
+    expect(setDraftMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quoteId: "quote-notes",
+        sourceType: "text",
+      }),
+    );
   });
 
   it("shows inline error and does not navigate when extraction fails", async () => {
@@ -589,6 +622,11 @@ describe("CaptureScreen", () => {
     });
     expect(mockedJobService.getJobStatus).toHaveBeenCalledTimes(2);
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-async/review");
+    expect(setDraftMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quoteId: "quote-async",
+      }),
+    );
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
   });
 

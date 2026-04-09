@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
+import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { HOME_ROUTE, resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
+import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -56,6 +58,7 @@ export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
   const { customerId } = useParams<{ customerId: string }>();
+  const { setDraft } = useQuoteDraft();
   const isMountedRef = useRef(true);
   const extractionStageTimerRefs = useRef<number[]>([]);
   const {
@@ -106,6 +109,31 @@ export function CaptureScreen(): React.ReactElement {
     };
   }, []);
 
+  function applyDraft(sourceType: QuoteSourceType, extraction: ExtractionResult, quoteId: string): void {
+    setDraft({
+      quoteId,
+      customerId: customerId ?? "",
+      launchOrigin,
+      title: "",
+      transcript: extraction.transcript,
+      lineItems: extraction.line_items.map((lineItem) => ({
+        description: lineItem.description,
+        details: lineItem.details,
+        price: lineItem.price,
+        flagged: lineItem.flagged,
+        flagReason: lineItem.flag_reason,
+      })),
+      total: extraction.total,
+      taxRate: null,
+      discountType: null,
+      discountValue: null,
+      depositAmount: null,
+      confidenceNotes: extraction.confidence_notes,
+      notes: "",
+      sourceType,
+    });
+  }
+
   async function onExtract(): Promise<void> {
     clearSubmissionErrors();
     if (clips.length > MAX_AUDIO_CLIPS_PER_REQUEST) {
@@ -139,12 +167,14 @@ export function CaptureScreen(): React.ReactElement {
       if (!isMountedRef.current) {
         return;
       }
+      const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
       if (extraction.type === "sync") {
+        applyDraft(sourceType, extraction.result, extraction.quoteId);
         navigate(`/quotes/${extraction.quoteId}/review`);
         return;
       }
 
-      await pollExtractionJob(extraction.jobId);
+      await pollExtractionJob(extraction.jobId, sourceType);
     } catch (submitError) {
       if (!isMountedRef.current) {
         return;
@@ -160,7 +190,7 @@ export function CaptureScreen(): React.ReactElement {
     }
   }
 
-  async function pollExtractionJob(jobId: string): Promise<void> {
+  async function pollExtractionJob(jobId: string, sourceType: QuoteSourceType): Promise<void> {
     for (let pollCount = 0; pollCount < EXTRACTION_MAX_POLLS; pollCount += 1) {
       const job = await jobService.getJobStatus(jobId);
       if (!isMountedRef.current) {
@@ -168,6 +198,10 @@ export function CaptureScreen(): React.ReactElement {
       }
 
       if (job.quote_id) {
+        if (!job.extraction_result) {
+          throw new Error("Extraction completed without a result. Please try again.");
+        }
+        applyDraft(sourceType, job.extraction_result, job.quote_id);
         navigate(`/quotes/${job.quote_id}/review`);
         return;
       }

@@ -220,7 +220,10 @@ export function ReviewScreen(): React.ReactElement | null {
           if (isInteractionLocked) {
             return;
           }
-          navigate(`/quotes/capture/${currentDraft.customerId}`, {
+          const capturePath = currentDraft.customerId
+            ? `/quotes/capture/${currentDraft.customerId}`
+            : "/quotes/capture";
+          navigate(capturePath, {
             replace: true,
             state: createCaptureLocationState(currentDraft.launchOrigin ?? HOME_ROUTE),
           });

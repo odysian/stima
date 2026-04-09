@@ -254,6 +254,17 @@ describe("ReviewScreen", () => {
     });
   });
 
+  it("navigates back to generic capture route when draft has no customer context", () => {
+    renderScreen(makeDraft({ customerId: "", launchOrigin: "/" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /back to capture/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture", {
+      replace: true,
+      state: { launchOrigin: "/" },
+    });
+  });
+
   it("renders line items as cards and navigates to edit route on click", () => {
     renderScreen(
       makeDraft({
