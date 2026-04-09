@@ -271,6 +271,7 @@ describe("QuoteList", () => {
     expect(screen.getByText(/I-002\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getAllByText("$220.00")).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "PAST INVOICES" }).querySelector("p:empty")).toBeNull();
   });
 
   it("filters rows by customer name", async () => {

@@ -77,9 +77,11 @@ function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionPro
                     {row.docAndDate}
                   </p>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm text-on-surface-variant">
-                      {row.itemDetails ?? ""}
-                    </p>
+                    {row.itemDetails ? (
+                      <p className="text-sm text-on-surface-variant">
+                        {row.itemDetails}
+                      </p>
+                    ) : null}
                     {row.needsCustomerAssignment ? (
                       <span className={needsCustomerBadgeClasses}>Needs customer</span>
                     ) : (
