@@ -23,7 +23,7 @@ export function ReviewActionFooter({
   return (
     <ScreenFooter>
       <div className="mx-auto w-full max-w-2xl space-y-2">
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-row gap-3">
           <Button
             type="button"
             variant="primary"

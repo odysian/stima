@@ -37,7 +37,7 @@ interface DocumentRowsSectionProps {
 }
 
 const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const draftRowClasses = "w-full cursor-pointer rounded-xl border-l-4 border-warning-accent bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+const draftRowClasses = "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent p-4 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} bg-warning-container text-warning`;
 
 function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
@@ -355,11 +355,13 @@ export function QuoteList(): React.ReactElement {
                   />
                 ) : null}
                 {nonDraftQuoteRows.length > 0 ? (
-                  <DocumentRowsSection
-                    label="PAST QUOTES"
-                    rows={nonDraftQuoteRows}
-                    onRowClick={(row) => navigate(row.destination)}
-                  />
+                  <div className={draftQuoteRows.length > 0 ? "mt-2" : undefined}>
+                    <DocumentRowsSection
+                      label="PAST QUOTES"
+                      rows={nonDraftQuoteRows}
+                      onRowClick={(row) => navigate(row.destination)}
+                    />
+                  </div>
                 ) : null}
               </>
             ) : (

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -180,6 +180,7 @@ function renderScreen(options?: {
 }): {
   clearDraftMock: ReturnType<typeof vi.fn>;
   refreshQuoteMock: ReturnType<typeof vi.fn>;
+  unmount: () => void;
 } {
   const quote = options?.quote ?? makeQuote();
   const draft = options?.draft ?? makeDraft();
@@ -222,7 +223,7 @@ function renderScreen(options?: {
     };
   });
 
-  render(
+  const renderResult = render(
     <MemoryRouter>
       <ReviewScreen />
     </MemoryRouter>,
@@ -231,6 +232,7 @@ function renderScreen(options?: {
   return {
     clearDraftMock,
     refreshQuoteMock,
+    unmount: renderResult.unmount,
   };
 }
 
@@ -703,7 +705,7 @@ describe("ReviewScreen", () => {
       JSON.stringify(["Verify soil depth before sending", "Double-check edging quantity"]),
     );
 
-    renderScreen();
+    const { unmount } = renderScreen();
 
     expect(screen.getByText("Verify soil depth before sending")).toBeInTheDocument();
     expect(screen.getByText("Double-check edging quantity")).toBeInTheDocument();
@@ -717,13 +719,21 @@ describe("ReviewScreen", () => {
       JSON.stringify(["Double-check edging quantity"]),
     );
 
-    cleanup();
+    await waitFor(() => {
+      expect(mockedProfileService.getProfile).toHaveBeenCalled();
+    });
+
+    unmount();
 
     window.localStorage.setItem(
       "stima_review_confidence_notes:quote-1",
       JSON.stringify(["Double-check edging quantity"]),
     );
     renderScreen();
+
+    await waitFor(() => {
+      expect(mockedProfileService.getProfile).toHaveBeenCalledTimes(2);
+    });
 
     expect(screen.getByText("Double-check edging quantity")).toBeInTheDocument();
     expect(screen.queryByText("Verify soil depth before sending")).not.toBeInTheDocument();

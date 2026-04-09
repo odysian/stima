@@ -348,27 +348,6 @@ export function CaptureScreen(): React.ReactElement {
           )}
         </section>
 
-        <section className="mb-4">
-          <label
-            htmlFor="capture-written-description"
-            className="mb-3 block font-headline text-sm font-semibold uppercase tracking-wide text-on-surface"
-          >
-            WRITTEN DESCRIPTION
-          </label>
-          <textarea
-            id="capture-written-description"
-            rows={4}
-            maxLength={NOTE_INPUT_MAX_CHARS}
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Add any typed details here..."
-            className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
-          />
-          <p className="mt-2 text-xs text-outline">
-            {notes.length}/{NOTE_INPUT_MAX_CHARS}
-          </p>
-        </section>
-
         {isRecording ? (
           <div className="my-6 flex flex-col items-center gap-3">
             <div className="flex items-center gap-2">
@@ -401,6 +380,27 @@ export function CaptureScreen(): React.ReactElement {
             </button>
           </div>
         )}
+
+        <section className="mb-4">
+          <label
+            htmlFor="capture-written-description"
+            className="mb-3 block font-headline text-sm font-semibold uppercase tracking-wide text-on-surface"
+          >
+            WRITTEN DESCRIPTION
+          </label>
+          <textarea
+            id="capture-written-description"
+            rows={4}
+            maxLength={NOTE_INPUT_MAX_CHARS}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Add any typed details here..."
+            className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
+          />
+          <p className="mt-2 text-xs text-outline">
+            {notes.length}/{NOTE_INPUT_MAX_CHARS}
+          </p>
+        </section>
       </section>
 
       <ScreenFooter>

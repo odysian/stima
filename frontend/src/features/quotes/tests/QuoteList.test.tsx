@@ -212,6 +212,15 @@ describe("QuoteList", () => {
     const needsCustomerBadges = within(draftsSection).getAllByText("Needs customer");
     expect(needsCustomerBadges).toHaveLength(1);
 
+    const unassignedDraftRow = within(draftsSection).getByRole("button", { name: /unassigned/i });
+    expect(unassignedDraftRow).toHaveClass(
+      "border-l-4",
+      "border-warning-accent",
+      "glass-surface",
+      "backdrop-blur-md",
+      "ghost-shadow",
+    );
+
     fireEvent.click(within(draftsSection).getByRole("button", { name: /unassigned/i }));
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-draft-unassigned/review", {
       state: { origin: "list" },
