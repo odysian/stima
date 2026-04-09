@@ -136,11 +136,6 @@ class ExtractionService:
             )
             log_event("draft_generation_failed", user_id=user_id, detail=source_type)
             raise
-
-        source_type = (
-            "audio+notes" if clips and (notes or "").strip() else "audio" if clips else "notes"
-        )
-        log_event("draft_generated", user_id=user_id, detail=source_type)
         return extraction
 
     async def _transcribe_clips(self, clips: Sequence[CaptureAudioClip]) -> str:

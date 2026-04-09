@@ -27,6 +27,7 @@ from app.features.quotes.repository import (
     QuoteViewTransition,
 )
 from app.features.quotes.schemas import (
+    ExtractionResult,
     LineItemDraft,
     QuoteCreateRequest,
     QuoteUpdateRequest,
@@ -225,12 +226,10 @@ class QuoteService:
     async def create_quote(self, user: User, data: QuoteCreateRequest) -> Document:
         """Create a user-owned quote and retry once on sequence collisions."""
         user_id = _resolve_user_id(user)
-        customer_exists = await self._repository.customer_exists_for_user(
+        await self.ensure_customer_exists_for_user(
             user_id=user_id,
             customer_id=data.customer_id,
         )
-        if not customer_exists:
-            raise QuoteServiceError(detail="Not found", status_code=404)
 
         validated_pricing = _validate_document_pricing_for_quote(
             total_amount=data.total_amount,
@@ -241,37 +240,103 @@ class QuoteService:
             deposit_amount=data.deposit_amount,
         )
 
-        for attempt in range(2):
-            try:
-                quote = await self._repository.create(
-                    user_id=user_id,
-                    customer_id=data.customer_id,
-                    title=data.title,
-                    transcript=data.transcript,
-                    line_items=data.line_items,
-                    total_amount=document_field_float_or_none(validated_pricing.total_amount),
-                    tax_rate=document_field_float_or_none(validated_pricing.tax_rate),
-                    discount_type=validated_pricing.discount_type,
-                    discount_value=document_field_float_or_none(validated_pricing.discount_value),
-                    deposit_amount=document_field_float_or_none(validated_pricing.deposit_amount),
-                    notes=data.notes,
-                    source_type=data.source_type,
-                )
-                await self._repository.commit()
-                log_event(
-                    "quote.created",
-                    user_id=user_id,
-                    quote_id=quote.id,
-                    customer_id=quote.customer_id,
-                )
-                return quote
-            except IntegrityError as exc:
-                await self._repository.rollback()
-                if attempt == 0 and _is_doc_sequence_collision(exc):
-                    continue
-                raise
+        quote = await _create_quote_document(
+            self,
+            user_id=user_id,
+            customer_id=data.customer_id,
+            title=data.title,
+            transcript=data.transcript,
+            line_items=data.line_items,
+            total_amount=document_field_float_or_none(validated_pricing.total_amount),
+            tax_rate=document_field_float_or_none(validated_pricing.tax_rate),
+            discount_type=validated_pricing.discount_type,
+            discount_value=document_field_float_or_none(validated_pricing.discount_value),
+            deposit_amount=document_field_float_or_none(validated_pricing.deposit_amount),
+            notes=data.notes,
+            source_type=data.source_type,
+        )
+        await self._repository.commit()
+        log_event(
+            "quote.created",
+            user_id=user_id,
+            quote_id=quote.id,
+            customer_id=quote.customer_id,
+        )
+        return quote
 
-        raise QuoteServiceError(detail="Unable to create quote", status_code=409)
+    async def ensure_customer_exists_for_user(
+        self,
+        *,
+        user_id: UUID,
+        customer_id: UUID | None,
+    ) -> None:
+        """Reject missing or foreign customer ids when one is supplied."""
+        if customer_id is None:
+            return
+        customer_exists = await self._repository.customer_exists_for_user(
+            user_id=user_id,
+            customer_id=customer_id,
+        )
+        if not customer_exists:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+    async def create_extracted_draft(
+        self,
+        *,
+        user_id: UUID,
+        customer_id: UUID | None,
+        extraction_result: ExtractionResult,
+        source_type: Literal["text", "voice"],
+        commit: bool = True,
+    ) -> Document:
+        """Persist one extraction result as a draft quote."""
+        await self.ensure_customer_exists_for_user(
+            user_id=user_id,
+            customer_id=customer_id,
+        )
+        try:
+            quote = await _create_quote_document(
+                self,
+                user_id=user_id,
+                customer_id=customer_id,
+                title=None,
+                transcript=extraction_result.transcript,
+                line_items=[
+                    LineItemDraft(
+                        description=item.description,
+                        details=item.details,
+                        price=item.price,
+                    )
+                    for item in extraction_result.line_items
+                ],
+                total_amount=extraction_result.total,
+                tax_rate=None,
+                discount_type=None,
+                discount_value=None,
+                deposit_amount=None,
+                notes=None,
+                source_type=source_type,
+            )
+        except QuoteServiceError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            await self._repository.rollback()
+            raise QuoteServiceError(
+                detail="Unable to save extracted draft right now. Please try again.",
+                status_code=503,
+            ) from exc
+        if not commit:
+            return quote
+
+        try:
+            await self._repository.commit()
+        except Exception as exc:  # noqa: BLE001
+            await self._repository.rollback()
+            raise QuoteServiceError(
+                detail="Unable to save extracted draft right now. Please try again.",
+                status_code=503,
+            ) from exc
+        return quote
 
     async def list_quotes(
         self,
@@ -859,6 +924,47 @@ class QuoteService:
 
         encoded_logo = base64.b64encode(logo_bytes).decode("ascii")
         context.logo_data_uri = f"data:{content_type};base64,{encoded_logo}"
+
+
+async def _create_quote_document(
+    service: QuoteService,
+    *,
+    user_id: UUID,
+    customer_id: UUID | None,
+    title: str | None,
+    transcript: str,
+    line_items: list[LineItemDraft],
+    total_amount: float | None,
+    tax_rate: float | None,
+    discount_type: str | None,
+    discount_value: float | None,
+    deposit_amount: float | None,
+    notes: str | None,
+    source_type: Literal["text", "voice"],
+) -> Document:
+    for attempt in range(2):
+        try:
+            return await service._repository.create(
+                user_id=user_id,
+                customer_id=customer_id,
+                title=title,
+                transcript=transcript,
+                line_items=line_items,
+                total_amount=total_amount,
+                tax_rate=tax_rate,
+                discount_type=discount_type,
+                discount_value=discount_value,
+                deposit_amount=deposit_amount,
+                notes=notes,
+                source_type=source_type,
+            )
+        except IntegrityError as exc:
+            await service._repository.rollback()
+            if attempt == 0 and _is_doc_sequence_collision(exc):
+                continue
+            raise
+
+    raise QuoteServiceError(detail="Unable to create quote", status_code=409)
 
 
 def _resolve_user_id(user: User) -> UUID:

@@ -60,7 +60,7 @@ from app.shared.input_limits import (
     NOTE_INPUT_MAX_CHARS,
 )
 from app.shared.rate_limit import reset_local_rate_limit_state
-from app.worker.job_registry import pdf_job
+from app.worker.job_registry import extraction_job, pdf_job
 from app.worker.runtime import (
     DEFAULT_MAX_TRIES,
     DEFAULT_RETRY_BASE_SECONDS,
@@ -920,6 +920,7 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
         "customer.created",
         "quote.created",
         "quote_started",
+        "quote.created",
         "draft_generated",
         "quote.updated",
         "quote_pdf_generated",
@@ -930,9 +931,10 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
     assert emitted_events[0]["customer_id"] == customer_payload["id"]
     assert emitted_events[1]["quote_id"] == quote_payload["id"]
     assert emitted_events[2]["detail"] == "notes"
-    assert emitted_events[3]["detail"] == "notes"
-    assert emitted_events[5]["quote_id"] == quote_payload["id"]
-    assert emitted_events[7]["quote_id"] == delete_quote_payload["id"]
+    assert emitted_events[3]["quote_id"] != quote_payload["id"]
+    assert emitted_events[4]["detail"] == "notes"
+    assert emitted_events[6]["quote_id"] == quote_payload["id"]
+    assert emitted_events[8]["quote_id"] == delete_quote_payload["id"]
     assert all(
         "Event Test Customer" not in payload_text
         for payload_text in map(json.dumps, emitted_events)
@@ -2953,6 +2955,7 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["quote_id"]
     assert payload["transcript"] == "add 10 percent travel surcharge"
     assert payload["line_items"]
     assert payload["confidence_notes"] == []
@@ -2974,8 +2977,16 @@ async def test_extract_combined_falls_back_to_sync_when_no_arq_pool_is_available
     job_count = await db_session.scalar(select(func.count(JobRecord.id)))
 
     assert response.status_code == 200
-    assert response.json()["transcript"] == "mulch the front beds"
+    payload = response.json()
+    assert payload["quote_id"]
+    assert payload["transcript"] == "mulch the front beds"
     assert int(job_count or 0) == 0
+
+    persisted_quote = await db_session.get(Document, UUID(payload["quote_id"]))
+    assert persisted_quote is not None
+    assert persisted_quote.status == QuoteStatus.DRAFT
+    assert persisted_quote.customer_id is None
+    assert persisted_quote.transcript == "mulch the front beds"
 
 
 async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
@@ -2999,6 +3010,7 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
     assert payload["job_type"] == "extraction"
     assert payload["status"] == "pending"
     assert payload["extraction_result"] is None
+    assert payload["quote_id"] is None
     assert len(jobs) == 1
     assert jobs[0].status == JobStatus.PENDING
     assert pool.calls == [
@@ -3008,9 +3020,93 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
             "kwargs": {
                 "_job_id": str(jobs[0].id),
                 "transcript": "mulch the front beds",
+                "source_type": "text",
+                "capture_detail": "notes",
+                "customer_id": None,
             },
         }
     ]
+
+
+async def test_extract_combined_async_worker_persists_draft_and_returns_quote_id(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    csrf_token = await _register_and_login(client, _credentials())
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    payload = response.json()
+    await _run_extraction_job(
+        db_session,
+        job_id=payload["id"],
+        source_type="text",
+        capture_detail="notes",
+    )
+
+    status_response = await client.get(f"/api/jobs/{payload['id']}")
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["status"] == "success"
+    assert status_payload["quote_id"] is not None
+    assert status_payload["document_id"] == status_payload["quote_id"]
+    assert status_payload["extraction_result"]["transcript"] == "mulch the front beds"
+
+    quote_response = await client.get(f"/api/quotes/{status_payload['quote_id']}")
+    assert quote_response.status_code == 200
+    quote_payload = quote_response.json()
+    assert quote_payload["status"] == "draft"
+    assert quote_payload["customer_id"] is None
+    assert quote_payload["transcript"] == "mulch the front beds"
+    assert len(quote_payload["line_items"]) == 1
+
+    matching_quote_events = [
+        event
+        for event in emitted_events
+        if event.get("event") == "draft_generated"
+        and event.get("quote_id") == status_payload["quote_id"]
+    ]
+    assert len(matching_quote_events) == 1
+
+
+async def test_extract_combined_sync_fallback_persists_preselected_customer(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    app.state.arq_pool = None
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[
+            ("notes", (None, "mulch the front beds")),
+            ("customer_id", (None, customer_id)),
+        ],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["quote_id"]
+
+    persisted_quote = await db_session.get(Document, UUID(payload["quote_id"]))
+    assert persisted_quote is not None
+    assert persisted_quote.customer_id == UUID(customer_id)
 
 
 async def test_extract_combined_clips_only_success(client: AsyncClient) -> None:
@@ -5207,6 +5303,38 @@ async def _run_pdf_job(db_session: AsyncSession, *, job_id: object) -> None:
             "storage_service": _MockStorageService(),
         },
         job_id,
+    )
+
+
+async def _run_extraction_job(
+    db_session: AsyncSession,
+    *,
+    job_id: object,
+    source_type: str,
+    capture_detail: str,
+) -> None:
+    assert isinstance(job_id, str)
+    session_maker = async_sessionmaker(
+        bind=db_session.bind,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    runtime = WorkerRuntimeSettings(
+        session_maker=session_maker,
+        max_tries=DEFAULT_MAX_TRIES,
+        retry_base_seconds=DEFAULT_RETRY_BASE_SECONDS,
+        retry_jitter_seconds=DEFAULT_RETRY_JITTER_SECONDS,
+    )
+    await extraction_job(
+        {
+            "job_try": 1,
+            "worker_runtime": runtime,
+            "extraction_integration": _MockExtractionIntegration(),
+        },
+        job_id,
+        transcript="mulch the front beds",
+        source_type=source_type,
+        capture_detail=capture_detail,
     )
 
 

@@ -173,6 +173,25 @@ class JobRepository:
         await self._session.refresh(record)
         return record
 
+    async def set_extraction_success(
+        self,
+        job_id: UUID,
+        *,
+        quote_id: UUID,
+        result_json: str,
+        expected_job_type: JobType = JobType.EXTRACTION,
+    ) -> JobRecord:
+        """Mark an extraction job successful and attach the persisted quote id."""
+        record = await self._get_required(job_id, expected_job_type=expected_job_type)
+        self._ensure_transition(record.status, JobStatus.SUCCESS)
+        record.status = JobStatus.SUCCESS
+        record.document_id = quote_id
+        record.terminal_error = None
+        record.result_json = result_json
+        await self._session.flush()
+        await self._session.refresh(record)
+        return record
+
     async def set_success(
         self,
         job_id: UUID,
