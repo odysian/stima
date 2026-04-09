@@ -10,7 +10,7 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { StatusBadge } from "@/shared/components/StatusBadge";
+import { StatusBadge, statusBadgeBaseClasses } from "@/shared/components/StatusBadge";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 type DocumentMode = "quotes" | "invoices";
@@ -25,7 +25,6 @@ interface DocumentRow {
   destination: string;
   destinationState?: {
     origin: "list";
-    from: "list";
   };
   isDraft?: boolean;
   needsCustomerAssignment?: boolean;
@@ -39,7 +38,7 @@ interface DocumentRowsSectionProps {
 
 const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const draftRowClasses = "w-full cursor-pointer rounded-xl border-l-4 border-warning-accent bg-white/80 p-4 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const needsCustomerBadgeClasses = "text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg bg-warning-container text-warning";
+const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} bg-warning-container text-warning`;
 
 function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
   return (
@@ -241,7 +240,7 @@ export function QuoteList(): React.ReactElement {
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/quotes/${quote.id}/review`,
-      destinationState: { origin: "list", from: "list" },
+      destinationState: { origin: "list" },
       isDraft: true,
       needsCustomerAssignment: quote.requires_customer_assignment === true,
     })),

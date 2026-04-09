@@ -213,7 +213,7 @@ describe("QuoteList", () => {
 
     fireEvent.click(within(draftsSection).getByRole("button", { name: /unassigned/i }));
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-draft-unassigned/review", {
-      state: { origin: "list", from: "list" },
+      state: { origin: "list" },
     });
 
     fireEvent.click(within(pastQuotesSection).getByRole("button", { name: /carla crew/i }));
