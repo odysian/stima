@@ -78,10 +78,10 @@ export function LineItemEditSheet({
       <Dialog.Portal>
         <Dialog.Overlay
           data-testid="line-item-edit-sheet-overlay"
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 px-4 pb-4 sm:items-center sm:pb-0"
+          className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0"
         />
         <Dialog.Content
-          className="fixed inset-x-4 bottom-4 z-50 w-auto max-w-md rounded-[1.75rem] bg-white p-6 shadow-[0_24px_64px_rgba(13,28,46,0.24)] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:-translate-x-1/2 sm:-translate-y-1/2"
+          className="modal-shadow fixed inset-x-4 bottom-4 z-50 w-auto max-w-md rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:-translate-x-1/2 sm:-translate-y-1/2"
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             descriptionInputRef.current?.focus();
