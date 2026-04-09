@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  useBeforeUnload,
-  useLocation,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
+import { useBeforeUnload, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { profileService } from "@/features/profile/services/profileService";
 import { ReviewActionFooter } from "@/features/quotes/components/ReviewActionFooter";
 import { ReviewCustomerAssignmentSheet } from "@/features/quotes/components/ReviewCustomerAssignmentSheet";
 import { ReviewFormContent } from "@/features/quotes/components/ReviewFormContent";
+import { LineItemEditSheet } from "@/features/quotes/components/LineItemEditSheet";
+import {
+  applyLineItemSheetSave,
+  resolveLineItemSheetInitialItem,
+  type ReviewLineItemSheetState,
+} from "@/features/quotes/components/reviewLineItemSheetState";
 import {
   EMPTY_LINE_ITEM,
   isInvalidLineItem,
@@ -33,6 +34,7 @@ import {
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { getPricingValidationMessage } from "@/shared/lib/pricing";
 
@@ -69,6 +71,7 @@ export function ReviewScreen(): React.ReactElement {
   const [suggestedTaxRate, setSuggestedTaxRate] = useState<number | null>(null);
   const [isAssigningCustomer, setIsAssigningCustomer] = useState(false);
   const [dismissedConfidenceFingerprint, setDismissedConfidenceFingerprint] = useState<string | null>(null);
+  const [lineItemSheetState, setLineItemSheetState] = useState<ReviewLineItemSheetState | null>(null);
   const locationState = useMemo(() => readReviewLocationState(location.state), [location.state]);
   const requiresCustomerAssignment = useMemo(() => {
     if (!quote) {
@@ -239,6 +242,9 @@ export function ReviewScreen(): React.ReactElement {
   }, 0);
 
   const isInteractionLocked = submitAction !== null || isAssigningCustomer;
+  const lineItemSheetInitialItem = lineItemSheetState
+    ? resolveLineItemSheetInitialItem(activeDraft, lineItemSheetState, EMPTY_LINE_ITEM)
+    : EMPTY_LINE_ITEM;
 
   async function saveDraft(nextAction: "save" | "continue"): Promise<void> {
     setSaveError(null);
@@ -355,14 +361,16 @@ export function ReviewScreen(): React.ReactElement {
           setDraft((currentDraft) => ({ ...currentDraft, transcript: nextTranscript }));
         }}
         onEditLineItem={(lineItemIndex) => {
-          navigate(`/quotes/${quoteId}/edit/line-items/${lineItemIndex}/edit`);
+          if (isInteractionLocked || !activeDraft.lineItems[lineItemIndex]) {
+            return;
+          }
+          setLineItemSheetState({ mode: "edit", index: lineItemIndex });
         }}
         onAddLineItem={() => {
-          setSaveNotice(null);
-          setDraft((currentDraft) => ({
-            ...currentDraft,
-            lineItems: [...currentDraft.lineItems, { ...EMPTY_LINE_ITEM }],
-          }));
+          if (isInteractionLocked || activeDraft.lineItems.length >= DOCUMENT_LINE_ITEMS_MAX_ITEMS) {
+            return;
+          }
+          setLineItemSheetState({ mode: "add" });
         }}
         onTotalChange={(nextTotal) => {
           setSaveNotice(null);
@@ -405,6 +413,21 @@ export function ReviewScreen(): React.ReactElement {
           currentCustomerId={quote.customer_id}
           onClose={() => setIsAssignmentSheetOpen(false)}
           onAssignCustomer={handleAssignCustomer}
+        />
+      ) : null}
+
+      {lineItemSheetState ? (
+        <LineItemEditSheet
+          open
+          mode={lineItemSheetState.mode}
+          initialLineItem={lineItemSheetInitialItem}
+          onClose={() => setLineItemSheetState(null)}
+          onSave={(nextLineItem) => {
+            const nextSheetState = lineItemSheetState;
+            setSaveNotice(null);
+            setDraft((currentDraft) => applyLineItemSheetSave(currentDraft, nextSheetState, nextLineItem));
+            setLineItemSheetState(null);
+          }}
         />
       ) : null}
 

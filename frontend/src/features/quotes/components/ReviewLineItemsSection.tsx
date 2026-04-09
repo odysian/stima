@@ -31,6 +31,7 @@ export function ReviewLineItemsSection({
           lineItems.map((lineItem, index) => (
             <LineItemCard
               key={`review-line-item-${index}`}
+              ariaLabel={`Edit line item ${index + 1}`}
               description={lineItem.description || "Untitled line item"}
               details={lineItem.details}
               price={lineItem.price}
@@ -64,4 +65,3 @@ export function ReviewLineItemsSection({
     </section>
   );
 }
-
