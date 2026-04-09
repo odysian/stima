@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { HOME_ROUTE, resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -43,13 +41,13 @@ function getExtractionStages(hasClips: boolean, hasNotes: boolean): string[] {
 
 function getExtractionHelperCopy(hasClips: boolean, hasNotes: boolean): string | null {
   if (hasClips && hasNotes) {
-    return "We will combine your recording and notes into one draft. If extraction fails, both stay here.";
+    return "Extraction saves one draft from your recording and notes. You can add more voice notes later from review.";
   }
   if (hasClips) {
-    return "Audio uploads and transcription can take a few moments. If extraction fails, your clips stay here.";
+    return "Extraction saves your recording as a draft checkpoint. You can add more voice notes later from review.";
   }
   if (hasNotes) {
-    return "We will turn your notes into draft line items. If extraction fails, your notes stay here.";
+    return "Extraction saves your notes as a draft checkpoint. You can add more voice notes later from review.";
   }
   return null;
 }
@@ -58,7 +56,6 @@ export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
   const { customerId } = useParams<{ customerId: string }>();
-  const { draft, setDraft } = useQuoteDraft();
   const isMountedRef = useRef(true);
   const extractionStageTimerRefs = useRef<number[]>([]);
   const {
@@ -83,8 +80,6 @@ export function CaptureScreen(): React.ReactElement {
   const extractionHelperCopy = getExtractionHelperCopy(hasClips, hasNotes);
   const launchOrigin = resolveCaptureLaunchOrigin({
     customerId,
-    draftCustomerId: draft?.customerId,
-    draftLaunchOrigin: draft?.launchOrigin,
     locationState: location.state,
   });
 
@@ -111,41 +106,7 @@ export function CaptureScreen(): React.ReactElement {
     };
   }, []);
 
-  function applyDraft(sourceType: QuoteSourceType, extraction: ExtractionResult, quoteId: string): void {
-    if (!customerId) {
-      throw new Error("Missing customer context. Please select a customer again.");
-    }
-
-    setDraft({
-      quoteId,
-      customerId,
-      launchOrigin,
-      title: "",
-      transcript: extraction.transcript,
-      lineItems: extraction.line_items.map((lineItem) => ({
-        description: lineItem.description,
-        details: lineItem.details,
-        price: lineItem.price,
-        flagged: lineItem.flagged,
-        flagReason: lineItem.flag_reason,
-      })),
-      total: extraction.total,
-      taxRate: null,
-      discountType: null,
-      discountValue: null,
-      depositAmount: null,
-      confidenceNotes: extraction.confidence_notes,
-      notes: "",
-      sourceType,
-    });
-  }
-
   async function onExtract(): Promise<void> {
-    if (!customerId) {
-      setError("Missing customer context. Please select a customer again.");
-      return;
-    }
-
     clearSubmissionErrors();
     if (clips.length > MAX_AUDIO_CLIPS_PER_REQUEST) {
       setError(`You can upload up to ${MAX_AUDIO_CLIPS_PER_REQUEST} clips at a time.`);
@@ -178,14 +139,12 @@ export function CaptureScreen(): React.ReactElement {
       if (!isMountedRef.current) {
         return;
       }
-      const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
       if (extraction.type === "sync") {
-        applyDraft(sourceType, extraction.result, extraction.quoteId);
-        navigate("/quotes/review");
+        navigate(`/quotes/${extraction.quoteId}/review`);
         return;
       }
 
-      await pollExtractionJob(extraction.jobId, sourceType);
+      await pollExtractionJob(extraction.jobId);
     } catch (submitError) {
       if (!isMountedRef.current) {
         return;
@@ -201,23 +160,20 @@ export function CaptureScreen(): React.ReactElement {
     }
   }
 
-  async function pollExtractionJob(jobId: string, sourceType: QuoteSourceType): Promise<void> {
+  async function pollExtractionJob(jobId: string): Promise<void> {
     for (let pollCount = 0; pollCount < EXTRACTION_MAX_POLLS; pollCount += 1) {
       const job = await jobService.getJobStatus(jobId);
       if (!isMountedRef.current) {
         return;
       }
 
-      if (job.status === "success") {
-        if (!job.extraction_result) {
-          throw new Error("Extraction completed without a result. Please try again.");
-        }
-        if (!job.quote_id) {
-          throw new Error("Extraction completed without a persisted draft. Please try again.");
-        }
-        applyDraft(sourceType, job.extraction_result, job.quote_id);
-        navigate("/quotes/review");
+      if (job.quote_id) {
+        navigate(`/quotes/${job.quote_id}/review`);
         return;
+      }
+
+      if (job.status === "success") {
+        throw new Error("Extraction completed without a persisted draft. Please try again.");
       }
 
       if (job.status === "terminal") {

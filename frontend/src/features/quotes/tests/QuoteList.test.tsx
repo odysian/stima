@@ -118,7 +118,7 @@ describe("QuoteList", () => {
     renderScreen();
 
     const quotesButton = await screen.findByRole("button", { name: "Quotes" });
-    const createButton = screen.getByRole("button", { name: "Create document" });
+    const createButton = screen.getByRole("button", { name: "New quote" });
 
     expect(quotesButton).toHaveClass("ghost-shadow", "bg-surface-container-lowest", "text-primary");
     expect(createButton).toHaveClass("forest-gradient", "ghost-shadow", "text-on-primary");
@@ -158,7 +158,7 @@ describe("QuoteList", () => {
     renderScreen();
 
     expect(
-      await screen.findByText("No quotes yet. Tap Create Document to create your first."),
+      await screen.findByText("No quotes yet. Tap New Quote to create your first."),
     ).toBeInTheDocument();
   });
 
@@ -307,9 +307,9 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText("Q-001");
 
-    fireEvent.click(screen.getByRole("button", { name: "Create document" }));
+    fireEvent.click(screen.getByRole("button", { name: "New quote" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/new");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture");
   });
 
   it("renders invoice empty state when no invoices are returned", async () => {
@@ -322,7 +322,7 @@ describe("QuoteList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
 
     expect(
-      await screen.findByText("No invoices yet. Tap Create Document to create your first."),
+      await screen.findByText("No invoices yet. Tap New Quote to create your first."),
     ).toBeInTheDocument();
   });
 
