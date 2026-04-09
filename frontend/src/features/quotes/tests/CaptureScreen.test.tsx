@@ -187,8 +187,9 @@ describe("CaptureScreen", () => {
   it("enables extract button when notes are present", () => {
     renderScreen();
 
+    const notesValue = "Install sod in backyard";
     fireEvent.change(screen.getByLabelText(/written description/i), {
-      target: { value: "Install sod in backyard" },
+      target: { value: notesValue },
     });
 
     expect(screen.getByRole("button", { name: /extract line items/i })).toBeEnabled();
@@ -196,6 +197,17 @@ describe("CaptureScreen", () => {
       "maxLength",
       NOTE_INPUT_MAX_CHARS.toString(),
     );
+    expect(
+      screen.queryByText(`${notesValue.length}/${NOTE_INPUT_MAX_CHARS}`),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders recorded clips inside a bounded scroll region", () => {
+    mockVoiceCapture({ clips: [clipFixture, { ...clipFixture, id: "clip-2", url: "blob:clip-2" }] });
+    renderScreen();
+
+    const scrollRegion = screen.getByTestId("recorded-clips-scroll-region");
+    expect(scrollRegion).toHaveClass("overflow-y-auto", "h-[30dvh]");
   });
 
   it("disables recording when the clip-count limit is reached", () => {

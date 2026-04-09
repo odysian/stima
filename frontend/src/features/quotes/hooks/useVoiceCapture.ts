@@ -12,6 +12,7 @@ export interface VoiceClip {
   blob: Blob;
   url: string;
   durationSeconds: number;
+  sequenceNumber?: number;
 }
 
 interface UseVoiceCaptureResult {
@@ -172,11 +173,13 @@ export function useVoiceCapture(): UseVoiceCaptureResult {
         if (chunks.length > 0) {
           const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
           if (blob.size > 0) {
+            const nextSequenceNumber = clipIdSequenceRef.current + 1;
             const nextClip: VoiceClip = {
               id: `clip-${clipIdSequenceRef.current}`,
               blob,
               url: URL.createObjectURL(blob),
               durationSeconds,
+              sequenceNumber: nextSequenceNumber,
             };
             clipIdSequenceRef.current += 1;
             setClips((currentClips) => [...currentClips, nextClip]);

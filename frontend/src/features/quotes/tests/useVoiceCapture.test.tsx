@@ -154,4 +154,36 @@ describe("useVoiceCapture", () => {
     expect(result.current.clips).toHaveLength(0);
     expect(revokeObjectUrlMock).toHaveBeenCalledTimes(2);
   });
+
+  it("keeps clip sequence numbers stable after deleting earlier clips", async () => {
+    const { result } = renderHook(() => useVoiceCapture());
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => {
+      result.current.stopRecording();
+    });
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => {
+      result.current.stopRecording();
+    });
+
+    expect(result.current.clips).toHaveLength(2);
+    expect(result.current.clips[0]?.sequenceNumber).toBe(1);
+    expect(result.current.clips[1]?.sequenceNumber).toBe(2);
+
+    const firstClipId = result.current.clips[0]?.id;
+    expect(firstClipId).toBeDefined();
+
+    act(() => {
+      result.current.removeClip(firstClipId ?? "");
+    });
+
+    expect(result.current.clips).toHaveLength(1);
+    expect(result.current.clips[0]?.sequenceNumber).toBe(2);
+  });
 });
