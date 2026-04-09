@@ -6,32 +6,14 @@ import { ReviewActionFooter } from "@/features/quotes/components/ReviewActionFoo
 import { ReviewCustomerAssignmentSheet } from "@/features/quotes/components/ReviewCustomerAssignmentSheet";
 import { ReviewFormContent } from "@/features/quotes/components/ReviewFormContent";
 import { LineItemEditSheet } from "@/features/quotes/components/LineItemEditSheet";
-import {
-  applyLineItemSheetDelete,
-  applyLineItemSheetSave,
-  resolveLineItemSheetInitialItem,
-  type ReviewLineItemSheetState,
-} from "@/features/quotes/components/reviewLineItemSheetState";
-import {
-  EMPTY_LINE_ITEM,
-  isInvalidLineItem,
-  normalizeLineItem,
-} from "@/features/quotes/components/reviewScreenUtils";
+import { applyLineItemSheetDelete, applyLineItemSheetSave, resolveLineItemSheetInitialItem, type ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
+import { EMPTY_LINE_ITEM, isInvalidLineItem, normalizeLineItem } from "@/features/quotes/components/reviewScreenUtils";
 import { mapQuoteToEditDraft, usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft, QuoteDetail } from "@/features/quotes/types/quote.types";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
-import {
-  buildDraftSnapshot,
-  readReviewLocationState,
-  resolveBackTarget,
-} from "@/features/quotes/utils/reviewScreenState";
-import {
-  fingerprintConfidenceNotes,
-  readDismissedConfidenceFingerprint,
-  readQuoteConfidenceNotes,
-  writeDismissedConfidenceFingerprint,
-} from "@/features/quotes/utils/reviewConfidenceNotes";
+import { buildDraftSnapshot, readReviewLocationState, resolveBackTarget } from "@/features/quotes/utils/reviewScreenState";
+import { fingerprintConfidenceNotes, readDismissedConfidenceFingerprint, readQuoteConfidenceNotes, writeDismissedConfidenceFingerprint } from "@/features/quotes/utils/reviewConfidenceNotes";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
