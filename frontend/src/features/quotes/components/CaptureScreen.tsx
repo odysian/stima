@@ -6,11 +6,11 @@ import {
   EXTRACTION_MAX_POLLS,
   EXTRACTION_POLL_INTERVAL_MS,
   EXTRACTION_STAGE_DELAY_MS,
-  formatElapsed,
   getAppendHelperCopy,
   getExtractionHelperCopy,
   getExtractionStages,
 } from "@/features/quotes/components/captureScreenHelpers";
+import { CaptureInputPanel } from "@/features/quotes/components/CaptureInputPanel";
 import {
   HOME_ROUTE,
   readCaptureLaunchOrigin,
@@ -36,7 +36,6 @@ import { formatByteLimit } from "@/shared/lib/formatters";
 import {
   MAX_AUDIO_CLIPS_PER_REQUEST,
   MAX_AUDIO_TOTAL_BYTES,
-  NOTE_INPUT_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
 
 export function CaptureScreen(): React.ReactElement {
@@ -351,116 +350,21 @@ export function CaptureScreen(): React.ReactElement {
         ) : null}
 
         <div className="flex h-full min-h-0 flex-col">
-          <section className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-headline text-sm font-semibold uppercase tracking-wide text-on-surface">
-                RECORDED CLIPS
-              </h2>
-              <span className="rounded-sm bg-surface-container-low px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                {clips.length} CLIPS
-              </span>
-            </div>
-
-            {clips.length === 0 ? (
-              <div className="flex h-[30dvh] flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-outline-variant/30 bg-surface-container-lowest p-10">
-                <span className="material-symbols-outlined text-4xl text-outline">
-                  mic_off
-                </span>
-                <p className="text-sm text-outline">No clips recorded yet</p>
-              </div>
-            ) : (
-              <div
-                data-testid="recorded-clips-scroll-region"
-                className="h-[30dvh] space-y-2 overflow-y-auto pr-1"
-              >
-                {clips.map((clip, index) => {
-                  const clipNumber = clip.sequenceNumber ?? index + 1;
-                  return (
-                    <div
-                      key={clip.id}
-                      className="flex items-center justify-between rounded-lg bg-surface-container-lowest p-3 ghost-shadow"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-outline">
-                          play_arrow
-                        </span>
-                        <p className="text-sm text-on-surface">
-                          Clip {clipNumber} · {clip.durationSeconds}s
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={`Delete clip ${clipNumber}`}
-                        className="cursor-pointer rounded-full p-1 text-outline transition-colors hover:bg-surface-container-low active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-                        onClick={() => removeClip(clip.id)}
-                        disabled={isExtracting}
-                      >
-                        <span className="material-symbols-outlined text-base">
-                          close
-                        </span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="mb-4">
-            <label
-              htmlFor="capture-written-description"
-              className="mb-3 block font-headline text-sm font-semibold uppercase tracking-wide text-on-surface"
-            >
-              WRITTEN DESCRIPTION
-            </label>
-            <textarea
-              id="capture-written-description"
-              rows={4}
-              maxLength={NOTE_INPUT_MAX_CHARS}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Add any typed details here..."
-              className="w-full resize-none rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
-            />
-          </section>
-
-          {isRecording ? (
-            <div className="mb-[4.5rem] mt-auto flex flex-col items-center gap-3 pt-6">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-secondary" />
-                <p className="text-sm font-medium text-secondary">
-                  Recording... {formatElapsed(elapsedSeconds)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="ghost-shadow flex h-20 w-20 cursor-pointer items-center justify-center rounded-full bg-secondary text-on-secondary transition-all active:scale-95"
-                onClick={stopRecording}
-              >
-                <span className="material-symbols-outlined text-4xl">stop</span>
-              </button>
-            </div>
-          ) : (
-            <div className="mb-[4.5rem] mt-auto flex flex-col items-center gap-3 pt-6">
-              <p className="text-xs uppercase tracking-widest text-outline">
-                TAP TO START
-              </p>
-              {hasReachedClipLimit ? (
-                <p className="text-center text-xs text-outline">
-                  Maximum of {MAX_AUDIO_CLIPS_PER_REQUEST} clips per request
-                  reached.
-                </p>
-              ) : null}
-              <button
-                type="button"
-                className="forest-gradient ghost-shadow flex h-20 w-20 cursor-pointer items-center justify-center rounded-full text-on-primary transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={() => void startRecording()}
-                disabled={!isSupported || hasReachedClipLimit}
-              >
-                <span className="material-symbols-outlined text-4xl">mic</span>
-              </button>
-            </div>
-          )}
+          <CaptureInputPanel
+            clips={clips}
+            isExtracting={isExtracting}
+            removeClip={removeClip}
+            notes={notes}
+            onNotesChange={setNotes}
+            isRecording={isRecording}
+            elapsedSeconds={elapsedSeconds}
+            hasReachedClipLimit={hasReachedClipLimit}
+            isSupported={isSupported}
+            onStartRecording={() => {
+              void startRecording();
+            }}
+            onStopRecording={stopRecording}
+          />
         </div>
       </section>
 
