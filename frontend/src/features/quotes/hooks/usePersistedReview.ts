@@ -63,8 +63,9 @@ export function usePersistedReview(quoteId: string | undefined): UsePersistedRev
 
     const refreshedQuote = await quoteService.getQuote(quoteId);
     setQuote(refreshedQuote);
+    setDraft(mapQuoteToEditDraft(refreshedQuote));
     return refreshedQuote;
-  }, [quoteId]);
+  }, [quoteId, setDraft]);
 
   useEffect(() => {
     let isActive = true;

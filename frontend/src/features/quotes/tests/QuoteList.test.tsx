@@ -322,7 +322,7 @@ describe("QuoteList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
 
     expect(
-      await screen.findByText("No invoices yet. Tap New Quote and choose Invoice in review."),
+      await screen.findByText("No invoices yet. Convert a quote to an invoice from Preview."),
     ).toBeInTheDocument();
   });
 
