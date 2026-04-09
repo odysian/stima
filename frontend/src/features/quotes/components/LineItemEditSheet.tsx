@@ -14,6 +14,7 @@ interface LineItemEditSheetProps {
   initialLineItem: LineItemDraftWithFlags;
   onClose: () => void;
   onSave: (nextLineItem: LineItemDraftWithFlags) => void;
+  onDelete?: () => void;
 }
 
 interface ParsedPrice {
@@ -41,6 +42,7 @@ export function LineItemEditSheet({
   initialLineItem,
   onClose,
   onSave,
+  onDelete,
 }: LineItemEditSheetProps): React.ReactElement {
   const descriptionInputRef = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState(initialLineItem.description);
@@ -164,6 +166,16 @@ export function LineItemEditSheet({
               Cancel
             </button>
           </div>
+
+          {mode === "edit" && onDelete ? (
+            <button
+              type="button"
+              className="mt-3 inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg bg-secondary px-4 py-3 text-sm font-semibold text-on-primary transition-all active:scale-[0.98]"
+              onClick={onDelete}
+            >
+              Delete Line Item
+            </button>
+          ) : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

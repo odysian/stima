@@ -7,6 +7,7 @@ import { ReviewCustomerAssignmentSheet } from "@/features/quotes/components/Revi
 import { ReviewFormContent } from "@/features/quotes/components/ReviewFormContent";
 import { LineItemEditSheet } from "@/features/quotes/components/LineItemEditSheet";
 import {
+  applyLineItemSheetDelete,
   applyLineItemSheetSave,
   resolveLineItemSheetInitialItem,
   type ReviewLineItemSheetState,
@@ -428,6 +429,14 @@ export function ReviewScreen(): React.ReactElement {
             setDraft((currentDraft) => applyLineItemSheetSave(currentDraft, nextSheetState, nextLineItem));
             setLineItemSheetState(null);
           }}
+          onDelete={lineItemSheetState.mode === "edit"
+            ? () => {
+                const nextSheetState = lineItemSheetState;
+                setSaveNotice(null);
+                setDraft((currentDraft) => applyLineItemSheetDelete(currentDraft, nextSheetState));
+                setLineItemSheetState(null);
+              }
+            : undefined}
         />
       ) : null}
 

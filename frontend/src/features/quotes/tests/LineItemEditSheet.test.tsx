@@ -25,6 +25,7 @@ describe("LineItemEditSheet", () => {
         initialLineItem={makeLineItem()}
         onClose={vi.fn()}
         onSave={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -33,6 +34,7 @@ describe("LineItemEditSheet", () => {
     expect(screen.getByLabelText(/details/i)).toHaveValue("5 yards");
     expect(screen.getByLabelText(/price/i)).toHaveValue("120");
     expect(screen.getByLabelText(/description/i)).toHaveFocus();
+    expect(screen.getByRole("button", { name: /delete line item/i })).toBeInTheDocument();
   });
 
   it("renders add mode with empty fields", () => {
@@ -50,6 +52,7 @@ describe("LineItemEditSheet", () => {
     expect(screen.getByLabelText(/description/i)).toHaveValue("");
     expect(screen.getByLabelText(/details/i)).toHaveValue("");
     expect(screen.getByLabelText(/price/i)).toHaveValue("");
+    expect(screen.queryByRole("button", { name: /delete line item/i })).not.toBeInTheDocument();
   });
 
   it("validates required description and blocks save", () => {
@@ -118,5 +121,23 @@ describe("LineItemEditSheet", () => {
     await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
 
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it("fires onDelete in edit mode", () => {
+    const onDelete = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem()}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });

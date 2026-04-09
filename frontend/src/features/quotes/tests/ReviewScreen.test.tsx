@@ -420,7 +420,67 @@ describe("ReviewScreen", () => {
           { description: "Hedge trimming + cleanup", details: "Front and sides", price: 95 },
           { description: "Edge beds", details: null, price: 45 },
         ],
-        total_amount: 255,
+        total_amount: 260,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
+        notes: "Thanks for your business",
+      });
+    });
+  });
+
+  it("deletes a line item in-sheet and waits to PATCH until Save Draft", async () => {
+    renderScreen({
+      quote: makeQuote({
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+          {
+            id: "line-2",
+            description: "Trim hedges",
+            details: "Front and sides",
+            price: 90,
+            sort_order: 1,
+          },
+        ],
+      }),
+      draft: makeDraft({
+        lineItems: [
+          { description: "Brown mulch", details: "5 yards", price: 120 },
+          { description: "Trim hedges", details: "Front and sides", price: 90 },
+        ],
+        total: 210,
+      }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /edit line item 2/i }));
+    expect(await screen.findByRole("dialog", { name: /edit line item/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /edit line item/i })).not.toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Trim hedges")).not.toBeInTheDocument();
+    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /^save draft$/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-1", {
+        title: "Front Yard Refresh",
+        transcript: "5 yards brown mulch",
+        line_items: [
+          { description: "Brown mulch", details: "5 yards", price: 120 },
+        ],
+        total_amount: 120,
         tax_rate: null,
         discount_type: null,
         discount_value: null,
