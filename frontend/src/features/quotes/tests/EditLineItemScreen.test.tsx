@@ -28,6 +28,7 @@ const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
 
 function makeDraft(overrides: Partial<QuoteDraft> = {}): QuoteDraft {
   return {
+    quoteId: "quote-1",
     customerId: "cust-1",
     title: "",
     transcript: "5 yards brown mulch and edge front beds",
@@ -102,7 +103,7 @@ describe("EditLineItemScreen", () => {
       details: "6 yards",
       price: 140,
     });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/review", { replace: true });
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review", { replace: true });
   });
 
   it("shows error and blocks save when description is empty", () => {
@@ -135,7 +136,7 @@ describe("EditLineItemScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
 
     expect(removeLineItemMock).toHaveBeenCalledWith(0);
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/review", { replace: true });
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review", { replace: true });
   });
 
   it("shows AI banner when item is flagged", () => {

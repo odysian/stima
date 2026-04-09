@@ -8,6 +8,7 @@ const EDIT_STORAGE_KEY = "stima_quote_edit";
 export interface QuoteEditDraft {
   quoteId: string;
   title: string;
+  transcript?: string;
   lineItems: LineItemDraftWithFlags[];
   total: number | null;
   taxRate: number | null;
@@ -67,6 +68,7 @@ function parseStoredDraft(raw: string | null): QuoteEditDraft | null {
     const {
       quoteId,
       title,
+      transcript,
       lineItems,
       total,
       taxRate,
@@ -79,6 +81,7 @@ function parseStoredDraft(raw: string | null): QuoteEditDraft | null {
     if (
       typeof quoteId !== "string" ||
       (title !== undefined && typeof title !== "string") ||
+      (transcript !== undefined && typeof transcript !== "string") ||
       !Array.isArray(lineItems) ||
       typeof notes !== "string"
     ) {
@@ -113,6 +116,7 @@ function parseStoredDraft(raw: string | null): QuoteEditDraft | null {
     return {
       quoteId,
       title: typeof title === "string" ? title : "",
+      transcript: typeof transcript === "string" ? transcript : "",
       lineItems,
       total,
       taxRate: typeof taxRate === "number" ? taxRate : null,

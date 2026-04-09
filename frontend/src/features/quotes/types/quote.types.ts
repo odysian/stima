@@ -85,7 +85,7 @@ export interface QuotePricingFields {
 
 export interface Quote {
   id: string;
-  customer_id: string;
+  customer_id: string | null;
   doc_number: string;
   title: string | null;
   status: QuoteStatus;
@@ -114,22 +114,26 @@ export interface LinkedInvoiceSummary {
 }
 
 export interface QuoteDetail extends Quote {
-  customer_name: string;
+  customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
+  requires_customer_assignment?: boolean;
+  can_reassign_customer?: boolean;
   linked_invoice: LinkedInvoiceSummary | null;
   pdf_artifact: PdfArtifact;
 }
 
 export interface QuoteListItem {
   id: string;
-  customer_id: string;
-  customer_name: string;
+  customer_id: string | null;
+  customer_name: string | null;
   doc_number: string;
   title: string | null;
   status: QuoteStatus;
   total_amount: number | null;
   item_count: number;
+  requires_customer_assignment?: boolean;
+  can_reassign_customer?: boolean;
   created_at: string;
 }
 
@@ -148,7 +152,9 @@ export interface QuoteCreateRequest {
 }
 
 export interface QuoteUpdateRequest {
+  customer_id?: string | null;
   title?: string | null;
+  transcript?: string;
   line_items?: LineItemDraft[];
   total_amount?: number | null;
   tax_rate?: number | null;

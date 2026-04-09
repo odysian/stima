@@ -4,6 +4,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useParams,
 } from "react-router-dom";
 
 import { LoginForm } from "@/features/auth/components/LoginForm";
@@ -20,7 +21,6 @@ import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { EditLineItemForEditScreen } from "@/features/quotes/components/EditLineItemForEditScreen";
 import { EditLineItemScreen } from "@/features/quotes/components/EditLineItemScreen";
-import { QuoteEditScreen } from "@/features/quotes/components/QuoteEditScreen";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { QuotePreview } from "@/features/quotes/components/QuotePreview";
 import { ReviewScreen } from "@/features/quotes/components/ReviewScreen";
@@ -63,6 +63,11 @@ function OnboardingRoute(): React.ReactElement {
   return <Outlet />;
 }
 
+function QuoteEditRedirect(): React.ReactElement {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/quotes/${id}/review` : "/"} replace />;
+}
+
 export default function App(): React.ReactElement {
   return (
     <Routes>
@@ -99,9 +104,8 @@ export default function App(): React.ReactElement {
         <Route path="/quotes/capture" element={<CaptureScreen />} />
         <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
         <Route path="/quotes/:id/review" element={<ReviewScreen />} />
-        <Route path="/quotes/review" element={<ReviewScreen />} />
         <Route path="/quotes/review/line-items/:lineItemIndex/edit" element={<EditLineItemScreen />} />
-        <Route path="/quotes/:id/edit" element={<QuoteEditScreen />} />
+        <Route path="/quotes/:id/edit" element={<QuoteEditRedirect />} />
         <Route path="/quotes/:id/edit/line-items/:lineItemIndex/edit" element={<EditLineItemForEditScreen />} />
         <Route path="/quotes/:id/preview" element={<QuotePreview />} />
       </Route>

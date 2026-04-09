@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { HOME_ROUTE, resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
+import { writeQuoteConfidenceNotes } from "@/features/quotes/utils/reviewConfidenceNotes";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
@@ -110,6 +111,7 @@ export function CaptureScreen(): React.ReactElement {
   }, []);
 
   function applyDraft(sourceType: QuoteSourceType, extraction: ExtractionResult, quoteId: string): void {
+    writeQuoteConfidenceNotes(quoteId, extraction.confidence_notes);
     setDraft({
       quoteId,
       customerId: customerId ?? "",

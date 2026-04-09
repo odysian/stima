@@ -42,6 +42,7 @@ export function EditLineItemScreen(): React.ReactElement | null {
     }
     return draft.lineItems[parsedLineItemIndex] ?? null;
   }, [draft, parsedLineItemIndex]);
+  const reviewRoute = draft?.quoteId ? `/quotes/${draft.quoteId}/review` : HOME_ROUTE;
 
   const [description, setDescription] = useState(() => currentItem?.description ?? "");
   const [details, setDetails] = useState(() => currentItem?.details ?? "");
@@ -56,9 +57,9 @@ export function EditLineItemScreen(): React.ReactElement | null {
     }
 
     if (parsedLineItemIndex < 0 || !currentItem) {
-      navigate("/quotes/review", { replace: true });
+      navigate(reviewRoute, { replace: true });
     }
-  }, [currentItem, draft, navigate, parsedLineItemIndex]);
+  }, [currentItem, draft, navigate, parsedLineItemIndex, reviewRoute]);
 
   if (!draft || parsedLineItemIndex < 0 || !currentItem) {
     return null;
@@ -84,12 +85,12 @@ export function EditLineItemScreen(): React.ReactElement | null {
       details: details.trim().length > 0 ? details.trim() : null,
       price: parsedPrice,
     });
-    navigate("/quotes/review", { replace: true });
+    navigate(reviewRoute, { replace: true });
   }
 
   function onDelete(): void {
     removeLineItem(parsedLineItemIndex);
-    navigate("/quotes/review", { replace: true });
+    navigate(reviewRoute, { replace: true });
   }
 
   return (
@@ -98,7 +99,7 @@ export function EditLineItemScreen(): React.ReactElement | null {
         title="Edit Line Item"
         eyebrow="REVIEW & EDIT"
         backLabel="Back to review"
-        onBack={() => navigate("/quotes/review", { replace: true })}
+        onBack={() => navigate(reviewRoute, { replace: true })}
         onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
 

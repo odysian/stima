@@ -399,6 +399,8 @@ rounded-lg border-l-4 border-warning-accent bg-warning-container p-4
 
 Includes a filled Material icon (`info`), an uppercase label ("AI Confidence Note"), and message text. Always positioned inline with the content it refers to — not as a toast or fixed banner.
 
+When the banner needs dismissal (for example persisted review), use a trailing icon button inside the banner instead of spawning a separate modal or toast.
+
 ### Error Feedback
 
 Use the `FeedbackMessage` component with `variant="error"`:
