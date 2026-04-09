@@ -149,7 +149,8 @@ describe("QuoteList", () => {
     expect(screen.getByText("1 active · 1 pending")).toBeInTheDocument();
     expect(screen.getByText("Spring Cleanup")).toBeInTheDocument();
     expect(screen.getByText("Bob Brown")).toBeInTheDocument();
-    expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026\s*·\s*3 items/)).toBeInTheDocument();
+    expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("3 items")).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getAllByText("$120.00")).toHaveLength(2);
   });

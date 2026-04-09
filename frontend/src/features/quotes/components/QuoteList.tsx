@@ -18,9 +18,10 @@ type DocumentStatus = QuoteListItem["status"] | InvoiceListItem["status"];
 
 interface DocumentRow {
   id: string;
-  primaryLabel: string;
-  secondaryDetails: string;
-  tertiaryDetails: string;
+  customerLabel: string;
+  titleLabel?: string | null;
+  docAndDate: string;
+  itemDetails?: string | null;
   totalAmount: number | null;
   status: DocumentStatus;
   destination: string;
@@ -60,24 +61,31 @@ function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionPro
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="font-headline font-bold text-on-surface">
-                    {row.primaryLabel}
+                    {row.customerLabel}
                   </p>
                   <p className="font-headline font-bold text-on-surface">
                     {formatCurrency(row.totalAmount)}
                   </p>
                 </div>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  {row.secondaryDetails}
-                </p>
-                <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="mt-1 space-y-1">
+                  {row.titleLabel ? (
+                    <p className="text-sm text-on-surface-variant">
+                      {row.titleLabel}
+                    </p>
+                  ) : null}
                   <p className="text-sm text-on-surface-variant">
-                    {row.tertiaryDetails}
+                    {row.docAndDate}
                   </p>
-                  {row.needsCustomerAssignment ? (
-                    <span className={needsCustomerBadgeClasses}>Needs customer</span>
-                  ) : (
-                    <StatusBadge variant={row.status} />
-                  )}
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-on-surface-variant">
+                      {row.itemDetails ?? ""}
+                    </p>
+                    {row.needsCustomerAssignment ? (
+                      <span className={needsCustomerBadgeClasses}>Needs customer</span>
+                    ) : (
+                      <StatusBadge variant={row.status} />
+                    )}
+                  </div>
                 </div>
               </button>
             </li>
@@ -235,12 +243,13 @@ export function QuoteList(): React.ReactElement {
   const draftQuoteRows = useMemo<DocumentRow[]>(
     () => draftQuotes.map((quote) => ({
       id: quote.id,
-      primaryLabel: quote.customer_name ?? "Unassigned",
-      secondaryDetails: [
+      customerLabel: quote.customer_name ?? "Unassigned",
+      titleLabel: quote.title ?? null,
+      docAndDate: [
         quote.doc_number,
         formatDate(quote.created_at, timezone),
       ].join(" · "),
-      tertiaryDetails: `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
+      itemDetails: `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/quotes/${quote.id}/review`,
@@ -254,13 +263,13 @@ export function QuoteList(): React.ReactElement {
   const nonDraftQuoteRows = useMemo<DocumentRow[]>(
     () => nonDraftQuotes.map((quote) => ({
       id: quote.id,
-      primaryLabel: quote.title ?? quote.doc_number,
-      secondaryDetails: quote.customer_name ?? "Unassigned customer",
-      tertiaryDetails: [
-        ...(quote.title ? [quote.doc_number] : []),
+      customerLabel: quote.customer_name ?? "Unassigned",
+      titleLabel: quote.title ?? null,
+      docAndDate: [
+        quote.doc_number,
         formatDate(quote.created_at, timezone),
-        `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
-      ].join(" · "),
+        ].join(" · "),
+      itemDetails: `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/quotes/${quote.id}/preview`,
@@ -271,12 +280,13 @@ export function QuoteList(): React.ReactElement {
   const invoiceRows = useMemo<DocumentRow[]>(
     () => filteredInvoices.map((invoice) => ({
       id: invoice.id,
-      primaryLabel: invoice.title ?? invoice.doc_number,
-      secondaryDetails: invoice.customer_name,
-      tertiaryDetails: [
-        ...(invoice.title ? [invoice.doc_number] : []),
+      customerLabel: invoice.customer_name,
+      titleLabel: invoice.title ?? null,
+      docAndDate: [
+        invoice.doc_number,
         formatDate(invoice.created_at, timezone),
       ].join(" · "),
+      itemDetails: null,
       totalAmount: invoice.total_amount,
       status: invoice.status,
       destination: `/invoices/${invoice.id}`,
