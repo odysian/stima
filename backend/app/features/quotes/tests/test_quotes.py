@@ -32,7 +32,7 @@ from app.features.quotes import email_delivery_service
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
-from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
+from app.features.quotes.schemas import ExtractionResult, LineItemDraft, LineItemExtracted
 from app.features.quotes.service import QuoteService
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.email import EmailConfigurationError, EmailMessage, EmailSendError
@@ -394,6 +394,10 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert list_payload[1]["customer_name"] == "Quote Test Customer"
     assert list_payload[0]["item_count"] == 1
     assert list_payload[1]["item_count"] == 1
+    assert list_payload[0]["requires_customer_assignment"] is False
+    assert list_payload[1]["requires_customer_assignment"] is False
+    assert list_payload[0]["can_reassign_customer"] is True
+    assert list_payload[1]["can_reassign_customer"] is True
     assert set(list_payload[0].keys()) == {
         "id",
         "customer_id",
@@ -403,6 +407,8 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
         "status",
         "total_amount",
         "item_count",
+        "requires_customer_assignment",
+        "can_reassign_customer",
         "created_at",
     }
     # Regression guard: list endpoint remains lightweight and does not leak detail payloads.
@@ -422,6 +428,8 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert detail_payload["customer_email"] == "customer@example.com"
     assert detail_payload["customer_phone"] == "+1-555-123-4567"
     assert detail_payload["title"] == "Front Bed Refresh"
+    assert detail_payload["requires_customer_assignment"] is False
+    assert detail_payload["can_reassign_customer"] is True
     assert detail_payload["linked_invoice"] is None
     assert detail_payload["line_items"]
 
@@ -2486,6 +2494,173 @@ async def test_get_quote_detail_includes_nullable_customer_contact_fields(
     assert detail_payload["linked_invoice"] is None
 
 
+async def test_quotes_support_unassigned_drafts_and_customer_assignment_guards(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    assigned_customer_id = await _create_customer(
+        client,
+        csrf_token,
+        name="Assigned Customer",
+        email="assigned@example.com",
+        phone="+1-555-000-1111",
+    )
+    target_customer_id = await _create_customer(
+        client,
+        csrf_token,
+        name="Target Customer",
+        email="target@example.com",
+        phone="+1-555-000-2222",
+    )
+    replacement_customer_id = await _create_customer(
+        client,
+        csrf_token,
+        name="Replacement Customer",
+        email="replacement@example.com",
+        phone="+1-555-000-3333",
+    )
+    assigned_quote = await _create_quote(client, csrf_token, assigned_customer_id)
+
+    user = await _get_user_by_email(db_session, credentials["email"])
+    repository = QuoteRepository(db_session)
+    unassigned_quote = await repository.create(
+        user_id=user.id,
+        customer_id=None,
+        title="Awaiting assignment",
+        transcript="unassigned quote transcript",
+        line_items=[
+            LineItemDraft(
+                description="Cleanup",
+                details="Front beds",
+                price=55,
+            )
+        ],
+        total_amount=55,
+        tax_rate=None,
+        discount_type=None,
+        discount_value=None,
+        deposit_amount=None,
+        notes=None,
+        source_type="text",
+    )
+    await repository.commit()
+
+    list_response = await client.get("/api/quotes")
+    assert list_response.status_code == 200
+    list_payload = list_response.json()
+    assert {quote["id"] for quote in list_payload} == {
+        assigned_quote["id"],
+        str(unassigned_quote.id),
+    }
+    unassigned_list_item = next(
+        quote for quote in list_payload if quote["id"] == str(unassigned_quote.id)
+    )
+    assert unassigned_list_item["customer_id"] is None
+    assert unassigned_list_item["customer_name"] is None
+    assert unassigned_list_item["requires_customer_assignment"] is True
+    assert unassigned_list_item["can_reassign_customer"] is True
+
+    detail_response = await client.get(f"/api/quotes/{unassigned_quote.id}")
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert detail_payload["customer_id"] is None
+    assert detail_payload["customer_name"] is None
+    assert detail_payload["customer_email"] is None
+    assert detail_payload["customer_phone"] is None
+    assert detail_payload["requires_customer_assignment"] is True
+    assert detail_payload["can_reassign_customer"] is True
+
+    pdf_response = await client.post(
+        f"/api/quotes/{unassigned_quote.id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert pdf_response.status_code == 409
+    assert pdf_response.json() == {"detail": "Assign a customer before continuing."}
+
+    share_response = await client.post(
+        f"/api/quotes/{unassigned_quote.id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 409
+    assert share_response.json() == {"detail": "Assign a customer before continuing."}
+
+    send_email_response = await client.post(
+        f"/api/quotes/{unassigned_quote.id}/send-email",
+        headers=_send_email_headers(
+            csrf_token,
+            idempotency_key="unassigned-quote-send-email",
+        ),
+    )
+    assert send_email_response.status_code == 409
+    assert send_email_response.json() == {"detail": "Assign a customer before continuing."}
+
+    convert_response = await client.post(
+        f"/api/quotes/{unassigned_quote.id}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 409
+    assert convert_response.json() == {"detail": "Assign a customer before continuing."}
+
+    assign_response = await client.patch(
+        f"/api/quotes/{unassigned_quote.id}",
+        json={
+            "customer_id": target_customer_id,
+            "transcript": "assigned quote transcript",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert assign_response.status_code == 200
+    assigned_payload = assign_response.json()
+    assert assigned_payload["customer_id"] == target_customer_id
+    assert assigned_payload["transcript"] == "assigned quote transcript"
+
+    assigned_detail_response = await client.get(f"/api/quotes/{unassigned_quote.id}")
+    assert assigned_detail_response.status_code == 200
+    assigned_detail_payload = assigned_detail_response.json()
+    assert assigned_detail_payload["customer_id"] == target_customer_id
+    assert assigned_detail_payload["customer_name"] == "Target Customer"
+    assert assigned_detail_payload["customer_email"] == "target@example.com"
+    assert assigned_detail_payload["customer_phone"] == "+1-555-000-2222"
+    assert assigned_detail_payload["requires_customer_assignment"] is False
+    assert assigned_detail_payload["can_reassign_customer"] is True
+
+    assigned_pdf_response = await client.post(
+        f"/api/quotes/{unassigned_quote.id}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert assigned_pdf_response.status_code == 503
+    assert assigned_pdf_response.json() == {
+        "detail": "Unable to start PDF generation right now. Please try again."
+    }
+
+    clear_response = await client.patch(
+        f"/api/quotes/{unassigned_quote.id}",
+        json={"customer_id": None},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert clear_response.status_code == 409
+    assert clear_response.json() == {"detail": "Customer cannot be cleared from a quote."}
+
+    shared_response = await client.post(
+        f"/api/quotes/{unassigned_quote.id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert shared_response.status_code == 200
+    assert shared_response.json()["status"] == "shared"
+
+    blocked_reassignment_response = await client.patch(
+        f"/api/quotes/{unassigned_quote.id}",
+        json={"customer_id": replacement_customer_id},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert blocked_reassignment_response.status_code == 409
+    assert blocked_reassignment_response.json() == {
+        "detail": "Customer cannot be changed after sharing or invoice conversion."
+    }
+
+
 async def test_list_quotes_can_filter_by_customer_id(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id_a = await _create_customer(client, csrf_token, name="Customer A")
@@ -2533,6 +2708,8 @@ async def test_list_quotes_can_filter_by_customer_id(client: AsyncClient) -> Non
             "status": "draft",
             "total_amount": 220,
             "item_count": 1,
+            "requires_customer_assignment": False,
+            "can_reassign_customer": True,
             "created_at": quote_b["created_at"],
         }
     ]

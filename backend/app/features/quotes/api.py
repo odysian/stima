@@ -172,6 +172,7 @@ async def create_quote(
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
 ) -> QuoteResponse:
     """Create a quote for the authenticated user."""
+    # Extraction-created drafts flow through the extraction handler/worker, not POST /quotes.
     try:
         quote = await quote_service.create_quote(user, payload)
     except QuoteServiceError as exc:
@@ -321,6 +322,8 @@ async def get_quote(
         customer_name=quote.customer_name,
         customer_email=quote.customer_email,
         customer_phone=quote.customer_phone,
+        requires_customer_assignment=quote.requires_customer_assignment,
+        can_reassign_customer=quote.can_reassign_customer,
         linked_invoice=(
             LinkedInvoiceResponse.model_validate(quote.linked_invoice)
             if quote.linked_invoice is not None

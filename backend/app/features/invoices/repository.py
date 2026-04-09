@@ -178,7 +178,7 @@ class InvoiceRepository:
         return [
             InvoiceListItemSummary(
                 id=row.id,
-                customer_id=row.customer_id,
+                customer_id=cast(UUID, row.customer_id),
                 customer_name=row.customer_name,
                 doc_number=row.doc_number,
                 title=row.title,
@@ -256,7 +256,7 @@ class InvoiceRepository:
         document, customer, quote, pdf_artifact_job_status, pdf_artifact_terminal_error = row
         return InvoiceDetailRow(
             id=document.id,
-            customer_id=document.customer_id,
+            customer_id=cast(UUID, document.customer_id),
             customer_name=customer.name,
             customer_email=customer.email,
             customer_phone=customer.phone,
@@ -312,7 +312,7 @@ class InvoiceRepository:
         return InvoiceEmailContext(
             invoice_id=document.id,
             user_id=document.user_id,
-            customer_id=document.customer_id,
+            customer_id=cast(UUID, document.customer_id),
             business_name=user.business_name,
             first_name=user.first_name,
             last_name=user.last_name,
@@ -405,7 +405,7 @@ class InvoiceRepository:
         return InvoicePublicShareRecord(
             invoice_id=row.id,
             user_id=row.user_id,
-            customer_id=row.customer_id,
+            customer_id=cast(UUID, row.customer_id),
             status=cast(QuoteStatus, row.status),
             share_token_created_at=row.share_token_created_at,
             share_token_expires_at=row.share_token_expires_at,
@@ -440,7 +440,7 @@ class InvoiceRepository:
         return InvoiceFirstViewTransition(
             invoice_id=updated_row.id,
             user_id=updated_row.user_id,
-            customer_id=updated_row.customer_id,
+            customer_id=cast(UUID, updated_row.customer_id),
         )
 
     async def touch_last_public_accessed_at_by_share_token(
@@ -472,7 +472,7 @@ class InvoiceRepository:
         )
         invoice = Document(
             user_id=source_quote.user_id,
-            customer_id=source_quote.customer_id,
+            customer_id=cast(UUID, source_quote.customer_id),
             doc_type=_INVOICE_DOC_TYPE,
             doc_sequence=next_sequence,
             doc_number=f"I-{next_sequence:03d}",
@@ -741,7 +741,7 @@ def _build_render_context(
     return QuoteRenderContext(
         quote_id=document.id,
         user_id=document.user_id,
-        customer_id=document.customer_id,
+        customer_id=cast(UUID, document.customer_id),
         business_name=user.business_name,
         first_name=user.first_name,
         last_name=user.last_name,
