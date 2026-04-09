@@ -3188,7 +3188,7 @@ async def test_extract_combined_async_worker_persists_preselected_customer(
     assert persisted_quote.customer_id == UUID(customer_id)
 
 
-async def test_append_extraction_sync_appends_line_items_and_numbers_transcript_sections(
+async def test_append_extraction_sync_appends_line_items_and_merges_transcript_entries(
     client: AsyncClient,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -3226,8 +3226,10 @@ async def test_append_extraction_sync_appends_line_items_and_numbers_transcript_
     assert payload["line_items"][2]["description"] == "Brown mulch"
     assert payload["total_amount"] == 295
     assert "quote transcript" in payload["transcript"]
-    assert "Added later:\nfirst follow-up request" in payload["transcript"]
-    assert "Added later (2):\nsecond follow-up request" in payload["transcript"]
+    assert "Added later:" in payload["transcript"]
+    assert "- first follow-up request" in payload["transcript"]
+    assert "- second follow-up request" in payload["transcript"]
+    assert "Added later (2):" not in payload["transcript"]
 
 
 async def test_append_extraction_enqueues_async_job_for_owned_quote(
@@ -3270,6 +3272,46 @@ async def test_append_extraction_enqueues_async_job_for_owned_quote(
             },
         }
     ]
+
+
+async def test_append_extraction_sync_normalizes_legacy_numbered_transcript_sections(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+    app.state.arq_pool = None
+
+    legacy_transcript = (
+        "quote transcript\n\n"
+        "Added later:\n"
+        "first follow-up request\n\n"
+        "Added later (2):\n"
+        "second follow-up request"
+    )
+    update_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"transcript": legacy_transcript},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert update_response.status_code == 200
+
+    append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "third follow-up request"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert append_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    transcript = detail_response.json()["transcript"]
+    assert transcript.count("Added later:") == 1
+    assert "Added later (2):" not in transcript
+    assert "- first follow-up request" in transcript
+    assert "- second follow-up request" in transcript
+    assert "- third follow-up request" in transcript
 
 
 async def test_append_extraction_rejects_when_async_job_limit_is_exhausted(
@@ -3347,7 +3389,7 @@ async def test_append_extraction_async_worker_updates_existing_quote(
     assert detail_payload["line_items"][0]["description"] == "line item"
     assert detail_payload["line_items"][1]["description"] == "Brown mulch"
     assert detail_payload["total_amount"] == 175
-    assert "Added later:\nappend via worker" in detail_payload["transcript"]
+    assert "Added later:\n- append via worker" in detail_payload["transcript"]
 
 
 async def test_append_extraction_returns_404_for_quotes_owned_by_other_users(

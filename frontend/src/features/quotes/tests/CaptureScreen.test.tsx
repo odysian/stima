@@ -372,7 +372,7 @@ describe("CaptureScreen", () => {
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
   });
 
-  it("submits append extraction from review and returns to persisted review without reseeding draft", async () => {
+  it("submits append extraction from review, requests draft reseed, and replaces prior confidence notes", async () => {
     window.localStorage.setItem(
       "stima_review_confidence_notes:quote-1",
       JSON.stringify(["Existing note"]),
@@ -394,7 +394,7 @@ describe("CaptureScreen", () => {
     fireEvent.change(screen.getByLabelText(/written description/i), {
       target: { value: "  add one more cleanup item  " },
     });
-    fireEvent.click(screen.getByRole("button", { name: /append voice note/i }));
+    fireEvent.click(screen.getByRole("button", { name: /extract more line items/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.appendExtraction).toHaveBeenCalledWith("quote-1", {
@@ -402,11 +402,13 @@ describe("CaptureScreen", () => {
         notes: "  add one more cleanup item  ",
       });
     });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review");
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review", {
+      state: { reseedDraft: true },
+    });
     expect(setDraftMock).not.toHaveBeenCalled();
     expect(
       window.localStorage.getItem("stima_review_confidence_notes:quote-1"),
-    ).toBe(JSON.stringify(["Existing note", "New note"]));
+    ).toBe(JSON.stringify(["New note"]));
   });
 
   it("submits home capture without customer context and routes when polling returns quote_id", async () => {
@@ -517,7 +519,7 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Analyzing notes...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves your notes as a draft checkpoint. You can add more voice notes later from review."),
+      screen.getByText("Extraction saves your notes as a draft checkpoint. You can capture more notes later from review."),
     ).toBeInTheDocument();
 
     act(() => {
@@ -551,7 +553,7 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves your recording as a draft checkpoint. You can add more voice notes later from review."),
+      screen.getByText("Extraction saves your recording as a draft checkpoint. You can capture more notes later from review."),
     ).toBeInTheDocument();
 
     act(() => {
@@ -594,7 +596,7 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves one draft from your recording and notes. You can add more voice notes later from review."),
+      screen.getByText("Extraction saves one draft from your recording and notes. You can capture more notes later from review."),
     ).toBeInTheDocument();
 
     act(() => {

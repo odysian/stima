@@ -321,6 +321,20 @@ describe("ReviewScreen", () => {
     expect(await screen.findByText("Needs customer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue to preview/i })).toBeDisabled();
     expect(screen.getByText(/disabled until a customer is assigned/i)).toBeInTheDocument();
+    expect(screen.queryByText(/assign a customer before continuing/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps transcript notes collapsed by default until expanded", async () => {
+    renderScreen();
+
+    const transcriptToggle = await screen.findByRole("button", { name: /transcript notes/i });
+    expect(transcriptToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("5 yards brown mulch")).not.toBeInTheDocument();
+
+    fireEvent.click(transcriptToggle);
+
+    expect(transcriptToggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("5 yards brown mulch")).toBeInTheDocument();
   });
 
   it("saves draft edits through PATCH /api/quotes/:id", async () => {
@@ -329,15 +343,12 @@ describe("ReviewScreen", () => {
     fireEvent.change(screen.getByLabelText(/quote title/i), {
       target: { value: "Patio Refresh" },
     });
-    fireEvent.change(screen.getByLabelText(/transcript notes/i), {
-      target: { value: "Updated transcript" },
-    });
     fireEvent.click(screen.getByRole("button", { name: /^save draft$/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-1", {
         title: "Patio Refresh",
-        transcript: "Updated transcript",
+        transcript: "5 yards brown mulch",
         line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
         total_amount: 120,
         tax_rate: null,
@@ -352,10 +363,10 @@ describe("ReviewScreen", () => {
     expect(await screen.findByText("Draft saved.")).toBeInTheDocument();
   });
 
-  it("opens append capture from the Add voice note action", async () => {
+  it("opens append capture from the Capture More Notes action", async () => {
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /add voice note/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /capture more notes/i }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review/append-capture", {
       state: { launchOrigin: "/quotes/quote-1/review" },
@@ -579,9 +590,6 @@ describe("ReviewScreen", () => {
     fireEvent.change(screen.getByLabelText(/quote title/i), {
       target: { value: "Patio Refresh " },
     });
-    fireEvent.change(screen.getByLabelText(/transcript notes/i), {
-      target: { value: "Updated transcript" },
-    });
     fireEvent.click(screen.getByRole("button", { name: /^save draft$/i }));
 
     expect(await screen.findByText("Draft saved.")).toBeInTheDocument();
@@ -657,6 +665,16 @@ describe("ReviewScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
   });
 
+  it("reseed refreshes persisted quote data when append-capture returns with reseed state", async () => {
+    const { refreshQuoteMock } = renderScreen({
+      locationState: { reseedDraft: true },
+    });
+
+    await waitFor(() => {
+      expect(refreshQuoteMock).toHaveBeenCalled();
+    });
+  });
+
   it("shows leave warning for unsaved edits before navigating away", async () => {
     const { clearDraftMock } = renderScreen();
 
@@ -679,39 +697,36 @@ describe("ReviewScreen", () => {
     });
   });
 
-  it("dismisses confidence notes per quote fingerprint and re-shows when notes change", async () => {
+  it("dismisses one confidence note at a time and persists only remaining notes", async () => {
     window.localStorage.setItem(
       "stima_review_confidence_notes:quote-1",
-      JSON.stringify(["Verify soil depth before sending"]),
+      JSON.stringify(["Verify soil depth before sending", "Double-check edging quantity"]),
     );
 
     renderScreen();
 
     expect(screen.getByText("Verify soil depth before sending")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /dismiss confidence note/i }));
+    expect(screen.getByText("Double-check edging quantity")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: /dismiss confidence note/i })[0]);
 
     await waitFor(() => {
       expect(screen.queryByText("Verify soil depth before sending")).not.toBeInTheDocument();
     });
+    expect(screen.getByText("Double-check edging quantity")).toBeInTheDocument();
+    expect(window.localStorage.getItem("stima_review_confidence_notes:quote-1")).toBe(
+      JSON.stringify(["Double-check edging quantity"]),
+    );
 
     cleanup();
-
-    window.localStorage.setItem(
-      "stima_review_confidence_notes:quote-1",
-      JSON.stringify(["Verify soil depth before sending"]),
-    );
-    renderScreen();
-
-    expect(screen.queryByText("Verify soil depth before sending")).not.toBeInTheDocument();
 
     window.localStorage.setItem(
       "stima_review_confidence_notes:quote-1",
       JSON.stringify(["Double-check edging quantity"]),
     );
-    cleanup();
     renderScreen();
 
-    expect(await screen.findByText("Double-check edging quantity")).toBeInTheDocument();
+    expect(screen.getByText("Double-check edging quantity")).toBeInTheDocument();
+    expect(screen.queryByText("Verify soil depth before sending")).not.toBeInTheDocument();
   });
 
   it("shows specific load errors when quote is unavailable", async () => {

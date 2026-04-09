@@ -7,6 +7,7 @@ export interface ReviewLocationState {
   origin?: "preview" | "list" | "home";
   returnTo?: string;
   notice?: string;
+  reseedDraft?: boolean;
 }
 
 export interface DraftSnapshot {
@@ -69,6 +70,7 @@ export function readReviewLocationState(value: unknown): ReviewLocationState {
     origin?: unknown;
     returnTo?: unknown;
     notice?: unknown;
+    reseedDraft?: unknown;
   };
 
   return {
@@ -77,6 +79,7 @@ export function readReviewLocationState(value: unknown): ReviewLocationState {
       : undefined,
     returnTo: typeof state.returnTo === "string" ? state.returnTo : undefined,
     notice: typeof state.notice === "string" ? state.notice : undefined,
+    reseedDraft: state.reseedDraft === true,
   };
 }
 

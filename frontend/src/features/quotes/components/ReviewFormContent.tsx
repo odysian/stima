@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { ReviewCustomerRow } from "@/features/quotes/components/ReviewCustomerRow";
 import { ReviewLineItemsSection } from "@/features/quotes/components/ReviewLineItemsSection";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
@@ -7,7 +9,6 @@ import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   DOCUMENT_NOTES_MAX_CHARS,
-  DOCUMENT_TRANSCRIPT_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
 
 interface ReviewFormContentProps {
@@ -23,14 +24,12 @@ interface ReviewFormContentProps {
   isInteractionLocked: boolean;
   hasVisibleConfidenceNotes: boolean;
   confidenceNotes: string[];
-  hasNullPrices: boolean;
   lineItemSum: number;
   suggestedTaxRate: number | null;
   onRequestAssignment: () => void;
   onAddVoiceNote: () => void;
-  onDismissConfidence: () => void;
+  onDismissConfidence: (noteIndex: number) => void;
   onTitleChange: (nextTitle: string) => void;
-  onTranscriptChange: (nextTranscript: string) => void;
   onEditLineItem: (lineItemIndex: number) => void;
   onAddLineItem: () => void;
   onTotalChange: (nextTotal: number | null) => void;
@@ -54,14 +53,12 @@ export function ReviewFormContent({
   isInteractionLocked,
   hasVisibleConfidenceNotes,
   confidenceNotes,
-  hasNullPrices,
   lineItemSum,
   suggestedTaxRate,
   onRequestAssignment,
   onAddVoiceNote,
   onDismissConfidence,
   onTitleChange,
-  onTranscriptChange,
   onEditLineItem,
   onAddLineItem,
   onTotalChange,
@@ -71,6 +68,8 @@ export function ReviewFormContent({
   onDepositAmountChange,
   onNotesChange,
 }: ReviewFormContentProps): React.ReactElement {
+  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+
   return (
     <form
       id="quote-review-form"
@@ -96,17 +95,6 @@ export function ReviewFormContent({
           {saveNotice}
         </section>
       ) : null}
-
-      <div className="flex justify-start">
-        <button
-          type="button"
-          className="cursor-pointer rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isInteractionLocked}
-          onClick={onAddVoiceNote}
-        >
-          Add voice note
-        </button>
-      </div>
 
       <section className="space-y-2">
         <label
@@ -135,23 +123,27 @@ export function ReviewFormContent({
         onRequestAssignment={onRequestAssignment}
       />
 
-      <section className="space-y-2 rounded-xl bg-surface-container-low p-4">
-        <label
-          htmlFor="quote-review-transcript"
-          className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
+      <section className="space-y-2">
+        <button
+          type="button"
+          aria-expanded={isTranscriptExpanded}
+          aria-controls="quote-review-transcript-panel"
+          className="inline-flex cursor-pointer items-center gap-1.5 py-1 text-left text-[0.6875rem] font-bold uppercase tracking-widest text-outline transition-colors hover:text-on-surface-variant"
+          onClick={() => setIsTranscriptExpanded((current) => !current)}
         >
-          TRANSCRIPT NOTES
-        </label>
-        <textarea
-          id="quote-review-transcript"
-          rows={6}
-          maxLength={DOCUMENT_TRANSCRIPT_MAX_CHARS}
-          value={draft.transcript ?? ""}
-          disabled={isInteractionLocked}
-          onChange={(event) => onTranscriptChange(event.target.value)}
-          className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
-          placeholder="Capture details for quote revisions and customer context."
-        />
+          <span>Transcript Notes</span>
+          <span className="material-symbols-outlined text-[1rem] leading-none text-outline">
+            {isTranscriptExpanded ? "expand_more" : "chevron_right"}
+          </span>
+        </button>
+        {isTranscriptExpanded ? (
+          <div
+            id="quote-review-transcript-panel"
+            className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm leading-6 text-on-surface whitespace-pre-wrap"
+          >
+            {draft.transcript?.trim().length ? draft.transcript : "No transcript notes captured."}
+          </div>
+        ) : null}
       </section>
 
       {hasVisibleConfidenceNotes ? (
@@ -160,24 +152,17 @@ export function ReviewFormContent({
             <AIConfidenceBanner
               key={`review-confidence-note-${id}-${index}`}
               message={note}
-              onDismiss={onDismissConfidence}
+              onDismiss={() => onDismissConfidence(index)}
             />
           ))}
         </div>
-      ) : null}
-
-      {hasNullPrices ? (
-        <section className="rounded-lg border border-warning-accent/30 bg-warning-container p-4 text-warning">
-          <p className="text-sm">
-            Line items without prices will render as "TBD" when the quote is shared.
-          </p>
-        </section>
       ) : null}
 
       <ReviewLineItemsSection
         lineItems={draft.lineItems}
         isInteractionLocked={isInteractionLocked}
         onEditLineItem={onEditLineItem}
+        onCaptureMoreNotes={onAddVoiceNote}
         onAddLineItem={onAddLineItem}
       />
 

@@ -117,10 +117,21 @@ export function CaptureScreen(): React.ReactElement {
   }
 
   function applyAppendResult(quoteId: string, extraction: ExtractionResult): void {
-    writeQuoteConfidenceNotes(
-      quoteId,
-      [...readQuoteConfidenceNotes(quoteId), ...extraction.confidence_notes],
-    );
+    const existingNotes = readQuoteConfidenceNotes(quoteId);
+    const nextNotes = extraction.confidence_notes.length > 0
+      ? extraction.confidence_notes
+      : existingNotes;
+    writeQuoteConfidenceNotes(quoteId, nextNotes);
+  }
+
+  function navigateToReview(quoteId: string): void {
+    if (isAppendMode) {
+      navigate(`/quotes/${quoteId}/review`, {
+        state: { reseedDraft: true },
+      });
+      return;
+    }
+    navigate(`/quotes/${quoteId}/review`);
   }
 
   async function onExtract(): Promise<void> {
@@ -168,7 +179,7 @@ export function CaptureScreen(): React.ReactElement {
         } else {
           applyDraft(sourceType, extraction.result, extraction.quoteId);
         }
-        navigate(`/quotes/${extraction.quoteId}/review`);
+        navigateToReview(extraction.quoteId);
         return;
       }
 
@@ -208,7 +219,7 @@ export function CaptureScreen(): React.ReactElement {
         } else {
           applyDraft(sourceType, job.extraction_result, job.quote_id);
         }
-        navigate(`/quotes/${job.quote_id}/review`);
+        navigateToReview(job.quote_id);
         return;
       }
 
@@ -267,7 +278,7 @@ export function CaptureScreen(): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-36">
       <WorkflowScreenHeader
-        title={isAppendMode ? "Add Voice Note" : "Capture Job Notes"}
+        title={isAppendMode ? "Capture More Job Notes" : "Capture Job Notes"}
         subtitle={isAppendMode
           ? "Add clips or notes and we'll append line items to this quote"
           : "Describe the job and we'll extract the line items"}
@@ -407,7 +418,7 @@ export function CaptureScreen(): React.ReactElement {
             isLoading={isExtracting}
             onClick={() => void onExtract()}
           >
-            {isAppendMode ? "Append Voice Note" : "Extract Line Items"}
+            {isAppendMode ? "Extract More Line Items" : "Extract Line Items"}
           </Button>
         </div>
       </ScreenFooter>

@@ -17,7 +17,7 @@ export function ReviewCustomerRow({
   const canOpenSheet = !isLocked && !isInteractionLocked;
 
   return (
-    <section className="space-y-2 rounded-xl bg-surface-container-low p-4">
+    <section className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Customer</p>
         {requiresCustomerAssignment ? (
@@ -29,7 +29,7 @@ export function ReviewCustomerRow({
 
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center justify-between rounded-lg bg-surface-container-lowest px-4 py-3 text-left ghost-shadow disabled:cursor-not-allowed disabled:opacity-70"
+        className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-all hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-70"
         onClick={onRequestAssignment}
         disabled={!canOpenSheet}
       >
@@ -41,12 +41,6 @@ export function ReviewCustomerRow({
         ) : null}
       </button>
 
-      {requiresCustomerAssignment ? (
-        <p className="text-sm text-warning">
-          Assign a customer before continuing to preview or sending quote output.
-        </p>
-      ) : null}
-
       {isLocked ? (
         <p className="text-sm text-outline">
           Customer reassignment is locked after sharing or invoice conversion.
@@ -55,4 +49,3 @@ export function ReviewCustomerRow({
     </section>
   );
 }
-

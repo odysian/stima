@@ -75,13 +75,12 @@ describe("TotalAmountSection", () => {
     expect(screen.queryByRole("checkbox", { name: "Tax" })).not.toBeInTheDocument();
   });
 
-  it("shows the suggested tax hint after manually opening the panel and applies the default when tax is enabled", () => {
+  it("applies the suggested tax rate only after tax is enabled", () => {
     renderSection();
 
     fireEvent.click(screen.getByRole("button", { name: /optional pricing/i }));
 
-    expect(screen.getByRole("spinbutton", { name: /suggested tax/i })).toHaveValue(8.25);
-    expect(screen.getByText("%")).toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton", { name: /tax rate/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Discount" }));
     const discountInput = screen.getByPlaceholderText("25") as HTMLInputElement;

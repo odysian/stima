@@ -94,6 +94,7 @@ _APPENDABLE_QUOTE_STATUSES = frozenset(
 )
 _APPEND_UNAVAILABLE_DETAIL = "This quote can no longer be edited."
 _APPEND_TRANSCRIPT_SEPARATOR_PATTERN = re.compile(r"\n\nAdded later(?: \(\d+\))?:\n")
+_APPEND_TRANSCRIPT_BULLET_PREFIXES = ("- ", "* ")
 
 
 class QuoteServiceError(Exception):
@@ -1189,10 +1190,52 @@ def _line_item_snapshots(
 
 def _merge_append_transcript(*, current_transcript: str, appended_transcript: str) -> str:
     normalized_current = current_transcript.rstrip()
-    normalized_append = appended_transcript.strip()
-    if not normalized_current:
-        return normalized_append
+    appended_entries = _extract_append_entries(appended_transcript)
 
-    append_count = len(_APPEND_TRANSCRIPT_SEPARATOR_PATTERN.findall(normalized_current))
-    section_label = "Added later" if append_count == 0 else f"Added later ({append_count + 1})"
-    return f"{normalized_current}\n\n{section_label}:\n{normalized_append}"
+    if not normalized_current:
+        if not appended_entries:
+            return ""
+        return "Added later:\n" + "\n".join(f"- {entry}" for entry in appended_entries)
+
+    base_transcript, existing_entries = _split_transcript_and_append_entries(normalized_current)
+    merged_entries = [*existing_entries, *appended_entries]
+    if not merged_entries:
+        return base_transcript
+
+    append_section = "Added later:\n" + "\n".join(f"- {entry}" for entry in merged_entries)
+    if not base_transcript:
+        return append_section
+    return f"{base_transcript}\n\n{append_section}"
+
+
+def _split_transcript_and_append_entries(current_transcript: str) -> tuple[str, list[str]]:
+    matches = list(_APPEND_TRANSCRIPT_SEPARATOR_PATTERN.finditer(current_transcript))
+    if not matches:
+        return current_transcript, []
+
+    base_transcript = current_transcript[: matches[0].start()].rstrip()
+    entries: list[str] = []
+    for index, match in enumerate(matches):
+        body_start = match.end()
+        body_end = (
+            matches[index + 1].start() if index + 1 < len(matches) else len(current_transcript)
+        )
+        section_body = current_transcript[body_start:body_end]
+        entries.extend(_extract_append_entries(section_body))
+
+    return base_transcript, entries
+
+
+def _extract_append_entries(transcript: str) -> list[str]:
+    entries: list[str] = []
+    for raw_line in transcript.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        for prefix in _APPEND_TRANSCRIPT_BULLET_PREFIXES:
+            if line.startswith(prefix):
+                line = line[len(prefix) :].strip()
+                break
+        if line:
+            entries.append(line)
+    return entries
