@@ -10,6 +10,7 @@ import { usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
+import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
 
 const navigateMock = vi.fn();
 const useParamsMock = vi.fn(() => ({ id: "quote-1" }));
@@ -27,9 +28,15 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-vi.mock("@/features/quotes/hooks/usePersistedReview", () => ({
-  usePersistedReview: vi.fn(),
-}));
+vi.mock("@/features/quotes/hooks/usePersistedReview", async () => {
+  const actual = await vi.importActual<typeof import("@/features/quotes/hooks/usePersistedReview")>(
+    "@/features/quotes/hooks/usePersistedReview",
+  );
+  return {
+    ...actual,
+    usePersistedReview: vi.fn(),
+  };
+});
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
@@ -131,16 +138,28 @@ function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
 }
 
 function mapQuoteToDraft(quote: QuoteDetail): QuoteEditDraft {
+  const lineItemSum = resolveLineItemSum(quote.line_items.map((item) => item.price));
+  const breakdown = calculatePricingFromPersisted(
+    {
+      totalAmount: quote.total_amount,
+      taxRate: quote.tax_rate,
+      discountType: quote.discount_type,
+      discountValue: quote.discount_value,
+      depositAmount: quote.deposit_amount,
+    },
+    lineItemSum,
+  );
+
   return {
     quoteId: quote.id,
-    title: quote.title ?? "",
+    title: quote.title?.trim() ?? "",
     transcript: quote.transcript,
     lineItems: quote.line_items.map((item) => ({
       description: item.description,
       details: item.details,
       price: item.price,
     })),
-    total: quote.total_amount,
+    total: breakdown.subtotal ?? quote.total_amount,
     taxRate: quote.tax_rate,
     discountType: quote.discount_type,
     discountValue: quote.discount_value,
@@ -331,11 +350,22 @@ describe("ReviewScreen", () => {
     expect(await screen.findByText("Draft saved.")).toBeInTheDocument();
   });
 
-  it("does not show leave warning immediately after save when server canonicalizes draft fields", async () => {
+  it("does not show leave warning after save when server canonicalizes pricing", async () => {
     renderScreen({
       refreshedQuote: makeQuote({
         title: "Patio Refresh",
         transcript: "Updated transcript",
+        total_amount: 108,
+        tax_rate: 0.08,
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 100,
+            sort_order: 0,
+          },
+        ],
       }),
     });
 

@@ -15,7 +15,7 @@ import {
   isInvalidLineItem,
   normalizeLineItem,
 } from "@/features/quotes/components/reviewScreenUtils";
-import { usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
+import { mapQuoteToEditDraft, usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft, QuoteDetail } from "@/features/quotes/types/quote.types";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
@@ -37,21 +37,8 @@ import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { getPricingValidationMessage } from "@/shared/lib/pricing";
 
 function buildQuoteSnapshotKey(quote: QuoteDetail): string {
-  return JSON.stringify(buildDraftSnapshot({
-    title: quote.title?.trim() ?? "",
-    transcript: quote.transcript,
-    lineItems: quote.line_items.map((lineItem) => ({
-      description: lineItem.description,
-      details: lineItem.details,
-      price: lineItem.price,
-    })),
-    total: quote.total_amount,
-    taxRate: quote.tax_rate,
-    discountType: quote.discount_type,
-    discountValue: quote.discount_value,
-    depositAmount: quote.deposit_amount,
-    notes: quote.notes ?? "",
-  }));
+  const canonicalDraft = mapQuoteToEditDraft(quote);
+  return JSON.stringify(buildDraftSnapshot(canonicalDraft));
 }
 
 export function ReviewScreen(): React.ReactElement {

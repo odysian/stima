@@ -9,7 +9,7 @@ import {
   resolveLineItemSum,
 } from "@/shared/lib/pricing";
 
-function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
+export function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
   const lineItemSum = resolveLineItemSum(quote.line_items.map((item) => item.price));
   const breakdown = calculatePricingFromPersisted(
     {
