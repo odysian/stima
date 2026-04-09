@@ -21,7 +21,6 @@ interface DocumentRow {
   customerLabel: string;
   titleLabel?: string | null;
   docAndDate: string;
-  itemDetails?: string | null;
   totalAmount: number | null;
   status: DocumentStatus;
   destination: string;
@@ -73,15 +72,10 @@ function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionPro
                       {row.titleLabel}
                     </p>
                   ) : null}
-                  <p className="text-sm text-on-surface-variant">
-                    {row.docAndDate}
-                  </p>
                   <div className="flex items-center gap-3">
-                    {row.itemDetails ? (
-                      <p className="text-sm text-on-surface-variant">
-                        {row.itemDetails}
-                      </p>
-                    ) : null}
+                    <p className="text-sm text-on-surface-variant">
+                      {row.docAndDate}
+                    </p>
                     {row.needsCustomerAssignment ? (
                       <span className={`${needsCustomerBadgeClasses} ml-auto`}>Needs customer</span>
                     ) : (
@@ -253,7 +247,6 @@ export function QuoteList(): React.ReactElement {
         quote.doc_number,
         formatDate(quote.created_at, timezone),
       ].join(" · "),
-      itemDetails: `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/quotes/${quote.id}/review`,
@@ -273,7 +266,6 @@ export function QuoteList(): React.ReactElement {
         quote.doc_number,
         formatDate(quote.created_at, timezone),
         ].join(" · "),
-      itemDetails: `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/quotes/${quote.id}/preview`,
@@ -290,7 +282,6 @@ export function QuoteList(): React.ReactElement {
         invoice.doc_number,
         formatDate(invoice.created_at, timezone),
       ].join(" · "),
-      itemDetails: null,
       totalAmount: invoice.total_amount,
       status: invoice.status,
       destination: `/invoices/${invoice.id}`,

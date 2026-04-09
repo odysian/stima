@@ -150,7 +150,6 @@ describe("QuoteList", () => {
     expect(screen.getByText("Spring Cleanup")).toBeInTheDocument();
     expect(screen.getByText("Bob Brown")).toBeInTheDocument();
     expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026/)).toBeInTheDocument();
-    expect(screen.getByText("3 items")).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getAllByText("$120.00")).toHaveLength(2);
   });
@@ -295,7 +294,6 @@ describe("QuoteList", () => {
     expect(screen.queryByText("Alice Johnson")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /bob brown/i })).toBeInTheDocument();
     expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026/)).toBeInTheDocument();
-    expect(screen.getByText("1 item")).toBeInTheDocument();
   });
 
   it("filters rows by quote title", async () => {
@@ -463,7 +461,6 @@ describe("QuoteList", () => {
 
     expect(await screen.findByRole("button", { name: /alice johnson/i })).toBeInTheDocument();
     expect(screen.getByText(/Q-001\s*·\s*Mar 24, 2026/)).toBeInTheDocument();
-    expect(screen.getByText("1 item")).toBeInTheDocument();
   });
 
   it("renders an em dash when total_amount is null", async () => {
