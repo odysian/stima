@@ -278,6 +278,7 @@ describe("invoiceService integration (MSW)", () => {
             attempts: 0,
             terminal_error: null,
             extraction_result: null,
+            quote_id: null,
             created_at: "2026-03-20T00:00:00.000Z",
             updated_at: "2026-03-20T00:00:00.000Z",
           },

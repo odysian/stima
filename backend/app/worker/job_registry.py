@@ -6,7 +6,7 @@ import asyncio
 import base64
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from arq.worker import func
@@ -19,7 +19,7 @@ from app.features.jobs.repository import JobRepository
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
 from app.features.quotes.repository import QuoteEmailContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult
-from app.features.quotes.service import QuoteServiceError
+from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.email import EmailService
 from app.integrations.extraction import ExtractionError, is_retryable_extraction_error
 from app.integrations.pdf import (
@@ -31,6 +31,7 @@ from app.integrations.storage import StorageNotFoundError
 from app.shared.dependencies import get_email_service, get_pdf_integration, get_storage_service
 from app.shared.event_logger import log_event
 from app.shared.image_signatures import detect_image_content_type
+from app.shared.observability import log_security_event
 from app.worker.email_repository import WorkerEmailRepository
 from app.worker.pdf_repository import WorkerPdfRepository
 from app.worker.runtime import (
@@ -44,6 +45,7 @@ from app.worker.runtime import (
 EXTRACTION_JOB_NAME = "jobs.extraction"
 PDF_JOB_NAME = "jobs.pdf"
 EMAIL_JOB_NAME = "jobs.email"
+TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED = "Extraction succeeded but draft persistence failed."
 TERMINAL_ERROR_MISSING_DOCUMENT_ID = "missing_document_id"
 TERMINAL_ERROR_STALE_DOCUMENT_REVISION = "stale_document_revision"
 
@@ -62,7 +64,15 @@ class _RenderedPdfArtifact:
     pdf_bytes: bytes | None
 
 
-async def extraction_job(ctx: dict[str, Any], job_id: str, *, transcript: str) -> None:
+async def extraction_job(
+    ctx: dict[str, Any],
+    job_id: str,
+    *,
+    transcript: str,
+    source_type: str = "text",
+    capture_detail: str | None = None,
+    customer_id: str | None = None,
+) -> None:
     """Run durable quote extraction against the transcript prepared by the API."""
     await process_job(
         ctx,
@@ -74,6 +84,12 @@ async def extraction_job(ctx: dict[str, Any], job_id: str, *, transcript: str) -
             runtime,
             job_id=UUID(job_id),
             result=result,
+            source_type=source_type,
+            capture_detail=_resolve_worker_capture_detail(
+                source_type=source_type,
+                capture_detail=capture_detail,
+            ),
+            customer_id=customer_id,
         ),
     )
 
@@ -334,20 +350,144 @@ def _get_email_service(ctx: dict[str, Any]) -> EmailService:
     return email_service
 
 
+class _UnusedWorkerPdfIntegration:
+    def render(self, context: Any) -> bytes:
+        del context
+        raise RuntimeError("PDF rendering is not available in extraction persistence")
+
+
+class _UnusedWorkerStorageService:
+    def fetch_bytes(self, object_path: str) -> bytes:
+        del object_path
+        raise RuntimeError("Storage is not available in extraction persistence")
+
+    def upload(self, *, prefix: str, filename: str, data: bytes, content_type: str) -> str:
+        del prefix, filename, data, content_type
+        raise RuntimeError("Storage is not available in extraction persistence")
+
+    def delete(self, object_path: str) -> None:
+        del object_path
+        raise RuntimeError("Storage is not available in extraction persistence")
+
+
+def _validate_extraction_source_type(source_type: str) -> Literal["text", "voice"]:
+    if source_type not in {"text", "voice"}:
+        raise NonRetryableJobError("Extraction job missing valid source_type")
+    return cast(Literal["text", "voice"], source_type)
+
+
+def _parse_optional_uuid(value: str | None) -> UUID | None:
+    if value is None:
+        return None
+    return UUID(value)
+
+
+def _resolve_worker_capture_detail(*, source_type: str, capture_detail: str | None) -> str:
+    normalized_capture_detail = (capture_detail or "").strip()
+    if normalized_capture_detail:
+        return normalized_capture_detail
+    if source_type == "voice":
+        return "audio"
+    return "notes"
+
+
 async def _store_extraction_result(
     runtime: WorkerRuntimeSettings,
     *,
     job_id: UUID,
     result: ExtractionResult,
+    source_type: str,
+    capture_detail: str,
+    customer_id: str | None,
 ) -> None:
     async with runtime.session_maker() as session:
         repository = JobRepository(session)
-        await repository.set_success_with_result(
+        job_record = await repository.get_by_id(job_id)
+        if job_record is None:
+            raise NonRetryableJobError(f"Job {job_id} does not exist")
+
+        quote_id = job_record.document_id
+        resolved_customer_id = _parse_optional_uuid(customer_id)
+        created_new_quote = False
+        if quote_id is None:
+            try:
+                quote = await QuoteService(
+                    repository=QuoteRepository(session),
+                    pdf_integration=_UnusedWorkerPdfIntegration(),
+                    storage_service=_UnusedWorkerStorageService(),
+                ).create_extracted_draft(
+                    user_id=job_record.user_id,
+                    customer_id=resolved_customer_id,
+                    extraction_result=result,
+                    source_type=_validate_extraction_source_type(source_type),
+                    commit=False,
+                )
+            except QuoteServiceError as exc:
+                await session.rollback()
+                logger.warning(
+                    "Extraction draft persistence failed for job %s",
+                    job_id,
+                    exc_info=True,
+                )
+                log_security_event(
+                    "quotes.extract_persist_failed",
+                    outcome="failure",
+                    level=logging.ERROR,
+                    reason="draft_persistence_failed",
+                    job_name=EXTRACTION_JOB_NAME,
+                    job_id=str(job_id),
+                    error_class=type(exc).__name__,
+                )
+                raise NonRetryableJobError(
+                    TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
+                    terminal_reason=TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
+                ) from exc
+            except Exception as exc:  # noqa: BLE001
+                await session.rollback()
+                logger.warning(
+                    "Extraction draft persistence failed for job %s",
+                    job_id,
+                    exc_info=True,
+                )
+                log_security_event(
+                    "quotes.extract_persist_failed",
+                    outcome="failure",
+                    level=logging.ERROR,
+                    reason="draft_persistence_failed",
+                    job_name=EXTRACTION_JOB_NAME,
+                    job_id=str(job_id),
+                    error_class=type(exc).__name__,
+                )
+                raise NonRetryableJobError(
+                    TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
+                    terminal_reason=TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
+                ) from exc
+
+            quote_id = quote.id
+            resolved_customer_id = quote.customer_id
+            created_new_quote = True
+
+        await repository.set_extraction_success(
             job_id,
+            quote_id=quote_id,
             result_json=result.model_dump_json(),
-            expected_job_type=JobType.EXTRACTION,
         )
         await session.commit()
+
+    if created_new_quote:
+        log_event(
+            "quote.created",
+            user_id=job_record.user_id,
+            quote_id=quote_id,
+            customer_id=resolved_customer_id,
+        )
+        log_event(
+            "draft_generated",
+            user_id=job_record.user_id,
+            quote_id=quote_id,
+            customer_id=resolved_customer_id,
+            detail=capture_detail,
+        )
 
 
 async def _store_pdf_artifact(

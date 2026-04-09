@@ -60,6 +60,12 @@ class ExtractionResult(BaseModel):
     )
 
 
+class PersistedExtractionResponse(ExtractionResult):
+    """Successful unified extraction response with the persisted draft id."""
+
+    quote_id: UUID
+
+
 class ConvertNotesRequest(BaseModel):
     """Request payload for text-note extraction."""
 

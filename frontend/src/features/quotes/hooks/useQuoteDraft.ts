@@ -6,6 +6,7 @@ import type { DiscountType } from "@/shared/lib/pricing";
 const DRAFT_STORAGE_KEY = "stima_quote_draft";
 
 export interface QuoteDraft {
+  quoteId?: string;
   customerId: string;
   launchOrigin?: string;
   title: string;
@@ -48,6 +49,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
 
     const {
       customerId,
+      quoteId,
       launchOrigin,
       title,
       transcript,
@@ -64,6 +66,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
 
     if (
       typeof customerId !== "string" ||
+      (quoteId !== undefined && typeof quoteId !== "string") ||
       (launchOrigin !== undefined && typeof launchOrigin !== "string") ||
       (title !== undefined && typeof title !== "string") ||
       typeof transcript !== "string" ||
@@ -100,6 +103,7 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
 
     return {
       customerId,
+      quoteId: typeof quoteId === "string" ? quoteId : undefined,
       launchOrigin: typeof launchOrigin === "string" ? launchOrigin : "/",
       title: typeof title === "string" ? title : "",
       transcript,

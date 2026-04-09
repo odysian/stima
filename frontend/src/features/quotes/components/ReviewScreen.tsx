@@ -11,7 +11,16 @@ import {
 } from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewSubmitFooter } from "@/features/quotes/components/ReviewSubmitFooter";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
-import { buildCreatePayload, EMPTY_LINE_ITEM, getReviewMessages, getWarningMessages, isInvalidLineItem, mapExtractedLineItems, normalizeLineItem } from "@/features/quotes/components/reviewScreenUtils";
+import {
+  buildCreatePayload,
+  buildUpdatePayload,
+  EMPTY_LINE_ITEM,
+  getReviewMessages,
+  getWarningMessages,
+  isInvalidLineItem,
+  mapExtractedLineItems,
+  normalizeLineItem,
+} from "@/features/quotes/components/reviewScreenUtils";
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft } from "@/features/quotes/types/quote.types";
@@ -91,7 +100,6 @@ export function ReviewScreen(): React.ReactElement | null {
   const isInteractionLocked = isSaving || isRegenerating;
 
   function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void { setDraft(updater); }
-
   function onLineItemAdd(): void {
     if (hasReachedLineItemLimit) return;
     setSaveError(null);
@@ -103,7 +111,6 @@ export function ReviewScreen(): React.ReactElement | null {
   async function regenerateFromTranscript(): Promise<void> {
     setSaveError(null);
     setIsRegenerating(true);
-
     try {
       const extraction = await quoteService.convertNotes(trimmedTranscript);
       setDraft({
@@ -130,13 +137,11 @@ export function ReviewScreen(): React.ReactElement | null {
       setIsRegenerating(false);
     }
   }
-
   function onRegenerateRequest(): void {
     if (trimmedTranscript.length === 0) {
       setSaveError("Add transcript notes before regenerating the draft.");
       return;
     }
-
     if (currentDraft.lineItems.length > 0) {
       setShowRegenerateConfirm(true);
       return;
@@ -146,17 +151,14 @@ export function ReviewScreen(): React.ReactElement | null {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setSaveError(null);
-
     if (lineItemsForSubmit.length === 0) {
       setSaveError("Add at least one line item description before generating the quote.");
       return;
     }
-
     if (hasInvalidLineItems) {
       setSaveError("Each line item with details or price needs a description.");
       return;
     }
-
     const pricingError = getPricingValidationMessage({
       totalAmount: currentDraft.total,
       taxRate: currentDraft.taxRate,
@@ -168,17 +170,30 @@ export function ReviewScreen(): React.ReactElement | null {
       setSaveError(pricingError);
       return;
     }
-
     setIsSaving(true);
-
     try {
       const createPayload = buildCreatePayload(currentDraft, lineItemsForSubmit);
-
+      const updatePayload = buildUpdatePayload(currentDraft, lineItemsForSubmit);
       if (documentType === "quote") {
+        if (currentDraft.quoteId) {
+          const updatedQuote = await quoteService.updateQuote(currentDraft.quoteId, updatePayload);
+          hasSubmittedRef.current = true;
+          clearDraft();
+          navigate(`/quotes/${updatedQuote.id}/preview`);
+          return;
+        }
         const createdQuote = await quoteService.createQuote(createPayload);
         hasSubmittedRef.current = true;
         clearDraft();
         navigate(`/quotes/${createdQuote.id}/preview`);
+        return;
+      }
+      if (currentDraft.quoteId) {
+        await quoteService.updateQuote(currentDraft.quoteId, updatePayload);
+        const createdInvoice = await quoteService.convertToInvoice(currentDraft.quoteId);
+        hasSubmittedRef.current = true;
+        clearDraft();
+        navigate(`/invoices/${createdInvoice.id}`);
         return;
       }
 
@@ -188,7 +203,7 @@ export function ReviewScreen(): React.ReactElement | null {
       navigate(`/invoices/${createdInvoice.id}`);
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : documentType === "quote"
-        ? "Unable to create quote"
+        ? currentDraft.quoteId ? "Unable to update quote" : "Unable to create quote"
         : "Unable to create invoice";
       setSaveError(message);
     } finally {
@@ -220,7 +235,6 @@ export function ReviewScreen(): React.ReactElement | null {
         {saveError ? (
           <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
         ) : null}
-
         {warningMessages.length > 0 ? (
           <section className="rounded-lg border border-warning-accent/30 bg-warning-container p-4 text-warning">
             <p className="text-[0.6875rem] font-bold uppercase tracking-widest">
@@ -233,7 +247,6 @@ export function ReviewScreen(): React.ReactElement | null {
             </ul>
           </section>
         ) : null}
-
         <details className="rounded-lg bg-surface-container-low">
           <summary className="cursor-pointer select-none px-4 py-3 text-xs font-bold uppercase tracking-widest text-outline">
             TRANSCRIPT
@@ -246,7 +259,6 @@ export function ReviewScreen(): React.ReactElement | null {
             ) : (
               <p className="text-sm text-outline">No transcript captured yet.</p>
             )}
-
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
@@ -256,7 +268,6 @@ export function ReviewScreen(): React.ReactElement | null {
               >
                 {isTranscriptEditorVisible ? "Hide Transcript Editor" : "Edit Transcript Notes"}
               </button>
-
               {isTranscriptEditorVisible ? (
                 <Button
                   type="button"
@@ -269,7 +280,6 @@ export function ReviewScreen(): React.ReactElement | null {
                 </Button>
               ) : null}
             </div>
-
             {isTranscriptEditorVisible ? (
               <section className="space-y-2">
                 <label
@@ -301,7 +311,6 @@ export function ReviewScreen(): React.ReactElement | null {
             ) : null}
           </div>
         </details>
-
         <section className="space-y-2">
           <label
             htmlFor="quote-title"
@@ -325,14 +334,12 @@ export function ReviewScreen(): React.ReactElement | null {
             maxLength={120}
           />
         </section>
-
         <div className="flex items-end justify-between">
           <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>
           <span className="text-[0.6875rem] uppercase tracking-widest text-outline">
             {currentDraft.lineItems.length} ITEMS EXTRACTED
           </span>
         </div>
-
         <div className="mt-3 space-y-3">
           {currentDraft.lineItems.length > 0 ? (
             currentDraft.lineItems.map((lineItem, index) => (
@@ -352,7 +359,6 @@ export function ReviewScreen(): React.ReactElement | null {
             </p>
           )}
         </div>
-
         <button
           type="button"
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
@@ -362,7 +368,6 @@ export function ReviewScreen(): React.ReactElement | null {
           <span className="material-symbols-outlined text-base">add</span>
           Add Line Item
         </button>
-
         <TotalAmountSection
           lineItemSum={lineItemSum}
           total={currentDraft.total}
@@ -388,7 +393,6 @@ export function ReviewScreen(): React.ReactElement | null {
             updateDraft((nextDraft) => ({ ...nextDraft, depositAmount }));
           }}
         />
-
         <section className="space-y-2">
           <label
             htmlFor="quote-notes"
@@ -412,7 +416,6 @@ export function ReviewScreen(): React.ReactElement | null {
             placeholder="Any notes to include for the customer."
           />
         </section>
-
         <ReviewDocumentTypeSelector
           value={documentType}
           disabled={isInteractionLocked}
@@ -425,7 +428,6 @@ export function ReviewScreen(): React.ReactElement | null {
         isInteractionLocked={isInteractionLocked}
         isSaving={isSaving}
       />
-
       {showRegenerateConfirm ? (
         <ConfirmModal
           title="Replace current draft?"

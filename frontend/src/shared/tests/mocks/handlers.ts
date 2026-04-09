@@ -260,6 +260,7 @@ export const handlers = [
 
     return HttpResponse.json(
       {
+        quote_id: "quote-1",
         transcript: "Transcribed clip transcript",
         line_items: [
           {
@@ -280,7 +281,7 @@ export const handlers = [
       {
         id: String(params.jobId),
         user_id: "user-1",
-        document_id: null,
+        document_id: "quote-1",
         job_type: "extraction",
         status: "success",
         attempts: 1,
@@ -297,6 +298,7 @@ export const handlers = [
           total: 120,
           confidence_notes: [],
         },
+        quote_id: "quote-1",
         created_at: "2026-03-20T00:00:00.000Z",
         updated_at: "2026-03-20T00:00:00.000Z",
       },
@@ -431,6 +433,7 @@ export const handlers = [
         attempts: 0,
         terminal_error: null,
         extraction_result: null,
+        quote_id: null,
         created_at: "2026-03-20T00:00:00.000Z",
         updated_at: "2026-03-20T00:00:00.000Z",
       },
@@ -685,6 +688,7 @@ export const handlers = [
         attempts: 0,
         terminal_error: null,
         extraction_result: null,
+        quote_id: null,
         created_at: "2026-03-20T00:00:00.000Z",
         updated_at: "2026-03-20T00:00:00.000Z",
       },

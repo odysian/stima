@@ -101,6 +101,7 @@ function makeJobStatusResponse(
     attempts: 0,
     terminal_error: null,
     extraction_result: null,
+    quote_id: null,
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
     ...overrides,
@@ -140,7 +141,7 @@ beforeEach(() => {
     clearDraft: vi.fn(),
   });
   mockVoiceCapture();
-  mockedQuoteService.extract.mockResolvedValue({ type: "sync", result: extractionFixture });
+  mockedQuoteService.extract.mockResolvedValue({ type: "sync", quoteId: "quote-1", result: extractionFixture });
   mockedJobService.getJobStatus.mockReset();
   useParamsMock.mockReturnValue({ customerId: "cust-1" });
 });
@@ -204,7 +205,7 @@ describe("CaptureScreen", () => {
   });
 
   it("shows extraction helper copy only while extraction is active", async () => {
-    const extractDeferred = new Promise<{ type: "sync"; result: ExtractionResult }>(() => {});
+    const extractDeferred = new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>(() => {});
     mockedQuoteService.extract.mockReturnValueOnce(extractDeferred);
     renderScreen();
 
@@ -328,7 +329,7 @@ describe("CaptureScreen", () => {
     expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
-  it("submits combined extraction payload and writes voice draft when clips are present", async () => {
+  it("submits extraction with customer context and routes to review using persisted draft data", async () => {
     mockVoiceCapture({ clips: [clipFixture] });
     renderScreen();
 
@@ -341,9 +342,11 @@ describe("CaptureScreen", () => {
       expect(mockedQuoteService.extract).toHaveBeenCalledWith({
         clips: [clipFixture.blob],
         notes: "  add travel surcharge  ",
+        customerId: "cust-1",
       });
     });
     expect(setDraftMock).toHaveBeenCalledWith({
+      quoteId: "quote-1",
       customerId: "cust-1",
       launchOrigin: HOME_ROUTE,
       title: "",
@@ -367,9 +370,15 @@ describe("CaptureScreen", () => {
       sourceType: "voice",
     });
     expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
+    expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
   });
 
-  it("writes text sourceType when extracting with notes only", async () => {
+  it("routes notes-only sync extraction to review with text source draft metadata", async () => {
+    mockedQuoteService.extract.mockResolvedValueOnce({
+      type: "sync",
+      quoteId: "quote-notes",
+      result: extractionFixture,
+    });
     renderScreen();
 
     fireEvent.change(screen.getByLabelText(/written description/i), {
@@ -380,10 +389,12 @@ describe("CaptureScreen", () => {
     await waitFor(() => {
       expect(setDraftMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          quoteId: "quote-notes",
           sourceType: "text",
         }),
       );
     });
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
   });
 
   it("shows inline error and does not navigate when extraction fails", async () => {
@@ -423,9 +434,9 @@ describe("CaptureScreen", () => {
   it("shows staged extraction progress and clears it after extraction resolves", async () => {
     vi.useFakeTimers();
 
-    let resolveExtraction: ((value: { type: "sync"; result: ExtractionResult }) => void) | undefined;
+    let resolveExtraction: ((value: { type: "sync"; quoteId: string; result: ExtractionResult }) => void) | undefined;
     mockedQuoteService.extract.mockReturnValueOnce(
-      new Promise<{ type: "sync"; result: ExtractionResult }>((resolve) => {
+      new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>((resolve) => {
         resolveExtraction = resolve;
       }),
     );
@@ -449,7 +460,7 @@ describe("CaptureScreen", () => {
     expect(screen.getByText("Extracting line items...")).toBeInTheDocument();
 
     await act(async () => {
-      resolveExtraction?.({ type: "sync", result: extractionFixture });
+      resolveExtraction?.({ type: "sync", quoteId: "quote-1", result: extractionFixture });
       await Promise.resolve();
     });
 
@@ -459,9 +470,9 @@ describe("CaptureScreen", () => {
   it("shows audio-specific staged copy when extracting recorded clips", async () => {
     vi.useFakeTimers();
 
-    let resolveExtraction: ((value: { type: "sync"; result: ExtractionResult }) => void) | undefined;
+    let resolveExtraction: ((value: { type: "sync"; quoteId: string; result: ExtractionResult }) => void) | undefined;
     mockedQuoteService.extract.mockReturnValueOnce(
-      new Promise<{ type: "sync"; result: ExtractionResult }>((resolve) => {
+      new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>((resolve) => {
         resolveExtraction = resolve;
       }),
     );
@@ -489,7 +500,7 @@ describe("CaptureScreen", () => {
     expect(screen.getByText("Extracting line items...")).toBeInTheDocument();
 
     await act(async () => {
-      resolveExtraction?.({ type: "sync", result: extractionFixture });
+      resolveExtraction?.({ type: "sync", quoteId: "quote-1", result: extractionFixture });
       await Promise.resolve();
     });
 
@@ -499,9 +510,9 @@ describe("CaptureScreen", () => {
   it("shows mixed-input staged copy when clips and notes are both present", async () => {
     vi.useFakeTimers();
 
-    let resolveExtraction: ((value: { type: "sync"; result: ExtractionResult }) => void) | undefined;
+    let resolveExtraction: ((value: { type: "sync"; quoteId: string; result: ExtractionResult }) => void) | undefined;
     mockedQuoteService.extract.mockReturnValueOnce(
-      new Promise<{ type: "sync"; result: ExtractionResult }>((resolve) => {
+      new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>((resolve) => {
         resolveExtraction = resolve;
       }),
     );
@@ -532,7 +543,7 @@ describe("CaptureScreen", () => {
     expect(screen.getByText("Extracting line items from audio and notes...")).toBeInTheDocument();
 
     await act(async () => {
-      resolveExtraction?.({ type: "sync", result: extractionFixture });
+      resolveExtraction?.({ type: "sync", quoteId: "quote-1", result: extractionFixture });
       await Promise.resolve();
     });
   });
@@ -553,7 +564,7 @@ describe("CaptureScreen", () => {
     expect(screen.getByText("Clip 1 · 4s")).toBeInTheDocument();
   });
 
-  it("polls async extraction jobs until success and then navigates to review", async () => {
+  it("polls async extraction jobs until success and then routes to review with persisted draft", async () => {
     vi.useFakeTimers();
     mockedQuoteService.extract.mockResolvedValueOnce({ type: "async", jobId: "job-1" });
     mockedJobService.getJobStatus
@@ -563,6 +574,7 @@ describe("CaptureScreen", () => {
           status: "success",
           attempts: 1,
           extraction_result: extractionFixture,
+          quote_id: "quote-async",
           updated_at: "2026-03-20T00:00:02.000Z",
         }),
       );
@@ -587,7 +599,38 @@ describe("CaptureScreen", () => {
       await Promise.resolve();
     });
     expect(mockedJobService.getJobStatus).toHaveBeenCalledTimes(2);
+    expect(setDraftMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quoteId: "quote-async",
+        sourceType: "text",
+      }),
+    );
     expect(navigateMock).toHaveBeenCalledWith("/quotes/review");
+    expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when async extraction succeeds without a persisted quote id", async () => {
+    mockedQuoteService.extract.mockResolvedValueOnce({ type: "async", jobId: "job-1" });
+    mockedJobService.getJobStatus.mockResolvedValueOnce(
+      makeJobStatusResponse({
+        status: "success",
+        attempts: 1,
+        extraction_result: extractionFixture,
+        quote_id: null,
+      }),
+    );
+
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Extraction completed without a persisted draft. Please try again.",
+    );
+    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/review");
   });
 
   it("shows a retry affordance when an async extraction job reaches terminal failure", async () => {
@@ -647,10 +690,10 @@ describe("CaptureScreen", () => {
     );
   });
 
-  it("does not apply the draft or redirect to review after leaving during in-flight extraction", async () => {
-    let resolveExtraction: ((value: { type: "sync"; result: ExtractionResult }) => void) | undefined;
+  it("does not set draft or redirect to review after leaving during in-flight extraction", async () => {
+    let resolveExtraction: ((value: { type: "sync"; quoteId: string; result: ExtractionResult }) => void) | undefined;
     mockedQuoteService.extract.mockReturnValueOnce(
-      new Promise<{ type: "sync"; result: ExtractionResult }>((resolve) => {
+      new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>((resolve) => {
         resolveExtraction = resolve;
       }),
     );
@@ -669,7 +712,7 @@ describe("CaptureScreen", () => {
     view.unmount();
 
     await act(async () => {
-      resolveExtraction?.({ type: "sync", result: extractionFixture });
+      resolveExtraction?.({ type: "sync", quoteId: "quote-1", result: extractionFixture });
       await Promise.resolve();
     });
 

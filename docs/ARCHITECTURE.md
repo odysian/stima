@@ -156,7 +156,7 @@ Unique constraints:
 |---|---|---|
 | id | UUID (PK) | |
 | user_id | UUID (FK → users) | indexed, cascade delete |
-| document_id | UUID (FK → documents) | nullable, `ON DELETE SET NULL`; domain tasks attach related quote/invoice rows |
+| document_id | UUID (FK → documents) | nullable, `ON DELETE SET NULL`; successful extraction jobs now attach the persisted draft quote here |
 | job_type | String(20) | constrained enum: `extraction \| pdf \| email` |
 | status | String(20) | constrained enum: `pending \| running \| success \| failed \| terminal` |
 | attempts | Integer | default `0`; incremented when a worker attempt starts |
@@ -245,12 +245,36 @@ Rules:
 - `flagged` and `flag_reason` are extraction-only review hints.
 - Extraction-only fields are stripped before `POST /quotes` and `PATCH /quotes/{id}` payloads.
 
+#### `PersistedExtractionResponse` contract (`/quotes/extract` sync fallback only)
+
+```json
+{
+  "quote_id": "uuid",
+  "transcript": "string",
+  "line_items": [],
+  "total": "number | null",
+  "confidence_notes": ["string"]
+}
+```
+
+Rules:
+- Successful unified extraction is now a persistence boundary: both the async worker and the sync fallback create the draft quote before reporting success.
+- `quote_id` is the persisted draft quote id the frontend should navigate to.
+- `/quotes/convert-notes` and `/quotes/capture-audio` remain extraction-only endpoints for now; they still return plain `ExtractionResult` and do not create drafts.
+
+#### `JobRecordResponse` extraction extension
+
+For `job_type = "extraction"`:
+- `quote_id: UUID | null` mirrors the persisted draft id once the worker succeeds
+- `quote_id` stays `null` while the job is `pending` or `running`
+- `extraction_result` remains for backward compatibility, but `quote_id` is now the canonical navigation signal for unified capture
+
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
 | `/quotes/convert-notes` | POST | yes | cookie | `{ notes }` | `200 ExtractionResult` |
 | `/quotes/capture-audio` | POST | yes | cookie | multipart form-data `clips` files | `200 ExtractionResult` |
-| `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `202 JobRecordResponse` when ARQ is available, otherwise `200 ExtractionResult` sync fallback; `429` when active extraction jobs are at the per-user limit; `503 { detail: "Unable to start extraction right now. Please try again." }` if enqueue fails after the durable job row is created |
-| `/jobs/{job_id}` | GET | no | cookie | — | `200 JobRecordResponse` for owned jobs, with `extraction_result` populated on successful extraction jobs; `404 { detail: "Not found" }` for unknown or foreign-owned jobs |
+| `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string + `customer_id?` UUID | `202 JobRecordResponse` when ARQ is available, otherwise `200 PersistedExtractionResponse` sync fallback; both success paths persist the draft quote before returning success, `429` when active extraction jobs are at the per-user limit, and `503 { detail: "Unable to start extraction right now. Please try again." }` if enqueue fails after the durable job row is created |
+| `/jobs/{job_id}` | GET | no | cookie | — | `200 JobRecordResponse` for owned jobs, with `quote_id` populated on successful extraction jobs and `extraction_result` retained for backward compatibility; `404 { detail: "Not found" }` for unknown or foreign-owned jobs |
 | `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"`; this route remains customer-required, while extraction-created unassigned drafts are reserved for the extraction worker flow |
 | `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`; `customer_id` / `customer_name` may be `null` for unassigned drafts and each row includes `requires_customer_assignment` plus `can_reassign_customer`) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + nullable `customer_name`, `customer_email`, `customer_phone`, helper flags `requires_customer_assignment` / `can_reassign_customer`, and `linked_invoice`) or `404 { detail: "Not found" }` |

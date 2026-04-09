@@ -7,7 +7,7 @@ import json
 from collections.abc import Iterator, Sequence
 from datetime import date
 from types import SimpleNamespace
-from typing import Annotated, cast
+from typing import Annotated, TypedDict, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -33,7 +33,7 @@ from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult, LineItemDraft, LineItemExtracted
-from app.features.quotes.service import QuoteService
+from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.email import EmailConfigurationError, EmailMessage, EmailSendError
 from app.integrations.extraction import ExtractionError
@@ -60,7 +60,7 @@ from app.shared.input_limits import (
     NOTE_INPUT_MAX_CHARS,
 )
 from app.shared.rate_limit import reset_local_rate_limit_state
-from app.worker.job_registry import pdf_job
+from app.worker.job_registry import extraction_job, pdf_job
 from app.worker.runtime import (
     DEFAULT_MAX_TRIES,
     DEFAULT_RETRY_BASE_SECONDS,
@@ -204,8 +204,13 @@ class _InProgressIdempotencyStore:
 
 
 class _MockArqPool:
+    class _EnqueueCall(TypedDict):
+        function: str
+        args: tuple[object, ...]
+        kwargs: dict[str, object]
+
     def __init__(self) -> None:
-        self.calls: list[dict[str, object]] = []
+        self.calls: list[_MockArqPool._EnqueueCall] = []
 
     async def enqueue_job(self, function: str, *args: object, **kwargs: object) -> object:
         self.calls.append(
@@ -920,6 +925,7 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
         "customer.created",
         "quote.created",
         "quote_started",
+        "quote.created",
         "draft_generated",
         "quote.updated",
         "quote_pdf_generated",
@@ -930,9 +936,10 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
     assert emitted_events[0]["customer_id"] == customer_payload["id"]
     assert emitted_events[1]["quote_id"] == quote_payload["id"]
     assert emitted_events[2]["detail"] == "notes"
-    assert emitted_events[3]["detail"] == "notes"
-    assert emitted_events[5]["quote_id"] == quote_payload["id"]
-    assert emitted_events[7]["quote_id"] == delete_quote_payload["id"]
+    assert emitted_events[3]["quote_id"] != quote_payload["id"]
+    assert emitted_events[4]["detail"] == "notes"
+    assert emitted_events[6]["quote_id"] == quote_payload["id"]
+    assert emitted_events[8]["quote_id"] == delete_quote_payload["id"]
     assert all(
         "Event Test Customer" not in payload_text
         for payload_text in map(json.dumps, emitted_events)
@@ -2942,6 +2949,39 @@ async def test_extract_combined_failure_logs_pilot_failure_events_to_stdout(
     assert all(payload["detail"] == "audio" for payload in emitted_events)
 
 
+async def test_extract_combined_logs_persistence_failure_event_by_status_code(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    async def _fail_create_extracted_draft(self, **kwargs):  # noqa: ANN001, ANN003
+        del self, kwargs
+        raise QuoteServiceError(detail="database unavailable", status_code=503)
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+    monkeypatch.setattr(QuoteService, "create_extracted_draft", _fail_create_extracted_draft)
+
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "database unavailable"}
+    assert [payload["event"] for payload in emitted_events] == [
+        "quote_started",
+        "draft_generation_failed",
+    ]
+    assert emitted_events[-1]["detail"] == "notes"
+
+
 async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -2953,6 +2993,7 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["quote_id"]
     assert payload["transcript"] == "add 10 percent travel surcharge"
     assert payload["line_items"]
     assert payload["confidence_notes"] == []
@@ -2974,8 +3015,16 @@ async def test_extract_combined_falls_back_to_sync_when_no_arq_pool_is_available
     job_count = await db_session.scalar(select(func.count(JobRecord.id)))
 
     assert response.status_code == 200
-    assert response.json()["transcript"] == "mulch the front beds"
+    payload = response.json()
+    assert payload["quote_id"]
+    assert payload["transcript"] == "mulch the front beds"
     assert int(job_count or 0) == 0
+
+    persisted_quote = await db_session.get(Document, UUID(payload["quote_id"]))
+    assert persisted_quote is not None
+    assert persisted_quote.status == QuoteStatus.DRAFT
+    assert persisted_quote.customer_id is None
+    assert persisted_quote.transcript == "mulch the front beds"
 
 
 async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
@@ -2999,6 +3048,7 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
     assert payload["job_type"] == "extraction"
     assert payload["status"] == "pending"
     assert payload["extraction_result"] is None
+    assert payload["quote_id"] is None
     assert len(jobs) == 1
     assert jobs[0].status == JobStatus.PENDING
     assert pool.calls == [
@@ -3008,9 +3058,134 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
             "kwargs": {
                 "_job_id": str(jobs[0].id),
                 "transcript": "mulch the front beds",
+                "source_type": "text",
+                "capture_detail": "notes",
+                "customer_id": None,
             },
         }
     ]
+
+
+async def test_extract_combined_async_worker_persists_draft_and_returns_quote_id(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    csrf_token = await _register_and_login(client, _credentials())
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    payload = response.json()
+    await _run_extraction_job(
+        db_session,
+        job_id=payload["id"],
+        source_type="text",
+        capture_detail="notes",
+    )
+
+    status_response = await client.get(f"/api/jobs/{payload['id']}")
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["status"] == "success"
+    assert status_payload["quote_id"] is not None
+    assert status_payload["document_id"] == status_payload["quote_id"]
+    assert status_payload["extraction_result"]["transcript"] == "mulch the front beds"
+
+    quote_response = await client.get(f"/api/quotes/{status_payload['quote_id']}")
+    assert quote_response.status_code == 200
+    quote_payload = quote_response.json()
+    assert quote_payload["status"] == "draft"
+    assert quote_payload["customer_id"] is None
+    assert quote_payload["transcript"] == "mulch the front beds"
+    assert len(quote_payload["line_items"]) == 1
+
+    matching_quote_events = [
+        event
+        for event in emitted_events
+        if event.get("event") == "draft_generated"
+        and event.get("quote_id") == status_payload["quote_id"]
+    ]
+    assert len(matching_quote_events) == 1
+
+
+async def test_extract_combined_sync_fallback_persists_preselected_customer(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    app.state.arq_pool = None
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[
+            ("notes", (None, "mulch the front beds")),
+            ("customer_id", (None, customer_id)),
+        ],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["quote_id"]
+
+    persisted_quote = await db_session.get(Document, UUID(payload["quote_id"]))
+    assert persisted_quote is not None
+    assert persisted_quote.customer_id == UUID(customer_id)
+
+
+async def test_extract_combined_async_worker_persists_preselected_customer(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[
+            ("notes", (None, "mulch the front beds")),
+            ("customer_id", (None, customer_id)),
+        ],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert pool.calls[0]["kwargs"]["customer_id"] == customer_id
+
+    await _run_extraction_job(
+        db_session,
+        job_id=payload["id"],
+        source_type="text",
+        capture_detail="notes",
+        customer_id=customer_id,
+    )
+
+    status_response = await client.get(f"/api/jobs/{payload['id']}")
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["status"] == "success"
+    assert status_payload["quote_id"] is not None
+
+    persisted_quote = await db_session.get(Document, UUID(status_payload["quote_id"]))
+    assert persisted_quote is not None
+    assert persisted_quote.customer_id == UUID(customer_id)
 
 
 async def test_extract_combined_clips_only_success(client: AsyncClient) -> None:
@@ -5207,6 +5382,40 @@ async def _run_pdf_job(db_session: AsyncSession, *, job_id: object) -> None:
             "storage_service": _MockStorageService(),
         },
         job_id,
+    )
+
+
+async def _run_extraction_job(
+    db_session: AsyncSession,
+    *,
+    job_id: object,
+    source_type: str,
+    capture_detail: str,
+    customer_id: str | None = None,
+) -> None:
+    assert isinstance(job_id, str)
+    session_maker = async_sessionmaker(
+        bind=db_session.bind,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    runtime = WorkerRuntimeSettings(
+        session_maker=session_maker,
+        max_tries=DEFAULT_MAX_TRIES,
+        retry_base_seconds=DEFAULT_RETRY_BASE_SECONDS,
+        retry_jitter_seconds=DEFAULT_RETRY_JITTER_SECONDS,
+    )
+    await extraction_job(
+        {
+            "job_try": 1,
+            "worker_runtime": runtime,
+            "extraction_integration": _MockExtractionIntegration(),
+        },
+        job_id,
+        transcript="mulch the front beds",
+        source_type=source_type,
+        capture_detail=capture_detail,
+        customer_id=customer_id,
     )
 
 

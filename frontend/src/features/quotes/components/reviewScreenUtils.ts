@@ -92,3 +92,17 @@ export function buildCreatePayload(draft: QuoteDraft, lineItems: LineItemDraft[]
     source_type: draft.sourceType,
   };
 }
+
+export function buildUpdatePayload(draft: QuoteDraft, lineItems: LineItemDraft[]) {
+  return {
+    title: normalizeOptionalTitle(draft.title),
+    transcript: draft.transcript,
+    line_items: lineItems,
+    total_amount: draft.total,
+    tax_rate: draft.taxRate,
+    discount_type: draft.discountType,
+    discount_value: draft.discountValue,
+    deposit_amount: draft.depositAmount,
+    notes: draft.notes,
+  };
+}

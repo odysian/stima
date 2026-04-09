@@ -40,6 +40,7 @@ from app.features.quotes.schemas import (
     LineItemResponse,
     LinkedInvoiceResponse,
     PdfArtifactResponse,
+    PersistedExtractionResponse,
     PublicDocumentResponse,
     PublicInvoiceResponse,
     PublicLineItemResponse,
@@ -64,6 +65,7 @@ from app.shared.dependencies import (
     get_quote_service,
     require_csrf,
 )
+from app.shared.event_logger import log_event
 from app.shared.idempotency import IdempotencyStore, validate_idempotency_key
 from app.shared.input_limits import (
     MAX_AUDIO_CLIP_BYTES,
@@ -151,7 +153,7 @@ async def convert_notes(
     user: Annotated[User, Depends(get_current_user)],
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
 ) -> ExtractionResult:
-    """Convert freeform notes into structured quote extraction output."""
+    """Convert notes into extraction output without creating a persisted draft."""
     del request
     async with extraction_capacity_guard(user.id):
         try:
@@ -192,7 +194,7 @@ async def capture_audio(
     user: Annotated[User, Depends(get_current_user)],
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
 ) -> ExtractionResult:
-    """Convert uploaded audio clips into structured quote extraction output."""
+    """Convert audio clips into extraction output without creating a persisted draft."""
     del request
     async with extraction_capacity_guard(user.id):
         clip_inputs = await _parse_upload_clips(clips)
@@ -205,7 +207,7 @@ async def capture_audio(
 
 @router.post(
     "/extract",
-    response_model=ExtractionResult | JobRecordResponse,
+    response_model=PersistedExtractionResponse | JobRecordResponse,
     dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(lambda: get_settings().quote_combined_extract_rate_limit, key_func=get_user_key)
@@ -213,27 +215,68 @@ async def extract_combined(
     request: Request,
     user: Annotated[User, Depends(get_current_user)],
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
     db: Annotated[AsyncSession, Depends(get_db)],
     arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
     job_service: Annotated[JobService, Depends(get_job_service)],
     response: Response,
     clips: Annotated[list[UploadFile] | None, File()] = None,
     notes: Annotated[str, Form(max_length=NOTE_INPUT_MAX_CHARS)] = "",
-) -> ExtractionResult | JobRecordResponse:
-    """Extract structured quote data from optional audio clips and optional notes."""
+    customer_id: Annotated[UUID | None, Form()] = None,
+) -> PersistedExtractionResponse | JobRecordResponse:
+    """Extract quote data, persist the draft, and return a quote id or extraction job."""
     del request
     clip_inputs = await _parse_upload_clips(clips or [])
+    capture_detail = _resolve_capture_detail(clip_inputs, notes)
+    source_type = _resolve_source_type(clip_inputs)
+
+    try:
+        await quote_service.ensure_customer_exists_for_user(
+            user_id=user.id,
+            customer_id=customer_id,
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     if arq_pool is None:
         async with extraction_capacity_guard(user.id):
             try:
-                return await extraction_service.extract_combined(
+                extraction = await extraction_service.extract_combined(
                     clip_inputs,
                     notes,
                     user_id=user.id,
                 )
             except QuoteServiceError as exc:
                 raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+            try:
+                quote = await quote_service.create_extracted_draft(
+                    user_id=user.id,
+                    customer_id=customer_id,
+                    extraction_result=extraction,
+                    source_type=source_type,
+                )
+            except QuoteServiceError as exc:
+                if exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
+                    log_event("draft_generation_failed", user_id=user.id, detail=capture_detail)
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        log_event(
+            "quote.created",
+            user_id=user.id,
+            quote_id=quote.id,
+            customer_id=quote.customer_id,
+        )
+        log_event(
+            "draft_generated",
+            user_id=user.id,
+            quote_id=quote.id,
+            customer_id=quote.customer_id,
+            detail=capture_detail,
+        )
+        return PersistedExtractionResponse(
+            quote_id=quote.id,
+            **extraction.model_dump(),
+        )
 
     try:
         transcript = await extraction_service.prepare_combined_transcript(
@@ -260,6 +303,9 @@ async def extract_combined(
             str(job.id),
             _job_id=str(job.id),
             transcript=transcript,
+            source_type=source_type,
+            capture_detail=capture_detail,
+            customer_id=str(customer_id) if customer_id is not None else None,
         )
         if queued_job is None:
             raise RuntimeError("ARQ did not accept the extraction job")
@@ -275,6 +321,19 @@ async def extract_combined(
     await db.commit()
     response.status_code = status.HTTP_202_ACCEPTED
     return job_record_to_response(job)
+
+
+def _resolve_source_type(clips: list[CaptureAudioClip]) -> Literal["text", "voice"]:
+    return "voice" if clips else "text"
+
+
+def _resolve_capture_detail(clips: list[CaptureAudioClip], notes: str | None) -> str:
+    normalized_notes = (notes or "").strip()
+    if clips and normalized_notes:
+        return "audio+notes"
+    if clips:
+        return "audio"
+    return "notes"
 
 
 @router.get("", response_model=list[QuoteListItemResponse])

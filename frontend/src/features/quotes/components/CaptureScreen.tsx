@@ -111,12 +111,13 @@ export function CaptureScreen(): React.ReactElement {
     };
   }, []);
 
-  function applyDraft(sourceType: QuoteSourceType, extraction: ExtractionResult): void {
+  function applyDraft(sourceType: QuoteSourceType, extraction: ExtractionResult, quoteId: string): void {
     if (!customerId) {
       throw new Error("Missing customer context. Please select a customer again.");
     }
 
     setDraft({
+      quoteId,
       customerId,
       launchOrigin,
       title: "",
@@ -172,13 +173,14 @@ export function CaptureScreen(): React.ReactElement {
       const extraction = await quoteService.extract({
         clips: clips.map((clip) => clip.blob),
         notes,
+        customerId,
       });
       if (!isMountedRef.current) {
         return;
       }
       const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
       if (extraction.type === "sync") {
-        applyDraft(sourceType, extraction.result);
+        applyDraft(sourceType, extraction.result, extraction.quoteId);
         navigate("/quotes/review");
         return;
       }
@@ -210,7 +212,10 @@ export function CaptureScreen(): React.ReactElement {
         if (!job.extraction_result) {
           throw new Error("Extraction completed without a result. Please try again.");
         }
-        applyDraft(sourceType, job.extraction_result);
+        if (!job.quote_id) {
+          throw new Error("Extraction completed without a persisted draft. Please try again.");
+        }
+        applyDraft(sourceType, job.extraction_result, job.quote_id);
         navigate("/quotes/review");
         return;
       }

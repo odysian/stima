@@ -8,11 +8,14 @@ import pytest
 from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
+from app.features.quotes.models import Document
 from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.service import QuoteServiceError
 from app.integrations.extraction import ExtractionError
-from app.worker.job_registry import extraction_job
+from app.worker.job_registry import TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED, extraction_job
 from app.worker.runtime import (
     TERMINAL_ERROR_RETRY_EXHAUSTED,
+    NonRetryableJobError,
     RetryableJobError,
     WorkerRuntimeSettings,
 )
@@ -37,12 +40,86 @@ async def test_extraction_job_stores_result_json_on_success(
         ),
         str(record.id),
         transcript="mulch the front beds",
+        source_type="text",
+        capture_detail="notes",
     )
 
     refreshed = await _load_job_record(db_session, record.id)
     assert refreshed is not None  # nosec B101 - pytest assertion
     assert refreshed.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
     assert refreshed.result_json is not None  # nosec B101 - pytest assertion
+    assert refreshed.document_id is not None  # nosec B101 - pytest assertion
+
+    persisted_quote = await db_session.get(Document, refreshed.document_id)
+    assert persisted_quote is not None  # nosec B101 - pytest assertion
+    assert persisted_quote.transcript == "mulch the front beds"  # nosec B101 - pytest assertion
+    assert persisted_quote.source_type == "text"  # nosec B101 - pytest assertion
+
+
+async def test_extraction_job_accepts_legacy_enqueued_payload_without_source_metadata(
+    db_session: AsyncSession,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    await extraction_job(
+        _worker_context(
+            db_session,
+            extraction_integration=_SuccessfulExtractionIntegration(),
+        ),
+        str(record.id),
+        transcript="legacy queued transcript",
+    )
+
+    refreshed = await _load_job_record(db_session, record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
+    assert refreshed.document_id is not None  # nosec B101 - pytest assertion
+
+    persisted_quote = await db_session.get(Document, refreshed.document_id)
+    assert persisted_quote is not None  # nosec B101 - pytest assertion
+    assert persisted_quote.source_type == "text"  # nosec B101 - pytest assertion
+    assert persisted_quote.transcript == "legacy queued transcript"  # nosec B101 - pytest assertion
+
+
+async def test_extraction_job_marks_terminal_when_draft_persistence_fails(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    async def _failing_create_extracted_draft(*args, **kwargs):  # noqa: ANN002, ANN003
+        del args, kwargs
+        raise QuoteServiceError(detail="persistence failed", status_code=503)
+
+    monkeypatch.setattr(
+        "app.features.quotes.service.QuoteService.create_extracted_draft",
+        _failing_create_extracted_draft,
+    )
+
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED):
+        await extraction_job(
+            _worker_context(
+                db_session,
+                extraction_integration=_SuccessfulExtractionIntegration(),
+            ),
+            str(record.id),
+            transcript="mulch the front beds",
+            source_type="text",
+            capture_detail="notes",
+        )
+
+    refreshed = await _load_job_record(db_session, record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
+    assert refreshed.terminal_error == TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED  # nosec B101 - pytest assertion
+    assert refreshed.document_id is None  # nosec B101 - pytest assertion
+    assert refreshed.result_json is None  # nosec B101 - pytest assertion
 
 
 async def test_extraction_job_retries_provider_429_and_marks_terminal_after_final_attempt(
@@ -64,6 +141,8 @@ async def test_extraction_job_retries_provider_429_and_marks_terminal_after_fina
             ),
             str(record.id),
             transcript="mulch the front beds",
+            source_type="text",
+            capture_detail="notes",
         )
 
     after_first_failure = await _load_job_record(db_session, record.id)
@@ -79,6 +158,8 @@ async def test_extraction_job_retries_provider_429_and_marks_terminal_after_fina
             ),
             str(record.id),
             transcript="mulch the front beds",
+            source_type="text",
+            capture_detail="notes",
         )
 
     terminal_record = await _load_job_record(db_session, record.id)

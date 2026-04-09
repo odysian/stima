@@ -9,6 +9,7 @@ from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.jobs.models import JobType
 from app.features.jobs.repository import JobRepository
+from app.features.quotes.repository import QuoteRepository
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,14 +26,28 @@ async def test_get_job_status_returns_owned_extraction_result(
     user = await _get_user_by_email(db_session, credentials["email"])
 
     repository = JobRepository(db_session)
+    quote = await QuoteRepository(db_session).create(
+        user_id=user.id,
+        customer_id=None,
+        title=None,
+        transcript="mulch the beds",
+        line_items=[],
+        total_amount=None,
+        tax_rate=None,
+        discount_type=None,
+        discount_value=None,
+        deposit_amount=None,
+        notes=None,
+        source_type="text",
+    )
     record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
     await repository.set_running(record.id, expected_job_type=JobType.EXTRACTION)
-    await repository.set_success_with_result(
+    await repository.set_extraction_success(
         record.id,
+        quote_id=quote.id,
         result_json=(
             '{"transcript":"mulch the beds","line_items":[],"total":null,"confidence_notes":[]}'
         ),
-        expected_job_type=JobType.EXTRACTION,
     )
     await db_session.commit()
 
@@ -42,6 +57,8 @@ async def test_get_job_status_returns_owned_extraction_result(
     payload = response.json()
     assert payload["id"] == str(record.id)  # nosec B101 - pytest assertion
     assert payload["status"] == "success"  # nosec B101 - pytest assertion
+    assert payload["document_id"] == str(quote.id)  # nosec B101 - pytest assertion
+    assert payload["quote_id"] == str(quote.id)  # nosec B101 - pytest assertion
     assert payload["extraction_result"] == {  # nosec B101 - pytest assertion
         "transcript": "mulch the beds",
         "line_items": [],
