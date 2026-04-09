@@ -39,7 +39,6 @@ export function LineItemCard({
         {details ? <p className="mt-0.5 text-sm text-on-surface-variant">{details}</p> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <span className="text-xs font-bold uppercase tracking-wide text-primary">Edit</span>
         {price != null ? <p className="font-bold text-on-surface">${price.toFixed(2)}</p> : null}
         <span className="material-symbols-outlined text-outline">chevron_right</span>
       </div>
