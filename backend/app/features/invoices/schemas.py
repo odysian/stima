@@ -87,7 +87,6 @@ class InvoiceListItemResponse(BaseModel):
     title: str | None
     status: Literal["draft", "ready", "sent"]
     total_amount: float | None
-    item_count: int
     due_date: date | None
     created_at: datetime
     source_document_id: UUID | None

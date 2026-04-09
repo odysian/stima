@@ -71,7 +71,6 @@ function makeInvoiceListItem(overrides: Partial<InvoiceListItem> = {}): InvoiceL
     title: null,
     status: "draft",
     total_amount: 120,
-    item_count: 1,
     due_date: "2026-04-19",
     created_at: "2026-03-20T00:00:00.000Z",
     source_document_id: null,
@@ -255,7 +254,6 @@ describe("QuoteList", () => {
         title: "Front Bed Refresh",
         status: "ready",
         total_amount: 220,
-        item_count: 3,
         created_at: "2026-03-21T00:00:00.000Z",
         source_document_id: "quote-2",
       }),
@@ -271,7 +269,6 @@ describe("QuoteList", () => {
     expect(screen.getByText("Front Bed Refresh")).toBeInTheDocument();
     expect(screen.getByText("Bob Brown")).toBeInTheDocument();
     expect(screen.getByText(/I-002\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
-    expect(screen.getByText("3 items")).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getAllByText("$220.00")).toHaveLength(1);
     expect(screen.getByRole("region", { name: "PAST INVOICES" }).querySelector("p:empty")).toBeNull();

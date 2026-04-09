@@ -76,16 +76,18 @@ function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionPro
                   <p className="text-sm text-on-surface-variant">
                     {row.docAndDate}
                   </p>
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
                     {row.itemDetails ? (
                       <p className="text-sm text-on-surface-variant">
                         {row.itemDetails}
                       </p>
                     ) : null}
                     {row.needsCustomerAssignment ? (
-                      <span className={needsCustomerBadgeClasses}>Needs customer</span>
+                      <span className={`${needsCustomerBadgeClasses} ml-auto`}>Needs customer</span>
                     ) : (
-                      <StatusBadge variant={row.status} />
+                      <span className="ml-auto">
+                        <StatusBadge variant={row.status} />
+                      </span>
                     )}
                   </div>
                 </div>
@@ -288,7 +290,7 @@ export function QuoteList(): React.ReactElement {
         invoice.doc_number,
         formatDate(invoice.created_at, timezone),
       ].join(" · "),
-      itemDetails: `${invoice.item_count} ${invoice.item_count === 1 ? "item" : "items"}`,
+      itemDetails: null,
       totalAmount: invoice.total_amount,
       status: invoice.status,
       destination: `/invoices/${invoice.id}`,

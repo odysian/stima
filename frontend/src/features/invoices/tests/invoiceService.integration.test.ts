@@ -58,7 +58,9 @@ describe("invoiceService integration (MSW)", () => {
       customer_id: "cust-1",
       title: "Spring cleanup",
       transcript: "5 yards brown mulch",
-      line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+      line_items: [
+        { description: "Brown mulch", details: "5 yards", price: 120 },
+      ],
       total_amount: 120,
       tax_rate: null,
       discount_type: null,
@@ -98,7 +100,6 @@ describe("invoiceService integration (MSW)", () => {
         title: "Front bed refresh",
         status: "ready",
         total_amount: 220,
-        item_count: 2,
         due_date: "2026-04-22",
         created_at: "2026-03-21T00:00:00.000Z",
         source_document_id: null,
@@ -111,7 +112,6 @@ describe("invoiceService integration (MSW)", () => {
         title: "Spring cleanup",
         status: "draft",
         total_amount: 120,
-        item_count: 1,
         due_date: "2026-04-19",
         created_at: "2026-03-20T00:00:00.000Z",
         source_document_id: "quote-1",
@@ -124,7 +124,9 @@ describe("invoiceService integration (MSW)", () => {
 
     server.use(
       http.get("/api/invoices", ({ request }) => {
-        capturedCustomerId = new URL(request.url).searchParams.get("customer_id");
+        capturedCustomerId = new URL(request.url).searchParams.get(
+          "customer_id",
+        );
         return HttpResponse.json([], { status: 200 });
       }),
     );
@@ -144,7 +146,11 @@ describe("invoiceService integration (MSW)", () => {
         capturedCsrfHeader = request.headers.get("X-CSRF-Token");
         const body = (await request.json()) as {
           title?: string | null;
-          line_items?: Array<{ description: string; details: string | null; price: number | null }>;
+          line_items?: Array<{
+            description: string;
+            details: string | null;
+            price: number | null;
+          }>;
           total_amount?: number | null;
           notes?: string | null;
           due_date?: string;
@@ -168,13 +174,15 @@ describe("invoiceService integration (MSW)", () => {
             shared_at: null,
             share_token: null,
             source_document_id: "quote-1",
-            line_items: (body.line_items ?? [
-              {
-                description: "Brown mulch",
-                details: "5 yards",
-                price: 120,
-              },
-            ]).map((lineItem, index) => ({
+            line_items: (
+              body.line_items ?? [
+                {
+                  description: "Brown mulch",
+                  details: "5 yards",
+                  price: 120,
+                },
+              ]
+            ).map((lineItem, index) => ({
               id: `line-${index + 1}`,
               description: lineItem.description,
               details: lineItem.details,
@@ -191,7 +199,9 @@ describe("invoiceService integration (MSW)", () => {
 
     const invoice = await invoiceService.updateInvoice("invoice-1", {
       title: "Updated invoice",
-      line_items: [{ description: "Final walkthrough", details: null, price: 90 }],
+      line_items: [
+        { description: "Final walkthrough", details: null, price: 90 },
+      ],
       total_amount: 90,
       notes: "Updated note",
       due_date: "2026-04-30",
@@ -200,7 +210,9 @@ describe("invoiceService integration (MSW)", () => {
     expect(capturedCsrfHeader).toBe("invoice-csrf-token");
     expect(capturedPayload).toEqual({
       title: "Updated invoice",
-      line_items: [{ description: "Final walkthrough", details: null, price: 90 }],
+      line_items: [
+        { description: "Final walkthrough", details: null, price: 90 },
+      ],
       total_amount: 90,
       notes: "Updated note",
       due_date: "2026-04-30",

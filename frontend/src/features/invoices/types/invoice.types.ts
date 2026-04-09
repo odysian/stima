@@ -50,7 +50,6 @@ export interface InvoiceListItem {
   title: string | null;
   status: InvoiceStatus;
   total_amount: number | null;
-  item_count: number;
   due_date: string | null;
   created_at: string;
   source_document_id: string | null;

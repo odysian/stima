@@ -13,7 +13,10 @@ import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 const navigateMock = vi.fn();
 
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  const actual =
+    await vi.importActual<typeof import("react-router-dom")>(
+      "react-router-dom",
+    );
   return {
     ...actual,
     useNavigate: () => navigateMock,
@@ -60,7 +63,9 @@ const mockedInvoiceService = vi.mocked(invoiceService);
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedUseAuth = vi.mocked(useAuth);
 
-function makeInvoice(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem {
+function makeInvoice(
+  overrides: Partial<InvoiceListItem> = {},
+): InvoiceListItem {
   return {
     id: "invoice-1",
     customer_id: "cust-1",
@@ -69,7 +74,6 @@ function makeInvoice(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem 
     title: null,
     status: "draft",
     total_amount: 120,
-    item_count: 1,
     due_date: "2026-04-19",
     created_at: "2026-03-25T00:00:00.000Z",
     source_document_id: null,
@@ -164,21 +168,37 @@ describe("CustomerDetailScreen", () => {
   it("renders the condensed customer summary by default", async () => {
     renderScreen();
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
-    expect(mockedQuoteService.listQuotes).toHaveBeenCalledWith({ customer_id: "cust-1" });
-    expect(mockedInvoiceService.listInvoices).toHaveBeenCalledWith({ customer_id: "cust-1" });
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Alice Johnson" }),
+    ).toBeInTheDocument();
+    expect(mockedQuoteService.listQuotes).toHaveBeenCalledWith({
+      customer_id: "cust-1",
+    });
+    expect(mockedInvoiceService.listInvoices).toHaveBeenCalledWith({
+      customer_id: "cust-1",
+    });
     expect(screen.getByText("555-0101")).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
     expect(screen.getByText("1 Main St")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Invoices" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Invoices" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     expect(screen.getByText("1 ITEM")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument();
   });
 
   it("shows loading state while fetching", () => {
-    mockedCustomerService.getCustomer.mockImplementationOnce(() => new Promise<Customer>(() => {}));
-    mockedInvoiceService.listInvoices.mockImplementationOnce(() => new Promise<InvoiceListItem[]>(() => {}));
+    mockedCustomerService.getCustomer.mockImplementationOnce(
+      () => new Promise<Customer>(() => {}),
+    );
+    mockedInvoiceService.listInvoices.mockImplementationOnce(
+      () => new Promise<InvoiceListItem[]>(() => {}),
+    );
 
     renderScreen();
 
@@ -186,11 +206,15 @@ describe("CustomerDetailScreen", () => {
   });
 
   it("shows error when customer fetch fails", async () => {
-    mockedCustomerService.getCustomer.mockRejectedValueOnce(new Error("Unable to load customer"));
+    mockedCustomerService.getCustomer.mockRejectedValueOnce(
+      new Error("Unable to load customer"),
+    );
 
     renderScreen();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load customer");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Unable to load customer",
+    );
   });
 
   it("calls updateCustomer with edited values and shows success feedback", async () => {
@@ -213,28 +237,37 @@ describe("CustomerDetailScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
-      expect(mockedCustomerService.updateCustomer).toHaveBeenCalledWith("cust-1", {
-        name: "Alice A. Johnson",
-        phone: "555-9999",
-        email: "alice+new@example.com",
-        address: "2 Main St",
-      });
+      expect(mockedCustomerService.updateCustomer).toHaveBeenCalledWith(
+        "cust-1",
+        {
+          name: "Alice A. Johnson",
+          phone: "555-9999",
+          email: "alice+new@example.com",
+          address: "2 Main St",
+        },
+      );
     });
 
     expect(await screen.findByRole("status")).toHaveTextContent("Saved");
     expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: "Alice A. Johnson" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Alice A. Johnson" }),
+    ).toBeInTheDocument();
   });
 
   it("shows save error when update fails", async () => {
-    mockedCustomerService.updateCustomer.mockRejectedValueOnce(new Error("Unable to save customer"));
+    mockedCustomerService.updateCustomer.mockRejectedValueOnce(
+      new Error("Unable to save customer"),
+    );
 
     renderScreen();
     await openEditForm();
 
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to save customer");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Unable to save customer",
+    );
   });
 
   it("sends null for optional fields when user clears them", async () => {
@@ -257,12 +290,15 @@ describe("CustomerDetailScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
-      expect(mockedCustomerService.updateCustomer).toHaveBeenCalledWith("cust-1", {
-        name: "Alice Johnson",
-        phone: null,
-        email: "alice@example.com",
-        address: "1 Main St",
-      });
+      expect(mockedCustomerService.updateCustomer).toHaveBeenCalledWith(
+        "cust-1",
+        {
+          name: "Alice Johnson",
+          phone: null,
+          email: "alice@example.com",
+          address: "1 Main St",
+        },
+      );
     });
   });
 
@@ -311,8 +347,14 @@ describe("CustomerDetailScreen", () => {
     await switchToInvoicesTab();
 
     expect(await screen.findByText("I-001")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Invoices" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Invoices" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     expect(screen.getByText("2 ITEMS")).toBeInTheDocument();
     expect(screen.getByText("Mar 24, 2026")).toBeInTheDocument();
     expect(screen.getByText(/I-002\s*·\s*Mar 25, 2026/)).toBeInTheDocument();
@@ -333,23 +375,33 @@ describe("CustomerDetailScreen", () => {
   });
 
   it("renders invoice history error state without hiding the customer details", async () => {
-    mockedInvoiceService.listInvoices.mockRejectedValueOnce(new Error("Unable to load invoices"));
+    mockedInvoiceService.listInvoices.mockRejectedValueOnce(
+      new Error("Unable to load invoices"),
+    );
 
     renderScreen();
     await switchToInvoicesTab();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load invoices");
-    expect(screen.getByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Unable to load invoices",
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Alice Johnson" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Q-001")).not.toBeInTheDocument();
   });
 
   it("renders invoice history loading state while invoices are in flight", async () => {
-    mockedInvoiceService.listInvoices.mockImplementationOnce(() => new Promise<InvoiceListItem[]>(() => {}));
+    mockedInvoiceService.listInvoices.mockImplementationOnce(
+      () => new Promise<InvoiceListItem[]>(() => {}),
+    );
 
     renderScreen();
     await switchToInvoicesTab();
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Alice Johnson" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Alice Johnson" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Loading invoices...");
   });
 
@@ -365,6 +417,8 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
     await screen.findByText("Q-001");
 
-    expect(screen.getByRole("button", { name: /group customers/i })).toHaveClass("text-primary");
+    expect(
+      screen.getByRole("button", { name: /group customers/i }),
+    ).toHaveClass("text-primary");
   });
 });
