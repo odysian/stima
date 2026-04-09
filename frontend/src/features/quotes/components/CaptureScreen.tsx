@@ -57,7 +57,7 @@ function getExtractionHelperCopy(hasClips: boolean, hasNotes: boolean): string |
 export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
-  const { customerId } = useParams<{ customerId: string }>();
+  const { customerId } = useParams();
   const { setDraft } = useQuoteDraft();
   const isMountedRef = useRef(true);
   const extractionStageTimerRefs = useRef<number[]>([]);

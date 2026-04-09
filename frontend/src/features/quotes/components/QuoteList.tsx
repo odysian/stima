@@ -157,7 +157,9 @@ export function QuoteList(): React.ReactElement {
     ? "Search customer, title, or quote ID..."
     : "Search customer, title, or invoice ID...";
   const emptyStateMessage = totalRows === 0
-    ? `No ${documentMode} yet. Tap New Quote to create your first.`
+    ? documentMode === "quotes"
+      ? "No quotes yet. Tap New Quote to create your first."
+      : "No invoices yet. Tap New Quote and choose Invoice in review."
     : `No ${documentMode} match your search.`;
   const sectionLabel = documentMode === "quotes" ? "PAST QUOTES" : "PAST INVOICES";
 
