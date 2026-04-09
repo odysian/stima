@@ -30,10 +30,29 @@ CONTAINER_PORT="${CONTAINER_PORT:-8000}"
 ZEROSSL_EAB_KID="$(grep -E '^ZEROSSL_EAB_KID=' "$ENV_FILE" | cut -d= -f2- | head -n1 || true)"
 ZEROSSL_EAB_HMAC_KEY="$(grep -E '^ZEROSSL_EAB_HMAC_KEY=' "$ENV_FILE" | cut -d= -f2- | head -n1 || true)"
 
+log_disk_state() {
+  echo "Disk usage for /:"
+  df -h / || true
+  echo "Docker disk usage:"
+  docker system df || true
+}
+
+reclaim_unused_docker_space() {
+  echo "Pruning unused Docker containers and images..."
+  docker container prune -f >/dev/null || true
+  docker image prune -af >/dev/null || true
+}
+
 # ── Docker ────────────────────────────────────────────────────────────────────
 if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
   echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
 fi
+
+echo "Checking Docker disk headroom before pull..."
+log_disk_state
+reclaim_unused_docker_space
+echo "Docker disk headroom after cleanup:"
+log_disk_state
 
 echo "Pulling: $IMAGE_TAG"
 docker pull "$IMAGE_TAG"
@@ -78,7 +97,8 @@ done
 echo "Recent worker logs:"
 docker logs "$WORKER_CONTAINER_NAME" --tail=10
 
-docker image prune -f >/dev/null || true
+echo "Pruning unused Docker containers and images after deploy..."
+reclaim_unused_docker_space
 
 # ── NGINX ─────────────────────────────────────────────────────────────────────
 install -d -m 755 /opt/stima/nginx "$ACME_WEBROOT"
