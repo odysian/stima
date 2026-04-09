@@ -36,7 +36,9 @@ def job_record_to_response(record: JobRecord) -> JobRecordResponse:
     if record.job_type != JobType.EXTRACTION:
         return response
 
-    updates: dict[str, UUID | ExtractionResult | None] = {"quote_id": record.document_id}
+    updates: dict[str, UUID | ExtractionResult | None] = {
+        "quote_id": record.document_id if record.status == JobStatus.SUCCESS else None
+    }
     if record.status == JobStatus.SUCCESS and record.result_json is not None:
         updates["extraction_result"] = ExtractionResult.model_validate_json(record.result_json)
     return response.model_copy(update=updates)

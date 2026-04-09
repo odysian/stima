@@ -151,7 +151,7 @@ export function LineItemEditSheet({
               </section>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
+            <div className="mt-6 flex flex-col gap-3">
               <button
                 type="button"
                 className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold forest-gradient text-on-primary transition-all active:scale-[0.98]"

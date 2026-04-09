@@ -323,6 +323,112 @@ async def extract_combined(
     return job_record_to_response(job)
 
 
+@router.post(
+    "/{quote_id}/append-extraction",
+    response_model=PersistedExtractionResponse | JobRecordResponse,
+    dependencies=[Depends(require_csrf)],
+)
+@limiter.limit(lambda: get_settings().quote_combined_extract_rate_limit, key_func=get_user_key)
+async def append_extraction(
+    request: Request,
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
+    job_service: Annotated[JobService, Depends(get_job_service)],
+    response: Response,
+    clips: Annotated[list[UploadFile] | None, File()] = None,
+    notes: Annotated[str, Form(max_length=NOTE_INPUT_MAX_CHARS)] = "",
+) -> PersistedExtractionResponse | JobRecordResponse:
+    """Append extraction output onto one existing persisted quote."""
+    del request
+    clip_inputs = await _parse_upload_clips(clips or [])
+    capture_detail = _resolve_capture_detail(clip_inputs, notes)
+    source_type = _resolve_source_type(clip_inputs)
+
+    try:
+        await quote_service.ensure_quote_appendable(user_id=user.id, quote_id=quote_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    if arq_pool is None:
+        async with extraction_capacity_guard(user.id):
+            try:
+                extraction = await extraction_service.extract_combined(
+                    clip_inputs,
+                    notes,
+                    user_id=user.id,
+                )
+                updated_quote, merged_extraction = await quote_service.append_extraction_to_quote(
+                    user_id=user.id,
+                    quote_id=quote_id,
+                    extraction_result=extraction,
+                )
+            except QuoteServiceError as exc:
+                if exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
+                    log_event("draft_generation_failed", user_id=user.id, detail=capture_detail)
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+        log_event(
+            "quote_append_extracted",
+            user_id=user.id,
+            quote_id=updated_quote.id,
+            customer_id=updated_quote.customer_id,
+            detail=capture_detail,
+        )
+        return PersistedExtractionResponse(
+            quote_id=updated_quote.id,
+            **merged_extraction.model_dump(),
+        )
+
+    try:
+        transcript = await extraction_service.prepare_combined_transcript(
+            clip_inputs,
+            notes,
+            user_id=user.id,
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    settings = get_settings()
+    job = await job_service.create_extraction_job_if_capacity_available(
+        user_id=user.id,
+        concurrency_limit=settings.extraction_concurrency_limit,
+        document_id=quote_id,
+    )
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Extraction quota or concurrency exhausted. Please retry later.",
+        )
+    try:
+        queued_job = await arq_pool.enqueue_job(
+            EXTRACTION_JOB_NAME,
+            str(job.id),
+            _job_id=str(job.id),
+            transcript=transcript,
+            source_type=source_type,
+            capture_detail=capture_detail,
+            append_to_quote=True,
+        )
+        if queued_job is None:
+            raise RuntimeError("ARQ did not accept the extraction job")
+    except Exception as exc:
+        LOGGER.warning("Failed to enqueue extraction append job %s", job.id, exc_info=True)
+        await job_service.mark_enqueue_failed(job.id, job_type=JobType.EXTRACTION)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_QUEUE_FAILURE_DETAIL,
+        ) from exc
+
+    await db.commit()
+    response.status_code = status.HTTP_202_ACCEPTED
+    return job_record_to_response(job)
+
+
 def _resolve_source_type(clips: list[CaptureAudioClip]) -> Literal["text", "voice"]:
     return "voice" if clips else "text"
 

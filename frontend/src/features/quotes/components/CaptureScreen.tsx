@@ -2,8 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
-import { HOME_ROUTE, resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
-import { writeQuoteConfidenceNotes } from "@/features/quotes/utils/reviewConfidenceNotes";
+import {
+  EXTRACTION_MAX_POLLS,
+  EXTRACTION_POLL_INTERVAL_MS,
+  EXTRACTION_STAGE_DELAY_MS,
+  formatElapsed,
+  getAppendHelperCopy,
+  getExtractionHelperCopy,
+  getExtractionStages,
+} from "@/features/quotes/components/captureScreenHelpers";
+import { HOME_ROUTE, readCaptureLaunchOrigin, resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
+import { readQuoteConfidenceNotes, writeQuoteConfidenceNotes } from "@/features/quotes/utils/reviewConfidenceNotes";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
@@ -20,45 +29,10 @@ import {
   NOTE_INPUT_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
 
-const EXTRACTION_STAGE_DELAY_MS = 2500;
-const EXTRACTION_POLL_INTERVAL_MS = 2000;
-const EXTRACTION_MAX_POLLS = 60;
-
-function formatElapsed(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, "0");
-  const secs = (seconds % 60).toString().padStart(2, "0");
-  return `${mins}:${secs}`;
-}
-
-function getExtractionStages(hasClips: boolean, hasNotes: boolean): string[] {
-  if (hasClips && hasNotes) {
-    return ["Uploading audio...", "Transcribing audio...", "Extracting line items from audio and notes..."];
-  }
-  if (hasClips) {
-    return ["Uploading audio...", "Transcribing audio...", "Extracting line items..."];
-  }
-  return ["Analyzing notes...", "Extracting line items..."];
-}
-
-function getExtractionHelperCopy(hasClips: boolean, hasNotes: boolean): string | null {
-  if (hasClips && hasNotes) {
-    return "Extraction saves one draft from your recording and notes. You can add more voice notes later from review.";
-  }
-  if (hasClips) {
-    return "Extraction saves your recording as a draft checkpoint. You can add more voice notes later from review.";
-  }
-  if (hasNotes) {
-    return "Extraction saves your notes as a draft checkpoint. You can add more voice notes later from review.";
-  }
-  return null;
-}
-
 export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
-  const { customerId } = useParams();
+  const { customerId, id: quoteIdFromRoute } = useParams<{ customerId?: string; id?: string }>();
   const { setDraft } = useQuoteDraft();
   const isMountedRef = useRef(true);
   const extractionStageTimerRefs = useRef<number[]>([]);
@@ -81,11 +55,17 @@ export function CaptureScreen(): React.ReactElement {
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
-  const extractionHelperCopy = getExtractionHelperCopy(hasClips, hasNotes);
-  const launchOrigin = resolveCaptureLaunchOrigin({
-    customerId,
-    locationState: location.state,
-  });
+  const appendQuoteId = quoteIdFromRoute ?? null;
+  const isAppendMode = appendQuoteId !== null;
+  const extractionHelperCopy = isAppendMode
+    ? getAppendHelperCopy(hasClips, hasNotes)
+    : getExtractionHelperCopy(hasClips, hasNotes);
+  const launchOrigin = isAppendMode
+    ? (readCaptureLaunchOrigin(location.state) ?? `/quotes/${appendQuoteId}/review`)
+    : resolveCaptureLaunchOrigin({
+      customerId,
+      locationState: location.state,
+    });
 
   function clearExtractionStageTimers(): void {
     extractionStageTimerRefs.current.forEach((timerId) => {
@@ -136,6 +116,24 @@ export function CaptureScreen(): React.ReactElement {
     });
   }
 
+  function applyAppendResult(quoteId: string, extraction: ExtractionResult): void {
+    const existingNotes = readQuoteConfidenceNotes(quoteId);
+    const nextNotes = extraction.confidence_notes.length > 0
+      ? extraction.confidence_notes
+      : existingNotes;
+    writeQuoteConfidenceNotes(quoteId, nextNotes);
+  }
+
+  function navigateToReview(quoteId: string): void {
+    if (isAppendMode) {
+      navigate(`/quotes/${quoteId}/review`, {
+        state: { reseedDraft: true },
+      });
+      return;
+    }
+    navigate(`/quotes/${quoteId}/review`);
+  }
+
   async function onExtract(): Promise<void> {
     clearSubmissionErrors();
     if (clips.length > MAX_AUDIO_CLIPS_PER_REQUEST) {
@@ -161,22 +159,31 @@ export function CaptureScreen(): React.ReactElement {
     });
 
     try {
-      const extraction = await quoteService.extract({
-        clips: clips.map((clip) => clip.blob),
-        notes,
-        customerId,
-      });
+      const extraction = isAppendMode && appendQuoteId
+        ? await quoteService.appendExtraction(appendQuoteId, {
+          clips: clips.map((clip) => clip.blob),
+          notes,
+        })
+        : await quoteService.extract({
+          clips: clips.map((clip) => clip.blob),
+          notes,
+          customerId,
+        });
       if (!isMountedRef.current) {
         return;
       }
       const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
       if (extraction.type === "sync") {
-        applyDraft(sourceType, extraction.result, extraction.quoteId);
-        navigate(`/quotes/${extraction.quoteId}/review`);
+        if (isAppendMode) {
+          applyAppendResult(extraction.quoteId, extraction.result);
+        } else {
+          applyDraft(sourceType, extraction.result, extraction.quoteId);
+        }
+        navigateToReview(extraction.quoteId);
         return;
       }
 
-      await pollExtractionJob(extraction.jobId, sourceType);
+      await pollExtractionJob(extraction.jobId, sourceType, isAppendMode);
     } catch (submitError) {
       if (!isMountedRef.current) {
         return;
@@ -192,7 +199,11 @@ export function CaptureScreen(): React.ReactElement {
     }
   }
 
-  async function pollExtractionJob(jobId: string, sourceType: QuoteSourceType): Promise<void> {
+  async function pollExtractionJob(
+    jobId: string,
+    sourceType: QuoteSourceType,
+    appendMode: boolean,
+  ): Promise<void> {
     for (let pollCount = 0; pollCount < EXTRACTION_MAX_POLLS; pollCount += 1) {
       const job = await jobService.getJobStatus(jobId);
       if (!isMountedRef.current) {
@@ -203,13 +214,21 @@ export function CaptureScreen(): React.ReactElement {
         if (!job.extraction_result) {
           throw new Error("Extraction completed without a result. Please try again.");
         }
-        applyDraft(sourceType, job.extraction_result, job.quote_id);
-        navigate(`/quotes/${job.quote_id}/review`);
+        if (appendMode) {
+          applyAppendResult(job.quote_id, job.extraction_result);
+        } else {
+          applyDraft(sourceType, job.extraction_result, job.quote_id);
+        }
+        navigateToReview(job.quote_id);
         return;
       }
 
       if (job.status === "success") {
-        throw new Error("Extraction completed without a persisted draft. Please try again.");
+        throw new Error(
+          appendMode
+            ? "Append completed without a refreshed quote. Please try again."
+            : "Extraction completed without a persisted draft. Please try again.",
+        );
       }
 
       if (job.status === "terminal") {
@@ -259,8 +278,10 @@ export function CaptureScreen(): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-36">
       <WorkflowScreenHeader
-        title="Capture Job Notes"
-        subtitle="Describe the job and we'll extract the line items"
+        title={isAppendMode ? "Capture More Job Notes" : "Capture Job Notes"}
+        subtitle={isAppendMode
+          ? "Add clips or notes and we'll append line items to this quote"
+          : "Describe the job and we'll extract the line items"}
         backLabel="Go back"
         onBack={onBack}
         onExitHome={onExitHome}
@@ -397,7 +418,7 @@ export function CaptureScreen(): React.ReactElement {
             isLoading={isExtracting}
             onClick={() => void onExtract()}
           >
-            Extract Line Items
+            {isAppendMode ? "Extract More Line Items" : "Extract Line Items"}
           </Button>
         </div>
       </ScreenFooter>

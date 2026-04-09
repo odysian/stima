@@ -13,7 +13,7 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type { LineItemDraft, QuoteDetail } from "@/features/quotes/types/quote.types";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { buildDraftSnapshot, readReviewLocationState, resolveBackTarget } from "@/features/quotes/utils/reviewScreenState";
-import { fingerprintConfidenceNotes, readDismissedConfidenceFingerprint, readQuoteConfidenceNotes, writeDismissedConfidenceFingerprint } from "@/features/quotes/utils/reviewConfidenceNotes";
+import { readQuoteConfidenceNotes, writeQuoteConfidenceNotes } from "@/features/quotes/utils/reviewConfidenceNotes";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -53,7 +53,8 @@ export function ReviewScreen(): React.ReactElement {
   const [snapshotQuoteId, setSnapshotQuoteId] = useState<string | null>(null);
   const [suggestedTaxRate, setSuggestedTaxRate] = useState<number | null>(null);
   const [isAssigningCustomer, setIsAssigningCustomer] = useState(false);
-  const [dismissedConfidenceFingerprint, setDismissedConfidenceFingerprint] = useState<string | null>(null);
+  const [confidenceNotes, setConfidenceNotes] = useState<string[]>([]);
+  const [hasAppliedReseedFromLocation, setHasAppliedReseedFromLocation] = useState(false);
   const [lineItemSheetState, setLineItemSheetState] = useState<ReviewLineItemSheetState | null>(null);
   const locationState = useMemo(() => readReviewLocationState(location.state), [location.state]);
   const requiresCustomerAssignment = useMemo(() => {
@@ -76,17 +77,7 @@ export function ReviewScreen(): React.ReactElement {
     return (quote.status === "draft" || quote.status === "ready") && !quote.linked_invoice;
   }, [quote]);
 
-  const confidenceNotes = useMemo(() => {
-    if (!id) {
-      return [];
-    }
-    return readQuoteConfidenceNotes(id);
-  }, [id]);
-
-  const confidenceFingerprint = useMemo(() => fingerprintConfidenceNotes(confidenceNotes), [confidenceNotes]);
-  const hasVisibleConfidenceNotes = confidenceNotes.length > 0
-    && confidenceFingerprint.length > 0
-    && dismissedConfidenceFingerprint !== confidenceFingerprint;
+  const hasVisibleConfidenceNotes = confidenceNotes.length > 0;
 
   const currentSnapshotKey = useMemo(() => {
     if (!draft) {
@@ -99,8 +90,20 @@ export function ReviewScreen(): React.ReactElement {
     if (!id) {
       return;
     }
-    setDismissedConfidenceFingerprint(readDismissedConfidenceFingerprint(id));
-  }, [id, confidenceFingerprint]);
+    setConfidenceNotes(readQuoteConfidenceNotes(id));
+    setHasAppliedReseedFromLocation(false);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || !locationState.reseedDraft || hasAppliedReseedFromLocation) {
+      return;
+    }
+
+    setHasAppliedReseedFromLocation(true);
+    void refreshQuote({ reseedDraft: true }).catch(() => {
+      // Existing load/save error messaging covers failed refreshes.
+    });
+  }, [hasAppliedReseedFromLocation, id, locationState.reseedDraft, refreshQuote]);
 
   useEffect(() => {
     if (!quote || !draft || !currentSnapshotKey) {
@@ -216,7 +219,6 @@ export function ReviewScreen(): React.ReactElement {
       details: lineItem.details,
       price: lineItem.price,
     }));
-  const hasNullPrices = lineItemsForSubmit.some((lineItem) => lineItem.price === null);
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
       return runningTotal;
@@ -324,24 +326,22 @@ export function ReviewScreen(): React.ReactElement {
         isInteractionLocked={isInteractionLocked}
         hasVisibleConfidenceNotes={hasVisibleConfidenceNotes}
         confidenceNotes={confidenceNotes}
-        hasNullPrices={hasNullPrices}
         lineItemSum={lineItemSum}
         suggestedTaxRate={suggestedTaxRate}
         onRequestAssignment={() => setIsAssignmentSheetOpen(true)}
-        onDismissConfidence={() => {
-          if (confidenceFingerprint.length === 0) {
-            return;
-          }
-          writeDismissedConfidenceFingerprint(quoteId, confidenceFingerprint);
-          setDismissedConfidenceFingerprint(confidenceFingerprint);
+        onAddVoiceNote={() => {
+          navigate(`/quotes/${quoteId}/review/append-capture`, {
+            state: { launchOrigin: `/quotes/${quoteId}/review` },
+          });
+        }}
+        onDismissConfidence={(noteIndex) => {
+          const nextNotes = confidenceNotes.filter((_, index) => index !== noteIndex);
+          writeQuoteConfidenceNotes(quoteId, nextNotes);
+          setConfidenceNotes(nextNotes);
         }}
         onTitleChange={(nextTitle) => {
           setSaveNotice(null);
           setDraft((currentDraft) => ({ ...currentDraft, title: nextTitle }));
-        }}
-        onTranscriptChange={(nextTranscript) => {
-          setSaveNotice(null);
-          setDraft((currentDraft) => ({ ...currentDraft, transcript: nextTranscript }));
         }}
         onEditLineItem={(lineItemIndex) => {
           if (isInteractionLocked || !activeDraft.lineItems[lineItemIndex]) {

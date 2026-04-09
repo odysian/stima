@@ -44,11 +44,13 @@ class JobService:
         *,
         user_id: UUID,
         concurrency_limit: int,
+        document_id: UUID | None = None,
     ) -> JobRecord | None:
         """Create one pending extraction job only when the user is below the active-job cap."""
         return await self.repository.create_extraction_job_with_capacity_limit(
             user_id=user_id,
             concurrency_limit=concurrency_limit,
+            document_id=document_id,
         )
 
     async def get_job_for_user(self, *, job_id: UUID, user_id: UUID) -> JobRecord | None:

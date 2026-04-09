@@ -2,12 +2,7 @@ import { useState } from "react";
 
 import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
-import {
-  calculatePricingFromSubtotal,
-  parseTaxPercentInput,
-  toTaxPercentDisplay,
-  type DiscountType,
-} from "@/shared/lib/pricing";
+import { calculatePricingFromSubtotal, parseTaxPercentInput, toTaxPercentDisplay, type DiscountType } from "@/shared/lib/pricing";
 
 interface TotalAmountSectionProps {
   lineItemSum: number;
@@ -110,8 +105,8 @@ export function TotalAmountSection({
                 Tax, discount, and deposit
               </p>
             </div>
-            <span className="text-xs font-semibold uppercase tracking-widest text-outline">
-              Shown
+            <span className="material-symbols-outlined text-outline">
+              expand_more
             </span>
           </div>
         ) : (
@@ -130,8 +125,8 @@ export function TotalAmountSection({
                 Tax, discount, and deposit
               </p>
             </div>
-            <span className="text-xs font-semibold uppercase tracking-widest text-outline">
-              {isOptionalPricingOpen ? "Hide" : "Show"}
+            <span className="material-symbols-outlined text-outline">
+              {isOptionalPricingOpen ? "expand_more" : "chevron_right"}
             </span>
           </button>
         )}
@@ -202,28 +197,6 @@ export function TotalAmountSection({
               />
               Tax
             </label>
-            {suggestedTaxRate !== null && !isTaxEnabled ? (
-              <div className="rounded-lg bg-surface-container-lowest p-3 text-sm text-on-surface-variant">
-                <p className="text-xs font-bold uppercase tracking-widest text-outline">
-                  Suggested Tax Rate
-                </p>
-                <div className="relative mt-2">
-                  <input
-                    type="number"
-                    aria-label="Suggested tax (%)"
-                    value={toTaxPercentDisplay(suggestedTaxRate)}
-                    disabled
-                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 pr-10 text-sm text-on-surface-variant"
-                  />
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-outline">
-                    %
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-outline">
-                  Enable tax to apply this default rate to this document.
-                </p>
-              </div>
-            ) : null}
             {isTaxEnabled ? (
               <div className="relative">
                 <input

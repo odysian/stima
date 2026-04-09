@@ -102,6 +102,7 @@ export default function App(): React.ReactElement {
         <Route path="/quotes/capture" element={<CaptureScreen />} />
         <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
         <Route path="/quotes/:id/review" element={<ReviewScreen />} />
+        <Route path="/quotes/:id/review/append-capture" element={<CaptureScreen />} />
         <Route path="/quotes/:id/edit" element={<QuoteEditRedirect />} />
         <Route path="/quotes/:id/preview" element={<QuotePreview />} />
       </Route>

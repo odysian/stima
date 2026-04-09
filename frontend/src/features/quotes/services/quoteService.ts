@@ -60,7 +60,7 @@ interface PersistedExtractionPayload extends ExtractionResult {
   quote_id: string;
 }
 
-async function extract(params: { clips?: Blob[]; notes?: string; customerId?: string }): Promise<QuoteExtractResponse> {
+function buildExtractionFormData(params: { clips?: Blob[]; notes?: string; customerId?: string }): FormData {
   const formData = new FormData();
   (params.clips ?? []).forEach((clip, index) => {
     const extension = resolveAudioExtensionFromMimeType(clip.type);
@@ -76,7 +76,16 @@ async function extract(params: { clips?: Blob[]; notes?: string; customerId?: st
     formData.append("customer_id", params.customerId);
   }
 
-  const response = await requestWithMetadata<PersistedExtractionPayload | JobStatusResponse>("/api/quotes/extract", {
+  return formData;
+}
+
+async function submitExtraction(
+  path: string,
+  params: { clips?: Blob[]; notes?: string; customerId?: string },
+): Promise<QuoteExtractResponse> {
+  const formData = buildExtractionFormData(params);
+
+  const response = await requestWithMetadata<PersistedExtractionPayload | JobStatusResponse>(path, {
     method: "POST",
     body: formData,
   });
@@ -99,6 +108,17 @@ async function extract(params: { clips?: Blob[]; notes?: string; customerId?: st
       confidence_notes: persistedExtraction.confidence_notes,
     },
   };
+}
+
+async function extract(params: { clips?: Blob[]; notes?: string; customerId?: string }): Promise<QuoteExtractResponse> {
+  return submitExtraction("/api/quotes/extract", params);
+}
+
+async function appendExtraction(
+  quoteId: string,
+  params: { clips?: Blob[]; notes?: string },
+): Promise<QuoteExtractResponse> {
+  return submitExtraction(`/api/quotes/${quoteId}/append-extraction`, params);
 }
 
 function createQuote(data: QuoteCreateRequest): Promise<Quote> {
@@ -174,6 +194,7 @@ function convertToInvoice(id: string): Promise<Invoice> {
 
 export const quoteService = {
   extract,
+  appendExtraction,
   convertNotes,
   captureAudio,
   createQuote,

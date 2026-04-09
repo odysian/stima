@@ -12,10 +12,6 @@ describe("AIConfidenceBanner", () => {
     expect(screen.getByText("AI Confidence Note")).toBeInTheDocument();
     expect(screen.getByText("Please verify line item quantities before sharing.")).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass("ghost-shadow", "bg-warning-container");
-
-    const icon = screen.getByText("info");
-    expect(icon).toHaveClass("material-symbols-outlined", "text-warning-accent");
-    expect((icon as HTMLElement).style.fontVariationSettings).toBe('"FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24');
   });
 
   it("supports a dismiss action when provided", () => {

@@ -69,6 +69,7 @@ class JobRepository:
         *,
         user_id: UUID,
         concurrency_limit: int,
+        document_id: UUID | None = None,
     ) -> JobRecord | None:
         """Atomically create one extraction job when user active-job capacity allows it."""
         user_row = await self._session.scalar(
@@ -84,7 +85,11 @@ class JobRepository:
         if active_count >= concurrency_limit:
             return None
 
-        return await self.create(user_id=user_id, job_type=JobType.EXTRACTION)
+        return await self.create(
+            user_id=user_id,
+            job_type=JobType.EXTRACTION,
+            document_id=document_id,
+        )
 
     async def reap_stale_extraction_jobs(
         self,
