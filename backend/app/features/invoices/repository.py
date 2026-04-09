@@ -80,6 +80,7 @@ class InvoiceListItemSummary:
     title: str | None
     status: str
     total_amount: Decimal | None
+    item_count: int
     due_date: date | None
     created_at: datetime
     source_document_id: UUID | None
@@ -151,6 +152,12 @@ class InvoiceRepository:
         customer_id: UUID | None = None,
     ) -> list[InvoiceListItemSummary]:
         """Return invoice summaries for a user ordered newest-first."""
+        line_item_count = (
+            select(func.count(LineItem.id))
+            .where(LineItem.document_id == Document.id)
+            .correlate(Document)
+            .scalar_subquery()
+        )
         statement = (
             select(
                 Document.id,
@@ -160,6 +167,7 @@ class InvoiceRepository:
                 Document.title,
                 Document.status,
                 Document.total_amount,
+                line_item_count.label("item_count"),
                 Document.due_date,
                 Document.created_at,
                 Document.source_document_id,
@@ -186,6 +194,7 @@ class InvoiceRepository:
                     row.status.value if isinstance(row.status, QuoteStatus) else str(row.status)
                 ),
                 total_amount=row.total_amount,
+                item_count=int(row.item_count),
                 due_date=row.due_date,
                 created_at=row.created_at,
                 source_document_id=row.source_document_id,

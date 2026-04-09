@@ -288,7 +288,7 @@ export function QuoteList(): React.ReactElement {
         invoice.doc_number,
         formatDate(invoice.created_at, timezone),
       ].join(" · "),
-      itemDetails: null,
+      itemDetails: `${invoice.item_count} ${invoice.item_count === 1 ? "item" : "items"}`,
       totalAmount: invoice.total_amount,
       status: invoice.status,
       destination: `/invoices/${invoice.id}`,

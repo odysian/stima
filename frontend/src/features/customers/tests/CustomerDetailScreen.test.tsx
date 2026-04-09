@@ -69,6 +69,7 @@ function makeInvoice(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem 
     title: null,
     status: "draft",
     total_amount: 120,
+    item_count: 1,
     due_date: "2026-04-19",
     created_at: "2026-03-25T00:00:00.000Z",
     source_document_id: null,
