@@ -30,6 +30,7 @@ describe("quoteService.extract", () => {
         new Blob(["clip-b"], { type: "audio/webm;codecs=opus" }),
       ],
       notes: "  add 10% travel surcharge  ",
+      customerId: "cust-1",
     });
 
     expect(result).toEqual({ type: "async", jobId: "job-1" });
@@ -46,12 +47,14 @@ describe("quoteService.extract", () => {
     expect((clips[0] as File).name).toBe("clip-1.mp4");
     expect((clips[1] as File).name).toBe("clip-2.webm");
     expect((formData as FormData).get("notes")).toBe("add 10% travel surcharge");
+    expect((formData as FormData).get("customer_id")).toBe("cust-1");
   });
 
-  it("sends notes without clips for notes-only extraction", async () => {
+  it("sends notes without clips for notes-only extraction and returns persisted quote id", async () => {
     mockedRequestWithMetadata.mockResolvedValue({
       status: 200,
       data: {
+        quote_id: "quote-11",
         transcript: "typed note only",
         line_items: [],
         total: null,
@@ -63,6 +66,7 @@ describe("quoteService.extract", () => {
 
     expect(result).toEqual({
       type: "sync",
+      quoteId: "quote-11",
       result: {
         transcript: "typed note only",
         line_items: [],
@@ -81,6 +85,7 @@ describe("quoteService.extract", () => {
     mockedRequestWithMetadata.mockResolvedValue({
       status: 200,
       data: {
+        quote_id: "quote-22",
         transcript: "clips only",
         line_items: [],
         total: null,
@@ -97,5 +102,6 @@ describe("quoteService.extract", () => {
     expect(formData.getAll("clips")).toHaveLength(1);
     expect((formData.getAll("clips")[0] as File).name).toBe("clip-1.webm");
     expect(formData.get("notes")).toBeNull();
+    expect(formData.get("customer_id")).toBeNull();
   });
 });

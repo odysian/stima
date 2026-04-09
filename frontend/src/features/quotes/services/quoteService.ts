@@ -56,7 +56,11 @@ function captureAudio(clips: Blob[]): Promise<ExtractionResult> {
   });
 }
 
-async function extract(params: { clips?: Blob[]; notes?: string }): Promise<QuoteExtractResponse> {
+interface PersistedExtractionPayload extends ExtractionResult {
+  quote_id: string;
+}
+
+async function extract(params: { clips?: Blob[]; notes?: string; customerId?: string }): Promise<QuoteExtractResponse> {
   const formData = new FormData();
   (params.clips ?? []).forEach((clip, index) => {
     const extension = resolveAudioExtensionFromMimeType(clip.type);
@@ -68,7 +72,11 @@ async function extract(params: { clips?: Blob[]; notes?: string }): Promise<Quot
     formData.append("notes", notes);
   }
 
-  const response = await requestWithMetadata<ExtractionResult | JobStatusResponse>("/api/quotes/extract", {
+  if (params.customerId) {
+    formData.append("customer_id", params.customerId);
+  }
+
+  const response = await requestWithMetadata<PersistedExtractionPayload | JobStatusResponse>("/api/quotes/extract", {
     method: "POST",
     body: formData,
   });
@@ -80,9 +88,16 @@ async function extract(params: { clips?: Blob[]; notes?: string }): Promise<Quot
     };
   }
 
+  const persistedExtraction = response.data as PersistedExtractionPayload;
   return {
     type: "sync",
-    result: response.data as ExtractionResult,
+    quoteId: persistedExtraction.quote_id,
+    result: {
+      transcript: persistedExtraction.transcript,
+      line_items: persistedExtraction.line_items,
+      total: persistedExtraction.total,
+      confidence_notes: persistedExtraction.confidence_notes,
+    },
   };
 }
 

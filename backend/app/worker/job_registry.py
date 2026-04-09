@@ -69,8 +69,8 @@ async def extraction_job(
     job_id: str,
     *,
     transcript: str,
-    source_type: str,
-    capture_detail: str,
+    source_type: str = "text",
+    capture_detail: str | None = None,
     customer_id: str | None = None,
 ) -> None:
     """Run durable quote extraction against the transcript prepared by the API."""
@@ -85,7 +85,10 @@ async def extraction_job(
             job_id=UUID(job_id),
             result=result,
             source_type=source_type,
-            capture_detail=capture_detail,
+            capture_detail=_resolve_worker_capture_detail(
+                source_type=source_type,
+                capture_detail=capture_detail,
+            ),
             customer_id=customer_id,
         ),
     )
@@ -377,6 +380,15 @@ def _parse_optional_uuid(value: str | None) -> UUID | None:
     if value is None:
         return None
     return UUID(value)
+
+
+def _resolve_worker_capture_detail(*, source_type: str, capture_detail: str | None) -> str:
+    normalized_capture_detail = (capture_detail or "").strip()
+    if normalized_capture_detail:
+        return normalized_capture_detail
+    if source_type == "voice":
+        return "audio"
+    return "notes"
 
 
 async def _store_extraction_result(

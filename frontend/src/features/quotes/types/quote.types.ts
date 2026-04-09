@@ -36,6 +36,7 @@ export interface JobRecord {
   status: JobStatus;
   attempts: number;
   terminal_error: string | null;
+  quote_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,7 +47,7 @@ export interface JobStatusResponse extends JobRecord {
 
 export type QuoteExtractResponse =
   | { type: "async"; jobId: string }
-  | { type: "sync"; result: ExtractionResult };
+  | { type: "sync"; quoteId: string; result: ExtractionResult };
 
 export type PdfArtifactStatus = "missing" | "pending" | "ready" | "failed";
 

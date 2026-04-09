@@ -56,6 +56,34 @@ async def test_extraction_job_stores_result_json_on_success(
     assert persisted_quote.source_type == "text"  # nosec B101 - pytest assertion
 
 
+async def test_extraction_job_accepts_legacy_enqueued_payload_without_source_metadata(
+    db_session: AsyncSession,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    await extraction_job(
+        _worker_context(
+            db_session,
+            extraction_integration=_SuccessfulExtractionIntegration(),
+        ),
+        str(record.id),
+        transcript="legacy queued transcript",
+    )
+
+    refreshed = await _load_job_record(db_session, record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
+    assert refreshed.document_id is not None  # nosec B101 - pytest assertion
+
+    persisted_quote = await db_session.get(Document, refreshed.document_id)
+    assert persisted_quote is not None  # nosec B101 - pytest assertion
+    assert persisted_quote.source_type == "text"  # nosec B101 - pytest assertion
+    assert persisted_quote.transcript == "legacy queued transcript"  # nosec B101 - pytest assertion
+
+
 async def test_extraction_job_marks_terminal_when_draft_persistence_fails(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,

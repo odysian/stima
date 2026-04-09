@@ -87,6 +87,7 @@ describe("quoteService integration (MSW)", () => {
             attempts: 0,
             terminal_error: null,
             extraction_result: null,
+            quote_id: null,
             created_at: "2026-03-20T00:00:00.000Z",
             updated_at: "2026-03-20T00:00:00.000Z",
           },
@@ -101,13 +102,14 @@ describe("quoteService integration (MSW)", () => {
     expect(result).toEqual({ type: "async", jobId: "job-1" });
   });
 
-  it("extract preserves the sync fallback contract when the backend responds with 200", async () => {
+  it("extract returns persisted quote id and extraction result when the backend responds with 200", async () => {
     setCsrfToken("integration-csrf-token");
 
     server.use(
       http.post("/api/quotes/extract", () =>
         HttpResponse.json(
           {
+            quote_id: "quote-1",
             transcript: "Mulch and edging",
             line_items: [],
             total: null,
@@ -121,6 +123,7 @@ describe("quoteService integration (MSW)", () => {
 
     expect(result).toEqual({
       type: "sync",
+      quoteId: "quote-1",
       result: {
         transcript: "Mulch and edging",
         line_items: [],
@@ -320,6 +323,7 @@ describe("quoteService integration (MSW)", () => {
             attempts: 0,
             terminal_error: null,
             extraction_result: null,
+            quote_id: null,
             created_at: "2026-03-20T00:00:00.000Z",
             updated_at: "2026-03-20T00:00:00.000Z",
           },
@@ -438,7 +442,7 @@ describe("quoteService integration (MSW)", () => {
     });
   });
 
-  it("extract sends multipart clips and trimmed notes", async () => {
+  it("extract sends multipart clips with CSRF protection", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;
     let capturedContentType: string | null = null;
@@ -449,6 +453,7 @@ describe("quoteService integration (MSW)", () => {
         capturedContentType = request.headers.get("Content-Type");
 
         return HttpResponse.json({
+          quote_id: "quote-2",
           transcript: "combined transcript",
           line_items: [],
           total: null,
@@ -463,12 +468,14 @@ describe("quoteService integration (MSW)", () => {
         new Blob(["clip-2"], { type: "audio/mp4" }),
       ],
       notes: "  add 10% travel surcharge  ",
+      customerId: "cust-9",
     });
 
     expect(capturedCsrfHeader).toBe("integration-csrf-token");
     expect(capturedContentType).not.toContain("application/json");
     expect(result).toEqual({
       type: "sync",
+      quoteId: "quote-2",
       result: {
         transcript: "combined transcript",
         line_items: [],
@@ -486,6 +493,7 @@ describe("quoteService integration (MSW)", () => {
         const capturedCsrfHeader = request.headers.get("X-CSRF-Token");
 
         return HttpResponse.json({
+          quote_id: "quote-3",
           transcript: capturedCsrfHeader ? "notes only transcript" : "missing csrf",
           line_items: [],
           total: null,
@@ -498,6 +506,7 @@ describe("quoteService integration (MSW)", () => {
 
     expect(result).toEqual({
       type: "sync",
+      quoteId: "quote-3",
       result: {
         transcript: "notes only transcript",
         line_items: [],
@@ -515,6 +524,7 @@ describe("quoteService integration (MSW)", () => {
         const capturedCsrfHeader = request.headers.get("X-CSRF-Token");
 
         return HttpResponse.json({
+          quote_id: "quote-4",
           transcript: capturedCsrfHeader ? "clips only transcript" : "missing csrf",
           line_items: [],
           total: null,
@@ -529,6 +539,7 @@ describe("quoteService integration (MSW)", () => {
 
     expect(result).toEqual({
       type: "sync",
+      quoteId: "quote-4",
       result: {
         transcript: "clips only transcript",
         line_items: [],
@@ -555,6 +566,7 @@ describe("quoteService integration (MSW)", () => {
           attempts: 0,
           terminal_error: null,
           extraction_result: null,
+          quote_id: null,
           created_at: "2026-03-20T00:00:00.000Z",
           updated_at: "2026-03-20T00:00:00.000Z",
         }, {

@@ -33,7 +33,7 @@ from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult, LineItemDraft, LineItemExtracted
-from app.features.quotes.service import QuoteService
+from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.email import EmailConfigurationError, EmailMessage, EmailSendError
 from app.integrations.extraction import ExtractionError
@@ -2944,6 +2944,39 @@ async def test_extract_combined_failure_logs_pilot_failure_events_to_stdout(
     assert all(payload["detail"] == "audio" for payload in emitted_events)
 
 
+async def test_extract_combined_logs_persistence_failure_event_by_status_code(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    async def _fail_create_extracted_draft(self, **kwargs):  # noqa: ANN001, ANN003
+        del self, kwargs
+        raise QuoteServiceError(detail="database unavailable", status_code=503)
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+    monkeypatch.setattr(QuoteService, "create_extracted_draft", _fail_create_extracted_draft)
+
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "database unavailable"}
+    assert [payload["event"] for payload in emitted_events] == [
+        "quote_started",
+        "draft_generation_failed",
+    ]
+    assert emitted_events[-1]["detail"] == "notes"
+
+
 async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
 
@@ -3105,6 +3138,47 @@ async def test_extract_combined_sync_fallback_persists_preselected_customer(
     assert payload["quote_id"]
 
     persisted_quote = await db_session.get(Document, UUID(payload["quote_id"]))
+    assert persisted_quote is not None
+    assert persisted_quote.customer_id == UUID(customer_id)
+
+
+async def test_extract_combined_async_worker_persists_preselected_customer(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[
+            ("notes", (None, "mulch the front beds")),
+            ("customer_id", (None, customer_id)),
+        ],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert pool.calls[0]["kwargs"]["customer_id"] == customer_id
+
+    await _run_extraction_job(
+        db_session,
+        job_id=payload["id"],
+        source_type="text",
+        capture_detail="notes",
+        customer_id=customer_id,
+    )
+
+    status_response = await client.get(f"/api/jobs/{payload['id']}")
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["status"] == "success"
+    assert status_payload["quote_id"] is not None
+
+    persisted_quote = await db_session.get(Document, UUID(status_payload["quote_id"]))
     assert persisted_quote is not None
     assert persisted_quote.customer_id == UUID(customer_id)
 
@@ -5312,6 +5386,7 @@ async def _run_extraction_job(
     job_id: object,
     source_type: str,
     capture_detail: str,
+    customer_id: str | None = None,
 ) -> None:
     assert isinstance(job_id, str)
     session_maker = async_sessionmaker(
@@ -5335,6 +5410,7 @@ async def _run_extraction_job(
         transcript="mulch the front beds",
         source_type=source_type,
         capture_detail=capture_detail,
+        customer_id=customer_id,
     )
 
 

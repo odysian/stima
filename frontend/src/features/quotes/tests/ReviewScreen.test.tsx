@@ -32,6 +32,7 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     convertNotes: vi.fn(),
     captureAudio: vi.fn(),
     createQuote: vi.fn(),
+    convertToInvoice: vi.fn(),
     listQuotes: vi.fn(),
     getQuote: vi.fn(),
     updateQuote: vi.fn(),
@@ -182,6 +183,26 @@ beforeEach(() => {
     total: 275,
     confidence_notes: ["Verify soil depth before sending"],
   });
+  mockedQuoteService.convertToInvoice.mockResolvedValue({
+    id: "invoice-1",
+    customer_id: "cust-1",
+    doc_number: "I-001",
+    title: null,
+    status: "draft",
+    total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
+    notes: "",
+    due_date: "2026-04-19",
+    shared_at: null,
+    share_token: null,
+    source_document_id: "quote-1",
+    line_items: [],
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T00:00:00.000Z",
+  });
   mockedProfileService.getProfile.mockResolvedValue({
     id: "user-1",
     email: "owner@example.com",
@@ -194,6 +215,26 @@ beforeEach(() => {
     has_logo: false,
     is_active: true,
     is_onboarded: true,
+  });
+  mockedQuoteService.updateQuote.mockResolvedValue({
+    id: "quote-1",
+    customer_id: "cust-1",
+    doc_number: "Q-001",
+    title: null,
+    status: "draft",
+    source_type: "text",
+    transcript: "5 yards brown mulch and edge front beds",
+    total_amount: 120,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
+    notes: "",
+    shared_at: null,
+    share_token: null,
+    line_items: [],
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T00:00:00.000Z",
   });
 });
 
@@ -256,6 +297,28 @@ describe("ReviewScreen", () => {
 
     expect(screen.getByText(/review required before generating/i)).toBeInTheDocument();
     expect(screen.getByText(/price for edging is uncertain/i)).toBeInTheDocument();
+  });
+
+  it("keeps review guidance visible for persisted extraction drafts", () => {
+    renderScreen(
+      makeDraft({
+        quoteId: "quote-existing",
+        confidenceNotes: ["Price for edging is uncertain"],
+        lineItems: [
+          {
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            flagged: true,
+            flagReason: "Unit phrasing may be ambiguous",
+          },
+        ],
+      }),
+    );
+
+    expect(screen.getByText(/review required before generating/i)).toBeInTheDocument();
+    expect(screen.getByText(/price for edging is uncertain/i)).toBeInTheDocument();
+    expect(screen.getByText(/brown mulch: unit phrasing may be ambiguous/i)).toBeInTheDocument();
   });
 
   it("keeps optional pricing collapsed until manually opened when only a suggested tax rate exists", async () => {
@@ -577,6 +640,55 @@ describe("ReviewScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview");
   });
 
+  it("updates persisted quote drafts instead of creating a duplicate quote", async () => {
+    mockedQuoteService.updateQuote.mockResolvedValueOnce({
+      id: "quote-existing",
+      customer_id: "cust-1",
+      doc_number: "Q-001",
+      title: null,
+      status: "draft",
+      source_type: "text",
+      transcript: "5 yards brown mulch and edge front beds",
+      total_amount: 120,
+      tax_rate: null,
+      discount_type: null,
+      discount_value: null,
+      deposit_amount: null,
+      notes: "",
+      shared_at: null,
+      share_token: null,
+      line_items: [],
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-20T00:00:00.000Z",
+    });
+    renderScreen(
+      makeDraft({
+        quoteId: "quote-existing",
+        title: "  Front Yard Refresh  ",
+        notes: "Thanks for your business",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^generate quote$/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-existing", {
+        title: "Front Yard Refresh",
+        transcript: "5 yards brown mulch and edge front beds",
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
+        total_amount: 120,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
+        notes: "Thanks for your business",
+      });
+    });
+    expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+    expect(clearDraftMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-existing/preview");
+  });
+
   it("allows quote creation after discount is toggled back off", async () => {
     const user = userEvent.setup();
     renderScreen(
@@ -626,6 +738,38 @@ describe("ReviewScreen", () => {
       });
     });
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+    expect(clearDraftMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1");
+  });
+
+  it("converts persisted quote drafts to invoice instead of creating a direct invoice", async () => {
+    const user = userEvent.setup();
+    renderScreen(
+      makeDraft({
+        quoteId: "quote-existing",
+        title: "  Front Yard Refresh  ",
+        notes: "Thanks for your business",
+      }),
+    );
+
+    await user.click(screen.getByRole("radio", { name: /invoice/i }));
+    await user.click(screen.getByRole("button", { name: /^create invoice$/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-existing", {
+        title: "Front Yard Refresh",
+        transcript: "5 yards brown mulch and edge front beds",
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: null }],
+        total_amount: 120,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
+        notes: "Thanks for your business",
+      });
+      expect(mockedQuoteService.convertToInvoice).toHaveBeenCalledWith("quote-existing");
+    });
+    expect(mockedInvoiceService.createInvoice).not.toHaveBeenCalled();
     expect(clearDraftMock).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith("/invoices/invoice-1");
   });

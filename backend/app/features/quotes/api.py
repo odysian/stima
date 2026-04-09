@@ -246,6 +246,10 @@ async def extract_combined(
                     notes,
                     user_id=user.id,
                 )
+            except QuoteServiceError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+            try:
                 quote = await quote_service.create_extracted_draft(
                     user_id=user.id,
                     customer_id=customer_id,
@@ -253,7 +257,7 @@ async def extract_combined(
                     source_type=source_type,
                 )
             except QuoteServiceError as exc:
-                if exc.detail == "Unable to save extracted draft right now. Please try again.":
+                if exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
                     log_event("draft_generation_failed", user_id=user.id, detail=capture_detail)
                 raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
         log_event(
