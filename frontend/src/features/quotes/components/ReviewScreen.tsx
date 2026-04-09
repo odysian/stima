@@ -1,57 +1,133 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useBeforeUnload,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 
-import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { profileService } from "@/features/profile/services/profileService";
-import { createCaptureLocationState, HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
-import { LineItemCard } from "@/features/quotes/components/LineItemCard";
+import { ReviewActionFooter } from "@/features/quotes/components/ReviewActionFooter";
+import { ReviewCustomerAssignmentSheet } from "@/features/quotes/components/ReviewCustomerAssignmentSheet";
+import { ReviewFormContent } from "@/features/quotes/components/ReviewFormContent";
 import {
-  ReviewDocumentTypeSelector,
-  type ReviewDocumentType,
-} from "@/features/quotes/components/ReviewDocumentTypeSelector";
-import { ReviewSubmitFooter } from "@/features/quotes/components/ReviewSubmitFooter";
-import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
-import {
-  buildCreatePayload,
-  buildUpdatePayload,
   EMPTY_LINE_ITEM,
-  getReviewMessages,
-  getWarningMessages,
   isInvalidLineItem,
-  mapExtractedLineItems,
   normalizeLineItem,
 } from "@/features/quotes/components/reviewScreenUtils";
-import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import { mapQuoteToEditDraft, usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { LineItemDraft } from "@/features/quotes/types/quote.types";
-import { Button } from "@/shared/components/Button";
+import type { LineItemDraft, QuoteDetail } from "@/features/quotes/types/quote.types";
+import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
+import {
+  buildDraftSnapshot,
+  readReviewLocationState,
+  resolveBackTarget,
+} from "@/features/quotes/utils/reviewScreenState";
+import {
+  fingerprintConfidenceNotes,
+  readDismissedConfidenceFingerprint,
+  readQuoteConfidenceNotes,
+  writeDismissedConfidenceFingerprint,
+} from "@/features/quotes/utils/reviewConfidenceNotes";
+import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
-import { DOCUMENT_LINE_ITEMS_MAX_ITEMS, DOCUMENT_NOTES_MAX_CHARS, DOCUMENT_TRANSCRIPT_MAX_CHARS } from "@/shared/lib/inputLimits";
 import { getPricingValidationMessage } from "@/shared/lib/pricing";
 
-export function ReviewScreen(): React.ReactElement | null {
+function buildQuoteSnapshotKey(quote: QuoteDetail): string {
+  const canonicalDraft = mapQuoteToEditDraft(quote);
+  return JSON.stringify(buildDraftSnapshot(canonicalDraft));
+}
+
+export function ReviewScreen(): React.ReactElement {
   const navigate = useNavigate();
-  const { draft, setDraft, clearDraft } = useQuoteDraft();
+  const location = useLocation();
+  const { id } = useParams<{ id: string }>();
+  const {
+    quote,
+    draft,
+    setDraft,
+    clearDraft,
+    isLoadingQuote,
+    loadError,
+    refreshQuote,
+  } = usePersistedReview(id);
+
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isTranscriptEditorVisible, setIsTranscriptEditorVisible] = useState(false);
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [documentType, setDocumentType] = useState<ReviewDocumentType>("quote");
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [submitAction, setSubmitAction] = useState<"save" | "continue" | null>(null);
+  const [isAssignmentSheetOpen, setIsAssignmentSheetOpen] = useState(false);
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false);
+  const [pendingNavigationTarget, setPendingNavigationTarget] = useState<{
+    to: string;
+    replace?: boolean;
+  } | null>(null);
+  const [savedSnapshotKey, setSavedSnapshotKey] = useState<string | null>(null);
+  const [snapshotQuoteId, setSnapshotQuoteId] = useState<string | null>(null);
   const [suggestedTaxRate, setSuggestedTaxRate] = useState<number | null>(null);
-  const hasSubmittedRef = useRef(false);
+  const [isAssigningCustomer, setIsAssigningCustomer] = useState(false);
+  const [dismissedConfidenceFingerprint, setDismissedConfidenceFingerprint] = useState<string | null>(null);
+  const locationState = useMemo(() => readReviewLocationState(location.state), [location.state]);
+  const requiresCustomerAssignment = useMemo(() => {
+    if (!quote) {
+      return false;
+    }
+    if (typeof quote.requires_customer_assignment === "boolean") {
+      return quote.requires_customer_assignment;
+    }
+    return quote.customer_id === null;
+  }, [quote]);
+
+  const canReassignCustomer = useMemo(() => {
+    if (!quote) {
+      return false;
+    }
+    if (typeof quote.can_reassign_customer === "boolean") {
+      return quote.can_reassign_customer;
+    }
+    return (quote.status === "draft" || quote.status === "ready") && !quote.linked_invoice;
+  }, [quote]);
+
+  const confidenceNotes = useMemo(() => {
+    if (!id) {
+      return [];
+    }
+    return readQuoteConfidenceNotes(id);
+  }, [id]);
+
+  const confidenceFingerprint = useMemo(() => fingerprintConfidenceNotes(confidenceNotes), [confidenceNotes]);
+  const hasVisibleConfidenceNotes = confidenceNotes.length > 0
+    && confidenceFingerprint.length > 0
+    && dismissedConfidenceFingerprint !== confidenceFingerprint;
+
+  const currentSnapshotKey = useMemo(() => {
+    if (!draft) {
+      return null;
+    }
+    return JSON.stringify(buildDraftSnapshot(draft));
+  }, [draft]);
 
   useEffect(() => {
-    if (!draft && !hasSubmittedRef.current) {
-      navigate("/", { replace: true });
+    if (!id) {
+      return;
     }
-  }, [draft, navigate]);
+    setDismissedConfidenceFingerprint(readDismissedConfidenceFingerprint(id));
+  }, [id, confidenceFingerprint]);
+
+  useEffect(() => {
+    if (!quote || !draft || !currentSnapshotKey) {
+      return;
+    }
+    if (snapshotQuoteId !== quote.id) {
+      setSnapshotQuoteId(quote.id);
+      setSavedSnapshotKey(currentSnapshotKey);
+    }
+  }, [currentSnapshotKey, draft, quote, snapshotQuoteId]);
 
   useEffect(() => {
     let isActive = true;
-
     async function loadSuggestedTaxRate(): Promise<void> {
       try {
         const profile = await profileService.getProfile();
@@ -64,19 +140,88 @@ export function ReviewScreen(): React.ReactElement | null {
         }
       }
     }
-
     void loadSuggestedTaxRate();
     return () => {
       isActive = false;
     };
   }, []);
 
-  if (!draft) {
-    return null;
+  const hasUnsavedChanges = currentSnapshotKey !== null
+    && savedSnapshotKey !== null
+    && currentSnapshotKey !== savedSnapshotKey;
+
+  useBeforeUnload((event) => {
+    if (!hasUnsavedChanges) {
+      return;
+    }
+
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
+  function requestNavigation(target: { to: string; replace?: boolean }): void {
+    if (!hasUnsavedChanges) {
+      navigate(target.to, { replace: target.replace });
+      return;
+    }
+
+    setPendingNavigationTarget(target);
+    setShowLeaveWarning(true);
   }
 
-  const currentDraft: QuoteDraft = draft;
-  const normalizedLineItems = currentDraft.lineItems.map(normalizeLineItem);
+  function handleLeaveConfirm(): void {
+    setShowLeaveWarning(false);
+
+    if (pendingNavigationTarget) {
+      const nextTarget = pendingNavigationTarget;
+      setPendingNavigationTarget(null);
+      clearDraft();
+      navigate(nextTarget.to, { replace: nextTarget.replace });
+    }
+  }
+
+  function handleLeaveCancel(): void {
+    setShowLeaveWarning(false);
+    setPendingNavigationTarget(null);
+  }
+
+  if (!id) {
+    return (
+      <main className="min-h-screen bg-background px-4 pt-20">
+        <FeedbackMessage variant="error">Missing quote id.</FeedbackMessage>
+      </main>
+    );
+  }
+
+  const quoteId = id;
+  const shouldUseQuoteListBackTarget = locationState.origin === "preview" && requiresCustomerAssignment;
+  const backTarget = shouldUseQuoteListBackTarget
+    ? HOME_ROUTE
+    : resolveBackTarget(locationState, quoteId);
+  const backLabel = shouldUseQuoteListBackTarget
+    ? "Back to quotes"
+    : (locationState.origin === "preview" ? "Back to preview" : "Back to quotes");
+
+  if (isLoadingQuote || !draft) {
+    return (
+      <main className="min-h-screen bg-background px-4 pt-20">
+        {isLoadingQuote ? (
+          <p role="status" className="text-sm text-on-surface-variant">Loading quote...</p>
+        ) : null}
+        {loadError ? <FeedbackMessage variant="error">{loadError}</FeedbackMessage> : null}
+      </main>
+    );
+  }
+  if (!quote) {
+    return (
+      <main className="min-h-screen bg-background px-4 pt-20">
+        <FeedbackMessage variant="error">{loadError ?? "Unable to load quote."}</FeedbackMessage>
+      </main>
+    );
+  }
+  const activeDraft = draft;
+
+  const normalizedLineItems = activeDraft.lineItems.map(normalizeLineItem);
   const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
   const lineItemsForSubmit: LineItemDraft[] = normalizedLineItems
     .filter((lineItem) => lineItem.description.length > 0)
@@ -86,362 +231,191 @@ export function ReviewScreen(): React.ReactElement | null {
       price: lineItem.price,
     }));
   const hasNullPrices = lineItemsForSubmit.some((lineItem) => lineItem.price === null);
-  const hasReachedLineItemLimit = currentDraft.lineItems.length >= DOCUMENT_LINE_ITEMS_MAX_ITEMS;
-  const canSubmit = lineItemsForSubmit.length > 0 && !hasInvalidLineItems;
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {
       return runningTotal;
     }
     return runningTotal + lineItem.price;
   }, 0);
-  const trimmedTranscript = currentDraft.transcript.trim();
-  const reviewMessages = getReviewMessages(currentDraft);
-  const warningMessages = getWarningMessages(reviewMessages, hasNullPrices, documentType);
-  const isInteractionLocked = isSaving || isRegenerating;
 
-  function updateDraft(updater: (current: QuoteDraft) => QuoteDraft): void { setDraft(updater); }
-  function onLineItemAdd(): void {
-    if (hasReachedLineItemLimit) return;
+  const isInteractionLocked = submitAction !== null || isAssigningCustomer;
+
+  async function saveDraft(nextAction: "save" | "continue"): Promise<void> {
     setSaveError(null);
-    updateDraft((nextDraft) => ({
-      ...nextDraft,
-      lineItems: [...nextDraft.lineItems, { ...EMPTY_LINE_ITEM }],
-    }));
-  }
-  async function regenerateFromTranscript(): Promise<void> {
-    setSaveError(null);
-    setIsRegenerating(true);
-    try {
-      const extraction = await quoteService.convertNotes(trimmedTranscript);
-      setDraft({
-        ...currentDraft,
-        title: currentDraft.title,
-        transcript: extraction.transcript,
-        lineItems: mapExtractedLineItems(extraction),
-        total: extraction.total,
-        taxRate: currentDraft.taxRate,
-        discountType: currentDraft.discountType,
-        discountValue: currentDraft.discountValue,
-        depositAmount: currentDraft.depositAmount,
-        confidenceNotes: extraction.confidence_notes,
-        notes: currentDraft.notes,
-        sourceType: currentDraft.sourceType,
-      });
-      setIsTranscriptEditorVisible(false);
-    } catch (regenerateError) {
-      const message = regenerateError instanceof Error
-        ? regenerateError.message
-        : "Unable to regenerate draft from transcript";
-      setSaveError(message);
-    } finally {
-      setIsRegenerating(false);
-    }
-  }
-  function onRegenerateRequest(): void {
-    if (trimmedTranscript.length === 0) {
-      setSaveError("Add transcript notes before regenerating the draft.");
-      return;
-    }
-    if (currentDraft.lineItems.length > 0) {
-      setShowRegenerateConfirm(true);
-      return;
-    }
-    void regenerateFromTranscript();
-  }
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    setSaveError(null);
+    setSaveNotice(null);
+
     if (lineItemsForSubmit.length === 0) {
-      setSaveError("Add at least one line item description before generating the quote.");
+      setSaveError("Add at least one line item description before saving the quote.");
       return;
     }
+
     if (hasInvalidLineItems) {
       setSaveError("Each line item with details or price needs a description.");
       return;
     }
+
     const pricingError = getPricingValidationMessage({
-      totalAmount: currentDraft.total,
-      taxRate: currentDraft.taxRate,
-      discountType: currentDraft.discountType,
-      discountValue: currentDraft.discountValue,
-      depositAmount: currentDraft.depositAmount,
+      totalAmount: activeDraft.total,
+      taxRate: activeDraft.taxRate,
+      discountType: activeDraft.discountType,
+      discountValue: activeDraft.discountValue,
+      depositAmount: activeDraft.depositAmount,
     });
+
     if (pricingError) {
       setSaveError(pricingError);
       return;
     }
-    setIsSaving(true);
+
+    setSubmitAction(nextAction);
+
     try {
-      const createPayload = buildCreatePayload(currentDraft, lineItemsForSubmit);
-      const updatePayload = buildUpdatePayload(currentDraft, lineItemsForSubmit);
-      if (documentType === "quote") {
-        if (currentDraft.quoteId) {
-          const updatedQuote = await quoteService.updateQuote(currentDraft.quoteId, updatePayload);
-          hasSubmittedRef.current = true;
-          clearDraft();
-          navigate(`/quotes/${updatedQuote.id}/preview`);
-          return;
-        }
-        const createdQuote = await quoteService.createQuote(createPayload);
-        hasSubmittedRef.current = true;
-        clearDraft();
-        navigate(`/quotes/${createdQuote.id}/preview`);
-        return;
-      }
-      if (currentDraft.quoteId) {
-        await quoteService.updateQuote(currentDraft.quoteId, updatePayload);
-        const createdInvoice = await quoteService.convertToInvoice(currentDraft.quoteId);
-        hasSubmittedRef.current = true;
-        clearDraft();
-        navigate(`/invoices/${createdInvoice.id}`);
+      await quoteService.updateQuote(quoteId, {
+        title: normalizeOptionalTitle(activeDraft.title),
+        transcript: activeDraft.transcript ?? "",
+        line_items: lineItemsForSubmit,
+        total_amount: activeDraft.total,
+        tax_rate: activeDraft.taxRate,
+        discount_type: activeDraft.discountType,
+        discount_value: activeDraft.discountValue,
+        deposit_amount: activeDraft.depositAmount,
+        notes: activeDraft.notes.trim().length > 0 ? activeDraft.notes.trim() : null,
+      });
+      const refreshedQuote = await refreshQuote({ reseedDraft: true });
+      setSavedSnapshotKey(buildQuoteSnapshotKey(refreshedQuote));
+
+      if (nextAction === "continue") {
+        navigate(`/quotes/${quoteId}/preview`, { replace: true });
         return;
       }
 
-      const createdInvoice = await invoiceService.createInvoice(createPayload);
-      hasSubmittedRef.current = true;
-      clearDraft();
-      navigate(`/invoices/${createdInvoice.id}`);
-    } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : documentType === "quote"
-        ? currentDraft.quoteId ? "Unable to update quote" : "Unable to create quote"
-        : "Unable to create invoice";
+      setSaveNotice("Draft saved.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to save quote";
       setSaveError(message);
     } finally {
-      setIsSaving(false);
+      setSubmitAction(null);
+    }
+  }
+
+  async function handleAssignCustomer(customerId: string): Promise<void> {
+    setIsAssigningCustomer(true);
+
+    try {
+      await quoteService.updateQuote(quoteId, { customer_id: customerId });
+      await refreshQuote();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to assign customer";
+      throw new Error(message);
+    } finally {
+      setIsAssigningCustomer(false);
     }
   }
 
   return (
     <main className="min-h-screen bg-background pb-28">
       <WorkflowScreenHeader
-        title="Review & Edit"
-        backLabel="Back to capture"
-        onBack={() => {
-          if (isInteractionLocked) {
+        title={activeDraft.title.trim().length > 0 ? activeDraft.title.trim() : quote.doc_number ?? "Review Quote"}
+        subtitle={quote?.doc_number}
+        backLabel={backLabel}
+        onBack={() => requestNavigation({ to: backTarget, replace: true })}
+        onExitHome={() => requestNavigation({ to: HOME_ROUTE, replace: true })}
+      />
+
+      <ReviewFormContent
+        id={quoteId}
+        quote={quote}
+        draft={activeDraft}
+        locationNotice={locationState.notice}
+        loadError={loadError}
+        saveError={saveError}
+        saveNotice={saveNotice}
+        requiresCustomerAssignment={requiresCustomerAssignment}
+        canReassignCustomer={canReassignCustomer}
+        isInteractionLocked={isInteractionLocked}
+        hasVisibleConfidenceNotes={hasVisibleConfidenceNotes}
+        confidenceNotes={confidenceNotes}
+        hasNullPrices={hasNullPrices}
+        lineItemSum={lineItemSum}
+        suggestedTaxRate={suggestedTaxRate}
+        onRequestAssignment={() => setIsAssignmentSheetOpen(true)}
+        onDismissConfidence={() => {
+          if (confidenceFingerprint.length === 0) {
             return;
           }
-          const capturePath = currentDraft.customerId
-            ? `/quotes/capture/${currentDraft.customerId}`
-            : "/quotes/capture";
-          navigate(capturePath, {
-            replace: true,
-            state: createCaptureLocationState(currentDraft.launchOrigin ?? HOME_ROUTE),
-          });
+          writeDismissedConfidenceFingerprint(quoteId, confidenceFingerprint);
+          setDismissedConfidenceFingerprint(confidenceFingerprint);
         }}
-        onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
+        onTitleChange={(nextTitle) => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({ ...currentDraft, title: nextTitle }));
+        }}
+        onTranscriptChange={(nextTranscript) => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({ ...currentDraft, transcript: nextTranscript }));
+        }}
+        onEditLineItem={(lineItemIndex) => {
+          navigate(`/quotes/${quoteId}/edit/line-items/${lineItemIndex}/edit`);
+        }}
+        onAddLineItem={() => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({
+            ...currentDraft,
+            lineItems: [...currentDraft.lineItems, { ...EMPTY_LINE_ITEM }],
+          }));
+        }}
+        onTotalChange={(nextTotal) => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({ ...currentDraft, total: nextTotal }));
+        }}
+        onTaxRateChange={(nextTaxRate) => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({ ...currentDraft, taxRate: nextTaxRate }));
+        }}
+        onDiscountTypeChange={(nextDiscountType) => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({ ...currentDraft, discountType: nextDiscountType }));
+        }}
+        onDiscountValueChange={(nextDiscountValue) => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({ ...currentDraft, discountValue: nextDiscountValue }));
+        }}
+        onDepositAmountChange={(nextDepositAmount) => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({ ...currentDraft, depositAmount: nextDepositAmount }));
+        }}
+        onNotesChange={(nextNotes) => {
+          setSaveNotice(null);
+          setDraft((currentDraft) => ({ ...currentDraft, notes: nextNotes }));
+        }}
       />
-      <form
-        id="quote-review-form"
-        className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-24 pt-20"
-        onSubmit={onSubmit}
-      >
-        {saveError ? (
-          <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
-        ) : null}
-        {warningMessages.length > 0 ? (
-          <section className="rounded-lg border border-warning-accent/30 bg-warning-container p-4 text-warning">
-            <p className="text-[0.6875rem] font-bold uppercase tracking-widest">
-              Review required before generating
-            </p>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm">
-              {warningMessages.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-        <details className="rounded-lg bg-surface-container-low">
-          <summary className="cursor-pointer select-none px-4 py-3 text-xs font-bold uppercase tracking-widest text-outline">
-            TRANSCRIPT
-          </summary>
-          <div className="space-y-4 px-4 pb-4">
-            {trimmedTranscript.length > 0 ? (
-              <p className="whitespace-pre-wrap text-sm text-on-surface-variant">
-                {currentDraft.transcript}
-              </p>
-            ) : (
-              <p className="text-sm text-outline">No transcript captured yet.</p>
-            )}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                type="button"
-                disabled={isInteractionLocked}
-                className="cursor-pointer text-left text-sm font-semibold text-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={() => setIsTranscriptEditorVisible((isVisible) => !isVisible)}
-              >
-                {isTranscriptEditorVisible ? "Hide Transcript Editor" : "Edit Transcript Notes"}
-              </button>
-              {isTranscriptEditorVisible ? (
-                <Button
-                  type="button"
-                  className="w-full px-4 py-3 sm:w-auto"
-                  onClick={onRegenerateRequest}
-                  disabled={trimmedTranscript.length === 0 || isInteractionLocked}
-                  isLoading={isRegenerating}
-                >
-                  Regenerate From Transcript
-                </Button>
-              ) : null}
-            </div>
-            {isTranscriptEditorVisible ? (
-              <section className="space-y-2">
-                <label
-                  htmlFor="transcript-notes"
-                  className="text-xs font-bold uppercase tracking-wider text-outline-variant"
-                >
-                  TRANSCRIPT NOTES
-                </label>
-                <textarea
-                  id="transcript-notes"
-                  rows={6}
-                  maxLength={DOCUMENT_TRANSCRIPT_MAX_CHARS}
-                  disabled={isInteractionLocked}
-                  value={currentDraft.transcript}
-                  onChange={(event) =>
-                    updateDraft((nextDraft) => ({
-                      ...nextDraft,
-                      transcript: event.target.value,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:bg-surface-container-lowest focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  placeholder="Correct the transcript notes before regenerating."
-                />
-                <p className="text-sm text-outline">
-                  Regenerating replaces current line items, total, and AI review notes. Customer
-                  notes stay as-is.
-                </p>
-              </section>
-            ) : null}
-          </div>
-        </details>
-        <section className="space-y-2">
-          <label
-            htmlFor="quote-title"
-            className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
-          >
-            QUOTE TITLE
-          </label>
-          <input
-            id="quote-title"
-            type="text"
-            disabled={isInteractionLocked}
-            value={currentDraft.title}
-            onChange={(event) =>
-              updateDraft((nextDraft) => ({
-                ...nextDraft,
-                title: event.target.value,
-              }))
-            }
-            className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-            placeholder="Front yard refresh (optional)"
-            maxLength={120}
-          />
-        </section>
-        <div className="flex items-end justify-between">
-          <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>
-          <span className="text-[0.6875rem] uppercase tracking-widest text-outline">
-            {currentDraft.lineItems.length} ITEMS EXTRACTED
-          </span>
-        </div>
-        <div className="mt-3 space-y-3">
-          {currentDraft.lineItems.length > 0 ? (
-            currentDraft.lineItems.map((lineItem, index) => (
-              <LineItemCard
-                key={`line-item-card-${index}`}
-                description={lineItem.description || "Untitled line item"}
-                details={lineItem.details}
-                price={lineItem.price}
-                flagged={lineItem.flagged}
-                disabled={isInteractionLocked}
-                onClick={() => navigate(`/quotes/review/line-items/${index}/edit`)}
-              />
-            ))
-          ) : (
-            <p className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline">
-              No line items extracted yet.
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={onLineItemAdd}
-          disabled={isInteractionLocked || hasReachedLineItemLimit}
-        >
-          <span className="material-symbols-outlined text-base">add</span>
-          Add Line Item
-        </button>
-        <TotalAmountSection
-          lineItemSum={lineItemSum}
-          total={currentDraft.total}
-          taxRate={currentDraft.taxRate}
-          discountType={currentDraft.discountType}
-          discountValue={currentDraft.discountValue}
-          depositAmount={currentDraft.depositAmount}
-          suggestedTaxRate={suggestedTaxRate}
-          disabled={isInteractionLocked}
-          onTotalChange={(total) => {
-            updateDraft((nextDraft) => ({ ...nextDraft, total }));
-          }}
-          onTaxRateChange={(taxRate) => {
-            updateDraft((nextDraft) => ({ ...nextDraft, taxRate }));
-          }}
-          onDiscountTypeChange={(discountType) => {
-            updateDraft((nextDraft) => ({ ...nextDraft, discountType }));
-          }}
-          onDiscountValueChange={(discountValue) => {
-            updateDraft((nextDraft) => ({ ...nextDraft, discountValue }));
-          }}
-          onDepositAmountChange={(depositAmount) => {
-            updateDraft((nextDraft) => ({ ...nextDraft, depositAmount }));
-          }}
-        />
-        <section className="space-y-2">
-          <label
-            htmlFor="quote-notes"
-            className="text-xs font-bold uppercase tracking-wider text-outline-variant"
-          >
-            CUSTOMER NOTES
-          </label>
-          <textarea
-            id="quote-notes"
-            rows={3}
-            maxLength={DOCUMENT_NOTES_MAX_CHARS}
-            disabled={isInteractionLocked}
-            value={currentDraft.notes}
-            onChange={(event) =>
-              updateDraft((nextDraft) => ({
-                ...nextDraft,
-                notes: event.target.value,
-              }))
-            }
-            className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:bg-surface-container-lowest focus:border-primary focus:ring-2 focus:ring-primary/20"
-            placeholder="Any notes to include for the customer."
-          />
-        </section>
-        <ReviewDocumentTypeSelector
-          value={documentType}
-          disabled={isInteractionLocked}
-          onChange={setDocumentType}
-        />
-      </form>
-      <ReviewSubmitFooter
-        documentType={documentType}
-        canSubmit={canSubmit}
+
+      <ReviewActionFooter
+        requiresCustomerAssignment={requiresCustomerAssignment}
         isInteractionLocked={isInteractionLocked}
-        isSaving={isSaving}
+        isSavingDraft={submitAction === "save"}
+        isContinuing={submitAction === "continue"}
+        onSaveDraft={() => void saveDraft("save")}
+        onContinueToPreview={() => void saveDraft("continue")}
       />
-      {showRegenerateConfirm ? (
+
+      {isAssignmentSheetOpen ? (
+        <ReviewCustomerAssignmentSheet
+          open={isAssignmentSheetOpen}
+          currentCustomerId={quote.customer_id}
+          onClose={() => setIsAssignmentSheetOpen(false)}
+          onAssignCustomer={handleAssignCustomer}
+        />
+      ) : null}
+
+      {showLeaveWarning ? (
         <ConfirmModal
-          title="Replace current draft?"
-          body="Regenerating from the edited transcript will replace the current line items, total, and AI review notes."
-          confirmLabel="Replace Draft"
-          cancelLabel="Keep Current Draft"
-          onConfirm={() => {
-            setShowRegenerateConfirm(false);
-            void regenerateFromTranscript();
-          }}
-          onCancel={() => setShowRegenerateConfirm(false)}
+          title="Leave this screen?"
+          body="You have unsaved quote edits. Leaving now will discard those changes."
+          confirmLabel="Leave without saving"
+          cancelLabel="Stay"
+          onConfirm={handleLeaveConfirm}
+          onCancel={handleLeaveCancel}
           variant="destructive"
         />
       ) : null}

@@ -80,7 +80,7 @@ describe("EditLineItemForEditScreen", () => {
     expect(screen.getByLabelText(/price/i)).toHaveValue("120");
   });
 
-  it("saves changes and navigates back to the quote edit screen", () => {
+  it("saves changes and navigates back to review", () => {
     renderScreen(makeDraft());
 
     fireEvent.change(screen.getByLabelText(/description/i), {
@@ -99,16 +99,16 @@ describe("EditLineItemForEditScreen", () => {
       details: "6 yards",
       price: 140,
     });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/edit", { replace: true });
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review", { replace: true });
   });
 
-  it("deletes item and navigates back to the quote edit screen", () => {
+  it("deletes item and navigates back to review", () => {
     renderScreen(makeDraft());
 
     fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
 
     expect(removeLineItemMock).toHaveBeenCalledWith(0);
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/edit", { replace: true });
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review", { replace: true });
   });
 
   it("exits home from the workflow header", () => {

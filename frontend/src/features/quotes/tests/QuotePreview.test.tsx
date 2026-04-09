@@ -127,7 +127,7 @@ function renderScreen(
     <MemoryRouter initialEntries={options?.initialEntries ?? [path]} initialIndex={options?.initialIndex}>
       <Routes>
         <Route path="/quotes/:id/preview" element={<QuotePreview />} />
-        <Route path="/quotes/:id/edit" element={<div>Edit Quote Screen</div>} />
+        <Route path="/quotes/:id/review" element={<div>Review Quote Screen</div>} />
         <Route path="/invoices/:id" element={<div>Invoice Detail Screen</div>} />
         <Route path="/" element={<div>Quote List Screen</div>} />
       </Routes>
@@ -608,13 +608,27 @@ describe("QuotePreview", () => {
     expect(screen.queryByText("Share link copied to clipboard.")).not.toBeInTheDocument();
   });
 
-  it("navigates to the edit route from the header action", async () => {
+  it("navigates to the canonical review route from the header action", async () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
     fireEvent.click(screen.getByRole("button", { name: /edit quote/i }));
 
-    expect(await screen.findByText("Edit Quote Screen")).toBeInTheDocument();
+    expect(await screen.findByText("Review Quote Screen")).toBeInTheDocument();
+  });
+
+  it("redirects unassigned quotes from preview to review with guidance", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        customer_id: null,
+        customer_name: null,
+        requires_customer_assignment: true,
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText("Review Quote Screen")).toBeInTheDocument();
   });
 
   it("shows an error when quote fetch fails", async () => {

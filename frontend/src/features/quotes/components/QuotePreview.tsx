@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
@@ -44,6 +45,9 @@ export function QuotePreview(): React.ReactElement {
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact = readOptionalQuoteText(quote, "customer_phone") ?? readOptionalQuoteText(quote, "customer_email") ?? "No contact details";
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
+  const requiresCustomerAssignment = quote
+    ? (quote.requires_customer_assignment ?? quote.customer_id === null)
+    : false;
   const showDraftInvoicePromptBelowActions = Boolean(quote && actionState === "draft" && !quote.linked_invoice);
   const {
     invoiceError,
@@ -121,6 +125,20 @@ export function QuotePreview(): React.ReactElement {
     onMarkLostRequest: () => setShowMarkLostConfirm(true),
   });
 
+  useEffect(() => {
+    if (!id || !quote || !requiresCustomerAssignment) {
+      return;
+    }
+
+    navigate(`/quotes/${id}/review`, {
+      replace: true,
+      state: {
+        origin: "preview",
+        notice: "Assign a customer before continuing to preview.",
+      },
+    });
+  }, [id, navigate, quote, requiresCustomerAssignment]);
+
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader
@@ -131,7 +149,10 @@ export function QuotePreview(): React.ReactElement {
           <QuotePreviewHeaderActions
             status={quote.status}
             canEdit={canEdit}
-            onEdit={() => navigate(`/quotes/${id}/edit`)}
+            onEdit={() =>
+              navigate(`/quotes/${id}/review`, {
+                state: { origin: "preview" },
+              })}
             overflowItems={overflowItems}
           />
         ) : null}

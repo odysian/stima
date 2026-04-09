@@ -97,6 +97,9 @@ Record conventions that already exist in code.
   - Use for explicit stay/leave, discard, or destructive confirmation flows instead of `window.confirm`.
   - Props: `title`, optional `body`, `confirmLabel`, `cancelLabel`, `onConfirm`, `onCancel`, optional `variant`.
   - Behavior: moves initial focus to cancel, supports `Escape` dismissal, and uses `primary` or `destructive` confirm styling.
+- Assignment sheets in feature flows:
+  - For mobile-first picker/create flows (for example review-customer assignment), reuse the same modal shell grammar as `ConfirmModal` (`items-end` on mobile, `sm:items-center` on desktop) with feature-local content.
+  - Keep feature sheets local to the feature unless 2+ independent flows need the exact same abstraction.
 - `formatCurrency` / `formatDate` (`@/shared/lib/formatters`):
   - Use for all money and calendar date display in UI.
   - Do not duplicate local currency/date formatter helpers in screens/components.

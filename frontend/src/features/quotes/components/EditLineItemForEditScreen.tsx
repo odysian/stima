@@ -44,7 +44,7 @@ export function EditLineItemForEditScreen(): React.ReactElement | null {
     }
 
     if (safeLineItemIndex < 0 || !currentItem) {
-      navigate(`/quotes/${id}/edit`, { replace: true });
+      navigate(`/quotes/${id}/review`, { replace: true });
     }
   }, [currentItem, hasMatchingDraft, id, navigate, safeLineItemIndex]);
 
@@ -72,12 +72,12 @@ export function EditLineItemForEditScreen(): React.ReactElement | null {
       details: details.trim().length > 0 ? details.trim() : null,
       price: parsedPrice,
     });
-    navigate(`/quotes/${id}/edit`, { replace: true });
+    navigate(`/quotes/${id}/review`, { replace: true });
   }
 
   function onDelete(): void {
     removeLineItem(safeLineItemIndex);
-    navigate(`/quotes/${id}/edit`, { replace: true });
+    navigate(`/quotes/${id}/review`, { replace: true });
   }
 
   return (
@@ -85,8 +85,8 @@ export function EditLineItemForEditScreen(): React.ReactElement | null {
       <WorkflowScreenHeader
         title="Edit Line Item"
         eyebrow="QUOTE EDITOR"
-        backLabel="Back to edit quote"
-        onBack={() => navigate(`/quotes/${id}/edit`, { replace: true })}
+        backLabel="Back to review"
+        onBack={() => navigate(`/quotes/${id}/review`, { replace: true })}
         onExitHome={() => navigate(HOME_ROUTE, { replace: true })}
       />
 

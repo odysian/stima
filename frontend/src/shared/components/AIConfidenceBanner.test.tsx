@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
 
@@ -16,5 +16,19 @@ describe("AIConfidenceBanner", () => {
     const icon = screen.getByText("info");
     expect(icon).toHaveClass("material-symbols-outlined", "text-warning-accent");
     expect((icon as HTMLElement).style.fontVariationSettings).toBe('"FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24');
+  });
+
+  it("supports a dismiss action when provided", () => {
+    const onDismiss = vi.fn();
+
+    render(
+      <AIConfidenceBanner
+        message="Double-check quantity assumptions."
+        onDismiss={onDismiss}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /dismiss confidence note/i }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

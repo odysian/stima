@@ -34,7 +34,7 @@ function matchesSearch(
   }
 
   return (
-    item.customer_name.toLowerCase().includes(normalizedSearchQuery)
+    (item.customer_name ?? "").toLowerCase().includes(normalizedSearchQuery)
     || item.doc_number.toLowerCase().includes(normalizedSearchQuery)
     || (item.title?.toLowerCase() ?? "").includes(normalizedSearchQuery)
   );
@@ -159,7 +159,7 @@ export function QuoteList(): React.ReactElement {
   const emptyStateMessage = totalRows === 0
     ? documentMode === "quotes"
       ? "No quotes yet. Tap New Quote to create your first."
-      : "No invoices yet. Tap New Quote and choose Invoice in review."
+      : "No invoices yet. Convert a quote to an invoice from Preview."
     : `No ${documentMode} match your search.`;
   const sectionLabel = documentMode === "quotes" ? "PAST QUOTES" : "PAST INVOICES";
 
@@ -169,7 +169,7 @@ export function QuoteList(): React.ReactElement {
         id: quote.id,
         primaryLabel: quote.title ?? quote.doc_number,
         supportingDetails: [
-          quote.customer_name,
+          quote.customer_name ?? "Unassigned customer",
           ...(quote.title ? [quote.doc_number] : []),
           formatDate(quote.created_at, timezone),
           `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
