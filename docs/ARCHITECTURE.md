@@ -105,7 +105,7 @@ Runbooks:
 |---|---|---|
 | id | UUID (PK) | |
 | user_id | UUID (FK → users) | indexed, cascade delete |
-| customer_id | UUID (FK → customers) | indexed, cascade delete |
+| customer_id | UUID (FK → customers) | nullable for quote drafts, indexed, cascade delete; invoice rows are guarded by `ck_documents_invoice_customer_required` so they still require a customer |
 | doc_type | String(20) | default `"quote"` |
 | doc_sequence | Integer | per-user, per-`doc_type` sequence counter |
 | doc_number | String(20) | stored display ID, format `Q-001` or `I-001` |
@@ -251,16 +251,16 @@ Rules:
 | `/quotes/capture-audio` | POST | yes | cookie | multipart form-data `clips` files | `200 ExtractionResult` |
 | `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `202 JobRecordResponse` when ARQ is available, otherwise `200 ExtractionResult` sync fallback; `429` when active extraction jobs are at the per-user limit; `503 { detail: "Unable to start extraction right now. Please try again." }` if enqueue fails after the durable job row is created |
 | `/jobs/{job_id}` | GET | no | cookie | — | `200 JobRecordResponse` for owned jobs, with `extraction_result` populated on successful extraction jobs; `404 { detail: "Not found" }` for unknown or foreign-owned jobs |
-| `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"` |
-| `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`) |
-| `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + `customer_name`, `customer_email`, `customer_phone`, `linked_invoice`) or `404 { detail: "Not found" }` |
-| `/quotes/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes, or `404 { detail: "Not found" }` |
-| `/quotes/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Quote`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, and preserves terminal quote status on resend |
+| `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"`; this route remains customer-required, while extraction-created unassigned drafts are reserved for the extraction worker flow |
+| `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`; `customer_id` / `customer_name` may be `null` for unassigned drafts and each row includes `requires_customer_assignment` plus `can_reassign_customer`) |
+| `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + nullable `customer_name`, `customer_email`, `customer_phone`, helper flags `requires_customer_assignment` / `can_reassign_customer`, and `linked_invoice`) or `404 { detail: "Not found" }` |
+| `/quotes/{id}` | PATCH | yes | cookie | partial `{ customer_id?, title?, transcript?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes; allows `customer_id: null -> UUID` assignment plus draft/ready reassignment, rejects clearing an assigned customer with `409 { detail: "Customer cannot be cleared from a quote." }`, rejects reassignment after sharing or invoice conversion with `409 { detail: "Customer cannot be changed after sharing or invoice conversion." }`, or `404 { detail: "Not found" }` |
+| `/quotes/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Quote`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, preserves terminal quote status on resend, and returns `409 { detail: "Assign a customer before continuing." }` for unassigned drafts |
 | `/quotes/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current quote share token without leaking token state publicly |
-| `/quotes/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `202 JobRecordResponse` after ensuring the quote is shared, creating a durable `email` job row, and enqueueing worker delivery; replayed same-key responses return the same `202` payload with `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when quote is missing/not owned, `409` when still `draft`, when the same key is reused for a different quote, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, or `503 { detail: "Unable to start email delivery right now. Please try again." }` when enqueue fails after job creation |
+| `/quotes/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `202 JobRecordResponse` after ensuring the quote is shared, creating a durable `email` job row, and enqueueing worker delivery; replayed same-key responses return the same `202` payload with `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when quote is missing/not owned, `409` when the quote has no assigned customer, when the quote is still `draft`, when the same key is reused for a different quote, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, or `503 { detail: "Unable to start email delivery right now. Please try again." }` when enqueue fails after job creation |
 | `/quotes/{id}/mark-won` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
 | `/quotes/{id}/mark-lost` | POST | yes | cookie | — | `200 Quote`, `404 { detail: "Not found" }`, or `409 { detail: "Unable to update quote outcome" }` on an unexpected write race |
-| `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, or `409 { detail: "An invoice already exists for this quote" }` |
+| `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, `409 { detail: "Assign a customer before continuing." }` for unassigned quotes, or `409 { detail: "An invoice already exists for this quote" }` |
 
 Quote extraction guardrails:
 - `POST /quotes/convert-notes`, `POST /quotes/capture-audio`, and `POST /quotes/extract` use user-keyed rate limits when a valid access cookie is present, with IP fallback only for unauthenticated resolution failures.
@@ -305,8 +305,13 @@ Public landing-page rules:
 - structured access logs must use redacted route templates for token-bearing paths and never emit raw share tokens
 
 `PATCH /quotes/{id}` behavior:
+- If `customer_id` is present and the quote is unassigned, `null -> UUID` assignment is allowed while the quote is still `draft` or `ready`.
+- If `customer_id` is present and unchanged, the patch is a `200` no-op even on otherwise locked statuses.
+- If `customer_id` is present and set to `null` for an already assigned quote, the API returns `409 { "detail": "Customer cannot be cleared from a quote." }`.
+- If `customer_id` changes after the quote is `shared`, `viewed`, `approved`, or `declined`, or once a linked invoice exists, the API returns `409 { "detail": "Customer cannot be changed after sharing or invoice conversion." }`.
 - If `title` is present, blank or whitespace-only values are normalized to `null`.
 - If `title` is omitted, the existing title is preserved.
+- If `transcript` is present, it is patchable with the same length validation as create.
 - If `line_items` is present, existing rows are fully replaced.
 - If `line_items` is omitted, existing rows are preserved.
 - Editing preserves the persisted quote status and any existing `share_token` / `shared_at` values.
@@ -314,6 +319,7 @@ Public landing-page rules:
 
 `POST /quotes/{id}/send-email` behavior:
 - `Idempotency-Key` is mandatory; missing keys return `400 { "detail": "Idempotency-Key header is required" }`.
+- Unassigned quotes are rejected up front with `409 { "detail": "Assign a customer before continuing." }` before share/email side effects start.
 - Successful same-key retries replay the original `202 JobRecordResponse` with `Idempotency-Replayed: true` and do not create a second `email` job.
 - Reusing the same key for a different quote, or while the original request is still in progress, returns `409`.
 - The quote is shared before enqueue, so a `503` enqueue failure can still leave the quote in `shared` state on a subsequent `GET`.
@@ -340,6 +346,8 @@ Public landing-page rules:
 - `status`
 - `total_amount`
 - `item_count`
+- `requires_customer_assignment`
+- `can_reassign_customer`
 - `created_at`
 
 `InvoiceListItem` fields:
@@ -355,8 +363,9 @@ Public landing-page rules:
 - `source_document_id`
 
 `QuoteDetailResponse` fields:
-- Standard `Quote` fields, including `id`, `customer_id`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
-- Customer display fields: `customer_name`, `customer_email`, `customer_phone`
+- Standard `Quote` fields, including `id`, nullable `customer_id`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
+- Customer display fields: nullable `customer_name`, `customer_email`, `customer_phone`
+- Helper flags: `requires_customer_assignment`, `can_reassign_customer`
 - `linked_invoice`: `{ id, doc_number, status, due_date, total_amount, created_at } | null`
 
 `InvoiceDetail` fields:
@@ -371,7 +380,7 @@ Invoice rules:
 - quote rows continue to route to `/quotes/{id}/preview`; invoice rows route to `/invoices/{id}`
 - direct invoices receive the server-side default due date on create
 - direct invoices use `source_document_id = null` and `source_quote_number = null`
-- only `approved` quotes can convert to invoices
+- quote-to-invoice conversion now rejects unassigned quotes before any invoice write is attempted
 - quote conversion is one-to-one; duplicate conversions are blocked by service guard plus the DB partial unique index
 - invoice lifecycle is `draft -> ready -> sent`
 - if `title` is present, blank or whitespace-only values are normalized to `null`

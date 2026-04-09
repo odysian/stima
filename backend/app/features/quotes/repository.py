@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.features.auth.models import User
 from app.features.customers.models import Customer
@@ -33,6 +33,13 @@ _PUBLIC_QUOTE_STATUSES = (
     QuoteStatus.DECLINED,
 )
 _QUOTE_DOC_TYPE = "quote"
+_INVOICE_DOC_TYPE = "invoice"
+_CUSTOMER_REASSIGNABLE_STATUSES = frozenset(
+    {
+        QuoteStatus.DRAFT.value,
+        QuoteStatus.READY.value,
+    }
+)
 
 
 @dataclass(slots=True)
@@ -100,13 +107,15 @@ class QuoteListItemSummary:
     """Summary row returned by the quote list query."""
 
     id: UUID
-    customer_id: UUID
-    customer_name: str
+    customer_id: UUID | None
+    customer_name: str | None
     doc_number: str
     title: str | None
     status: str
     total_amount: Decimal | None
     item_count: int
+    requires_customer_assignment: bool
+    can_reassign_customer: bool
     created_at: datetime
 
 
@@ -115,8 +124,8 @@ class QuoteDetailRow:
     """Detail row returned by the quote detail query."""
 
     id: UUID
-    customer_id: UUID
-    customer_name: str
+    customer_id: UUID | None
+    customer_name: str | None
     customer_email: str | None
     customer_phone: str | None
     doc_number: str
@@ -135,6 +144,8 @@ class QuoteDetailRow:
     line_items: list[LineItem]
     created_at: datetime
     updated_at: datetime
+    requires_customer_assignment: bool
+    can_reassign_customer: bool
     linked_invoice: LinkedInvoiceSummary | None
     pdf_artifact_path: str | None
     pdf_artifact_revision: int
@@ -208,11 +219,21 @@ class QuoteRepository:
         customer_id: UUID | None = None,
     ) -> list[QuoteListItemSummary]:
         """Return quote summaries for a user ordered newest-first."""
+        linked_invoice = aliased(Document)
         line_item_count = (
             select(func.count(LineItem.id))
             .where(LineItem.document_id == Document.id)
             .correlate(Document)
             .scalar_subquery()
+        )
+        has_linked_invoice = (
+            select(linked_invoice.id)
+            .where(
+                linked_invoice.user_id == user_id,
+                linked_invoice.doc_type == _INVOICE_DOC_TYPE,
+                linked_invoice.source_document_id == Document.id,
+            )
+            .exists()
         )
         statement = (
             select(
@@ -224,9 +245,10 @@ class QuoteRepository:
                 Document.status,
                 Document.total_amount,
                 line_item_count.label("item_count"),
+                has_linked_invoice.label("has_linked_invoice"),
                 Document.created_at,
             )
-            .join(Customer, Customer.id == Document.customer_id)
+            .outerjoin(Customer, Customer.id == Document.customer_id)
             .where(
                 Document.user_id == user_id,
                 Document.doc_type == _QUOTE_DOC_TYPE,
@@ -249,6 +271,13 @@ class QuoteRepository:
                 ),
                 total_amount=row.total_amount,
                 item_count=int(row.item_count),
+                requires_customer_assignment=row.customer_id is None,
+                can_reassign_customer=_can_reassign_customer(
+                    status=(
+                        row.status.value if isinstance(row.status, QuoteStatus) else str(row.status)
+                    ),
+                    has_linked_invoice=bool(row.has_linked_invoice),
+                ),
                 created_at=row.created_at,
             )
             for row in result
@@ -271,7 +300,7 @@ class QuoteRepository:
         """Return one quote detail row with customer contact fields."""
         result = await self._session.execute(
             select(Document, Customer, JobRecord.status, JobRecord.terminal_error)
-            .join(Customer, Customer.id == Document.customer_id)
+            .outerjoin(Customer, Customer.id == Document.customer_id)
             .outerjoin(JobRecord, JobRecord.id == Document.pdf_artifact_job_id)
             .where(
                 Document.id == quote_id,
@@ -289,20 +318,21 @@ class QuoteRepository:
             source_document_id=document.id,
             user_id=user_id,
         )
+        status = (
+            document.status.value
+            if isinstance(document.status, QuoteStatus)
+            else str(document.status)
+        )
 
         return QuoteDetailRow(
             id=document.id,
             customer_id=document.customer_id,
-            customer_name=customer.name,
-            customer_email=customer.email,
-            customer_phone=customer.phone,
+            customer_name=customer.name if customer is not None else None,
+            customer_email=customer.email if customer is not None else None,
+            customer_phone=customer.phone if customer is not None else None,
             doc_number=document.doc_number,
             title=document.title,
-            status=(
-                document.status.value
-                if isinstance(document.status, QuoteStatus)
-                else str(document.status)
-            ),
+            status=status,
             source_type=document.source_type,
             transcript=document.transcript,
             total_amount=document.total_amount,
@@ -316,6 +346,11 @@ class QuoteRepository:
             line_items=document.line_items,
             created_at=document.created_at,
             updated_at=document.updated_at,
+            requires_customer_assignment=document.customer_id is None,
+            can_reassign_customer=_can_reassign_customer(
+                status=status,
+                has_linked_invoice=linked_invoice is not None,
+            ),
             linked_invoice=linked_invoice,
             pdf_artifact_path=document.pdf_artifact_path,
             pdf_artifact_revision=document.pdf_artifact_revision,
@@ -344,7 +379,7 @@ class QuoteRepository:
         return QuoteEmailContext(
             quote_id=document.id,
             user_id=document.user_id,
-            customer_id=document.customer_id,
+            customer_id=cast(UUID, document.customer_id),
             business_name=user.business_name,
             first_name=user.first_name,
             last_name=user.last_name,
@@ -428,7 +463,7 @@ class QuoteRepository:
         return PublicShareRecord(
             document_id=row.id,
             user_id=row.user_id,
-            customer_id=row.customer_id,
+            customer_id=cast(UUID, row.customer_id),
             status=cast(QuoteStatus, row.status),
             share_token_created_at=row.share_token_created_at,
             share_token_expires_at=row.share_token_expires_at,
@@ -462,7 +497,7 @@ class QuoteRepository:
         return QuoteViewTransition(
             quote_id=updated_row.id,
             user_id=updated_row.user_id,
-            customer_id=updated_row.customer_id,
+            customer_id=cast(UUID, updated_row.customer_id),
         )
 
     async def touch_last_public_accessed_at_by_share_token(
@@ -563,7 +598,7 @@ class QuoteRepository:
         self,
         *,
         user_id: UUID,
-        customer_id: UUID,
+        customer_id: UUID | None,
         title: str | None,
         transcript: str,
         line_items: list[LineItemDraft],
@@ -615,8 +650,12 @@ class QuoteRepository:
         self,
         *,
         document: Document,
+        customer_id: UUID | None,
+        update_customer_id: bool,
         title: str | None,
         update_title: bool,
+        transcript: str | None,
+        update_transcript: bool,
         total_amount: float | None,
         update_total_amount: bool,
         tax_rate: float | None,
@@ -633,8 +672,12 @@ class QuoteRepository:
         replace_line_items: bool,
     ) -> Document:
         """Apply partial quote updates and optional full line-item replacement."""
+        if update_customer_id:
+            document.customer_id = customer_id
         if update_title:
             document.title = title
+        if update_transcript:
+            document.transcript = cast(str, transcript)
         if update_total_amount:
             document.total_amount = _to_decimal(total_amount)
         if update_tax_rate:
@@ -655,6 +698,22 @@ class QuoteRepository:
         await self._session.refresh(document)
         await self._session.refresh(document, attribute_names=["line_items"])
         return document
+
+    async def has_linked_invoice(
+        self,
+        *,
+        source_document_id: UUID,
+        user_id: UUID,
+    ) -> bool:
+        """Return true when an invoice already exists for one source quote."""
+        linked_invoice_id = await self._session.scalar(
+            select(Document.id).where(
+                Document.user_id == user_id,
+                Document.doc_type == _INVOICE_DOC_TYPE,
+                Document.source_document_id == source_document_id,
+            )
+        )
+        return linked_invoice_id is not None
 
     async def invalidate_pdf_artifact(self, document: Document) -> str | None:
         """Invalidate one quote artifact by clearing durable state and bumping revision."""
@@ -771,7 +830,7 @@ def _build_render_context(
     return QuoteRenderContext(
         quote_id=document.id,
         user_id=document.user_id,
-        customer_id=document.customer_id,
+        customer_id=cast(UUID, document.customer_id),
         business_name=user.business_name,
         first_name=user.first_name,
         last_name=user.last_name,
@@ -823,3 +882,7 @@ def _format_quote_date(value: datetime, timezone: str | None) -> str:
             resolved_tz = UTC
 
     return value.astimezone(resolved_tz).strftime("%b %d, %Y")
+
+
+def _can_reassign_customer(*, status: str, has_linked_invoice: bool) -> bool:
+    return status in _CUSTOMER_REASSIGNABLE_STATUSES and not has_linked_invoice

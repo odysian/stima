@@ -35,7 +35,11 @@ from app.features.jobs.service import JobService
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext
 from app.features.quotes.schemas import LineItemDraft
-from app.features.quotes.service import QuoteRepositoryProtocol, QuoteServiceError
+from app.features.quotes.service import (
+    QuoteRepositoryProtocol,
+    QuoteServiceError,
+    ensure_quote_customer_assigned,
+)
 from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.event_logger import log_event
@@ -271,6 +275,7 @@ class InvoiceService:
         quote = await self._quote_repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        ensure_quote_customer_assigned(quote)
 
         existing_invoice = await self._invoice_repository.get_by_source_document_id(
             source_document_id=quote.id,

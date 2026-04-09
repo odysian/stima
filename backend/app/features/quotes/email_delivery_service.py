@@ -16,7 +16,11 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from app.features.auth.models import User
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteEmailContext
-from app.features.quotes.service import QuoteService, QuoteServiceError
+from app.features.quotes.service import (
+    QuoteService,
+    QuoteServiceError,
+    ensure_quote_customer_assigned,
+)
 from app.integrations.email import (
     EmailConfigurationError,
     EmailMessage,
@@ -105,13 +109,16 @@ class QuoteEmailDeliveryService:
     async def prepare_quote_email_job(self, user: User, quote_id: UUID) -> Document:
         """Validate prerequisites, enforce duplicate guard, and ensure share state."""
         user_id = _resolve_user_id(user)
+        if self._quote_service is None:
+            raise QuoteServiceError(detail="Quote share service unavailable", status_code=500)
+
+        quote = await self._quote_service.get_quote(user, quote_id)
+        ensure_quote_customer_assigned(quote)
         await self._load_context(
             quote_id=quote_id,
             user_id=user_id,
             enforce_duplicate_send_guard=True,
         )
-        if self._quote_service is None:
-            raise QuoteServiceError(detail="Quote share service unavailable", status_code=500)
 
         shared_quote = await self._quote_service.share_quote(user, quote_id)
         if shared_quote.share_token is None:

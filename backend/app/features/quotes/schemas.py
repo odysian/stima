@@ -90,7 +90,13 @@ class QuoteCreateRequest(BaseModel):
 class QuoteUpdateRequest(BaseModel):
     """Request payload for partial quote updates with full line-item replacement."""
 
+    customer_id: UUID | None = None
     title: str | None = Field(default=None, max_length=120)
+    transcript: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=DOCUMENT_TRANSCRIPT_MAX_CHARS,
+    )
     line_items: list[LineItemDraft] | None = Field(
         default=None,
         max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
@@ -106,9 +112,11 @@ class QuoteUpdateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_line_items_not_null_when_provided(self) -> QuoteUpdateRequest:
-        """Reject explicit null for line_items while allowing omission."""
+        """Reject explicit null for required patch fields while allowing omission."""
         if "line_items" in self.model_fields_set and self.line_items is None:
             raise ValueError("line_items cannot be null")
+        if "transcript" in self.model_fields_set and self.transcript is None:
+            raise ValueError("transcript cannot be null")
         return self
 
 
@@ -140,13 +148,15 @@ class QuoteListItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    customer_id: UUID
-    customer_name: str
+    customer_id: UUID | None
+    customer_name: str | None
     doc_number: str
     title: str | None
     status: str
     total_amount: float | None
     item_count: int
+    requires_customer_assignment: bool
+    can_reassign_customer: bool
     created_at: datetime
 
 
@@ -156,7 +166,7 @@ class QuoteResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    customer_id: UUID
+    customer_id: UUID | None
     doc_number: str
     title: str | None
     status: str
@@ -200,9 +210,11 @@ class PdfArtifactResponse(BaseModel):
 class QuoteDetailResponse(QuoteResponse):
     """Quote detail payload including customer display fields."""
 
-    customer_name: str
+    customer_name: str | None
     customer_email: str | None
     customer_phone: str | None
+    requires_customer_assignment: bool
+    can_reassign_customer: bool
     linked_invoice: LinkedInvoiceResponse | None
     pdf_artifact: PdfArtifactResponse
 

@@ -39,6 +39,10 @@ class Document(Base):
             "doc_sequence",
             name="uq_documents_user_type_sequence",
         ),
+        sa.CheckConstraint(
+            "doc_type <> 'invoice' OR customer_id IS NOT NULL",
+            name="ck_documents_invoice_customer_required",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(sa.Uuid, primary_key=True, default=uuid4)
@@ -47,9 +51,9 @@ class Document(Base):
         nullable=False,
         index=True,
     )
-    customer_id: Mapped[UUID] = mapped_column(
+    customer_id: Mapped[UUID | None] = mapped_column(
         sa.ForeignKey("customers.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     doc_type: Mapped[str] = mapped_column(

@@ -76,6 +76,10 @@ _POST_SHARE_NON_REGRESSION_STATUSES = frozenset(
         QuoteStatus.DECLINED,
     }
 )
+_CUSTOMER_ASSIGNMENT_REQUIRED_DETAIL = "Assign a customer before continuing."
+_CUSTOMER_CLEAR_BLOCKED_DETAIL = "Customer cannot be cleared from a quote."
+_CUSTOMER_CHANGE_BLOCKED_DETAIL = "Customer cannot be changed after sharing or invoice conversion."
+_CUSTOMER_REASSIGNABLE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY})
 
 
 class QuoteServiceError(Exception):
@@ -101,6 +105,13 @@ class QuoteRepositoryProtocol(Protocol):
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
 
     async def get_detail_by_id(self, quote_id: UUID, user_id: UUID) -> QuoteDetailRow | None: ...
+
+    async def has_linked_invoice(
+        self,
+        *,
+        source_document_id: UUID,
+        user_id: UUID,
+    ) -> bool: ...
 
     async def get_render_context(
         self, quote_id: UUID, user_id: UUID
@@ -141,7 +152,7 @@ class QuoteRepositoryProtocol(Protocol):
         self,
         *,
         user_id: UUID,
-        customer_id: UUID,
+        customer_id: UUID | None,
         title: str | None,
         transcript: str,
         line_items: list[LineItemDraft],
@@ -158,8 +169,12 @@ class QuoteRepositoryProtocol(Protocol):
         self,
         *,
         document: Document,
+        customer_id: UUID | None,
+        update_customer_id: bool,
         title: str | None,
         update_title: bool,
+        transcript: str | None,
+        update_transcript: bool,
         total_amount: float | None,
         update_total_amount: bool,
         tax_rate: float | None,
@@ -294,6 +309,18 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        has_linked_invoice = await self._repository.has_linked_invoice(
+            source_document_id=quote.id,
+            user_id=user_id,
+        )
+        next_customer_id = quote.customer_id
+        if "customer_id" in data.model_fields_set:
+            next_customer_id = await self._resolve_next_customer_id(
+                user_id=user_id,
+                quote=quote,
+                requested_customer_id=data.customer_id,
+                has_linked_invoice=has_linked_invoice,
+            )
 
         next_line_items = (
             data.line_items if "line_items" in data.model_fields_set else quote.line_items
@@ -348,6 +375,7 @@ class QuoteService:
         rendered_fields_changed = _quote_render_inputs_changed(
             quote=quote,
             update_fields=data.model_fields_set,
+            next_customer_id=next_customer_id,
             next_line_items=next_line_items,
             next_total_amount=document_field_float_or_none(current_pricing.total_amount),
             next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
@@ -360,8 +388,12 @@ class QuoteService:
 
         updated_quote = await self._repository.update(
             document=quote,
+            customer_id=next_customer_id,
+            update_customer_id="customer_id" in data.model_fields_set,
             title=data.title,
             update_title="title" in data.model_fields_set,
+            transcript=data.transcript,
+            update_transcript="transcript" in data.model_fields_set,
             total_amount=document_field_float_or_none(current_pricing.total_amount),
             update_total_amount="total_amount" in data.model_fields_set
             or ("line_items" in data.model_fields_set and line_items_define_subtotal)
@@ -434,6 +466,7 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        ensure_quote_customer_assigned(quote)
 
         existing_job = await self._get_reusable_pdf_job(
             job_service=job_service,
@@ -676,6 +709,7 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        ensure_quote_customer_assigned(quote)
         now = _utcnow()
         should_refresh_token = (
             regenerate
@@ -763,6 +797,41 @@ class QuoteService:
         )
         return refreshed_quote
 
+    async def _resolve_next_customer_id(
+        self,
+        *,
+        user_id: UUID,
+        quote: Document,
+        requested_customer_id: UUID | None,
+        has_linked_invoice: bool,
+    ) -> UUID | None:
+        current_customer_id = quote.customer_id
+        if requested_customer_id == current_customer_id:
+            return current_customer_id
+
+        if requested_customer_id is None:
+            if current_customer_id is None:
+                return None
+            raise QuoteServiceError(
+                detail=_CUSTOMER_CLEAR_BLOCKED_DETAIL,
+                status_code=409,
+            )
+
+        customer_exists = await self._repository.customer_exists_for_user(
+            user_id=user_id,
+            customer_id=requested_customer_id,
+        )
+        if not customer_exists:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        if quote.status not in _CUSTOMER_REASSIGNABLE_STATUSES or has_linked_invoice:
+            raise QuoteServiceError(
+                detail=_CUSTOMER_CHANGE_BLOCKED_DETAIL,
+                status_code=409,
+            )
+
+        return requested_customer_id
+
     async def _attach_logo_data_uri(self, context: QuoteRenderContext) -> None:
         if context.logo_path is None:
             context.logo_data_uri = None
@@ -798,6 +867,15 @@ def _resolve_user_id(user: User) -> UUID:
     if identity and identity[0] is not None:
         return cast(UUID, identity[0])
     return user.id
+
+
+def ensure_quote_customer_assigned(quote: Document) -> None:
+    """Reject customer-dependent quote actions until a customer is assigned."""
+    if quote.customer_id is None:
+        raise QuoteServiceError(
+            detail=_CUSTOMER_ASSIGNMENT_REQUIRED_DETAIL,
+            status_code=409,
+        )
 
 
 def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
@@ -859,6 +937,7 @@ def _quote_render_inputs_changed(
     *,
     quote: Document,
     update_fields: set[str],
+    next_customer_id: UUID | None,
     next_line_items: Sequence[object] | None,
     next_total_amount: float | None,
     next_tax_rate: float | None,
@@ -870,6 +949,7 @@ def _quote_render_inputs_changed(
 ) -> bool:
     return any(
         (
+            quote.customer_id != next_customer_id,
             quote.title != next_title,
             quote.notes != next_notes,
             document_field_float_or_none(quote.total_amount) != next_total_amount,
