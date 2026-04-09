@@ -121,4 +121,30 @@ describe("App routes", () => {
 
     expect(await screen.findByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
   });
+
+  it("routes retired quote line-item edit deep links to the default fallback", async () => {
+    mockedAuthService.me.mockResolvedValue({
+      id: "user-7",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "America/New_York",
+    });
+
+    renderApp("/quotes/review/line-items/0/edit");
+    expect(await screen.findByRole("heading", { name: /^quotes$/i })).toBeInTheDocument();
+  });
+
+  it("routes retired persisted quote line-item edit deep links to the default fallback", async () => {
+    mockedAuthService.me.mockResolvedValue({
+      id: "user-8",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "America/New_York",
+    });
+
+    renderApp("/quotes/quote-1/edit/line-items/0/edit");
+    expect(await screen.findByRole("heading", { name: /^quotes$/i })).toBeInTheDocument();
+  });
 });

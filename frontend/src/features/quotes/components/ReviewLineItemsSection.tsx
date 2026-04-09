@@ -28,17 +28,21 @@ export function ReviewLineItemsSection({
 
       <div className="space-y-2.5">
         {lineItems.length > 0 ? (
-          lineItems.map((lineItem, index) => (
-            <LineItemCard
-              key={`review-line-item-${index}`}
-              description={lineItem.description || "Untitled line item"}
-              details={lineItem.details}
-              price={lineItem.price}
-              flagged={lineItem.flagged}
-              disabled={isInteractionLocked}
-              onClick={() => onEditLineItem(index)}
-            />
-          ))
+          lineItems.map((lineItem, index) => {
+            const displayDescription = lineItem.description || "Untitled line item";
+            return (
+              <LineItemCard
+                key={`review-line-item-${index}`}
+                ariaLabel={`Edit line item ${index + 1}: ${displayDescription}`}
+                description={displayDescription}
+                details={lineItem.details}
+                price={lineItem.price}
+                flagged={lineItem.flagged}
+                disabled={isInteractionLocked}
+                onClick={() => onEditLineItem(index)}
+              />
+            );
+          })
         ) : (
           <p className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline">
             No line items on this quote yet.
@@ -64,4 +68,3 @@ export function ReviewLineItemsSection({
     </section>
   );
 }
-
