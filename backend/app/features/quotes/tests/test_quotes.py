@@ -3314,6 +3314,45 @@ async def test_append_extraction_sync_normalizes_legacy_numbered_transcript_sect
     assert "- third follow-up request" in transcript
 
 
+async def test_append_extraction_sync_merges_from_append_only_baseline_without_duplicate_headers(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+    app.state.arq_pool = None
+
+    update_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"transcript": "Added later:\n- existing append-only note"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert update_response.status_code == 200
+
+    first_append = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "first follow-up request"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_append = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "second follow-up request"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert first_append.status_code == 200
+    assert second_append.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    transcript = detail_response.json()["transcript"]
+    assert transcript.count("Added later:") == 1
+    assert "Added later (2):" not in transcript
+    assert "- existing append-only note" in transcript
+    assert "- first follow-up request" in transcript
+    assert "- second follow-up request" in transcript
+
+
 async def test_append_extraction_rejects_when_async_job_limit_is_exhausted(
     client: AsyncClient,
     db_session: AsyncSession,

@@ -93,7 +93,7 @@ _APPENDABLE_QUOTE_STATUSES = frozenset(
     }
 )
 _APPEND_UNAVAILABLE_DETAIL = "This quote can no longer be edited."
-_APPEND_TRANSCRIPT_SEPARATOR_PATTERN = re.compile(r"\n\nAdded later(?: \(\d+\))?:\n")
+_APPEND_TRANSCRIPT_SEPARATOR_PATTERN = re.compile(r"(?:^|\n\n)Added later(?: \(\d+\))?:\n")
 _APPEND_TRANSCRIPT_BULLET_PREFIXES = ("- ", "* ")
 
 
