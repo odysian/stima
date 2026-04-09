@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import re
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol, cast
@@ -81,6 +82,18 @@ _CUSTOMER_ASSIGNMENT_REQUIRED_DETAIL = "Assign a customer before continuing."
 _CUSTOMER_CLEAR_BLOCKED_DETAIL = "Customer cannot be cleared from a quote."
 _CUSTOMER_CHANGE_BLOCKED_DETAIL = "Customer cannot be changed after sharing or invoice conversion."
 _CUSTOMER_REASSIGNABLE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY})
+_APPENDABLE_QUOTE_STATUSES = frozenset(
+    {
+        QuoteStatus.DRAFT,
+        QuoteStatus.READY,
+        QuoteStatus.SHARED,
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    }
+)
+_APPEND_UNAVAILABLE_DETAIL = "This quote can no longer be edited."
+_APPEND_TRANSCRIPT_SEPARATOR_PATTERN = re.compile(r"\n\nAdded later(?: \(\d+\))?:\n")
 
 
 class QuoteServiceError(Exception):
@@ -193,6 +206,15 @@ class QuoteRepositoryProtocol(Protocol):
     ) -> Document: ...
 
     async def invalidate_pdf_artifact(self, document: Document) -> str | None: ...
+
+    async def append_extraction(
+        self,
+        *,
+        document: Document,
+        transcript: str,
+        total_amount: float | None,
+        line_items: list[LineItemDraft],
+    ) -> Document: ...
 
     async def delete(self, document_id: UUID) -> None: ...
 
@@ -337,6 +359,89 @@ class QuoteService:
                 status_code=503,
             ) from exc
         return quote
+
+    async def ensure_quote_appendable(
+        self,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+    ) -> Document:
+        """Return one owned quote that can accept append extraction updates."""
+        quote = await self._repository.get_by_id(quote_id, user_id)
+        if quote is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if quote.status not in _APPENDABLE_QUOTE_STATUSES:
+            raise QuoteServiceError(detail=_APPEND_UNAVAILABLE_DETAIL, status_code=409)
+        return quote
+
+    async def append_extraction_to_quote(
+        self,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+        extraction_result: ExtractionResult,
+        commit: bool = True,
+    ) -> tuple[Document, ExtractionResult]:
+        """Append extraction output onto an existing persisted quote."""
+        quote = await self.ensure_quote_appendable(user_id=user_id, quote_id=quote_id)
+        appended_line_items = [
+            LineItemDraft(
+                description=item.description,
+                details=item.details,
+                price=item.price,
+            )
+            for item in extraction_result.line_items
+        ]
+        merged_line_items = [
+            *[
+                LineItemDraft(
+                    description=line_item.description,
+                    details=line_item.details,
+                    price=document_field_float_or_none(line_item.price),
+                )
+                for line_item in quote.line_items
+            ],
+            *appended_line_items,
+        ]
+        line_items_define_subtotal, derived_line_item_subtotal = (
+            derive_document_subtotal_from_line_items(merged_line_items)
+        )
+        current_subtotal = resolve_document_subtotal_for_edit(
+            total_amount=quote.total_amount,
+            discount_type=quote.discount_type,
+            discount_value=quote.discount_value,
+            tax_rate=quote.tax_rate,
+            deposit_amount=quote.deposit_amount,
+            line_items=merged_line_items,
+        )
+        validated_pricing = _validate_document_pricing_for_quote(
+            total_amount=(
+                derived_line_item_subtotal if line_items_define_subtotal else current_subtotal
+            ),
+            line_items=merged_line_items,
+            discount_type=quote.discount_type,
+            discount_value=document_field_float_or_none(quote.discount_value),
+            tax_rate=document_field_float_or_none(quote.tax_rate),
+            deposit_amount=document_field_float_or_none(quote.deposit_amount),
+        )
+
+        next_transcript = _merge_append_transcript(
+            current_transcript=quote.transcript,
+            appended_transcript=extraction_result.transcript,
+        )
+        updated_quote = await self._repository.append_extraction(
+            document=quote,
+            transcript=next_transcript,
+            total_amount=document_field_float_or_none(validated_pricing.total_amount),
+            line_items=appended_line_items,
+        )
+        obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
+        if not commit:
+            return updated_quote, extraction_result
+
+        await self._repository.commit()
+        await self._delete_obsolete_artifact(obsolete_artifact_path)
+        return await self._repository.refresh(updated_quote), extraction_result
 
     async def list_quotes(
         self,
@@ -1080,3 +1185,14 @@ def _line_item_snapshots(
         )
         for line_item in (line_items or ())
     ]
+
+
+def _merge_append_transcript(*, current_transcript: str, appended_transcript: str) -> str:
+    normalized_current = current_transcript.rstrip()
+    normalized_append = appended_transcript.strip()
+    if not normalized_current:
+        return normalized_append
+
+    append_count = len(_APPEND_TRANSCRIPT_SEPARATOR_PATTERN.findall(normalized_current))
+    section_label = "Added later" if append_count == 0 else f"Added later ({append_count + 1})"
+    return f"{normalized_current}\n\n{section_label}:\n{normalized_append}"

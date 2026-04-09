@@ -699,6 +699,35 @@ class QuoteRepository:
         await self._session.refresh(document, attribute_names=["line_items"])
         return document
 
+    async def append_extraction(
+        self,
+        *,
+        document: Document,
+        transcript: str,
+        total_amount: float | None,
+        line_items: list[LineItemDraft],
+    ) -> Document:
+        """Append extracted line items while preserving existing rows and order."""
+        document.transcript = transcript
+        document.total_amount = _to_decimal(total_amount)
+
+        next_sort_order = len(document.line_items)
+        for index, item in enumerate(line_items):
+            self._session.add(
+                LineItem(
+                    document_id=document.id,
+                    description=item.description,
+                    details=item.details,
+                    price=_to_decimal(item.price),
+                    sort_order=next_sort_order + index,
+                )
+            )
+
+        await self._session.flush()
+        await self._session.refresh(document)
+        await self._session.refresh(document, attribute_names=["line_items"])
+        return document
+
     async def has_linked_invoice(
         self,
         *,

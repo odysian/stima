@@ -27,6 +27,7 @@ interface ReviewFormContentProps {
   lineItemSum: number;
   suggestedTaxRate: number | null;
   onRequestAssignment: () => void;
+  onAddVoiceNote: () => void;
   onDismissConfidence: () => void;
   onTitleChange: (nextTitle: string) => void;
   onTranscriptChange: (nextTranscript: string) => void;
@@ -57,6 +58,7 @@ export function ReviewFormContent({
   lineItemSum,
   suggestedTaxRate,
   onRequestAssignment,
+  onAddVoiceNote,
   onDismissConfidence,
   onTitleChange,
   onTranscriptChange,
@@ -94,6 +96,17 @@ export function ReviewFormContent({
           {saveNotice}
         </section>
       ) : null}
+
+      <div className="flex justify-start">
+        <button
+          type="button"
+          className="cursor-pointer rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isInteractionLocked}
+          onClick={onAddVoiceNote}
+        >
+          Add voice note
+        </button>
+      </div>
 
       <section className="space-y-2">
         <label
@@ -205,4 +218,3 @@ export function ReviewFormContent({
     </form>
   );
 }
-

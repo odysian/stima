@@ -133,6 +133,39 @@ describe("quoteService integration (MSW)", () => {
     });
   });
 
+  it("appendExtraction posts to the quote-specific endpoint and returns async job metadata", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.post("/api/quotes/:id/append-extraction", ({ request, params }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        return HttpResponse.json(
+          {
+            id: "job-append-1",
+            user_id: "user-1",
+            document_id: String(params.id),
+            document_revision: null,
+            job_type: "extraction",
+            status: "pending",
+            attempts: 0,
+            terminal_error: null,
+            extraction_result: null,
+            quote_id: String(params.id),
+            created_at: "2026-03-20T00:00:00.000Z",
+            updated_at: "2026-03-20T00:00:00.000Z",
+          },
+          { status: 202 },
+        );
+      }),
+    );
+
+    const result = await quoteService.appendExtraction("quote-1", { notes: "append this" });
+
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(result).toEqual({ type: "async", jobId: "job-append-1" });
+  });
+
   it("createQuote returns created Quote and sends CSRF header", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;

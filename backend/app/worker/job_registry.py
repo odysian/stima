@@ -72,6 +72,7 @@ async def extraction_job(
     source_type: str = "text",
     capture_detail: str | None = None,
     customer_id: str | None = None,
+    append_to_quote: bool = False,
 ) -> None:
     """Run durable quote extraction against the transcript prepared by the API."""
     await process_job(
@@ -90,6 +91,7 @@ async def extraction_job(
                 capture_detail=capture_detail,
             ),
             customer_id=customer_id,
+            append_to_quote=append_to_quote,
         ),
     )
 
@@ -399,6 +401,7 @@ async def _store_extraction_result(
     source_type: str,
     capture_detail: str,
     customer_id: str | None,
+    append_to_quote: bool,
 ) -> None:
     async with runtime.session_maker() as session:
         repository = JobRepository(session)
@@ -409,7 +412,67 @@ async def _store_extraction_result(
         quote_id = job_record.document_id
         resolved_customer_id = _parse_optional_uuid(customer_id)
         created_new_quote = False
-        if quote_id is None:
+        result_payload = result
+        if append_to_quote:
+            if quote_id is None:
+                raise NonRetryableJobError(
+                    "Extraction append job missing required document_id",
+                    terminal_reason=TERMINAL_ERROR_MISSING_DOCUMENT_ID,
+                )
+            try:
+                quote, merged_result = await QuoteService(
+                    repository=QuoteRepository(session),
+                    pdf_integration=_UnusedWorkerPdfIntegration(),
+                    storage_service=_UnusedWorkerStorageService(),
+                ).append_extraction_to_quote(
+                    user_id=job_record.user_id,
+                    quote_id=quote_id,
+                    extraction_result=result,
+                    commit=False,
+                )
+            except QuoteServiceError as exc:
+                await session.rollback()
+                logger.warning(
+                    "Extraction append persistence failed for job %s",
+                    job_id,
+                    exc_info=True,
+                )
+                log_security_event(
+                    "quotes.extract_persist_failed",
+                    outcome="failure",
+                    level=logging.ERROR,
+                    reason="draft_persistence_failed",
+                    job_name=EXTRACTION_JOB_NAME,
+                    job_id=str(job_id),
+                    error_class=type(exc).__name__,
+                )
+                raise NonRetryableJobError(
+                    TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
+                    terminal_reason=TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
+                ) from exc
+            except Exception as exc:  # noqa: BLE001
+                await session.rollback()
+                logger.warning(
+                    "Extraction append persistence failed for job %s",
+                    job_id,
+                    exc_info=True,
+                )
+                log_security_event(
+                    "quotes.extract_persist_failed",
+                    outcome="failure",
+                    level=logging.ERROR,
+                    reason="draft_persistence_failed",
+                    job_name=EXTRACTION_JOB_NAME,
+                    job_id=str(job_id),
+                    error_class=type(exc).__name__,
+                )
+                raise NonRetryableJobError(
+                    TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
+                    terminal_reason=TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
+                ) from exc
+            resolved_customer_id = quote.customer_id
+            result_payload = merged_result
+        elif quote_id is None:
             try:
                 quote = await QuoteService(
                     repository=QuoteRepository(session),
@@ -470,7 +533,7 @@ async def _store_extraction_result(
         await repository.set_extraction_success(
             job_id,
             quote_id=quote_id,
-            result_json=result.model_dump_json(),
+            result_json=result_payload.model_dump_json(),
         )
         await session.commit()
 
@@ -483,6 +546,14 @@ async def _store_extraction_result(
         )
         log_event(
             "draft_generated",
+            user_id=job_record.user_id,
+            quote_id=quote_id,
+            customer_id=resolved_customer_id,
+            detail=capture_detail,
+        )
+    elif append_to_quote:
+        log_event(
+            "quote_append_extracted",
             user_id=job_record.user_id,
             quote_id=quote_id,
             customer_id=resolved_customer_id,

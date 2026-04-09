@@ -10,6 +10,7 @@ import { jobService } from "@/shared/lib/jobService";
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
+    appendExtraction: vi.fn(),
     convertNotes: vi.fn(),
     captureAudio: vi.fn(),
     createQuote: vi.fn(),

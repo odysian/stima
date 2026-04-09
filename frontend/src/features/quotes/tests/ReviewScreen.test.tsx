@@ -42,6 +42,7 @@ vi.mock("@/features/quotes/hooks/usePersistedReview", async () => {
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
     extract: vi.fn(),
+    appendExtraction: vi.fn(),
     convertNotes: vi.fn(),
     captureAudio: vi.fn(),
     createQuote: vi.fn(),
@@ -349,6 +350,16 @@ describe("ReviewScreen", () => {
 
     expect(refreshQuoteMock).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("Draft saved.")).toBeInTheDocument();
+  });
+
+  it("opens append capture from the Add voice note action", async () => {
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /add voice note/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review/append-capture", {
+      state: { launchOrigin: "/quotes/quote-1/review" },
+    });
   });
 
   it("edits a line item in-sheet and waits to PATCH until Save Draft", async () => {

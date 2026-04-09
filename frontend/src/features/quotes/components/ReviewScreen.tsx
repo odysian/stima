@@ -328,6 +328,11 @@ export function ReviewScreen(): React.ReactElement {
         lineItemSum={lineItemSum}
         suggestedTaxRate={suggestedTaxRate}
         onRequestAssignment={() => setIsAssignmentSheetOpen(true)}
+        onAddVoiceNote={() => {
+          navigate(`/quotes/${quoteId}/review/append-capture`, {
+            state: { launchOrigin: `/quotes/${quoteId}/review` },
+          });
+        }}
         onDismissConfidence={() => {
           if (confidenceFingerprint.length === 0) {
             return;

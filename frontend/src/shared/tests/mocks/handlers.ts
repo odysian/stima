@@ -276,6 +276,28 @@ export const handlers = [
     );
   }),
 
+  http.post("/api/quotes/:id/append-extraction", async ({ request, params }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    return HttpResponse.json(
+      {
+        quote_id: String(params.id),
+        transcript: "Appended transcript",
+        line_items: [
+          {
+            description: "Extra cleanup",
+            details: "One additional pass",
+            price: 45,
+          },
+        ],
+        total: 165,
+        confidence_notes: ["Confirm cleanup scope before sending"],
+      },
+      { status: 200 },
+    );
+  }),
+
   http.get("/api/jobs/:jobId", ({ params }) => {
     return HttpResponse.json(
       {
