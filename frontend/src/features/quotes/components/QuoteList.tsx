@@ -10,7 +10,7 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { StatusBadge } from "@/shared/components/StatusBadge";
+import { StatusBadge, statusBadgeBaseClasses } from "@/shared/components/StatusBadge";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 type DocumentMode = "quotes" | "invoices";
@@ -23,6 +23,65 @@ interface DocumentRow {
   totalAmount: number | null;
   status: DocumentStatus;
   destination: string;
+  destinationState?: {
+    origin: "list";
+  };
+  isDraft?: boolean;
+  needsCustomerAssignment?: boolean;
+}
+
+interface DocumentRowsSectionProps {
+  label: string;
+  rows: DocumentRow[];
+  onRowClick: (row: DocumentRow) => void;
+}
+
+const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+const draftRowClasses = "w-full cursor-pointer rounded-xl border-l-4 border-warning-accent bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} bg-warning-container text-warning`;
+
+function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
+  return (
+    <section aria-label={label}>
+      <div className="mb-2 px-4">
+        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+          {label}
+        </p>
+      </div>
+      <div className="mx-4 rounded-xl bg-surface-container-low p-3">
+        <ul className="flex flex-col gap-3">
+          {rows.map((row) => (
+            <li key={row.id}>
+              <button
+                type="button"
+                onClick={() => onRowClick(row)}
+                className={row.isDraft ? draftRowClasses : baseRowClasses}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-headline font-bold text-on-surface">
+                    {row.primaryLabel}
+                  </p>
+                  <p className="font-headline font-bold text-on-surface">
+                    {formatCurrency(row.totalAmount)}
+                  </p>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <p className="text-sm text-on-surface-variant">
+                    {row.supportingDetails}
+                  </p>
+                  {row.needsCustomerAssignment ? (
+                    <span className={needsCustomerBadgeClasses}>Needs customer</span>
+                  ) : (
+                    <StatusBadge variant={row.status} />
+                  )}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
 }
 
 function matchesSearch(
@@ -149,6 +208,14 @@ export function QuoteList(): React.ReactElement {
   const isLoading = documentMode === "quotes" ? isLoadingQuotes : isLoadingInvoices;
   const loadError = documentMode === "quotes" ? quoteLoadError : invoiceLoadError;
   const filteredRows = documentMode === "quotes" ? filteredQuotes : filteredInvoices;
+  const draftQuotes = useMemo(
+    () => filteredQuotes.filter((quote) => quote.status === "draft"),
+    [filteredQuotes],
+  );
+  const nonDraftQuotes = useMemo(
+    () => filteredQuotes.filter((quote) => quote.status !== "draft"),
+    [filteredQuotes],
+  );
   const totalRows = documentMode === "quotes" ? quotes.length : invoices.length;
   const headerTitle = documentMode === "quotes" ? "Quotes" : "Invoices";
   const headerSubtitle = documentMode === "quotes" ? quoteSubtitle : invoiceSubtitle;
@@ -161,26 +228,44 @@ export function QuoteList(): React.ReactElement {
       ? "No quotes yet. Tap New Quote to create your first."
       : "No invoices yet. Convert a quote to an invoice from Preview."
     : `No ${documentMode} match your search.`;
-  const sectionLabel = documentMode === "quotes" ? "PAST QUOTES" : "PAST INVOICES";
+  const draftQuoteRows = useMemo<DocumentRow[]>(
+    () => draftQuotes.map((quote) => ({
+      id: quote.id,
+      primaryLabel: quote.customer_name ?? "Unassigned",
+      supportingDetails: [
+        quote.doc_number,
+        formatDate(quote.created_at, timezone),
+        `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
+      ].join(" · "),
+      totalAmount: quote.total_amount,
+      status: quote.status,
+      destination: `/quotes/${quote.id}/review`,
+      destinationState: { origin: "list" },
+      isDraft: true,
+      needsCustomerAssignment: quote.requires_customer_assignment === true,
+    })),
+    [draftQuotes, timezone],
+  );
 
-  const documentRows = useMemo<DocumentRow[]>(() => {
-    if (documentMode === "quotes") {
-      return filteredQuotes.map((quote) => ({
-        id: quote.id,
-        primaryLabel: quote.title ?? quote.doc_number,
-        supportingDetails: [
-          quote.customer_name ?? "Unassigned customer",
-          ...(quote.title ? [quote.doc_number] : []),
-          formatDate(quote.created_at, timezone),
-          `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
-        ].join(" · "),
-        totalAmount: quote.total_amount,
-        status: quote.status,
-        destination: `/quotes/${quote.id}/preview`,
-      }));
-    }
+  const nonDraftQuoteRows = useMemo<DocumentRow[]>(
+    () => nonDraftQuotes.map((quote) => ({
+      id: quote.id,
+      primaryLabel: quote.title ?? quote.doc_number,
+      supportingDetails: [
+        quote.customer_name ?? "Unassigned customer",
+        ...(quote.title ? [quote.doc_number] : []),
+        formatDate(quote.created_at, timezone),
+        `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
+      ].join(" · "),
+      totalAmount: quote.total_amount,
+      status: quote.status,
+      destination: `/quotes/${quote.id}/preview`,
+    })),
+    [nonDraftQuotes, timezone],
+  );
 
-    return filteredInvoices.map((invoice) => ({
+  const invoiceRows = useMemo<DocumentRow[]>(
+    () => filteredInvoices.map((invoice) => ({
       id: invoice.id,
       primaryLabel: invoice.title ?? invoice.doc_number,
       supportingDetails: [
@@ -191,8 +276,9 @@ export function QuoteList(): React.ReactElement {
       totalAmount: invoice.total_amount,
       status: invoice.status,
       destination: `/invoices/${invoice.id}`,
-    }));
-  }, [documentMode, filteredInvoices, filteredQuotes, timezone]);
+    })),
+    [filteredInvoices, timezone],
+  );
 
   return (
     <main className="min-h-screen bg-background pb-24">
@@ -259,39 +345,30 @@ export function QuoteList(): React.ReactElement {
 
         {!isLoading && !loadError && filteredRows.length > 0 ? (
           <>
-            <div className="mb-2 px-4">
-              <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                {sectionLabel}
-              </p>
-            </div>
-            <div className="mx-4 rounded-xl bg-surface-container-low p-3">
-              <ul className="flex flex-col gap-3">
-                {documentRows.map((row) => (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      onClick={() => navigate(row.destination)}
-                      className="w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="font-headline font-bold text-on-surface">
-                          {row.primaryLabel}
-                        </p>
-                        <p className="font-headline font-bold text-on-surface">
-                          {formatCurrency(row.totalAmount)}
-                        </p>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between gap-3">
-                        <p className="text-sm text-on-surface-variant">
-                          {row.supportingDetails}
-                        </p>
-                        <StatusBadge variant={row.status} />
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {documentMode === "quotes" ? (
+              <>
+                {draftQuoteRows.length > 0 ? (
+                  <DocumentRowsSection
+                    label="DRAFTS"
+                    rows={draftQuoteRows}
+                    onRowClick={(row) => navigate(row.destination, { state: row.destinationState })}
+                  />
+                ) : null}
+                {nonDraftQuoteRows.length > 0 ? (
+                  <DocumentRowsSection
+                    label="PAST QUOTES"
+                    rows={nonDraftQuoteRows}
+                    onRowClick={(row) => navigate(row.destination)}
+                  />
+                ) : null}
+              </>
+            ) : (
+              <DocumentRowsSection
+                label="PAST INVOICES"
+                rows={invoiceRows}
+                onRowClick={(row) => navigate(row.destination)}
+              />
+            )}
           </>
         ) : null}
       </section>

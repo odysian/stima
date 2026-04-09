@@ -2,6 +2,8 @@ interface StatusBadgeProps {
   variant: "draft" | "ready" | "shared" | "viewed" | "approved" | "declined" | "sent";
 }
 
+export const statusBadgeBaseClasses = "text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg";
+
 const styles = {
   draft: "bg-neutral-container text-on-surface-variant",
   ready: "bg-success-container text-success",
@@ -24,7 +26,7 @@ const labels = {
 
 export function StatusBadge({ variant }: StatusBadgeProps): React.ReactElement {
   return (
-    <span className={`text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg ${styles[variant]}`}>
+    <span className={`${statusBadgeBaseClasses} ${styles[variant]}`}>
       {labels[variant]}
     </span>
   );
