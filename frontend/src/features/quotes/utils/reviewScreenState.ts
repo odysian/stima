@@ -36,7 +36,11 @@ export function buildDraftSnapshot(
 ): DraftSnapshot {
   const normalizedLineItems = draft.lineItems
     .map(normalizeLineItem)
-    .filter((lineItem) => lineItem.description.length > 0)
+    .filter((lineItem) =>
+      lineItem.description.length > 0
+      || lineItem.details !== null
+      || lineItem.price !== null
+    )
     .map((lineItem) => ({
       description: lineItem.description,
       details: lineItem.details,
@@ -87,4 +91,3 @@ export function resolveBackTarget(state: ReviewLocationState, quoteId: string | 
 
   return HOME_ROUTE;
 }
-

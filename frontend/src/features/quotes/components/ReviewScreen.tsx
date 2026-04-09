@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   useBeforeUnload,
-  useBlocker,
   useLocation,
   useNavigate,
   useParams,
@@ -18,7 +17,7 @@ import {
 } from "@/features/quotes/components/reviewScreenUtils";
 import { usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { LineItemDraft } from "@/features/quotes/types/quote.types";
+import type { LineItemDraft, QuoteDetail } from "@/features/quotes/types/quote.types";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import {
   buildDraftSnapshot,
@@ -36,6 +35,24 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { getPricingValidationMessage } from "@/shared/lib/pricing";
+
+function buildQuoteSnapshotKey(quote: QuoteDetail): string {
+  return JSON.stringify(buildDraftSnapshot({
+    title: quote.title?.trim() ?? "",
+    transcript: quote.transcript,
+    lineItems: quote.line_items.map((lineItem) => ({
+      description: lineItem.description,
+      details: lineItem.details,
+      price: lineItem.price,
+    })),
+    total: quote.total_amount,
+    taxRate: quote.tax_rate,
+    discountType: quote.discount_type,
+    discountValue: quote.discount_value,
+    depositAmount: quote.deposit_amount,
+    notes: quote.notes ?? "",
+  }));
+}
 
 export function ReviewScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -65,7 +82,6 @@ export function ReviewScreen(): React.ReactElement {
   const [suggestedTaxRate, setSuggestedTaxRate] = useState<number | null>(null);
   const [isAssigningCustomer, setIsAssigningCustomer] = useState(false);
   const [dismissedConfidenceFingerprint, setDismissedConfidenceFingerprint] = useState<string | null>(null);
-  const [isBypassingLeaveWarning, setIsBypassingLeaveWarning] = useState(false);
   const locationState = useMemo(() => readReviewLocationState(location.state), [location.state]);
   const requiresCustomerAssignment = useMemo(() => {
     if (!quote) {
@@ -156,19 +172,8 @@ export function ReviewScreen(): React.ReactElement {
     event.returnValue = "";
   });
 
-  const blocker = useBlocker(hasUnsavedChanges && !isBypassingLeaveWarning);
-
-  useEffect(() => {
-    if (blocker.state !== "blocked") {
-      return;
-    }
-    setShowLeaveWarning(true);
-    setPendingNavigationTarget(null);
-  }, [blocker.state]);
-
   function requestNavigation(target: { to: string; replace?: boolean }): void {
     if (!hasUnsavedChanges) {
-      setIsBypassingLeaveWarning(true);
       navigate(target.to, { replace: target.replace });
       return;
     }
@@ -184,25 +189,13 @@ export function ReviewScreen(): React.ReactElement {
       const nextTarget = pendingNavigationTarget;
       setPendingNavigationTarget(null);
       clearDraft();
-      setIsBypassingLeaveWarning(true);
       navigate(nextTarget.to, { replace: nextTarget.replace });
-      return;
-    }
-
-    if (blocker.state === "blocked") {
-      clearDraft();
-      setIsBypassingLeaveWarning(true);
-      blocker.proceed();
     }
   }
 
   function handleLeaveCancel(): void {
     setShowLeaveWarning(false);
     setPendingNavigationTarget(null);
-
-    if (blocker.state === "blocked") {
-      blocker.reset();
-    }
   }
 
   if (!id) {
@@ -214,8 +207,13 @@ export function ReviewScreen(): React.ReactElement {
   }
 
   const quoteId = id;
-  const backTarget = resolveBackTarget(locationState, quoteId);
-  const backLabel = locationState.origin === "preview" ? "Back to preview" : "Back to quotes";
+  const shouldUseQuoteListBackTarget = locationState.origin === "preview" && requiresCustomerAssignment;
+  const backTarget = shouldUseQuoteListBackTarget
+    ? HOME_ROUTE
+    : resolveBackTarget(locationState, quoteId);
+  const backLabel = shouldUseQuoteListBackTarget
+    ? "Back to quotes"
+    : (locationState.origin === "preview" ? "Back to preview" : "Back to quotes");
 
   if (isLoadingQuote || !draft) {
     return (
@@ -230,7 +228,7 @@ export function ReviewScreen(): React.ReactElement {
   if (!quote) {
     return (
       <main className="min-h-screen bg-background px-4 pt-20">
-        <FeedbackMessage variant="error">Unable to load quote.</FeedbackMessage>
+        <FeedbackMessage variant="error">{loadError ?? "Unable to load quote."}</FeedbackMessage>
       </main>
     );
   }
@@ -296,14 +294,10 @@ export function ReviewScreen(): React.ReactElement {
         deposit_amount: activeDraft.depositAmount,
         notes: activeDraft.notes.trim().length > 0 ? activeDraft.notes.trim() : null,
       });
-      await refreshQuote({ reseedDraft: true });
-
-      if (currentSnapshotKey) {
-        setSavedSnapshotKey(currentSnapshotKey);
-      }
+      const refreshedQuote = await refreshQuote({ reseedDraft: true });
+      setSavedSnapshotKey(buildQuoteSnapshotKey(refreshedQuote));
 
       if (nextAction === "continue") {
-        setIsBypassingLeaveWarning(true);
         navigate(`/quotes/${quoteId}/preview`, { replace: true });
         return;
       }
@@ -374,7 +368,6 @@ export function ReviewScreen(): React.ReactElement {
           setDraft((currentDraft) => ({ ...currentDraft, transcript: nextTranscript }));
         }}
         onEditLineItem={(lineItemIndex) => {
-          setIsBypassingLeaveWarning(true);
           navigate(`/quotes/${quoteId}/edit/line-items/${lineItemIndex}/edit`);
         }}
         onAddLineItem={() => {

@@ -14,7 +14,6 @@ import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 const navigateMock = vi.fn();
 const useParamsMock = vi.fn(() => ({ id: "quote-1" }));
 const useLocationMock = vi.fn<() => { state: unknown }>(() => ({ state: null }));
-const useBlockerMock = vi.fn(() => ({ state: "unblocked", proceed: vi.fn(), reset: vi.fn() }));
 const useBeforeUnloadMock = vi.fn<(callback: (event: BeforeUnloadEvent) => void) => void>();
 
 vi.mock("react-router-dom", async () => {
@@ -24,7 +23,6 @@ vi.mock("react-router-dom", async () => {
     useNavigate: () => navigateMock,
     useParams: () => useParamsMock(),
     useLocation: () => useLocationMock(),
-    useBlocker: () => useBlockerMock(),
     useBeforeUnload: (callback: (event: BeforeUnloadEvent) => void) => useBeforeUnloadMock(callback),
   };
 });
@@ -152,10 +150,12 @@ function mapQuoteToDraft(quote: QuoteDetail): QuoteEditDraft {
 }
 
 function renderScreen(options?: {
-  quote?: QuoteDetail;
+  quote?: QuoteDetail | null;
   draft?: QuoteEditDraft;
   locationState?: unknown;
   refreshedQuote?: QuoteDetail;
+  loadError?: string | null;
+  isLoadingQuote?: boolean;
 }): {
   clearDraftMock: ReturnType<typeof vi.fn>;
   refreshQuoteMock: ReturnType<typeof vi.fn>;
@@ -185,8 +185,8 @@ function renderScreen(options?: {
         });
       },
       clearDraft: clearDraftMock,
-      isLoadingQuote: false,
-      loadError: null,
+      isLoadingQuote: options?.isLoadingQuote ?? false,
+      loadError: options?.loadError ?? null,
       refreshQuote: async (refreshOptions?: { reseedDraft?: boolean }) => {
         const nextQuote = options?.refreshedQuote ?? quoteState;
         if (nextQuote) {
@@ -279,7 +279,6 @@ beforeEach(() => {
   window.localStorage.clear();
   useParamsMock.mockReturnValue({ id: "quote-1" });
   useLocationMock.mockReturnValue({ state: null });
-  useBlockerMock.mockReturnValue({ state: "unblocked", proceed: vi.fn(), reset: vi.fn() });
 });
 
 afterEach(() => {
@@ -332,6 +331,29 @@ describe("ReviewScreen", () => {
     expect(await screen.findByText("Draft saved.")).toBeInTheDocument();
   });
 
+  it("does not show leave warning immediately after save when server canonicalizes draft fields", async () => {
+    renderScreen({
+      refreshedQuote: makeQuote({
+        title: "Patio Refresh",
+        transcript: "Updated transcript",
+      }),
+    });
+
+    fireEvent.change(screen.getByLabelText(/quote title/i), {
+      target: { value: "Patio Refresh " },
+    });
+    fireEvent.change(screen.getByLabelText(/transcript notes/i), {
+      target: { value: "Updated transcript" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^save draft$/i }));
+
+    expect(await screen.findByText("Draft saved.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /back to quotes/i }));
+
+    expect(screen.queryByRole("dialog", { name: /leave this screen\?/i })).not.toBeInTheDocument();
+    expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
+  });
+
   it("opens the customer assignment sheet and patches selected customer", async () => {
     renderScreen({
       quote: makeQuote({
@@ -377,6 +399,25 @@ describe("ReviewScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /back to preview/i }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/preview", { replace: true });
+  });
+
+  it("routes back to quotes when preview-origin quote still needs customer assignment", async () => {
+    renderScreen({
+      quote: makeQuote({
+        customer_id: null,
+        customer_name: null,
+        requires_customer_assignment: true,
+      }),
+      locationState: {
+        origin: "preview",
+        notice: "Assign a customer before continuing to preview.",
+      },
+    });
+
+    await screen.findByText("Assign a customer before continuing to preview.");
+    fireEvent.click(screen.getByRole("button", { name: /back to quotes/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/", { replace: true });
   });
 
   it("shows leave warning for unsaved edits before navigating away", async () => {
@@ -434,5 +475,14 @@ describe("ReviewScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Double-check edging quantity")).toBeInTheDocument();
+  });
+
+  it("shows specific load errors when quote is unavailable", async () => {
+    renderScreen({
+      quote: null,
+      loadError: "This quote can no longer be edited.",
+    });
+
+    expect(await screen.findByText("This quote can no longer be edited.")).toBeInTheDocument();
   });
 });
