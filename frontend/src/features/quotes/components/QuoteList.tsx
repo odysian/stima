@@ -38,8 +38,8 @@ interface DocumentRowsSectionProps {
   onRowClick: (row: DocumentRow) => void;
 }
 
-const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const draftRowClasses = "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent p-4 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+const draftRowClasses = "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} shrink-0 whitespace-nowrap tracking-normal bg-warning-container text-warning`;
 
 function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
