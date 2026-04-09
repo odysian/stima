@@ -144,12 +144,80 @@ describe("QuoteList", () => {
     expect(screen.getByText("Stima")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
     expect(screen.queryByText("Sorted by: Most Recent")).not.toBeInTheDocument();
-    expect(await screen.findByText("Q-001")).toBeInTheDocument();
+    expect(await screen.findByText(/Q-001/)).toBeInTheDocument();
     expect(screen.getByText("1 active · 1 pending")).toBeInTheDocument();
     expect(screen.getByText("Spring Cleanup")).toBeInTheDocument();
     expect(screen.getByText(/Bob Brown\s*·\s*Q-002\s*·\s*Mar 20, 2026\s*·\s*3 items/)).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getAllByText("$120.00")).toHaveLength(2);
+  });
+
+  it("renders drafts above past quotes and splits draft vs non-draft routing", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([
+      makeQuoteListItem({
+        id: "quote-draft-unassigned",
+        customer_id: null,
+        customer_name: null,
+        doc_number: "Q-001",
+        status: "draft",
+        requires_customer_assignment: true,
+      }),
+      makeQuoteListItem({
+        id: "quote-draft-assigned",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "Q-002",
+        status: "draft",
+        requires_customer_assignment: false,
+      }),
+      makeQuoteListItem({
+        id: "quote-ready",
+        customer_id: "cust-3",
+        customer_name: "Carla Crew",
+        doc_number: "Q-003",
+        status: "ready",
+      }),
+      makeQuoteListItem({
+        id: "quote-shared",
+        customer_id: "cust-4",
+        customer_name: "Diego Deck",
+        doc_number: "Q-004",
+        status: "shared",
+      }),
+      makeQuoteListItem({
+        id: "quote-approved",
+        customer_id: "cust-5",
+        customer_name: "Elliot Elm",
+        doc_number: "Q-005",
+        status: "approved",
+      }),
+    ]);
+
+    renderScreen();
+
+    const draftsSection = await screen.findByRole("region", { name: "DRAFTS" });
+    const pastQuotesSection = screen.getByRole("region", { name: "PAST QUOTES" });
+
+    const orderFlag = draftsSection.compareDocumentPosition(pastQuotesSection);
+    expect(orderFlag & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+
+    expect(within(draftsSection).getByRole("button", { name: /unassigned/i })).toBeInTheDocument();
+    expect(within(draftsSection).getByRole("button", { name: /bob brown/i })).toBeInTheDocument();
+    expect(within(draftsSection).queryByRole("button", { name: /carla crew/i })).not.toBeInTheDocument();
+    expect(within(pastQuotesSection).getByRole("button", { name: /carla crew/i })).toBeInTheDocument();
+    expect(within(pastQuotesSection).getByRole("button", { name: /diego deck/i })).toBeInTheDocument();
+    expect(within(pastQuotesSection).getByRole("button", { name: /elliot elm/i })).toBeInTheDocument();
+
+    const needsCustomerBadges = within(draftsSection).getAllByText("Needs customer");
+    expect(needsCustomerBadges).toHaveLength(1);
+
+    fireEvent.click(within(draftsSection).getByRole("button", { name: /unassigned/i }));
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-draft-unassigned/review", {
+      state: { origin: "list", from: "list" },
+    });
+
+    fireEvent.click(within(pastQuotesSection).getByRole("button", { name: /carla crew/i }));
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-ready/preview");
   });
 
   it("renders empty state when no quotes are returned", async () => {
@@ -180,7 +248,7 @@ describe("QuoteList", () => {
     ]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
 
@@ -204,14 +272,15 @@ describe("QuoteList", () => {
     ]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     fireEvent.change(screen.getByLabelText("Search quotes"), {
       target: { value: "bob" },
     });
 
     expect(screen.queryByText("Alice Johnson")).not.toBeInTheDocument();
-    expect(screen.getByText(/Bob Brown\s*·\s*Mar 20, 2026\s*·\s*1 item/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /bob brown/i })).toBeInTheDocument();
+    expect(screen.getByText(/Q-002\s*·\s*Mar 20, 2026\s*·\s*1 item/)).toBeInTheDocument();
   });
 
   it("filters rows by quote title", async () => {
@@ -223,25 +292,26 @@ describe("QuoteList", () => {
         customer_name: "Bob Brown",
         doc_number: "Q-002",
         title: "Spring Cleanup",
+        status: "ready",
       }),
     ]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     fireEvent.change(screen.getByLabelText("Search quotes"), {
       target: { value: "spring" },
     });
 
-    expect(screen.queryByText("Q-001")).not.toBeInTheDocument();
-    expect(screen.getByText("Spring Cleanup")).toBeInTheDocument();
+    expect(screen.queryByText(/Q-001/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /spring cleanup/i })).toBeInTheDocument();
   });
 
   it("shows search empty state when filter has no matches", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     fireEvent.change(screen.getByLabelText("Search quotes"), {
       target: { value: "does-not-exist" },
@@ -250,8 +320,8 @@ describe("QuoteList", () => {
     expect(screen.getByText("No quotes match your search.")).toBeInTheDocument();
   });
 
-  it("navigates to quote preview when a row is clicked", async () => {
-    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+  it("navigates to quote preview when a non-draft row is clicked", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem({ status: "ready" })]);
 
     renderScreen();
     fireEvent.click(await screen.findByRole("button", { name: /q-001/i }));
@@ -264,7 +334,7 @@ describe("QuoteList", () => {
     mockedInvoiceService.listInvoices.mockResolvedValueOnce([makeInvoiceListItem()]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
     fireEvent.click(await screen.findByRole("button", { name: /i-001/i }));
@@ -285,7 +355,7 @@ describe("QuoteList", () => {
     ]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     expect(screen.getByText(/1 active\s*·\s*1 pending/i)).toBeInTheDocument();
     expect(screen.queryByText("ACTIVE QUOTES")).not.toBeInTheDocument();
@@ -296,7 +366,7 @@ describe("QuoteList", () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     expect(within(screen.getByRole("navigation")).getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
   });
@@ -305,7 +375,7 @@ describe("QuoteList", () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     fireEvent.click(screen.getByRole("button", { name: "New quote" }));
 
@@ -317,13 +387,33 @@ describe("QuoteList", () => {
     mockedInvoiceService.listInvoices.mockResolvedValueOnce([]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
 
     expect(
       await screen.findByText("No invoices yet. Convert a quote to an invoice from Preview."),
     ).toBeInTheDocument();
+  });
+
+  it("hides the Drafts section when there are only non-draft quotes", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([
+      makeQuoteListItem({ status: "ready" }),
+      makeQuoteListItem({
+        id: "quote-2",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "Q-002",
+        status: "shared",
+      }),
+    ]);
+
+    renderScreen();
+
+    await screen.findByText(/Q-001/);
+
+    expect(screen.queryByRole("region", { name: "DRAFTS" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "PAST QUOTES" })).toBeInTheDocument();
   });
 
   it("shows loading state while list request is in flight", async () => {
@@ -356,7 +446,8 @@ describe("QuoteList", () => {
 
     renderScreen();
 
-    expect(await screen.findByText(/Alice Johnson\s*·\s*Mar 24, 2026/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /alice johnson/i })).toBeInTheDocument();
+    expect(screen.getByText(/Q-001\s*·\s*Mar 24, 2026\s*·\s*1 item/)).toBeInTheDocument();
   });
 
   it("renders an em dash when total_amount is null", async () => {
@@ -376,7 +467,7 @@ describe("QuoteList", () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
-    await screen.findByText("Q-001");
+    await screen.findByText(/Q-001/);
 
     const searchInput = screen.getByLabelText("Search quotes");
     const searchLabel = document.querySelector('label[for="document-search"]');

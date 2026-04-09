@@ -232,6 +232,18 @@ Row 2: [Q-001 · Mar 14 · 3 items]    [DRAFT]
 - Metadata collapses into a single middot-separated string: `"{doc_number} · {date} · {count} items"`.
 - Null amounts display as `"—"` (em dash), never `$0.00`.
 
+**Quote draft card variant (list review cue):**
+```
+rounded-xl border-l-4 border-warning-accent bg-white/80 p-4 backdrop-blur-md ghost-shadow
+transition active:scale-[0.98] active:bg-surface-container-low
+```
+
+- Use this only for draft rows in the dedicated `DRAFTS` list section.
+- Keep the same two-row hierarchy as standard quote cards.
+- Draft rows with no assigned customer show the semantic warning badge:
+  - `text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg bg-warning-container text-warning`
+- The warning badge replaces the status pill in that row to keep the right edge visually clean.
+
 **Customer card (2-line layout):**
 ```
 Row 1: [Customer Name]              [chevron]
