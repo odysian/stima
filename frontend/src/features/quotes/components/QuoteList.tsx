@@ -157,7 +157,9 @@ export function QuoteList(): React.ReactElement {
     ? "Search customer, title, or quote ID..."
     : "Search customer, title, or invoice ID...";
   const emptyStateMessage = totalRows === 0
-    ? `No ${documentMode} yet. Tap Create Document to create your first.`
+    ? documentMode === "quotes"
+      ? "No quotes yet. Tap New Quote to create your first."
+      : "No invoices yet. Tap New Quote and choose Invoice in review."
     : `No ${documentMode} match your search.`;
   const sectionLabel = documentMode === "quotes" ? "PAST QUOTES" : "PAST INVOICES";
 
@@ -296,11 +298,11 @@ export function QuoteList(): React.ReactElement {
 
       <button
         type="button"
-        aria-label="Create document"
+        aria-label="New quote"
         className="fixed bottom-20 right-4 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
-        onClick={() => navigate("/quotes/new")}
+        onClick={() => navigate("/quotes/capture")}
       >
-        <span className="material-symbols-outlined">add</span>
+        <span className="material-symbols-outlined">description</span>
       </button>
       <BottomNav active="quotes" />
     </main>

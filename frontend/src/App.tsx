@@ -15,7 +15,6 @@ import { EditInvoiceLineItemScreen } from "@/features/invoices/components/EditIn
 import { InvoiceDetailScreen } from "@/features/invoices/components/InvoiceDetailScreen";
 import { InvoiceEditScreen } from "@/features/invoices/components/InvoiceEditScreen";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { CustomerSelectScreen } from "@/features/customers/components/CustomerSelectScreen";
 import { PublicQuotePage } from "@/features/public/components/PublicQuotePage";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
@@ -96,8 +95,10 @@ export default function App(): React.ReactElement {
         <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
         <Route path="/invoices/:id/edit" element={<InvoiceEditScreen />} />
         <Route path="/invoices/:id/edit/line-items/:lineItemIndex/edit" element={<EditInvoiceLineItemScreen />} />
-        <Route path="/quotes/new" element={<CustomerSelectScreen />} />
+        <Route path="/quotes/new" element={<Navigate to="/quotes/capture" replace />} />
+        <Route path="/quotes/capture" element={<CaptureScreen />} />
         <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
+        <Route path="/quotes/:id/review" element={<ReviewScreen />} />
         <Route path="/quotes/review" element={<ReviewScreen />} />
         <Route path="/quotes/review/line-items/:lineItemIndex/edit" element={<EditLineItemScreen />} />
         <Route path="/quotes/:id/edit" element={<QuoteEditScreen />} />
