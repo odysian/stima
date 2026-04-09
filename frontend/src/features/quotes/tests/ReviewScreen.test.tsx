@@ -132,6 +132,25 @@ function makeDraft(overrides: Partial<QuoteEditDraft> = {}): QuoteEditDraft {
   };
 }
 
+function mapQuoteToDraft(quote: QuoteDetail): QuoteEditDraft {
+  return {
+    quoteId: quote.id,
+    title: quote.title ?? "",
+    transcript: quote.transcript,
+    lineItems: quote.line_items.map((item) => ({
+      description: item.description,
+      details: item.details,
+      price: item.price,
+    })),
+    total: quote.total_amount,
+    taxRate: quote.tax_rate,
+    discountType: quote.discount_type,
+    discountValue: quote.discount_value,
+    depositAmount: quote.deposit_amount,
+    notes: quote.notes ?? "",
+  };
+}
+
 function renderScreen(options?: {
   quote?: QuoteDetail;
   draft?: QuoteEditDraft;
@@ -168,10 +187,13 @@ function renderScreen(options?: {
       clearDraft: clearDraftMock,
       isLoadingQuote: false,
       loadError: null,
-      refreshQuote: async () => {
+      refreshQuote: async (refreshOptions?: { reseedDraft?: boolean }) => {
         const nextQuote = options?.refreshedQuote ?? quoteState;
         if (nextQuote) {
           setQuoteState(nextQuote);
+          if (refreshOptions?.reseedDraft) {
+            setDraftState(mapQuoteToDraft(nextQuote));
+          }
         }
         refreshQuoteMock();
         return nextQuote as QuoteDetail;
@@ -324,6 +346,9 @@ describe("ReviewScreen", () => {
       }),
     });
 
+    fireEvent.change(screen.getByLabelText(/quote title/i), {
+      target: { value: "Unsaved local title" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /customer: unassigned/i }));
 
     expect(await screen.findByRole("dialog", { name: /assign customer/i })).toBeInTheDocument();
@@ -334,6 +359,7 @@ describe("ReviewScreen", () => {
         customer_id: "cust-2",
       });
     });
+    expect(screen.getByLabelText(/quote title/i)).toHaveValue("Unsaved local title");
   });
 
   it("uses preview-origin route state for notice and back navigation", async () => {

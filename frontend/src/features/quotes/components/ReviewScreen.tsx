@@ -296,7 +296,7 @@ export function ReviewScreen(): React.ReactElement {
         deposit_amount: activeDraft.depositAmount,
         notes: activeDraft.notes.trim().length > 0 ? activeDraft.notes.trim() : null,
       });
-      await refreshQuote();
+      await refreshQuote({ reseedDraft: true });
 
       if (currentSnapshotKey) {
         setSavedSnapshotKey(currentSnapshotKey);

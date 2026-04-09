@@ -47,7 +47,7 @@ interface UsePersistedReviewResult {
   clearDraft: () => void;
   isLoadingQuote: boolean;
   loadError: string | null;
-  refreshQuote: () => Promise<QuoteDetail>;
+  refreshQuote: (options?: { reseedDraft?: boolean }) => Promise<QuoteDetail>;
 }
 
 export function usePersistedReview(quoteId: string | undefined): UsePersistedReviewResult {
@@ -56,14 +56,18 @@ export function usePersistedReview(quoteId: string | undefined): UsePersistedRev
   const [isLoadingQuote, setIsLoadingQuote] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const refreshQuote = useCallback(async (): Promise<QuoteDetail> => {
+  const refreshQuote = useCallback(async (
+    options?: { reseedDraft?: boolean },
+  ): Promise<QuoteDetail> => {
     if (!quoteId) {
       throw new Error("Missing quote id.");
     }
 
     const refreshedQuote = await quoteService.getQuote(quoteId);
     setQuote(refreshedQuote);
-    setDraft(mapQuoteToEditDraft(refreshedQuote));
+    if (options?.reseedDraft) {
+      setDraft(mapQuoteToEditDraft(refreshedQuote));
+    }
     return refreshedQuote;
   }, [quoteId, setDraft]);
 

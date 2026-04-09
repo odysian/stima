@@ -67,7 +67,53 @@ afterEach(() => {
 });
 
 describe("usePersistedReview", () => {
-  it("re-seeds the draft from refreshed canonical quote data", async () => {
+  it("preserves local edits when refreshing without draft reseed", async () => {
+    const initialQuote = makeQuote();
+    const refreshedQuote = makeQuote({
+      title: "Server Canonical Title",
+      transcript: "Server canonical transcript",
+      line_items: [
+        {
+          id: "line-2",
+          description: "Edging",
+          details: "40 linear ft",
+          price: 200,
+          sort_order: 0,
+        },
+      ],
+      total_amount: 200,
+      updated_at: "2026-03-20T01:00:00.000Z",
+    });
+
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(initialQuote)
+      .mockResolvedValueOnce(refreshedQuote);
+
+    const { result } = renderHook(() => usePersistedReview("quote-1"));
+
+    await waitFor(() => {
+      expect(result.current.isLoadingQuote).toBe(false);
+    });
+    expect(result.current.draft?.title).toBe("Front Yard Refresh");
+
+    act(() => {
+      result.current.setDraft((currentDraft) => ({
+        ...currentDraft,
+        title: "Locally edited title",
+      }));
+    });
+
+    await act(async () => {
+      await result.current.refreshQuote();
+    });
+
+    await waitFor(() => {
+      expect(result.current.quote?.title).toBe("Server Canonical Title");
+    });
+    expect(result.current.draft?.title).toBe("Locally edited title");
+  });
+
+  it("re-seeds the draft from refreshed canonical quote data when requested", async () => {
     const initialQuote = makeQuote();
     const refreshedQuote = makeQuote({
       title: "Server Canonical Title",
@@ -105,7 +151,7 @@ describe("usePersistedReview", () => {
     expect(result.current.draft?.title).toBe("Locally stale title");
 
     await act(async () => {
-      await result.current.refreshQuote();
+      await result.current.refreshQuote({ reseedDraft: true });
     });
 
     await waitFor(() => {
