@@ -183,6 +183,52 @@ async def test_extraction_job_retries_provider_429_then_persists_degraded_on_fin
     assert stored_result.line_items == []  # nosec B101 - pytest assertion
 
 
+async def test_extraction_job_persists_validation_repair_failed_degraded_result_without_retry(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    security_logs: list[dict[str, object]] = []
+
+    def _capture_security(payload: dict[str, object], *, level: int) -> None:
+        security_logs.append({**payload, "_level": level})
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture_security)
+
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    await extraction_job(
+        _worker_context(
+            db_session,
+            extraction_integration=_ValidationRepairFailedExtractionIntegration(),
+        ),
+        str(record.id),
+        transcript="mulch the front beds",
+        source_type="text",
+        capture_detail="notes",
+    )
+
+    refreshed = await _load_job_record(db_session, record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
+    assert refreshed.document_id is not None  # nosec B101 - pytest assertion
+
+    persisted_quote = await db_session.get(Document, refreshed.document_id)
+    assert persisted_quote is not None  # nosec B101 - pytest assertion
+    assert persisted_quote.extraction_tier == "degraded"  # nosec B101 - pytest assertion
+    assert persisted_quote.extraction_degraded_reason_code == "validation_repair_failed"  # nosec B101 - pytest assertion
+
+    repair_log = next(log for log in security_logs if log.get("event") == "quotes.extract_repair")
+    assert repair_log["outcome"] == "repair_invalid"  # nosec B101 - pytest assertion
+    assert repair_log["repair_validation_error_count"] == 1  # nosec B101 - pytest assertion
+    assert repair_log["extraction_tier"] == "degraded"  # nosec B101 - pytest assertion
+    assert (  # nosec B101 - pytest assertion
+        repair_log["extraction_degraded_reason_code"] == "validation_repair_failed"
+    )
+
+
 async def test_extraction_job_logs_draft_generation_failed_on_terminal_failure(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
@@ -293,6 +339,29 @@ class _RetryableFailureExtractionIntegration:
     async def extract(self, notes: str) -> ExtractionResult:
         del notes
         raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)
+
+
+class _ValidationRepairFailedExtractionIntegration:
+    model_id = "claude-haiku-4-5-20251001"
+
+    async def extract(self, notes: str) -> ExtractionResult:
+        return ExtractionResult(
+            transcript=notes,
+            line_items=[],
+            total=None,
+            confidence_notes=[],
+            extraction_tier="degraded",
+            extraction_degraded_reason_code="validation_repair_failed",
+        )
+
+    def pop_last_call_metadata(self) -> ExtractionCallMetadata:
+        return ExtractionCallMetadata(
+            model_id=self.model_id,
+            token_usage={"input_tokens": 91, "output_tokens": 44},
+            repair_attempted=True,
+            repair_outcome="repair_invalid",
+            repair_validation_error_count=1,
+        )
 
 
 class _NonRetryableFailureExtractionIntegration:
