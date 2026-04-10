@@ -9,13 +9,14 @@ import {
 
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { RegisterForm } from "@/features/auth/components/RegisterForm";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerCreateScreen } from "@/features/customers/components/CustomerCreateScreen";
 import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
 import { CustomerListScreen } from "@/features/customers/components/CustomerListScreen";
 import { EditInvoiceLineItemScreen } from "@/features/invoices/components/EditInvoiceLineItemScreen";
 import { InvoiceDetailScreen } from "@/features/invoices/components/InvoiceDetailScreen";
 import { InvoiceEditScreen } from "@/features/invoices/components/InvoiceEditScreen";
-import { useAuth } from "@/features/auth/hooks/useAuth";
+import { LandingPage } from "@/features/marketing/components/LandingPage";
 import { PublicQuotePage } from "@/features/public/components/PublicQuotePage";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
@@ -61,6 +62,19 @@ function OnboardingRoute(): React.ReactElement {
   return <Outlet />;
 }
 
+function RootHome(): React.ReactElement {
+  const { user, isOnboarded } = useAuth();
+
+  if (!user) {
+    return <LandingPage />;
+  }
+  if (!isOnboarded) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <QuoteList />;
+}
+
 function QuoteEditRedirect(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
   return <Navigate to={id ? `/quotes/${id}/review` : "/"} replace />;
@@ -85,12 +99,12 @@ export default function App(): React.ReactElement {
           </PublicRoute>
         }
       />
+      <Route path="/" element={<RootHome />} />
       <Route path="/doc/:token" element={<PublicQuotePage />} />
       <Route element={<OnboardingRoute />}>
         <Route path="/onboarding" element={<OnboardingForm />} />
       </Route>
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<QuoteList />} />
         <Route path="/customers" element={<CustomerListScreen />} />
         <Route path="/customers/new" element={<CustomerCreateScreen />} />
         <Route path="/customers/:id" element={<CustomerDetailScreen />} />
