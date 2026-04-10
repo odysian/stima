@@ -63,7 +63,7 @@ export function LandingPage(): React.ReactElement {
                 className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-5 py-3 text-sm font-semibold text-on-surface ghost-shadow transition hover:bg-surface-container-low"
                 href={STIMA_GITHUB_URL}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
               >
                 View repo
               </a>
