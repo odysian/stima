@@ -83,8 +83,11 @@ def get_extraction_integration() -> ExtractionIntegration:
     return ExtractionIntegration(
         api_key=settings.anthropic_api_key,
         model=settings.extraction_model,
+        fallback_model=settings.extraction_fallback_model,
         timeout_seconds=settings.provider_request_timeout_seconds,
         max_attempts=settings.provider_max_retries,
+        primary_prompt_variant=settings.extraction_primary_prompt_variant,
+        fallback_prompt_variant=settings.extraction_fallback_prompt_variant,
     )
 
 

@@ -25,4 +25,7 @@ TRANSCRIPTS: dict[str, str] = {
     "no_pricing_at_all": (
         "Inspect attic insulation, check crawlspace moisture barrier, and send me recommendations."
     ),
+    "fallback_tier_probe": (
+        "Replace two porch lights, tighten one loose railing section, and test both GFCI outlets."
+    ),
 }

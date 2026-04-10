@@ -16,6 +16,9 @@ def _reset_dependency_caches(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-test")
     monkeypatch.setenv("OPENAI_API_KEY", "openai-test")
     monkeypatch.setenv("EXTRACTION_MODEL", "claude-test")
+    monkeypatch.setenv("EXTRACTION_FALLBACK_MODEL", "claude-fallback-test")
+    monkeypatch.setenv("EXTRACTION_PRIMARY_PROMPT_VARIANT", "primary_v1")
+    monkeypatch.setenv("EXTRACTION_FALLBACK_PROMPT_VARIANT", "fallback_v1")
     monkeypatch.setenv("TRANSCRIPTION_MODEL", "whisper-test")
     monkeypatch.setenv("PROVIDER_REQUEST_TIMEOUT_SECONDS", "21.5")
     monkeypatch.setenv("PROVIDER_MAX_RETRIES", "4")
@@ -40,6 +43,15 @@ def test_get_transcription_integration_returns_singleton() -> None:
     second = dependencies.get_transcription_integration()
 
     assert first is second
+
+
+def test_get_extraction_integration_applies_fallback_settings() -> None:
+    integration = dependencies.get_extraction_integration()
+
+    assert integration._primary_model == "claude-test"  # noqa: SLF001
+    assert integration._fallback_model == "claude-fallback-test"  # noqa: SLF001
+    assert integration._primary_prompt_variant == "primary_v1"  # noqa: SLF001
+    assert integration._fallback_prompt_variant == "fallback_v1"  # noqa: SLF001
 
 
 def test_get_extraction_service_reuses_provider_singletons() -> None:

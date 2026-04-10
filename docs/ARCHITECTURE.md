@@ -160,6 +160,7 @@ Unique constraints:
 | job_type | String(20) | constrained enum: `extraction \| pdf \| email` |
 | status | String(20) | constrained enum: `pending \| running \| success \| failed \| terminal` |
 | attempts | Integer | default `0`; incremented when a worker attempt starts |
+| last_model_id | String(128) | nullable; most recent extraction provider model used for the job |
 | terminal_error | Text | nullable final failure reason once retries are exhausted |
 | created_at, updated_at | DateTime(tz) | server defaults |
 
@@ -291,9 +292,11 @@ For `job_type = "extraction"`:
 
 Quote extraction guardrails:
 - `POST /quotes/convert-notes`, `POST /quotes/capture-audio`, and `POST /quotes/extract` use user-keyed rate limits when a valid access cookie is present, with IP fallback only for unauthenticated resolution failures.
+- Extraction integration can be configured with an optional fallback model tier that runs only after primary attempts are exhausted; `ExtractionResult` and persisted `documents.extraction_tier` remain `primary|degraded` for storage compatibility.
 - `POST /quotes/convert-notes` and the sync fallback path of `POST /quotes/extract` return `429 { "detail": "Extraction quota or concurrency exhausted. Please retry later." }` when the per-user daily quota or concurrent in-flight extraction limit is exhausted before provider work starts.
 - The async `POST /quotes/extract` path uses durable `job_records` plus a count of user-owned extraction jobs in `pending|running` state to reject new enqueue attempts with the same `429` detail when the active-job cap is already reached.
 - `POST /quotes/{id}/append-extraction` inherits the same user-keyed limiter and extraction capacity/concurrency behavior as `/quotes/extract` (sync and async paths), and emits `quote_append_extracted` after successful append persistence.
+- Extraction worker security logs include segmentation metadata (`last_model_id`, `extraction_invocation_tier`, and `extraction_prompt_variant`) for primary vs fallback analysis.
 - `POST /quotes/{id}/pdf`, `POST /quotes/{id}/send-email`, `POST /invoices/{id}/pdf`, and `POST /invoices/{id}/send-email` are also user-keyed and rate-limited.
 
 ### Invoice endpoints (`/api/invoices`)

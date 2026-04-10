@@ -269,6 +269,8 @@ async def _extract_quote_data(
             last_model_id=resolved_last_model_id,
             latency_ms=int((perf_counter() - started_at) * 1000),
             token_usage=metadata.token_usage if metadata is not None else None,
+            extraction_invocation_tier=(metadata.invocation_tier if metadata is not None else None),
+            extraction_prompt_variant=(metadata.prompt_variant if metadata is not None else None),
             repair_attempted=metadata.repair_attempted if metadata is not None else False,
             repair_outcome=metadata.repair_outcome if metadata is not None else None,
             repair_validation_error_count=(
@@ -306,6 +308,8 @@ async def _extract_quote_data(
             job_name=EXTRACTION_JOB_NAME,
             job_id=str(job_id),
             last_model_id=resolved_last_model_id,
+            extraction_invocation_tier=metadata.invocation_tier,
+            extraction_prompt_variant=metadata.prompt_variant,
             extraction_tier=result.extraction_tier,
             extraction_degraded_reason_code=result.extraction_degraded_reason_code,
             repair_validation_error_count=metadata.repair_validation_error_count,

@@ -389,6 +389,89 @@ async def test_extract_retries_rate_limit_then_succeeds(
     assert sleep_calls == [0.25]
 
 
+async def test_extract_does_not_invoke_fallback_before_primary_exhaustion() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    rate_limit_error = anthropic.RateLimitError(
+        "rate limited",
+        response=httpx.Response(429, request=request),
+        body=None,
+    )
+    client = _SequencedClient(
+        [
+            rate_limit_error,
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": [],
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+        ]
+    )
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="primary-model",
+        fallback_model="fallback-model",
+        max_attempts=2,
+        client=client,
+    )
+
+    await integration.extract(transcript)
+
+    assert [call["model"] for call in client.messages.calls] == ["primary-model", "primary-model"]
+
+
+async def test_extract_invokes_fallback_after_primary_exhaustion_and_tags_metadata() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    rate_limit_error = anthropic.RateLimitError(
+        "rate limited",
+        response=httpx.Response(429, request=request),
+        body=None,
+    )
+    client = _SequencedClient(
+        [
+            rate_limit_error,
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": [],
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+        ]
+    )
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="primary-model",
+        fallback_model="fallback-model",
+        max_attempts=1,
+        client=client,
+    )
+
+    result = await integration.extract(transcript)
+
+    assert result.transcript == transcript
+    assert [call["model"] for call in client.messages.calls] == ["primary-model", "fallback-model"]
+
+    metadata = integration.pop_last_call_metadata()
+    assert metadata is not None
+    assert metadata.invocation_tier == "fallback"
+    assert metadata.model_id == "fallback-model"
+    assert metadata.prompt_variant == "fallback_default"
+
+
 async def test_extract_does_not_retry_non_retryable_provider_status() -> None:
     transcript = TRANSCRIPTS["clean_with_total"]
     request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
