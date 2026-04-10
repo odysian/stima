@@ -27,7 +27,7 @@ This guide explains how to use this template as the foundation for a new project
 3. Reconcile contradictions first (verification commands, auth pattern statements, test plan claims).
 4. Decide source of truth: for issue-backed work (`single`/`gated`), GitHub Issues = execution control plane, `TASKS.md` = optional scratchpad only.
 5. Roll out in two phases: Phase A = docs/templates only, Phase B = enforce in active work (`Task -> PR` by default; `Spec -> Task -> PR` when needed).
-6. Set review policy to lean follow-up by default: implementation agent provides reviewer prompt after PR creation, reviewer returns only `APPROVED` or `ACTIONABLE`, and reviewer avoids environment triage/worktree/broad verify reruns.
+6. Set review policy to lean follow-up by default: implementation agent provides the short reviewer kickoff (`docs/template/KICKOFF.md` section 3a) after PR creation, reviewer returns only `APPROVED` or `ACTIONABLE` per section 3b, and reviewer avoids environment triage/worktree/broad verify reruns.
 7. Keep execution mode defaults strict: default to `single`; use `gated`/`fast` only when explicitly requested.
 8. Keep ceremony conditional: second review pass only when explicitly requested; decision briefs and doc updates only when behavior/contracts/architecture changed.
 

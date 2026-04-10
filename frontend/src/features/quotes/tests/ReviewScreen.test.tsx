@@ -365,14 +365,99 @@ describe("ReviewScreen", () => {
     expect(await screen.findByText("Draft saved.")).toBeInTheDocument();
   });
 
-  it("opens append capture from the Capture More Notes action", async () => {
+  it("auto-saves before opening append capture from the Capture More Notes action", async () => {
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/quote title/i), {
+      target: { value: "Patio Refresh" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /capture more notes/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("quote-1", {
+        title: "Patio Refresh",
+        transcript: "5 yards brown mulch",
+        line_items: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
+        total_amount: 120,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
+        notes: "Thanks for your business",
+      });
+    });
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review/append-capture", {
+        state: { launchOrigin: "/quotes/quote-1/review" },
+      });
+    });
+
+    const [updateOrder] = mockedQuoteService.updateQuote.mock.invocationCallOrder;
+    const [navigateOrder] = navigateMock.mock.invocationCallOrder;
+    expect(updateOrder).toBeLessThan(navigateOrder);
+  });
+
+  it("still navigates to append capture when autosave validation fails", async () => {
+    renderScreen({
+      draft: makeDraft({
+        lineItems: [{ description: "", details: "5 yards", price: 120 }],
+      }),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /capture more notes/i }));
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review/append-capture", {
+        state: { launchOrigin: "/quotes/quote-1/review" },
+      });
+    });
+    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
+  });
+
+  it("still navigates to append capture when autosave update request fails", async () => {
+    mockedQuoteService.updateQuote.mockRejectedValueOnce(new Error("Network unavailable"));
     renderScreen();
 
     fireEvent.click(await screen.findByRole("button", { name: /capture more notes/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review/append-capture", {
-      state: { launchOrigin: "/quotes/quote-1/review" },
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledTimes(1);
     });
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review/append-capture", {
+        state: { launchOrigin: "/quotes/quote-1/review" },
+      });
+    });
+    expect(screen.queryByText("Network unavailable")).not.toBeInTheDocument();
+  });
+
+  it("prevents duplicate autosave PATCH calls on rapid capture-more-notes taps", async () => {
+    let resolveUpdate!: (value: QuoteDetail) => void;
+    mockedQuoteService.updateQuote.mockReturnValueOnce(
+      new Promise<QuoteDetail>((resolve) => {
+        resolveUpdate = resolve;
+      }),
+    );
+
+    renderScreen();
+
+    const captureMoreNotesButton = await screen.findByRole("button", { name: /capture more notes/i });
+    fireEvent.click(captureMoreNotesButton);
+    fireEvent.click(captureMoreNotesButton);
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledTimes(1);
+    });
+    expect(navigateMock).not.toHaveBeenCalled();
+
+    resolveUpdate(makeQuote());
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review/append-capture", {
+        state: { launchOrigin: "/quotes/quote-1/review" },
+      });
+    });
+    expect(navigateMock).toHaveBeenCalledTimes(1);
   });
 
   it("edits a line item in-sheet and waits to PATCH until Save Draft", async () => {

@@ -16,7 +16,7 @@ Then execute the full Task flow end-to-end:
 3. Implement minimally and surgically, preserving existing contracts unless issue scope says otherwise.
 4. Run relevant verification once after implementation.
 5. Open PR with `Closes #<task-id>`.
-6. Return the standardized reviewer follow-up prompt from section 3 below.
+6. Return the **short reviewer kickoff** from section 3a below only. Do **not** paste the full section 3b brief unless the operator explicitly asks for the inline copy.
 7. After review verdict:
    - if verdict is `ACTIONABLE`: use the delta-only patch handoff below; patch listed findings only and rerun targeted verification unless scope expands.
    - if verdict is `APPROVED`: finalize the Task and return the final completion summary; do not generate a second lightweight tutoring handoff after approval is relayed back.
@@ -153,9 +153,23 @@ Notes:
 - If `mode=gated`, output Spec + default child Task issue bodies and commands.
 - If `mode=fast`, output a quick-fix checklist and verification plan; no issue creation by default.
 
-## 3) Standard Reviewer Follow-Up Prompt (Robust)
+## 3) Reviewer follow-up after Task PR
 
-Use this exact prompt after opening a Task PR.
+### 3a) Short reviewer kickoff (default)
+
+Use this after opening a Task PR. It keeps the implementation agent output small; the reviewer loads **section 3b** in-repo for the full scope and output shape.
+
+```text
+Review Task #<task-id> / PR #<pr-id> | branch `<task-branch>` vs `<base-branch>`.
+
+Implementation verification (already run, green): <e.g. make backend-verify>
+
+Follow `docs/template/KICKOFF.md` section **3b) Full reviewer brief** for review scope, constraints, and required output shape. Reply with `APPROVED` or `ACTIONABLE` per that section. If `APPROVED`, end the same response with the lightweight tutoring handoff per **section 4** there.
+```
+
+### 3b) Full reviewer brief (optional inline copy)
+
+Use this exact prompt when the reviewer thread will not have repo access to `docs/template/KICKOFF.md`, or when the operator explicitly requests the full inline brief.
 
 ```text
 Review Task #<task-id> / PR #<pr-id> on branch <task-branch> vs <base-branch>.

@@ -34,7 +34,7 @@ Read conditionally (only when relevant):
   - If `mode` is omitted, default to `single`.
   - Do not switch to `gated` or `fast` unless explicitly requested.
   - Planning kickoff output: issue body file(s), `gh issue create` command(s) when applicable, created issue link(s), and a 3-5 step implementation plan.
-  - Execution kickoff output: implementation + verification + PR + standardized reviewer follow-up prompt + final completion after explicit `APPROVED`, with the lightweight tutoring handoff generated once by the approving reviewer in that same response.
+  - Execution kickoff output: implementation + verification + PR + short reviewer kickoff (`docs/template/KICKOFF.md` section 3a) + final completion after explicit `APPROVED`, with the lightweight tutoring handoff generated once by the approving reviewer in that same response.
   - Use `docs/template/KICKOFF.md` for the exact brief-first execution, delta-only patch, and reviewer prompt wording instead of restating stable repo rules in task-local prompts.
 
 ## Agent Operating Loop
@@ -48,7 +48,7 @@ Read conditionally (only when relevant):
 5. Implement with tight, surgical changes.
 6. Run verification commands once (or once per code change set).
 7. For issue-backed work, open PR that closes the Task issue; close Spec after child Tasks are done/deferred.
-8. Provide a lean reviewer follow-up prompt for a separate review pass.
+8. Provide the short reviewer kickoff (`docs/template/KICKOFF.md` section 3a) for a separate review pass; paste the full section 3b brief only if the operator explicitly requests it.
 9. Patch only actionable findings, rerun relevant verification, and repeat review only if explicitly requested.
 10. After explicit reviewer verdict `APPROVED`, finalize the Task or Spec; do not generate a second lightweight tutoring handoff after approval is relayed back.
 11. Finalize: return the completion output and then close/complete the Task or Spec as applicable.
@@ -127,7 +127,7 @@ Reviewer pass default constraints:
 - default to one review pass; run a second pass only if the user explicitly requests it
 - if verdict is `APPROVED`, the approving reviewer ends that same response with the lightweight tutoring handoff, generated once
 
-Use the exact reviewer prompt/output contract from `docs/template/KICKOFF.md`.
+Default: paste only the short reviewer kickoff from `docs/template/KICKOFF.md` section 3a (plus verification summary). Reviewer output shape and constraints are defined in section 3b; use the full section 3b inline copy only when the operator requests it or the reviewer lacks repo access.
 
 ## Learning Handoff Contract
 
