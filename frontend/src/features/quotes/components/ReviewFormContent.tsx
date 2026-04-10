@@ -18,7 +18,6 @@ interface ReviewFormContentProps {
   locationNotice?: string;
   loadError: string | null;
   saveError: string | null;
-  saveNotice: string | null;
   requiresCustomerAssignment: boolean;
   canReassignCustomer: boolean;
   isInteractionLocked: boolean;
@@ -47,7 +46,6 @@ export function ReviewFormContent({
   locationNotice,
   loadError,
   saveError,
-  saveNotice,
   requiresCustomerAssignment,
   canReassignCustomer,
   isInteractionLocked,
@@ -88,12 +86,6 @@ export function ReviewFormContent({
 
       {saveError ? (
         <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
-      ) : null}
-
-      {saveNotice ? (
-        <section className="rounded-lg border border-success/30 bg-success-container px-4 py-3 text-sm text-success">
-          {saveNotice}
-        </section>
       ) : null}
 
       <section className="space-y-2">

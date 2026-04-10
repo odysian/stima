@@ -29,7 +29,11 @@ export function ReviewCustomerRow({
 
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-all hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-70"
+        className={`flex w-full cursor-pointer items-center justify-between rounded-lg border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-all hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-70 ${
+          requiresCustomerAssignment
+            ? "ring-2 ring-warning-accent/60 animate-pulse [animation-iteration-count:3]"
+            : ""
+        }`}
         onClick={onRequestAssignment}
         disabled={!canOpenSheet}
       >

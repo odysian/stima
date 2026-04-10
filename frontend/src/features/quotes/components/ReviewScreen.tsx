@@ -17,6 +17,7 @@ import { readQuoteConfidenceNotes, writeQuoteConfidenceNotes } from "@/features/
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { Toast } from "@/shared/components/Toast";
 import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { getPricingValidationMessage } from "@/shared/lib/pricing";
@@ -41,7 +42,7 @@ export function ReviewScreen(): React.ReactElement {
   } = usePersistedReview(id);
 
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [submitAction, setSubmitAction] = useState<"save" | "continue" | null>(null);
   const [isAssignmentSheetOpen, setIsAssignmentSheetOpen] = useState(false);
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
@@ -233,7 +234,7 @@ export function ReviewScreen(): React.ReactElement {
 
   async function saveDraft(nextAction: "save" | "continue"): Promise<void> {
     setSaveError(null);
-    setSaveNotice(null);
+    setToastMessage(null);
 
     if (lineItemsForSubmit.length === 0) {
       setSaveError("Add at least one line item description before saving the quote.");
@@ -280,7 +281,7 @@ export function ReviewScreen(): React.ReactElement {
         return;
       }
 
-      setSaveNotice("Draft saved.");
+      setToastMessage("Draft saved.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save quote";
       setSaveError(message);
@@ -320,7 +321,6 @@ export function ReviewScreen(): React.ReactElement {
         locationNotice={locationState.notice}
         loadError={loadError}
         saveError={saveError}
-        saveNotice={saveNotice}
         requiresCustomerAssignment={requiresCustomerAssignment}
         canReassignCustomer={canReassignCustomer}
         isInteractionLocked={isInteractionLocked}
@@ -340,7 +340,7 @@ export function ReviewScreen(): React.ReactElement {
           setConfidenceNotes(nextNotes);
         }}
         onTitleChange={(nextTitle) => {
-          setSaveNotice(null);
+          setToastMessage(null);
           setDraft((currentDraft) => ({ ...currentDraft, title: nextTitle }));
         }}
         onEditLineItem={(lineItemIndex) => {
@@ -356,27 +356,27 @@ export function ReviewScreen(): React.ReactElement {
           setLineItemSheetState({ mode: "add" });
         }}
         onTotalChange={(nextTotal) => {
-          setSaveNotice(null);
+          setToastMessage(null);
           setDraft((currentDraft) => ({ ...currentDraft, total: nextTotal }));
         }}
         onTaxRateChange={(nextTaxRate) => {
-          setSaveNotice(null);
+          setToastMessage(null);
           setDraft((currentDraft) => ({ ...currentDraft, taxRate: nextTaxRate }));
         }}
         onDiscountTypeChange={(nextDiscountType) => {
-          setSaveNotice(null);
+          setToastMessage(null);
           setDraft((currentDraft) => ({ ...currentDraft, discountType: nextDiscountType }));
         }}
         onDiscountValueChange={(nextDiscountValue) => {
-          setSaveNotice(null);
+          setToastMessage(null);
           setDraft((currentDraft) => ({ ...currentDraft, discountValue: nextDiscountValue }));
         }}
         onDepositAmountChange={(nextDepositAmount) => {
-          setSaveNotice(null);
+          setToastMessage(null);
           setDraft((currentDraft) => ({ ...currentDraft, depositAmount: nextDepositAmount }));
         }}
         onNotesChange={(nextNotes) => {
-          setSaveNotice(null);
+          setToastMessage(null);
           setDraft((currentDraft) => ({ ...currentDraft, notes: nextNotes }));
         }}
       />
@@ -407,20 +407,22 @@ export function ReviewScreen(): React.ReactElement {
           onClose={() => setLineItemSheetState(null)}
           onSave={(nextLineItem) => {
             const nextSheetState = lineItemSheetState;
-            setSaveNotice(null);
+            setToastMessage(null);
             setDraft((currentDraft) => applyLineItemSheetSave(currentDraft, nextSheetState, nextLineItem));
             setLineItemSheetState(null);
           }}
           onDelete={lineItemSheetState.mode === "edit"
             ? () => {
                 const nextSheetState = lineItemSheetState;
-                setSaveNotice(null);
+                setToastMessage(null);
                 setDraft((currentDraft) => applyLineItemSheetDelete(currentDraft, nextSheetState));
                 setLineItemSheetState(null);
               }
             : undefined}
         />
       ) : null}
+
+      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
 
       {showLeaveWarning ? (
         <ConfirmModal

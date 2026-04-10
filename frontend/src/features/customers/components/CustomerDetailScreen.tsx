@@ -19,6 +19,7 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { Toast } from "@/shared/components/Toast";
 
 type HistoryMode = "quotes" | "invoices";
 
@@ -249,15 +250,6 @@ export function CustomerDetailScreen(): React.ReactElement {
             {!isEditing ? (
               <section className="rounded-xl bg-surface-container-lowest p-4 ghost-shadow">
                 <div className="flex flex-col gap-3">
-                  {saveSuccess ? (
-                    <p
-                      role="status"
-                      className="rounded-lg bg-success-container px-3 py-2 text-sm text-success"
-                    >
-                      {saveSuccess}
-                    </p>
-                  ) : null}
-
                   <dl className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-3">
                       <dt className="w-16 shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
@@ -382,6 +374,7 @@ export function CustomerDetailScreen(): React.ReactElement {
       </section>
 
       <BottomNav active="customers" />
+      <Toast message={saveSuccess} onDismiss={() => setSaveSuccess(null)} />
     </main>
   );
 }

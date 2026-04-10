@@ -28,8 +28,8 @@ import type {
 } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
+import { Toast } from "@/shared/components/Toast";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { jobService } from "@/shared/lib/jobService";
 import { formatByteLimit } from "@/shared/lib/formatters";
@@ -89,9 +89,19 @@ export function CaptureScreen(): React.ReactElement {
     extractionStageTimerRefs.current = [];
   }
 
-  function clearSubmissionErrors(): void {
+  function clearActionErrors(): void {
     setError(null);
     clearError();
+  }
+
+  function dismissActiveError(): void {
+    if (error) {
+      setError(null);
+      return;
+    }
+    if (voiceError) {
+      clearError();
+    }
   }
 
   useEffect(() => {
@@ -158,7 +168,7 @@ export function CaptureScreen(): React.ReactElement {
   }
 
   async function onExtract(): Promise<void> {
-    clearSubmissionErrors();
+    clearActionErrors();
     if (clips.length > MAX_AUDIO_CLIPS_PER_REQUEST) {
       setError(
         `You can upload up to ${MAX_AUDIO_CLIPS_PER_REQUEST} clips at a time.`,
@@ -331,17 +341,6 @@ export function CaptureScreen(): React.ReactElement {
       />
 
       <section className="mx-auto h-full w-full max-w-2xl overflow-hidden px-4 pb-24 pt-20">
-        {displayedError ? (
-          <div className="mb-4 space-y-3">
-            <FeedbackMessage variant="error">{displayedError}</FeedbackMessage>
-            {error ? (
-              <Button type="button" onClick={clearSubmissionErrors}>
-                Try again
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-
         {!isSupported ? (
           <p className="mb-4 rounded-lg border border-warning-accent/40 bg-warning-container p-3 text-sm text-warning">
             Voice capture is not supported in this browser. You can still type
@@ -391,6 +390,13 @@ export function CaptureScreen(): React.ReactElement {
           </Button>
         </div>
       </ScreenFooter>
+
+      <Toast
+        message={displayedError}
+        variant="error"
+        durationMs={null}
+        onDismiss={dismissActiveError}
+      />
 
       {pendingExitTarget ? (
         <ConfirmModal
