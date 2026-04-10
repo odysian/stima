@@ -62,4 +62,25 @@ describe("Toast", () => {
     fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the original auto-dismiss schedule when onDismiss callback identity changes", () => {
+    vi.useFakeTimers();
+    const firstDismiss = vi.fn();
+    const secondDismiss = vi.fn();
+
+    const { rerender } = render(<Toast message="Saved" onDismiss={firstDismiss} />);
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    rerender(<Toast message="Saved" onDismiss={secondDismiss} />);
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(firstDismiss).not.toHaveBeenCalled();
+    expect(secondDismiss).toHaveBeenCalledTimes(1);
+  });
 });

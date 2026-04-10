@@ -34,6 +34,7 @@ export function ReviewCustomerRow({
             ? "ring-2 ring-warning-accent/60 animate-pulse [animation-iteration-count:3]"
             : ""
         }`}
+        style={requiresCustomerAssignment ? { animationIterationCount: 3 } : undefined}
         onClick={onRequestAssignment}
         disabled={!canOpenSheet}
       >
