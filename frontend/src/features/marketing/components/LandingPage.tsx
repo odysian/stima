@@ -69,14 +69,16 @@ export function LandingPage(): React.ReactElement {
               </a>
             </div>
           </div>
-          <div className="mx-auto w-full max-w-[19rem] rounded-[1.75rem] bg-surface-container-low p-2 ghost-shadow">
-            <img
-              src={heroScreenshot}
-              alt="Stima quote capture and review flow on mobile"
-              width={402}
-              height={872}
-              className="h-auto w-full rounded-[1.35rem] bg-surface-container-lowest object-cover"
-            />
+          <div className="mx-auto w-full max-w-[19rem] rounded-[1.75rem] border border-outline-variant/30 bg-surface-container-low p-2 ghost-shadow">
+            <div className="overflow-hidden rounded-[1.35rem] border border-outline-variant/20 bg-surface-container-lowest">
+              <img
+                src={heroScreenshot}
+                alt="Stima quote capture and review flow on mobile"
+                width={402}
+                height={872}
+                className="h-auto w-full object-cover"
+              />
+            </div>
           </div>
         </section>
 
@@ -110,8 +112,8 @@ export function LandingPage(): React.ReactElement {
           <article className="rounded-xl bg-surface-container-low p-5 ghost-shadow">
             <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Engineering</p>
             <ul className="mt-3 space-y-2 text-sm leading-relaxed text-on-surface-variant">
-              <li>Async background jobs handle extraction, PDF generation, and email.</li>
-              <li>Cookie auth, CSRF checks, and protected app routes enforce boundaries.</li>
+              <li>Async background jobs for extraction, PDF generation, and email.</li>
+              <li>Cookie auth, CSRF checks, and protected app routes.</li>
               <li>Production-minded deployment with Vercel, GCP, and PostgreSQL.</li>
             </ul>
           </article>
