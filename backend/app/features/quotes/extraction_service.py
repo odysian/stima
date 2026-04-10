@@ -10,6 +10,11 @@ from uuid import UUID
 
 import sentry_sdk
 
+from app.features.quotes.extraction_outcomes import (
+    build_degraded_extraction_result,
+    log_draft_generation_failed_event,
+    should_persist_degraded_retryable_error,
+)
 from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
@@ -121,6 +126,7 @@ class ExtractionService:
         notes: str | None,
         *,
         user_id: UUID | None = None,
+        allow_degraded_persist_on_retryable_failure: bool = False,
     ) -> ExtractionResult:
         """Extract quote line items from optional clips plus optional typed notes."""
         try:
@@ -129,12 +135,25 @@ class ExtractionService:
                 notes,
                 user_id=user_id,
             )
-            extraction = await self.convert_notes(combined_text)
+            try:
+                extraction = await self.convert_notes(combined_text)
+            except QuoteServiceError as exc:
+                should_persist_degraded = (
+                    allow_degraded_persist_on_retryable_failure
+                    and should_persist_degraded_retryable_error(
+                        exc,
+                        is_final_attempt=True,
+                    )
+                )
+                if should_persist_degraded:
+                    return build_degraded_extraction_result(transcript=combined_text)
+                raise
         except QuoteServiceError:
             source_type = (
                 "audio+notes" if clips and (notes or "").strip() else "audio" if clips else "notes"
             )
-            log_event("draft_generation_failed", user_id=user_id, detail=source_type)
+            if user_id is not None:
+                log_draft_generation_failed_event(user_id=user_id, capture_detail=source_type)
             raise
         return extraction
 

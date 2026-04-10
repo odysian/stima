@@ -58,6 +58,8 @@ class ExtractionResult(BaseModel):
         default_factory=list,
         max_length=CONFIDENCE_NOTES_MAX_ITEMS,
     )
+    extraction_tier: Literal["primary", "degraded"] = "primary"
+    extraction_degraded_reason_code: str | None = None
 
 
 class PersistedExtractionResponse(ExtractionResult):
@@ -216,6 +218,8 @@ class PdfArtifactResponse(BaseModel):
 class QuoteDetailResponse(QuoteResponse):
     """Quote detail payload including customer display fields."""
 
+    extraction_tier: Literal["primary", "degraded"] | None
+    extraction_degraded_reason_code: str | None
     customer_name: str | None
     customer_email: str | None
     customer_phone: str | None

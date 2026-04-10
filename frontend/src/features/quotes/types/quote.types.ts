@@ -22,6 +22,8 @@ export interface ExtractionResult {
   line_items: LineItemExtracted[];
   total: number | null;
   confidence_notes: string[];
+  extraction_tier: ExtractionTier;
+  extraction_degraded_reason_code: string | null;
 }
 
 export type JobStatus = "pending" | "running" | "success" | "failed" | "terminal";
@@ -74,6 +76,7 @@ export type QuoteStatus =
   | "approved"
   | "declined";
 export type QuoteSourceType = "text" | "voice";
+export type ExtractionTier = "primary" | "degraded";
 
 export interface QuotePricingFields {
   total_amount: number | null;
@@ -114,6 +117,8 @@ export interface LinkedInvoiceSummary {
 }
 
 export interface QuoteDetail extends Quote {
+  extraction_tier: ExtractionTier | null;
+  extraction_degraded_reason_code: string | null;
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;

@@ -11,6 +11,7 @@ import {
   buildOverflowItems,
   getEmailActionLabel,
   readOptionalQuoteText,
+  resolveExtractionDegradedCopy,
   resolveActionState,
 } from "@/features/quotes/components/quotePreview.helpers";
 import { useQuoteDetail } from "@/features/quotes/hooks/useQuoteDetail";
@@ -44,6 +45,7 @@ export function QuotePreview(): React.ReactElement {
   const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact = readOptionalQuoteText(quote, "customer_phone") ?? readOptionalQuoteText(quote, "customer_email") ?? "No contact details";
+  const extractionDegradedCopy = resolveExtractionDegradedCopy(quote);
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
   const requiresCustomerAssignment = quote
     ? (quote.requires_customer_assignment ?? quote.customer_id === null)
@@ -169,6 +171,11 @@ export function QuotePreview(): React.ReactElement {
 
         {!isLoadingQuote && !loadError ? (
           <>
+            {quote && extractionDegradedCopy ? (
+              <div className="mx-4 mt-4 rounded-lg border border-warning-accent/40 bg-warning-container p-4 text-sm text-warning">
+                {extractionDegradedCopy}
+              </div>
+            ) : null}
             {quote ? (
               <QuoteDetailsCard
                 documentLabel="QUOTE"

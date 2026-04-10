@@ -83,6 +83,11 @@ class Document(Base):
     )
     source_type: Mapped[str] = mapped_column(sa.String(20), nullable=False)
     transcript: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    extraction_tier: Mapped[str | None] = mapped_column(sa.String(20), nullable=True)
+    extraction_degraded_reason_code: Mapped[str | None] = mapped_column(
+        sa.String(64),
+        nullable=True,
+    )
     total_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
     tax_rate: Mapped[Decimal | None] = mapped_column(sa.Numeric(5, 4), nullable=True)
     discount_type: Mapped[str | None] = mapped_column(sa.String(7), nullable=True)

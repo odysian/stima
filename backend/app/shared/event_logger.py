@@ -8,6 +8,7 @@ import logging
 import sys
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -65,9 +66,13 @@ def log_event(
     invoice_id: UUID | None = None,
     customer_id: UUID | None = None,
     detail: str | None = None,
+    extraction_outcome: Literal["primary", "degraded"] | None = None,
     persist_async: bool = True,
 ) -> None:
     """Emit a structured JSON log record for one business event."""
+    if event == "draft_generated" and extraction_outcome is None:
+        raise ValueError("draft_generated events require extraction_outcome")
+
     payload = {
         "event": event,
         "timestamp": datetime.now(UTC).isoformat(),
@@ -76,6 +81,7 @@ def log_event(
         "invoice_id": str(invoice_id) if invoice_id else None,
         "customer_id": str(customer_id) if customer_id else None,
         "detail": detail,
+        "extraction_outcome": extraction_outcome,
     }
     _EVENT_LOGGER.info(
         json.dumps({key: value for key, value in payload.items() if value is not None})
@@ -100,6 +106,7 @@ def log_event(
                     invoice_id=invoice_id,
                     customer_id=customer_id,
                     detail=detail,
+                    extraction_outcome=extraction_outcome,
                 ),
             )
         )
@@ -124,6 +131,7 @@ def _build_metadata_payload(
     invoice_id: UUID | None,
     customer_id: UUID | None,
     detail: str | None,
+    extraction_outcome: Literal["primary", "degraded"] | None,
 ) -> dict[str, str]:
     metadata: dict[str, str] = {}
     if quote_id is not None:
@@ -134,6 +142,8 @@ def _build_metadata_payload(
         metadata["customer_id"] = str(customer_id)
     if detail is not None:
         metadata["detail"] = detail
+    if extraction_outcome is not None:
+        metadata["extraction_outcome"] = extraction_outcome
     return metadata
 
 

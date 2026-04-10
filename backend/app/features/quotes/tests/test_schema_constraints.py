@@ -39,3 +39,31 @@ async def test_invoice_rows_require_customer_id_at_db_layer(
 
     with pytest.raises(IntegrityError):
         await db_session.flush()
+
+
+async def test_invoice_rows_reject_extraction_outcome_fields(
+    db_session: AsyncSession,
+) -> None:
+    user = User(
+        email=f"user-{uuid4().hex[:12]}@example.com",
+        password_hash="hash",  # nosec B106 - test-only stub value
+    )
+    db_session.add(user)
+    await db_session.flush()
+
+    db_session.add(
+        Document(
+            user_id=user.id,
+            customer_id=uuid4(),
+            doc_type="invoice",
+            doc_sequence=1,
+            doc_number="I-001",
+            status=QuoteStatus.DRAFT,
+            source_type="text",
+            transcript="invoice transcript",
+            extraction_tier="primary",
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        await db_session.flush()

@@ -80,6 +80,8 @@ const extractionFixture: ExtractionResult = {
   ],
   total: 120,
   confidence_notes: [],
+  extraction_tier: "primary",
+  extraction_degraded_reason_code: null,
 };
 
 const clipFixture: VoiceClip = {

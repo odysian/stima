@@ -19,6 +19,7 @@ from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.service import JobService
+from app.features.quotes.extraction_outcomes import classify_extraction_result
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import (
     PublicShareRecord,
@@ -178,6 +179,8 @@ class QuoteRepositoryProtocol(Protocol):
         deposit_amount: float | None,
         notes: str | None,
         source_type: str,
+        extraction_tier: str | None = None,
+        extraction_degraded_reason_code: str | None = None,
     ) -> Document: ...
 
     async def update(
@@ -215,6 +218,8 @@ class QuoteRepositoryProtocol(Protocol):
         transcript: str,
         total_amount: float | None,
         line_items: list[LineItemDraft],
+        extraction_tier: str | None = None,
+        extraction_degraded_reason_code: str | None = None,
     ) -> Document: ...
 
     async def delete(self, document_id: UUID) -> None: ...
@@ -317,6 +322,7 @@ class QuoteService:
             user_id=user_id,
             customer_id=customer_id,
         )
+        extraction_metadata = classify_extraction_result(extraction_result)
         try:
             quote = await _create_quote_document(
                 self,
@@ -339,6 +345,8 @@ class QuoteService:
                 deposit_amount=None,
                 notes=None,
                 source_type=source_type,
+                extraction_tier=extraction_metadata.tier,
+                extraction_degraded_reason_code=extraction_metadata.degraded_reason_code,
             )
         except QuoteServiceError:
             raise
@@ -430,11 +438,14 @@ class QuoteService:
             current_transcript=quote.transcript,
             appended_transcript=extraction_result.transcript,
         )
+        extraction_metadata = classify_extraction_result(extraction_result)
         updated_quote = await self._repository.append_extraction(
             document=quote,
             transcript=next_transcript,
             total_amount=document_field_float_or_none(validated_pricing.total_amount),
             line_items=appended_line_items,
+            extraction_tier=extraction_metadata.tier,
+            extraction_degraded_reason_code=extraction_metadata.degraded_reason_code,
         )
         obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
         if not commit:
@@ -1047,6 +1058,8 @@ async def _create_quote_document(
     deposit_amount: float | None,
     notes: str | None,
     source_type: Literal["text", "voice"],
+    extraction_tier: str | None = None,
+    extraction_degraded_reason_code: str | None = None,
 ) -> Document:
     for attempt in range(2):
         try:
@@ -1063,6 +1076,8 @@ async def _create_quote_document(
                 deposit_amount=deposit_amount,
                 notes=notes,
                 source_type=source_type,
+                extraction_tier=extraction_tier,
+                extraction_degraded_reason_code=extraction_degraded_reason_code,
             )
         except IntegrityError as exc:
             await service._repository.rollback()

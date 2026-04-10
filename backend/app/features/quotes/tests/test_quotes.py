@@ -231,6 +231,18 @@ class _FailingArqPool:
         raise RuntimeError("redis unavailable")
 
 
+class _RetryableProviderError(Exception):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"provider error {status_code}")
+        self.status_code = status_code
+
+
+class _RetryableFailureExtractionIntegration:
+    async def extract(self, notes: str) -> ExtractionResult:
+        del notes
+        raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)
+
+
 def _send_email_headers(csrf_token: str, *, idempotency_key: str | None = None) -> dict[str, str]:
     return {
         "X-CSRF-Token": csrf_token,
@@ -938,6 +950,7 @@ async def test_business_events_are_logged_for_quote_customer_and_extraction_flow
     assert emitted_events[2]["detail"] == "notes"
     assert emitted_events[3]["quote_id"] != quote_payload["id"]
     assert emitted_events[4]["detail"] == "notes"
+    assert emitted_events[4]["extraction_outcome"] == "primary"
     assert emitted_events[6]["quote_id"] == quote_payload["id"]
     assert emitted_events[8]["quote_id"] == delete_quote_payload["id"]
     assert all(
@@ -3018,6 +3031,8 @@ async def test_extract_combined_falls_back_to_sync_when_no_arq_pool_is_available
     payload = response.json()
     assert payload["quote_id"]
     assert payload["transcript"] == "mulch the front beds"
+    assert payload["extraction_tier"] == "primary"
+    assert payload["extraction_degraded_reason_code"] is None
     assert int(job_count or 0) == 0
 
     persisted_quote = await db_session.get(Document, UUID(payload["quote_id"]))
@@ -3025,6 +3040,99 @@ async def test_extract_combined_falls_back_to_sync_when_no_arq_pool_is_available
     assert persisted_quote.status == QuoteStatus.DRAFT
     assert persisted_quote.customer_id is None
     assert persisted_quote.transcript == "mulch the front beds"
+    assert persisted_quote.extraction_tier == "primary"
+    assert persisted_quote.extraction_degraded_reason_code is None
+
+
+async def test_extract_combined_sync_retryable_failure_persists_degraded_draft(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    async def _retryable_extract(self, notes: str) -> ExtractionResult:  # noqa: ANN001
+        del self, notes
+        raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+    monkeypatch.setattr(_MockExtractionIntegration, "extract", _retryable_extract)
+
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["quote_id"]
+    assert payload["line_items"] == []
+    assert payload["extraction_tier"] == "degraded"
+    assert payload["extraction_degraded_reason_code"] == "provider_retryable_error"
+
+    persisted_quote = await db_session.get(Document, UUID(payload["quote_id"]))
+    assert persisted_quote is not None
+    assert persisted_quote.extraction_tier == "degraded"
+    assert persisted_quote.extraction_degraded_reason_code == "provider_retryable_error"
+    assert [event["event"] for event in emitted_events] == [
+        "quote_started",
+        "quote.created",
+        "draft_generated",
+    ]
+    assert emitted_events[-1]["extraction_outcome"] == "degraded"
+
+
+async def test_append_extraction_sync_retryable_failure_uses_degraded_append_semantics(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _retryable_extract(self, notes: str) -> ExtractionResult:  # noqa: ANN001
+        del self, notes
+        raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)
+
+    monkeypatch.setattr(_MockExtractionIntegration, "extract", _retryable_extract)
+
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+    app.state.arq_pool = None
+
+    first_append = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "first degraded note"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_append = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "second degraded note"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_append.status_code == 200
+    assert second_append.status_code == 200
+    assert first_append.json()["line_items"] == []
+    assert second_append.json()["line_items"] == []
+    assert first_append.json()["extraction_tier"] == "degraded"
+    assert second_append.json()["extraction_tier"] == "degraded"
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert len(payload["line_items"]) == 1
+    assert payload["extraction_tier"] == "degraded"
+    assert payload["extraction_degraded_reason_code"] == "provider_retryable_error"
+    assert payload["transcript"].count("Added later:") == 1
+    assert "- first degraded note" in payload["transcript"]
+    assert "- second degraded note" in payload["transcript"]
+    assert "Added later (2):" not in payload["transcript"]
 
 
 async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
@@ -3110,6 +3218,8 @@ async def test_extract_combined_async_worker_persists_draft_and_returns_quote_id
     assert quote_payload["status"] == "draft"
     assert quote_payload["customer_id"] is None
     assert quote_payload["transcript"] == "mulch the front beds"
+    assert quote_payload["extraction_tier"] == "primary"
+    assert quote_payload["extraction_degraded_reason_code"] is None
     assert len(quote_payload["line_items"]) == 1
 
     matching_quote_events = [
@@ -3119,6 +3229,69 @@ async def test_extract_combined_async_worker_persists_draft_and_returns_quote_id
         and event.get("quote_id") == status_payload["quote_id"]
     ]
     assert len(matching_quote_events) == 1
+    assert matching_quote_events[0]["extraction_outcome"] == "primary"
+
+
+async def test_extract_combined_async_final_retryable_failure_persists_degraded_draft(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    csrf_token = await _register_and_login(client, _credentials())
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert response.status_code == 202
+
+    payload = response.json()
+    await _run_extraction_job(
+        db_session,
+        job_id=payload["id"],
+        source_type="text",
+        capture_detail="notes",
+        job_try=3,
+        extraction_integration=_RetryableFailureExtractionIntegration(),
+    )
+
+    status_response = await client.get(f"/api/jobs/{payload['id']}")
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["status"] == "success"
+    assert status_payload["quote_id"] is not None
+    assert status_payload["extraction_result"]["line_items"] == []
+    assert status_payload["extraction_result"]["extraction_tier"] == "degraded"
+    assert (
+        status_payload["extraction_result"]["extraction_degraded_reason_code"]
+        == "provider_retryable_error"
+    )
+
+    quote_response = await client.get(f"/api/quotes/{status_payload['quote_id']}")
+    assert quote_response.status_code == 200
+    quote_payload = quote_response.json()
+    assert quote_payload["extraction_tier"] == "degraded"
+    assert quote_payload["extraction_degraded_reason_code"] == "provider_retryable_error"
+
+    matching_quote_events = [
+        event
+        for event in emitted_events
+        if event.get("event") == "draft_generated"
+        and event.get("quote_id") == status_payload["quote_id"]
+    ]
+    assert len(matching_quote_events) == 1
+    assert matching_quote_events[0]["extraction_outcome"] == "degraded"
+    assert all(event["event"] != "draft_generation_failed" for event in emitted_events)
 
 
 async def test_extract_combined_sync_fallback_persists_preselected_customer(
@@ -5765,6 +5938,8 @@ async def _run_extraction_job(
     customer_id: str | None = None,
     append_to_quote: bool = False,
     transcript: str = "mulch the front beds",
+    job_try: int = 1,
+    extraction_integration: object | None = None,
 ) -> None:
     assert isinstance(job_id, str)
     session_maker = async_sessionmaker(
@@ -5778,11 +5953,12 @@ async def _run_extraction_job(
         retry_base_seconds=DEFAULT_RETRY_BASE_SECONDS,
         retry_jitter_seconds=DEFAULT_RETRY_JITTER_SECONDS,
     )
+    resolved_extraction_integration = extraction_integration or _MockExtractionIntegration()
     await extraction_job(
         {
-            "job_try": 1,
+            "job_try": job_try,
             "worker_runtime": runtime,
-            "extraction_integration": _MockExtractionIntegration(),
+            "extraction_integration": resolved_extraction_integration,
         },
         job_id,
         transcript=transcript,
