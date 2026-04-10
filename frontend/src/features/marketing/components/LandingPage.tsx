@@ -57,10 +57,7 @@ export function LandingPage(): React.ReactElement {
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-4">
               <Link className="forest-gradient rounded-lg px-5 py-3 text-sm font-semibold text-on-primary transition active:scale-[0.98]" to="/register">
-                Get started
-              </Link>
-              <Link className="text-sm font-semibold text-primary hover:underline" to="/login">
-                Sign in
+                Try it free
               </Link>
               <a
                 className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-5 py-3 text-sm font-semibold text-on-surface ghost-shadow transition hover:bg-surface-container-low"
@@ -68,7 +65,7 @@ export function LandingPage(): React.ReactElement {
                 target="_blank"
                 rel="noreferrer"
               >
-                GitHub
+                View repo
               </a>
             </div>
           </div>
@@ -125,12 +122,9 @@ export function LandingPage(): React.ReactElement {
           <p className="mt-2 text-sm text-on-primary">
             Start with capture-first quoting, then share polished results when you are ready.
           </p>
-          <div className="mt-5 flex flex-wrap items-center gap-4">
-            <Link className="rounded-lg bg-surface-container-lowest px-5 py-3 text-sm font-semibold text-primary transition hover:bg-surface-container-low" to="/register">
-              Get started
-            </Link>
+          <div className="mt-5">
             <Link className="text-sm font-semibold text-on-primary hover:underline" to="/login">
-              Sign in
+              Already have an account? Sign in
             </Link>
           </div>
         </section>
