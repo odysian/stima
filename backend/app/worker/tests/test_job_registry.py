@@ -148,6 +148,8 @@ async def test_extraction_job_retries_provider_429_then_persists_degraded_on_fin
     after_first_failure = await _load_job_record(db_session, record.id)
     assert after_first_failure is not None  # nosec B101 - pytest assertion
     assert after_first_failure.status == JobStatus.FAILED  # nosec B101 - pytest assertion
+    assert after_first_failure.document_id is None  # nosec B101 - pytest assertion
+    assert after_first_failure.result_json is None  # nosec B101 - pytest assertion
 
     await extraction_job(
         _worker_context(
