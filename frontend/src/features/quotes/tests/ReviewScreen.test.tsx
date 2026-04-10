@@ -414,6 +414,23 @@ describe("ReviewScreen", () => {
     expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
   });
 
+  it("still navigates to append capture when autosave update request fails", async () => {
+    mockedQuoteService.updateQuote.mockRejectedValueOnce(new Error("Network unavailable"));
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /capture more notes/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review/append-capture", {
+        state: { launchOrigin: "/quotes/quote-1/review" },
+      });
+    });
+    expect(screen.queryByText("Network unavailable")).not.toBeInTheDocument();
+  });
+
   it("prevents duplicate autosave PATCH calls on rapid capture-more-notes taps", async () => {
     let resolveUpdate!: (value: QuoteDetail) => void;
     mockedQuoteService.updateQuote.mockReturnValueOnce(
