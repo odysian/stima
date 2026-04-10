@@ -163,27 +163,101 @@ async def test_extract_handles_ambiguous_partial_input_without_raising() -> None
     assert "ambiguous" in result.confidence_notes[0].lower()
 
 
-async def test_extract_raises_typed_error_for_malformed_payload() -> None:
+async def test_extract_returns_degraded_result_when_repair_is_still_invalid() -> None:
     transcript = TRANSCRIPTS["clean_with_total"]
-    client = _FakeClient(
-        lambda _: _FakeResponse(
-            content=[
-                {
-                    "type": "tool_use",
-                    "input": {
-                        "transcript": transcript,
-                        "line_items": "invalid-shape",
-                        "total": 435,
-                        "confidence_notes": [],
-                    },
-                }
-            ]
-        )
+    client = _SequencedClient(
+        [
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": "invalid-shape",
+                            "total": 435,
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": "still-invalid",
+                            "total": 435,
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+        ]
     )
     integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
 
-    with pytest.raises(ExtractionError, match="schema"):
-        await integration.extract(transcript)
+    result = await integration.extract(transcript)
+
+    assert result.extraction_tier == "degraded"
+    assert result.extraction_degraded_reason_code == "validation_repair_failed"
+    assert result.line_items == []
+    assert len(client.messages.calls) == 2
+
+
+async def test_extract_attempts_one_repair_then_accepts_valid_repaired_payload() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    client = _SequencedClient(
+        [
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": "invalid-shape",
+                            "total": 435,
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": [
+                                {
+                                    "description": "Trim shrubs",
+                                    "details": "Front beds",
+                                    "price": 125,
+                                }
+                            ],
+                            "total": 125,
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+        ]
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert len(client.messages.calls) == 2
+    assert result.extraction_tier == "primary"
+    assert result.total == 125
+    assert result.line_items[0].description == "Trim shrubs"
+
+    repair_messages = client.messages.calls[1]["messages"]
+    assert isinstance(repair_messages, list)
+    assert repair_messages
+    repair_user_content = repair_messages[0]["content"]
+    assert isinstance(repair_user_content, str)
+    assert "Schema validation errors:" in repair_user_content
 
 
 async def test_extract_builds_client_with_configured_timeout_and_disabled_sdk_retries(

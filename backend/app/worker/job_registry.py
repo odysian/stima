@@ -269,6 +269,11 @@ async def _extract_quote_data(
             last_model_id=resolved_last_model_id,
             latency_ms=int((perf_counter() - started_at) * 1000),
             token_usage=metadata.token_usage if metadata is not None else None,
+            repair_attempted=metadata.repair_attempted if metadata is not None else False,
+            repair_outcome=metadata.repair_outcome if metadata is not None else None,
+            repair_validation_error_count=(
+                metadata.repair_validation_error_count if metadata is not None else None
+            ),
             error_class=_compact_error_class(exc),
             transcript_sha256=_transcript_sha256(transcript),
         )
@@ -291,6 +296,22 @@ async def _extract_quote_data(
         job_id=job_id,
         last_model_id=resolved_last_model_id,
     )
+    if metadata is not None and metadata.repair_attempted:
+        repair_outcome = metadata.repair_outcome or "unknown"
+        log_security_event(
+            "quotes.extract_repair",
+            outcome=repair_outcome,
+            level=logging.INFO if repair_outcome == "repair_succeeded" else logging.WARNING,
+            reason=repair_outcome,
+            job_name=EXTRACTION_JOB_NAME,
+            job_id=str(job_id),
+            last_model_id=resolved_last_model_id,
+            extraction_tier=result.extraction_tier,
+            extraction_degraded_reason_code=result.extraction_degraded_reason_code,
+            repair_validation_error_count=metadata.repair_validation_error_count,
+            token_usage=metadata.token_usage,
+            transcript_sha256=_transcript_sha256(transcript),
+        )
     return result
 
 

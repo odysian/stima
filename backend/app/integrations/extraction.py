@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import json
 import secrets
 from dataclasses import dataclass
 from typing import Any, cast
@@ -74,6 +75,13 @@ EXTRACTION_SYSTEM_PROMPT = (
     "Return only structured tool output."
 )
 
+EXTRACTION_REPAIR_SYSTEM_PROMPT = (
+    "You are repairing invalid structured extraction tool output. "
+    "Return only corrected tool output that strictly matches the extraction schema."
+)
+
+EXTRACTION_DEGRADED_REASON_VALIDATION_REPAIR_FAILED = "validation_repair_failed"
+
 _RETRY_BASE_DELAY_SECONDS = 0.25
 _RETRY_MAX_DELAY_SECONDS = 2.0
 
@@ -88,6 +96,9 @@ class ExtractionCallMetadata:
 
     model_id: str | None
     token_usage: dict[str, int] | None
+    repair_attempted: bool = False
+    repair_outcome: str | None = None
+    repair_validation_error_count: int | None = None
 
 
 _LAST_CALL_METADATA_VAR: contextvars.ContextVar[ExtractionCallMetadata | None] = (
@@ -138,6 +149,9 @@ class ExtractionIntegration:
         _set_last_call_metadata(
             model_id=getattr(response, "model", None) or self._model,
             token_usage=_extract_token_usage(response),
+            repair_attempted=False,
+            repair_outcome="not_attempted",
+            repair_validation_error_count=None,
         )
 
         payload = _extract_tool_payload(response)
@@ -148,7 +162,41 @@ class ExtractionIntegration:
         try:
             return ExtractionResult.model_validate(payload)
         except ValidationError as exc:
-            raise ExtractionError("Claude response did not match extraction schema") from exc
+            validation_errors = _compact_validation_errors(exc)
+            repair_response = await self._request_with_retry(
+                typed_client,
+                _build_repair_request(
+                    notes=normalized_notes,
+                    invalid_payload=payload,
+                    validation_errors=validation_errors,
+                ),
+                system_prompt=EXTRACTION_REPAIR_SYSTEM_PROMPT,
+            )
+            repair_usage = _extract_token_usage(repair_response)
+            repair_model_id = getattr(repair_response, "model", None) or self._model
+            repair_payload = _extract_tool_payload(repair_response)
+            repair_payload.setdefault("transcript", normalized_notes)
+            repair_payload.setdefault("line_items", [])
+            repair_payload.setdefault("confidence_notes", [])
+            try:
+                repaired_result = ExtractionResult.model_validate(repair_payload)
+            except ValidationError:
+                _set_last_call_metadata(
+                    model_id=repair_model_id,
+                    token_usage=repair_usage,
+                    repair_attempted=True,
+                    repair_outcome="repair_invalid",
+                    repair_validation_error_count=len(validation_errors),
+                )
+                return _build_validation_repair_failed_result(transcript=normalized_notes)
+            _set_last_call_metadata(
+                model_id=repair_model_id,
+                token_usage=repair_usage,
+                repair_attempted=True,
+                repair_outcome="repair_succeeded",
+                repair_validation_error_count=len(validation_errors),
+            )
+            return repaired_result
 
     @property
     def model_id(self) -> str:
@@ -161,7 +209,13 @@ class ExtractionIntegration:
         _LAST_CALL_METADATA_VAR.set(None)
         return metadata
 
-    async def _request_with_retry(self, typed_client: Any, normalized_notes: str) -> object:
+    async def _request_with_retry(
+        self,
+        typed_client: Any,
+        request_content: str,
+        *,
+        system_prompt: str = EXTRACTION_SYSTEM_PROMPT,
+    ) -> object:
         last_error: Exception | None = None
         for attempt in range(1, self._max_attempts + 1):
             try:
@@ -169,11 +223,11 @@ class ExtractionIntegration:
                     model=self._model,
                     max_tokens=800,
                     temperature=0,
-                    system=EXTRACTION_SYSTEM_PROMPT,
+                    system=system_prompt,
                     messages=[
                         {
                             "role": "user",
-                            "content": normalized_notes,
+                            "content": request_content,
                         }
                     ],
                     tools=[
@@ -290,11 +344,21 @@ def _retry_delay_seconds(attempt: int) -> float:
     return base_delay + (secrets.randbelow(1000) / 1000) * jitter_bound
 
 
-def _set_last_call_metadata(*, model_id: str | None, token_usage: dict[str, int] | None) -> None:
+def _set_last_call_metadata(
+    *,
+    model_id: str | None,
+    token_usage: dict[str, int] | None,
+    repair_attempted: bool = False,
+    repair_outcome: str | None = None,
+    repair_validation_error_count: int | None = None,
+) -> None:
     _LAST_CALL_METADATA_VAR.set(
         ExtractionCallMetadata(
             model_id=model_id,
             token_usage=token_usage,
+            repair_attempted=repair_attempted,
+            repair_outcome=repair_outcome,
+            repair_validation_error_count=repair_validation_error_count,
         )
     )
 
@@ -323,3 +387,46 @@ def _token_usage_int(usage: object, key: str) -> int | None:
     else:
         candidate = getattr(usage, key, None)
     return candidate if isinstance(candidate, int) else None
+
+
+def _build_repair_request(
+    *,
+    notes: str,
+    invalid_payload: dict[str, Any],
+    validation_errors: list[str],
+) -> str:
+    compact_payload = json.dumps(invalid_payload, ensure_ascii=True, separators=(",", ":"))
+    compact_errors = "\n".join(f"- {error}" for error in validation_errors)
+    return (
+        "Original notes:\n"
+        f"{notes}\n\n"
+        "Invalid tool output JSON:\n"
+        f"{compact_payload}\n\n"
+        "Schema validation errors:\n"
+        f"{compact_errors}\n\n"
+        "Return corrected structured tool output only."
+    )
+
+
+def _compact_validation_errors(error: ValidationError) -> list[str]:
+    compact: list[str] = []
+    for item in error.errors(include_url=False):
+        location = ".".join(str(part) for part in item.get("loc", ()))
+        message = str(item.get("msg", "Invalid value"))
+        issue_type = str(item.get("type", "validation_error"))
+        if location:
+            compact.append(f"{location}: {message} ({issue_type})")
+        else:
+            compact.append(f"{message} ({issue_type})")
+    return compact
+
+
+def _build_validation_repair_failed_result(*, transcript: str) -> ExtractionResult:
+    return ExtractionResult(
+        transcript=transcript,
+        line_items=[],
+        total=None,
+        confidence_notes=[],
+        extraction_tier="degraded",
+        extraction_degraded_reason_code=EXTRACTION_DEGRADED_REASON_VALIDATION_REPAIR_FAILED,
+    )
