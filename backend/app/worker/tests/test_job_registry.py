@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,11 +13,10 @@ from app.features.quotes.models import Document
 from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.extraction import ExtractionError
+from app.shared import event_logger
 from app.worker.job_registry import TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED, extraction_job
 from app.worker.runtime import (
-    TERMINAL_ERROR_RETRY_EXHAUSTED,
     NonRetryableJobError,
-    RetryableJobError,
     WorkerRuntimeSettings,
 )
 from arq.worker import Retry
@@ -122,7 +122,7 @@ async def test_extraction_job_marks_terminal_when_draft_persistence_fails(
     assert refreshed.result_json is None  # nosec B101 - pytest assertion
 
 
-async def test_extraction_job_retries_provider_429_and_marks_terminal_after_final_attempt(
+async def test_extraction_job_retries_provider_429_then_persists_degraded_on_final_attempt(
     db_session: AsyncSession,
 ) -> None:
     user = await _seed_user(db_session)
@@ -149,12 +149,57 @@ async def test_extraction_job_retries_provider_429_and_marks_terminal_after_fina
     assert after_first_failure is not None  # nosec B101 - pytest assertion
     assert after_first_failure.status == JobStatus.FAILED  # nosec B101 - pytest assertion
 
-    with pytest.raises(RetryableJobError):
+    await extraction_job(
+        _worker_context(
+            db_session,
+            job_try=3,
+            extraction_integration=failing_integration,
+        ),
+        str(record.id),
+        transcript="mulch the front beds",
+        source_type="text",
+        capture_detail="notes",
+    )
+
+    degraded_record = await _load_job_record(db_session, record.id)
+    assert degraded_record is not None  # nosec B101 - pytest assertion
+    assert degraded_record.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
+    assert degraded_record.terminal_error is None  # nosec B101 - pytest assertion
+    assert degraded_record.document_id is not None  # nosec B101 - pytest assertion
+    assert degraded_record.result_json is not None  # nosec B101 - pytest assertion
+
+    persisted_quote = await db_session.get(Document, degraded_record.document_id)
+    assert persisted_quote is not None  # nosec B101 - pytest assertion
+    assert persisted_quote.extraction_tier == "degraded"  # nosec B101 - pytest assertion
+    assert persisted_quote.extraction_degraded_reason_code == "provider_retryable_error"  # nosec B101 - pytest assertion
+    assert persisted_quote.transcript == "mulch the front beds"  # nosec B101 - pytest assertion
+
+    stored_result = ExtractionResult.model_validate_json(degraded_record.result_json)
+    assert stored_result.extraction_tier == "degraded"  # nosec B101 - pytest assertion
+    assert stored_result.extraction_degraded_reason_code == "provider_retryable_error"  # nosec B101 - pytest assertion
+    assert stored_result.line_items == []  # nosec B101 - pytest assertion
+
+
+async def test_extraction_job_logs_draft_generation_failed_on_terminal_failure(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    with pytest.raises(ExtractionError):
         await extraction_job(
             _worker_context(
                 db_session,
-                job_try=3,
-                extraction_integration=failing_integration,
+                extraction_integration=_NonRetryableFailureExtractionIntegration(),
             ),
             str(record.id),
             transcript="mulch the front beds",
@@ -162,10 +207,12 @@ async def test_extraction_job_retries_provider_429_and_marks_terminal_after_fina
             capture_detail="notes",
         )
 
-    terminal_record = await _load_job_record(db_session, record.id)
-    assert terminal_record is not None  # nosec B101 - pytest assertion
-    assert terminal_record.status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
-    assert terminal_record.terminal_error == TERMINAL_ERROR_RETRY_EXHAUSTED  # nosec B101 - pytest assertion
+    refreshed = await _load_job_record(db_session, record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
+    assert [event["event"] for event in emitted_events] == ["draft_generation_failed"]  # nosec B101 - pytest assertion
+    assert emitted_events[0]["detail"] == "notes"  # nosec B101 - pytest assertion
+    assert "quote_id" not in emitted_events[0]  # nosec B101 - pytest assertion
 
 
 class _SuccessfulExtractionIntegration:
@@ -188,6 +235,12 @@ class _RetryableFailureExtractionIntegration:
     async def extract(self, notes: str) -> ExtractionResult:
         del notes
         raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)
+
+
+class _NonRetryableFailureExtractionIntegration:
+    async def extract(self, notes: str) -> ExtractionResult:
+        del notes
+        raise ExtractionError("Claude request failed: malformed payload")
 
 
 async def _seed_user(db_session: AsyncSession) -> User:

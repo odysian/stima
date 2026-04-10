@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, cast
 from uuid import UUID
 
-from arq.worker import func
+from arq.worker import Retry, func
 
 from app.core.config import get_settings
 from app.features.invoices.email_delivery_service import InvoiceEmailDeliveryService
@@ -17,6 +17,12 @@ from app.features.invoices.repository import InvoiceEmailContext, InvoiceReposit
 from app.features.jobs.models import JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
+from app.features.quotes.extraction_outcomes import (
+    build_degraded_extraction_result,
+    log_draft_generated_event,
+    log_draft_generation_failed_event,
+    should_persist_degraded_retryable_error,
+)
 from app.features.quotes.repository import QuoteEmailContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteService, QuoteServiceError
@@ -75,25 +81,37 @@ async def extraction_job(
     append_to_quote: bool = False,
 ) -> None:
     """Run durable quote extraction against the transcript prepared by the API."""
-    await process_job(
-        ctx,
-        job_id=UUID(job_id),
-        job_type=JobType.EXTRACTION,
-        job_name=EXTRACTION_JOB_NAME,
-        handler=lambda: _extract_quote_data(ctx, transcript),
-        on_success=lambda runtime, result: _store_extraction_result(
-            runtime,
-            job_id=UUID(job_id),
-            result=result,
-            source_type=source_type,
-            capture_detail=_resolve_worker_capture_detail(
-                source_type=source_type,
-                capture_detail=capture_detail,
-            ),
-            customer_id=customer_id,
-            append_to_quote=append_to_quote,
-        ),
+    parsed_job_id = UUID(job_id)
+    resolved_capture_detail = _resolve_worker_capture_detail(
+        source_type=source_type,
+        capture_detail=capture_detail,
     )
+    try:
+        await process_job(
+            ctx,
+            job_id=parsed_job_id,
+            job_type=JobType.EXTRACTION,
+            job_name=EXTRACTION_JOB_NAME,
+            handler=lambda: _extract_quote_data(ctx, transcript),
+            on_success=lambda runtime, result: _store_extraction_result(
+                runtime,
+                job_id=parsed_job_id,
+                result=result,
+                source_type=source_type,
+                capture_detail=resolved_capture_detail,
+                customer_id=customer_id,
+                append_to_quote=append_to_quote,
+            ),
+        )
+    except Retry:
+        raise
+    except Exception:
+        await _log_extraction_terminal_failure(
+            ctx,
+            job_id=parsed_job_id,
+            capture_detail=resolved_capture_detail,
+        )
+        raise
 
 
 async def pdf_job(ctx: dict[str, Any], job_id: str) -> None:
@@ -209,6 +227,13 @@ async def _extract_quote_data(
     try:
         return await extraction_integration.extract(transcript)
     except ExtractionError as exc:
+        runtime = _get_runtime(ctx)
+        attempt_number = max(int(ctx.get("job_try", 1)), 1)
+        if should_persist_degraded_retryable_error(
+            exc,
+            is_final_attempt=attempt_number >= runtime.max_tries,
+        ):
+            return build_degraded_extraction_result(transcript=transcript)
         if is_retryable_extraction_error(exc):
             raise RetryableJobError(str(exc)) from exc
         raise
@@ -544,12 +569,12 @@ async def _store_extraction_result(
             quote_id=quote_id,
             customer_id=resolved_customer_id,
         )
-        log_event(
-            "draft_generated",
+        log_draft_generated_event(
             user_id=job_record.user_id,
             quote_id=quote_id,
             customer_id=resolved_customer_id,
-            detail=capture_detail,
+            capture_detail=capture_detail,
+            extraction_result=result_payload,
         )
     elif append_to_quote:
         log_event(
@@ -621,3 +646,20 @@ async def _store_pdf_artifact(
             await asyncio.to_thread(storage_service.delete, persistence_result.previous_path)
         except Exception:  # noqa: BLE001
             logger.warning("Failed to delete superseded PDF artifact", exc_info=True)
+
+
+async def _log_extraction_terminal_failure(
+    ctx: dict[str, Any],
+    *,
+    job_id: UUID,
+    capture_detail: str,
+) -> None:
+    runtime = _get_runtime(ctx)
+    async with runtime.session_maker() as session:
+        job_record = await JobRepository(session).get_by_id(job_id)
+    if job_record is None:
+        return
+    log_draft_generation_failed_event(
+        user_id=job_record.user_id,
+        capture_detail=capture_detail,
+    )

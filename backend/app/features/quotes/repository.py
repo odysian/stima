@@ -133,6 +133,8 @@ class QuoteDetailRow:
     status: str
     source_type: str
     transcript: str
+    extraction_tier: str | None
+    extraction_degraded_reason_code: str | None
     total_amount: Decimal | None
     tax_rate: Decimal | None
     discount_type: str | None
@@ -335,6 +337,8 @@ class QuoteRepository:
             status=status,
             source_type=document.source_type,
             transcript=document.transcript,
+            extraction_tier=document.extraction_tier,
+            extraction_degraded_reason_code=document.extraction_degraded_reason_code,
             total_amount=document.total_amount,
             tax_rate=document.tax_rate,
             discount_type=document.discount_type,
@@ -609,6 +613,8 @@ class QuoteRepository:
         deposit_amount: float | None,
         notes: str | None,
         source_type: str,
+        extraction_tier: str | None = None,
+        extraction_degraded_reason_code: str | None = None,
     ) -> Document:
         """Create a quote and optional line items for the owning user."""
         next_sequence = await self.get_next_doc_sequence_for_type(
@@ -624,6 +630,8 @@ class QuoteRepository:
             title=title,
             source_type=source_type,
             transcript=transcript,
+            extraction_tier=extraction_tier,
+            extraction_degraded_reason_code=extraction_degraded_reason_code,
             total_amount=_to_decimal(total_amount),
             tax_rate=_to_decimal(tax_rate),
             discount_type=discount_type,
@@ -706,10 +714,14 @@ class QuoteRepository:
         transcript: str,
         total_amount: float | None,
         line_items: list[LineItemDraft],
+        extraction_tier: str | None = None,
+        extraction_degraded_reason_code: str | None = None,
     ) -> Document:
         """Append extracted line items while preserving existing rows and order."""
         document.transcript = transcript
         document.total_amount = _to_decimal(total_amount)
+        document.extraction_tier = extraction_tier
+        document.extraction_degraded_reason_code = extraction_degraded_reason_code
 
         next_sort_order = len(document.line_items)
         for index, item in enumerate(line_items):

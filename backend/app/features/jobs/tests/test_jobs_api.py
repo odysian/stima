@@ -64,6 +64,8 @@ async def test_get_job_status_returns_owned_extraction_result(
         "line_items": [],
         "total": None,
         "confidence_notes": [],
+        "extraction_tier": "primary",
+        "extraction_degraded_reason_code": None,
     }
 
 

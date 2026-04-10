@@ -52,6 +52,8 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
   return {
     id: "quote-1",
     customer_id: "cust-1",
+    extraction_tier: "primary",
+    extraction_degraded_reason_code: null,
     customer_name: "Test Customer",
     customer_email: null,
     customer_phone: null,
@@ -236,6 +238,23 @@ describe("QuotePreview", () => {
     expect(screen.queryByText(/doc\/share-token/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
     expect(screen.getByText("QUOTE")).toBeInTheDocument();
+  });
+
+  it("renders canonical degraded extraction copy from reason code", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        extraction_tier: "degraded",
+        extraction_degraded_reason_code: "provider_retryable_error",
+      }),
+    );
+
+    renderScreen();
+
+    expect(
+      await screen.findByText(
+        /line item extraction was temporarily unavailable/i,
+      ),
+    ).toBeInTheDocument();
   });
 
   it.each(["approved", "declined"] as const)(

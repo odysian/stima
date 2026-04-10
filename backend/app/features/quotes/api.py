@@ -32,6 +32,10 @@ from app.features.jobs.models import JobStatus, JobType
 from app.features.jobs.schemas import JobRecordResponse, job_record_to_response
 from app.features.jobs.service import JobService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
+from app.features.quotes.extraction_outcomes import (
+    log_draft_generated_event,
+    log_draft_generation_failed_event,
+)
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
 from app.features.quotes.schemas import (
     ConvertNotesRequest,
@@ -245,6 +249,7 @@ async def extract_combined(
                     clip_inputs,
                     notes,
                     user_id=user.id,
+                    allow_degraded_persist_on_retryable_failure=True,
                 )
             except QuoteServiceError as exc:
                 raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
@@ -258,7 +263,10 @@ async def extract_combined(
                 )
             except QuoteServiceError as exc:
                 if exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
-                    log_event("draft_generation_failed", user_id=user.id, detail=capture_detail)
+                    log_draft_generation_failed_event(
+                        user_id=user.id,
+                        capture_detail=capture_detail,
+                    )
                 raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
         log_event(
             "quote.created",
@@ -266,12 +274,12 @@ async def extract_combined(
             quote_id=quote.id,
             customer_id=quote.customer_id,
         )
-        log_event(
-            "draft_generated",
+        log_draft_generated_event(
             user_id=user.id,
             quote_id=quote.id,
             customer_id=quote.customer_id,
-            detail=capture_detail,
+            capture_detail=capture_detail,
+            extraction_result=extraction,
         )
         return PersistedExtractionResponse(
             quote_id=quote.id,
@@ -360,6 +368,7 @@ async def append_extraction(
                     clip_inputs,
                     notes,
                     user_id=user.id,
+                    allow_degraded_persist_on_retryable_failure=True,
                 )
                 updated_quote, merged_extraction = await quote_service.append_extraction_to_quote(
                     user_id=user.id,
@@ -368,7 +377,10 @@ async def append_extraction(
                 )
             except QuoteServiceError as exc:
                 if exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
-                    log_event("draft_generation_failed", user_id=user.id, detail=capture_detail)
+                    log_draft_generation_failed_event(
+                        user_id=user.id,
+                        capture_detail=capture_detail,
+                    )
                 raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
         log_event(
@@ -473,6 +485,8 @@ async def get_quote(
         status=cast(str, quote.status),
         source_type=cast(Literal["text", "voice"], quote.source_type),
         transcript=quote.transcript,
+        extraction_tier=cast(Literal["primary", "degraded"] | None, quote.extraction_tier),
+        extraction_degraded_reason_code=quote.extraction_degraded_reason_code,
         total_amount=float(quote.total_amount) if quote.total_amount is not None else None,
         tax_rate=float(quote.tax_rate) if quote.tax_rate is not None else None,
         discount_type=cast(DiscountType | None, quote.discount_type),

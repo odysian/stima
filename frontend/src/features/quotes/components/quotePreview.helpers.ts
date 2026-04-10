@@ -4,6 +4,11 @@ import { isHttpRequestError } from "@/shared/lib/http";
 
 export type QuotePreviewActionState = QuoteStatus;
 
+const DEGRADED_REASON_COPY: Record<string, string> = {
+  provider_retryable_error:
+    "We saved your transcript, but line item extraction was temporarily unavailable. Please review and complete this draft before sharing.",
+};
+
 export function isShareAbortError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -21,6 +26,19 @@ export function readOptionalQuoteText(
   if (typeof value !== "string") return null;
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
+export function resolveExtractionDegradedCopy(quote: QuoteDetail | null): string | null {
+  if (!quote || quote.extraction_tier !== "degraded") {
+    return null;
+  }
+  if (!quote.extraction_degraded_reason_code) {
+    return "We saved your transcript, but extraction quality was degraded. Please review this draft before sharing.";
+  }
+  return (
+    DEGRADED_REASON_COPY[quote.extraction_degraded_reason_code]
+    ?? "We saved your transcript, but extraction quality was degraded. Please review this draft before sharing."
+  );
 }
 
 export function resolveActionState(

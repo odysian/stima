@@ -87,6 +87,16 @@ def test_log_event_can_skip_async_persistence(monkeypatch) -> None:
     assert not event_logger._PENDING_EVENT_TASKS  # noqa: SLF001
 
 
+def test_log_event_requires_extraction_outcome_for_draft_generated() -> None:
+    with pytest.raises(ValueError, match="extraction_outcome"):
+        event_logger.log_event(
+            "draft_generated",
+            user_id=uuid4(),
+            quote_id=uuid4(),
+            detail="notes",
+        )
+
+
 @pytest.mark.asyncio
 async def test_flush_event_tasks_waits_for_pending_persistence(monkeypatch) -> None:
     gate = asyncio.Event()
@@ -280,6 +290,61 @@ async def test_log_event_persists_invoice_id_metadata() -> None:
     assert fake_session.added[0].metadata_json == {
         "invoice_id": str(invoice_id),
         "customer_id": str(customer_id),
+    }
+
+
+@pytest.mark.asyncio
+async def test_log_event_persists_draft_generated_extraction_outcome() -> None:
+    class _FakeSession:
+        def __init__(self) -> None:
+            self.added: list[EventLog] = []
+            self.committed = False
+
+        def add(self, instance: EventLog) -> None:
+            self.added.append(instance)
+
+        async def commit(self) -> None:
+            self.committed = True
+
+    class _FakeSessionContext:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        async def __aenter__(self) -> _FakeSession:
+            return self._session
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            del exc_type, exc, tb
+
+    class _FakeSessionFactory:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        def __call__(self) -> _FakeSessionContext:
+            return _FakeSessionContext(self._session)
+
+    fake_session = _FakeSession()
+    quote_id = uuid4()
+    user_id = uuid4()
+    event_logger.configure_event_logging(
+        session_factory=_FakeSessionFactory(fake_session),  # type: ignore[arg-type]
+    )
+
+    event_logger.log_event(
+        "draft_generated",
+        user_id=user_id,
+        quote_id=quote_id,
+        detail="notes",
+        extraction_outcome="degraded",
+    )
+    await event_logger.flush_event_tasks()
+
+    assert fake_session.committed is True
+    assert len(fake_session.added) == 1
+    assert fake_session.added[0].metadata_json == {
+        "quote_id": str(quote_id),
+        "detail": "notes",
+        "extraction_outcome": "degraded",
     }
 
 

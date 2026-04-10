@@ -247,6 +247,8 @@ describe("quoteService integration (MSW)", () => {
     const response: QuoteDetail = {
       id: "quote-1",
       customer_id: "cust-1",
+      extraction_tier: "primary",
+      extraction_degraded_reason_code: null,
       customer_name: "Alice Johnson",
       customer_email: "alice@example.com",
       customer_phone: "+1-555-0100",
