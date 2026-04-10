@@ -122,8 +122,11 @@ export function LandingPage(): React.ReactElement {
           <p className="mt-2 text-sm text-on-primary">
             Start with capture-first quoting, then share polished results when you are ready.
           </p>
-          <div className="mt-5">
-            <Link className="text-sm font-semibold text-on-primary hover:underline" to="/login">
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <Link className="rounded-lg bg-surface-container-lowest px-5 py-3 text-sm font-semibold text-primary transition hover:bg-surface-container-low" to="/register">
+              Get started
+            </Link>
+            <Link className="text-xs font-medium text-on-primary/90 hover:underline" to="/login">
               Already have an account? Sign in
             </Link>
           </div>
