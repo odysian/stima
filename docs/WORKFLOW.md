@@ -44,7 +44,7 @@ Use this as the default human-in-the-loop sequence to reduce handoff overhead:
 1. Plan scope and choose mode (`single` by default; `gated`/`fast` only when explicitly requested).
 2. For issue-backed work (`single`/`gated`), use the brief-first execution flow in `docs/template/KICKOFF.md`: keep the Task issue authoritative, add an Execution Brief only for task-local deltas, and reference analog docs when relevant.
 3. Open PR with `Closes #<task-id>`.
-4. Run one reviewer pass using the standardized prompt from `docs/template/KICKOFF.md`.
+4. Run one reviewer pass: implementation agent posts the short kickoff from `docs/template/KICKOFF.md` section 3a; reviewer follows section 3b for scope and output shape (or uses the section 3b inline copy when requested).
 5. If verdict is `ACTIONABLE`, use the delta-only patch handoff from `docs/template/KICKOFF.md` and rerun targeted verification only unless scope expands.
 6. When verdict is `APPROVED`, the approving reviewer includes the lightweight tutoring handoff in that same response; the implementation agent then finalizes without generating a second handoff.
 7. Merge PR and sync local branch.
@@ -141,7 +141,7 @@ Reviewer note for stateful/cross-layer Tasks:
 
 ## Canonical Reviewer Follow-Up Prompt
 
-Use the robust standard prompt from `docs/template/KICKOFF.md` after opening a Task PR.
+After opening a Task PR, default to the short reviewer kickoff in `docs/template/KICKOFF.md` section 3a. Section 3b there is the full inline brief and the authoritative output contract; paste it only when the operator asks or the reviewer lacks repo context.
 Do not redefine the format in this file; keep `docs/template/KICKOFF.md` as the single source of truth.
 
 ## Learning Handoff (Required Completion Gate)

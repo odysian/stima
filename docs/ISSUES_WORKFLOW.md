@@ -212,7 +212,7 @@ Expected behavior:
 - create/switch to dedicated branch `task-<id>-<slug>` before implementation
 - open PR with `Closes #<task-id>`
 - follow the brief-first / analog-aware execution flow and delta-only patch handoff in `docs/template/KICKOFF.md` instead of reprinting stable repo rules in task-local prompts
-- return the standardized robust reviewer follow-up prompt
+- return the short reviewer kickoff from `docs/template/KICKOFF.md` section 3a (not the full section 3b unless explicitly requested)
 
 ### Resiliency Checkpoints (Lightweight)
 

@@ -15,7 +15,7 @@ Given a Task issue:
 9. Run a follow-up review pass only if explicitly requested.
 10. Update docs and ADR links when applicable.
 
-Use `docs/template/KICKOFF.md` as the canonical reviewer prompt/output source.
+Use `docs/template/KICKOFF.md` as the canonical reviewer handoff: default to section 3a (short kickoff); section 3b is the full brief and output contract when inline copy is needed.
 Do not restate the reviewer output schema in this file.
 
 Reviewer constraints:
