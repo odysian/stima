@@ -1,24 +1,94 @@
 # Stima
 
-Stima is a mobile-first quote drafting platform for solo tradespeople.
+Stima is a mobile-first quoting app for solo tradespeople. It turns rough job notes into a saved draft quote that can be refined, shared, emailed, and converted into an invoice.
 
-## Stack Summary
-- Backend: FastAPI, SQLAlchemy, Alembic, PostgreSQL
-- Frontend: Vite, React, TypeScript, Tailwind CSS v4
-- AI integrations: OpenAI Whisper + Anthropic Claude
-- PDF generation: WeasyPrint + Jinja2
+Its main idea is simple: **capture first, refine second**. Instead of pushing the user through a heavier quote-builder flow up front, Stima is built to get from “I just talked through the job” to “I have a usable draft” as quickly as possible.
 
-## Local Development (Placeholder)
-1. Use Python `3.13` from `.python-version` and Node `24.0.0` from `.nvmrc` (the frontend currently declares support for Node `>=24.0.0`).
-2. Copy backend and frontend env examples into local env files.
-3. Start local dependencies with `docker-compose up -d`.
-4. Run backend and frontend dev servers.
+**Live Demo:** https://stima.odysian.dev/
 
-## Voice Capture Prerequisite
-- Install `ffmpeg` locally so backend audio normalization can decode browser-recorded clips.
+## What It Does
 
-## Dependency Security
-- Backend CI installs pinned `pip-audit==2.10.0` ephemerally and runs `backend/.venv/bin/pip-audit -r backend/requirements.txt`.
-- Frontend CI runs `npm audit --prefix frontend --audit-level=high`.
-- `security/dependency-audit-exceptions.json` is an audit trail plus schema-validated registry; it does not automatically suppress findings in `pip-audit` or `npm audit`.
-- Any temporary ignore must be documented in `security/dependency-audit-exceptions.json` with `id`, `ecosystem`, `package`, `advisory`, `reason`, `owner`, and `expires_on`, and must also be wired into the relevant audit tool invocation before CI will pass.
+- Capture job details by voice, text, or both
+- Extract line items into a persisted draft quote
+- Resume unfinished drafts later
+- Review and refine pricing, notes, customer details, and line items
+- Generate PDFs, share public quote links, and send quotes by email
+- Convert approved quotes into invoices
+
+## Highlights
+
+- **Quick-capture workflow**
+  Stima is designed around a faster quote flow: capture the job first, then refine the saved draft afterward.
+
+- **Persisted draft lifecycle**
+  Extraction creates a real draft that can be resumed later instead of leaving the user in a temporary one-shot flow.
+
+- **Async document pipeline**
+  Extraction, PDF generation, and email delivery run through background jobs so heavier document work is durable and recoverable.
+
+- **Production-minded app boundaries**
+  The project includes cookie auth, CSRF protection, Redis-backed controls, public share flows, and deployment/infrastructure decisions that go beyond a local-only demo.
+
+## Tech Stack
+
+### Backend
+- FastAPI
+- PostgreSQL
+- SQLAlchemy
+- Alembic
+- Redis
+- ARQ
+- WeasyPrint + Jinja2
+- OpenAI Whisper + Anthropic Claude
+
+### Frontend
+- React
+- TypeScript
+- Vite
+- Tailwind CSS v4
+
+### Infrastructure
+- Vercel frontend
+- GCP VM + NGINX backend
+- Cloud SQL PostgreSQL
+- GCS asset storage
+
+## Local Development
+
+### Requirements
+- Python 3.13
+- Node 24.0.0
+- Docker
+
+### Run locally
+1. Copy the backend and frontend env examples into local env files.
+2. Start local services:
+   ```bash
+   docker compose up -d
+   ```
+3. Set up the backend virtual environment and install dependencies:
+   ```bash
+   cd backend
+   python3 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+   ```
+4. Run the backend:
+   ```bash
+   .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   ```
+5. Install frontend dependencies and run the app:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+## Notes
+
+- Local audio handling requires `ffmpeg`
+- Redis-backed controls support production-style rate limiting and async workflows
+- Stima is an actively evolving portfolio project built with internet-facing deployment concerns in mind
+
+## License
+
+MIT
