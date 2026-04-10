@@ -77,7 +77,7 @@ from app.shared.input_limits import (
     MAX_AUDIO_TOTAL_BYTES,
     NOTE_INPUT_MAX_CHARS,
 )
-from app.shared.observability import log_security_event
+from app.shared.observability import current_correlation_id, log_security_event
 from app.shared.pdf_artifacts import resolve_pdf_artifact_state
 from app.shared.rate_limit import get_ip_key, get_user_key, limiter
 from app.worker.job_registry import EMAIL_JOB_NAME, EXTRACTION_JOB_NAME
@@ -310,6 +310,7 @@ async def extract_combined(
             EXTRACTION_JOB_NAME,
             str(job.id),
             _job_id=str(job.id),
+            correlation_id=current_correlation_id(),
             transcript=transcript,
             source_type=source_type,
             capture_detail=capture_detail,
@@ -420,6 +421,7 @@ async def append_extraction(
             EXTRACTION_JOB_NAME,
             str(job.id),
             _job_id=str(job.id),
+            correlation_id=current_correlation_id(),
             transcript=transcript,
             source_type=source_type,
             capture_detail=capture_detail,

@@ -29,7 +29,7 @@ def _required_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 @pytest_asyncio.fixture()
 async def boundary_client() -> AsyncGenerator[AsyncClient, None]:
     app = create_app()
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app, client=("127.0.0.1", 4321))
     async with AsyncClient(transport=transport, base_url="http://api.stima.dev") as client:
         yield client
 
@@ -49,7 +49,7 @@ async def test_invalid_host_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None
     get_settings.cache_clear()
 
     app = create_app()
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app, client=("127.0.0.1", 4321))
     async with AsyncClient(transport=transport, base_url="http://api.stima.dev") as client:
         response = await client.get("/health", headers={"host": "evil.example"})
 
@@ -69,7 +69,7 @@ async def test_trusted_proxy_headers_prevent_https_redirect_loops(
     get_settings.cache_clear()
 
     app = create_app()
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app, client=("127.0.0.1", 4321))
     async with AsyncClient(
         transport=transport,
         base_url="http://api.stima.odysian.dev",
@@ -96,7 +96,7 @@ async def test_https_redirect_ignores_untrusted_forwarded_proto(
     get_settings.cache_clear()
 
     app = create_app()
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app, client=("127.0.0.1", 4321))
     async with AsyncClient(
         transport=transport,
         base_url="http://api.stima.dev",
@@ -112,6 +112,58 @@ async def test_https_redirect_ignores_untrusted_forwarded_proto(
 
     assert response.status_code == 307
     assert response.headers["location"] == "https://api.stima.dev/health"
+
+
+async def test_trusted_ingress_correlation_header_is_preserved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trusted_correlation_id = "trusted-correlation-id-123"
+    monkeypatch.setenv("TRUSTED_PROXY_IPS", "127.0.0.1")
+    get_settings.cache_clear()
+
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://api.stima.dev") as client:
+        response = await client.get(
+            "/health",
+            headers={
+                "host": "api.stima.dev",
+                "x-correlation-id": trusted_correlation_id,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["x-correlation-id"] == trusted_correlation_id
+
+
+async def test_missing_or_invalid_ingress_correlation_id_generates_new_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRUSTED_PROXY_IPS", "127.0.0.1")
+    get_settings.cache_clear()
+
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://api.stima.dev") as client:
+        invalid_response = await client.get(
+            "/health",
+            headers={
+                "host": "api.stima.dev",
+                "x-correlation-id": "invalid id with spaces",
+            },
+        )
+        missing_response = await client.get(
+            "/health",
+            headers={"host": "api.stima.dev"},
+        )
+
+    generated_invalid = invalid_response.headers["x-correlation-id"]
+    generated_missing = missing_response.headers["x-correlation-id"]
+    assert generated_invalid != "invalid id with spaces"
+    assert len(generated_invalid) == 32
+    assert generated_invalid.isalnum()
+    assert len(generated_missing) == 32
+    assert generated_missing.isalnum()
 
 
 @pytest.mark.asyncio

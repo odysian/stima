@@ -6,6 +6,8 @@ import asyncio
 import base64
 import logging
 from dataclasses import dataclass
+from hashlib import sha256
+from time import perf_counter
 from typing import Any, Literal, cast
 from uuid import UUID
 
@@ -27,7 +29,11 @@ from app.features.quotes.repository import QuoteEmailContext, QuoteRepository
 from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.email import EmailService
-from app.integrations.extraction import ExtractionError, is_retryable_extraction_error
+from app.integrations.extraction import (
+    ExtractionCallMetadata,
+    ExtractionError,
+    is_retryable_extraction_error,
+)
 from app.integrations.pdf import (
     PdfRenderError,
     PdfRenderValidationError,
@@ -74,6 +80,7 @@ async def extraction_job(
     ctx: dict[str, Any],
     job_id: str,
     *,
+    correlation_id: str | None = None,
     transcript: str,
     source_type: str = "text",
     capture_detail: str | None = None,
@@ -92,7 +99,8 @@ async def extraction_job(
             job_id=parsed_job_id,
             job_type=JobType.EXTRACTION,
             job_name=EXTRACTION_JOB_NAME,
-            handler=lambda: _extract_quote_data(ctx, transcript),
+            correlation_id=correlation_id,
+            handler=lambda: _extract_quote_data(ctx, transcript, job_id=parsed_job_id),
             on_success=lambda runtime, result: _store_extraction_result(
                 runtime,
                 job_id=parsed_job_id,
@@ -219,24 +227,71 @@ async def _deliver_email(ctx: dict[str, Any], *, job_id: UUID) -> None:
 async def _extract_quote_data(
     ctx: dict[str, Any],
     transcript: str,
+    *,
+    job_id: UUID,
 ) -> ExtractionResult:
     extraction_integration = ctx.get("extraction_integration")
     if extraction_integration is None or not hasattr(extraction_integration, "extract"):
         raise RuntimeError("Worker extraction integration is not initialized")
 
+    started_at = perf_counter()
+    runtime = _get_runtime(ctx)
+    attempt_number = max(int(ctx.get("job_try", 1)), 1)
+    configured_model_id = getattr(extraction_integration, "model_id", None)
+    await _persist_last_model_id(
+        runtime,
+        job_id=job_id,
+        last_model_id=configured_model_id if isinstance(configured_model_id, str) else None,
+    )
+
     try:
-        return await extraction_integration.extract(transcript)
+        result = await extraction_integration.extract(transcript)
     except ExtractionError as exc:
-        runtime = _get_runtime(ctx)
-        attempt_number = max(int(ctx.get("job_try", 1)), 1)
+        metadata = _pop_extraction_call_metadata(extraction_integration)
+        resolved_last_model_id = _resolve_last_model_id(
+            configured_model_id=configured_model_id,
+            metadata=metadata,
+        )
+        await _persist_last_model_id(
+            runtime,
+            job_id=job_id,
+            last_model_id=resolved_last_model_id,
+        )
+        is_retryable = is_retryable_extraction_error(exc)
+        is_final_attempt = attempt_number >= runtime.max_tries
+        log_security_event(
+            "quotes.extract_failed",
+            outcome="retrying" if is_retryable and not is_final_attempt else "failure",
+            level=logging.WARNING if is_retryable and not is_final_attempt else logging.ERROR,
+            reason="provider_retryable_error" if is_retryable else "provider_non_retryable_error",
+            job_name=EXTRACTION_JOB_NAME,
+            job_id=str(job_id),
+            last_model_id=resolved_last_model_id,
+            latency_ms=int((perf_counter() - started_at) * 1000),
+            token_usage=metadata.token_usage if metadata is not None else None,
+            error_class=_compact_error_class(exc),
+            transcript_sha256=_transcript_sha256(transcript),
+        )
         if should_persist_degraded_retryable_error(
             exc,
-            is_final_attempt=attempt_number >= runtime.max_tries,
+            is_final_attempt=is_final_attempt,
         ):
             return build_degraded_extraction_result(transcript=transcript)
-        if is_retryable_extraction_error(exc):
+        if is_retryable:
             raise RetryableJobError(str(exc)) from exc
         raise
+
+    metadata = _pop_extraction_call_metadata(extraction_integration)
+    resolved_last_model_id = _resolve_last_model_id(
+        configured_model_id=configured_model_id,
+        metadata=metadata,
+    )
+    await _persist_last_model_id(
+        runtime,
+        job_id=job_id,
+        last_model_id=resolved_last_model_id,
+    )
+    return result
 
 
 async def _render_pdf(ctx: dict[str, Any], *, job_id: UUID) -> _RenderedPdfArtifact:
@@ -663,3 +718,51 @@ async def _log_extraction_terminal_failure(
         user_id=job_record.user_id,
         capture_detail=capture_detail,
     )
+
+
+async def _persist_last_model_id(
+    runtime: WorkerRuntimeSettings,
+    *,
+    job_id: UUID,
+    last_model_id: str | None,
+) -> None:
+    if last_model_id is None:
+        return
+    async with runtime.session_maker() as session:
+        repository = JobRepository(session)
+        await repository.set_last_model_id(
+            job_id,
+            last_model_id=last_model_id,
+            expected_job_type=JobType.EXTRACTION,
+        )
+        await session.commit()
+
+
+def _pop_extraction_call_metadata(extraction_integration: object) -> ExtractionCallMetadata | None:
+    pop_metadata = getattr(extraction_integration, "pop_last_call_metadata", None)
+    if not callable(pop_metadata):
+        return None
+    metadata = pop_metadata()
+    return metadata if isinstance(metadata, ExtractionCallMetadata) else None
+
+
+def _resolve_last_model_id(
+    *,
+    configured_model_id: object,
+    metadata: ExtractionCallMetadata | None,
+) -> str | None:
+    metadata_model_id = metadata.model_id if metadata is not None else None
+    if isinstance(metadata_model_id, str) and metadata_model_id:
+        return metadata_model_id
+    if isinstance(configured_model_id, str) and configured_model_id:
+        return configured_model_id
+    return None
+
+
+def _compact_error_class(error: Exception) -> str:
+    candidate = error.__cause__ if isinstance(error.__cause__, Exception) else error
+    return type(candidate).__name__
+
+
+def _transcript_sha256(transcript: str) -> str:
+    return sha256(transcript.encode("utf-8")).hexdigest()

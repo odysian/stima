@@ -145,6 +145,20 @@ class JobRepository:
         await self._session.refresh(record)
         return record
 
+    async def set_last_model_id(
+        self,
+        job_id: UUID,
+        *,
+        last_model_id: str | None,
+        expected_job_type: JobType | None = None,
+    ) -> JobRecord:
+        """Persist the most recent extraction model id used for one job."""
+        record = await self._get_required(job_id, expected_job_type=expected_job_type)
+        record.last_model_id = last_model_id
+        await self._session.flush()
+        await self._session.refresh(record)
+        return record
+
     async def set_failed(
         self,
         job_id: UUID,

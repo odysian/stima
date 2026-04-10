@@ -112,6 +112,25 @@ async def test_create_extraction_job_with_capacity_limit_rejects_when_at_limit(
     assert second is None  # nosec B101 - pytest assertion
 
 
+async def test_set_last_model_id_persists_operator_model_telemetry(
+    db_session: AsyncSession,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+
+    await repository.set_last_model_id(
+        record.id,
+        last_model_id="claude-haiku-4-5-20251001",
+        expected_job_type=JobType.EXTRACTION,
+    )
+    await db_session.commit()
+
+    refreshed = await repository.get_by_id(record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.last_model_id == "claude-haiku-4-5-20251001"  # nosec B101 - pytest assertion
+
+
 async def test_reap_stale_extraction_jobs_terminalizes_only_stale_active_extraction_rows(
     db_session: AsyncSession,
 ) -> None:

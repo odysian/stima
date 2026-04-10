@@ -77,6 +77,7 @@ class JobRecord(Base):
         nullable=False,
         server_default=sa.text("0"),
     )
+    last_model_id: Mapped[str | None] = mapped_column(sa.String(length=128), nullable=True)
     terminal_error: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     result_json: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
