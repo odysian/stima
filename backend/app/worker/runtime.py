@@ -119,13 +119,18 @@ async def process_job[T](
     job_type: JobType,
     job_name: str | None = None,
     handler: Callable[[], Awaitable[T]],
+    correlation_id: str | None = None,
     on_success: Callable[[WorkerRuntimeSettings, T], Awaitable[None]] | None = None,
 ) -> None:
     """Wrap domain handlers with durable job status transitions and retry policy."""
     runtime = _get_runtime(ctx)
     attempt_number = max(int(ctx.get("job_try", 1)), 1)
     resolved_job_name = job_name or job_type.value
-    correlation_token = bind_worker_correlation(job_name=resolved_job_name, job_id=str(job_id))
+    correlation_token = bind_worker_correlation(
+        job_name=resolved_job_name,
+        job_id=str(job_id),
+        correlation_id=correlation_id,
+    )
     request_context_token = suspend_request_context()
 
     try:

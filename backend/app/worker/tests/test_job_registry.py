@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,8 +13,8 @@ from app.features.jobs.repository import JobRepository
 from app.features.quotes.models import Document
 from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteServiceError
-from app.integrations.extraction import ExtractionError
-from app.shared import event_logger
+from app.integrations.extraction import ExtractionCallMetadata, ExtractionError
+from app.shared import event_logger, observability
 from app.worker.job_registry import TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED, extraction_job
 from app.worker.runtime import (
     NonRetryableJobError,
@@ -217,6 +218,61 @@ async def test_extraction_job_logs_draft_generation_failed_on_terminal_failure(
     assert "quote_id" not in emitted_events[0]  # nosec B101 - pytest assertion
 
 
+async def test_extraction_job_uses_enqueued_correlation_id_and_logs_failure_metadata(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    security_logs: list[dict[str, object]] = []
+
+    def _capture_security(payload: dict[str, object], *, level: int) -> None:
+        security_logs.append({**payload, "_level": level})
+
+    monkeypatch.setattr(observability, "_emit_security_payload", _capture_security)
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    ingress_correlation_id = "ingress-correlation-id-123"
+    transcript = "mulch the front beds"
+    with pytest.raises(ExtractionError, match="Claude request failed: malformed payload"):
+        await extraction_job(
+            _worker_context(
+                db_session,
+                extraction_integration=_MetadataFailureExtractionIntegration(),
+            ),
+            str(record.id),
+            correlation_id=ingress_correlation_id,
+            transcript=transcript,
+            source_type="text",
+            capture_detail="notes",
+        )
+
+    refreshed = await _load_job_record(db_session, record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.last_model_id == "claude-haiku-4-5-20251001"  # nosec B101 - pytest assertion
+
+    extraction_failure = next(
+        log for log in security_logs if log.get("event") == "quotes.extract_failed"
+    )
+    assert extraction_failure["job_id"] == str(record.id)  # nosec B101 - pytest assertion
+    assert extraction_failure["correlation_id"] == ingress_correlation_id  # nosec B101 - pytest assertion
+    assert extraction_failure["last_model_id"] == "claude-haiku-4-5-20251001"  # nosec B101 - pytest assertion
+    assert extraction_failure["error_class"] == "_NonRetryableProviderError"  # nosec B101 - pytest assertion
+    assert isinstance(extraction_failure["latency_ms"], int)  # nosec B101 - pytest assertion
+    assert extraction_failure["token_usage"] == {  # nosec B101 - pytest assertion
+        "input_tokens": 91,
+        "output_tokens": 0,
+    }
+    assert (
+        extraction_failure["transcript_sha256"]
+        == sha256(  # nosec B101 - pytest assertion
+            transcript.encode("utf-8")
+        ).hexdigest()
+    )
+    assert transcript not in json.dumps(extraction_failure)  # nosec B101 - pytest assertion
+
+
 class _SuccessfulExtractionIntegration:
     async def extract(self, notes: str) -> ExtractionResult:
         return ExtractionResult(
@@ -243,6 +299,28 @@ class _NonRetryableFailureExtractionIntegration:
     async def extract(self, notes: str) -> ExtractionResult:
         del notes
         raise ExtractionError("Claude request failed: malformed payload")
+
+
+class _NonRetryableProviderError(Exception):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"provider error {status_code}")
+        self.status_code = status_code
+
+
+class _MetadataFailureExtractionIntegration:
+    model_id = "claude-haiku-4-5-20251001"
+
+    async def extract(self, notes: str) -> ExtractionResult:
+        del notes
+        raise ExtractionError(
+            "Claude request failed: malformed payload"
+        ) from _NonRetryableProviderError(status_code=400)
+
+    def pop_last_call_metadata(self) -> ExtractionCallMetadata:
+        return ExtractionCallMetadata(
+            model_id=self.model_id,
+            token_usage={"input_tokens": 91, "output_tokens": 0},
+        )
 
 
 async def _seed_user(db_session: AsyncSession) -> User:

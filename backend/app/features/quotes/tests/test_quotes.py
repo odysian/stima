@@ -3148,6 +3148,7 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
         files=[("notes", (None, "mulch the front beds"))],
         headers={"X-CSRF-Token": csrf_token},
     )
+    response_correlation_id = response.headers["x-correlation-id"]
 
     jobs = (await db_session.scalars(select(JobRecord))).all()
 
@@ -3165,6 +3166,7 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
             "args": (str(jobs[0].id),),
             "kwargs": {
                 "_job_id": str(jobs[0].id),
+                "correlation_id": response_correlation_id,
                 "transcript": "mulch the front beds",
                 "source_type": "text",
                 "capture_detail": "notes",
@@ -3172,6 +3174,32 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
             },
         }
     ]
+
+
+async def test_extract_combined_preserves_trusted_ingress_correlation_id_in_queue_payload(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ingress_correlation_id = "ingress-correlation-id-123"
+    monkeypatch.setenv("TRUSTED_PROXY_IPS", "127.0.0.1")
+    get_settings.cache_clear()
+
+    csrf_token = await _register_and_login(client, _credentials())
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch the front beds"))],
+        headers={
+            "X-CSRF-Token": csrf_token,
+            "X-Correlation-ID": ingress_correlation_id,
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.headers["x-correlation-id"] == ingress_correlation_id
+    assert pool.calls[0]["kwargs"]["correlation_id"] == ingress_correlation_id
 
 
 async def test_extract_combined_async_worker_persists_draft_and_returns_quote_id(
@@ -3421,6 +3449,7 @@ async def test_append_extraction_enqueues_async_job_for_owned_quote(
         files=[("notes", (None, "append this"))],
         headers={"X-CSRF-Token": csrf_token},
     )
+    response_correlation_id = response.headers["x-correlation-id"]
 
     jobs = (await db_session.scalars(select(JobRecord))).all()
 
@@ -3438,6 +3467,7 @@ async def test_append_extraction_enqueues_async_job_for_owned_quote(
             "args": (str(jobs[0].id),),
             "kwargs": {
                 "_job_id": str(jobs[0].id),
+                "correlation_id": response_correlation_id,
                 "transcript": "append this",
                 "source_type": "text",
                 "capture_detail": "notes",
@@ -5940,6 +5970,7 @@ async def _run_extraction_job(
     transcript: str = "mulch the front beds",
     job_try: int = 1,
     extraction_integration: object | None = None,
+    correlation_id: str | None = None,
 ) -> None:
     assert isinstance(job_id, str)
     session_maker = async_sessionmaker(
@@ -5961,6 +5992,7 @@ async def _run_extraction_job(
             "extraction_integration": resolved_extraction_integration,
         },
         job_id,
+        correlation_id=correlation_id,
         transcript=transcript,
         source_type=source_type,
         capture_detail=capture_detail,

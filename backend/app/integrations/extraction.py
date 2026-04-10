@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import secrets
+from dataclasses import dataclass
 from typing import Any, cast
 
 import anthropic
@@ -80,6 +82,19 @@ class ExtractionError(Exception):
     """Raised when quote extraction cannot produce a valid structured payload."""
 
 
+@dataclass(frozen=True, slots=True)
+class ExtractionCallMetadata:
+    """Telemetry captured from the most recent extraction provider call."""
+
+    model_id: str | None
+    token_usage: dict[str, int] | None
+
+
+_LAST_CALL_METADATA_VAR: contextvars.ContextVar[ExtractionCallMetadata | None] = (
+    contextvars.ContextVar("stima_extraction_call_metadata", default=None)
+)
+
+
 class ExtractionIntegration:
     """Convert typed notes to a validated extraction result via Claude."""
 
@@ -103,6 +118,7 @@ class ExtractionIntegration:
         normalized_notes = notes.strip()
         if not normalized_notes:
             raise ExtractionError("notes cannot be empty")
+        _set_last_call_metadata(model_id=self._model, token_usage=None)
 
         if self._client is None:
             if not self._api_key:
@@ -119,6 +135,10 @@ class ExtractionIntegration:
         typed_client = cast(Any, client)
 
         response = await self._request_with_retry(typed_client, normalized_notes)
+        _set_last_call_metadata(
+            model_id=getattr(response, "model", None) or self._model,
+            token_usage=_extract_token_usage(response),
+        )
 
         payload = _extract_tool_payload(response)
         payload.setdefault("transcript", normalized_notes)
@@ -129,6 +149,17 @@ class ExtractionIntegration:
             return ExtractionResult.model_validate(payload)
         except ValidationError as exc:
             raise ExtractionError("Claude response did not match extraction schema") from exc
+
+    @property
+    def model_id(self) -> str:
+        """Return the configured provider model id for extraction calls."""
+        return self._model
+
+    def pop_last_call_metadata(self) -> ExtractionCallMetadata | None:
+        """Return and clear per-task extraction telemetry from the latest call."""
+        metadata = _LAST_CALL_METADATA_VAR.get()
+        _LAST_CALL_METADATA_VAR.set(None)
+        return metadata
 
     async def _request_with_retry(self, typed_client: Any, normalized_notes: str) -> object:
         last_error: Exception | None = None
@@ -257,3 +288,38 @@ def _retry_delay_seconds(attempt: int) -> float:
     if jitter_bound <= 0:
         return base_delay
     return base_delay + (secrets.randbelow(1000) / 1000) * jitter_bound
+
+
+def _set_last_call_metadata(*, model_id: str | None, token_usage: dict[str, int] | None) -> None:
+    _LAST_CALL_METADATA_VAR.set(
+        ExtractionCallMetadata(
+            model_id=model_id,
+            token_usage=token_usage,
+        )
+    )
+
+
+def _extract_token_usage(response: object) -> dict[str, int] | None:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+
+    usage_payload: dict[str, int] = {}
+    for key in (
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_input_tokens",
+        "cache_read_input_tokens",
+    ):
+        value = _token_usage_int(usage, key)
+        if value is not None:
+            usage_payload[key] = value
+    return usage_payload or None
+
+
+def _token_usage_int(usage: object, key: str) -> int | None:
+    if isinstance(usage, dict):
+        candidate = usage.get(key)
+    else:
+        candidate = getattr(usage, key, None)
+    return candidate if isinstance(candidate, int) else None

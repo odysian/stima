@@ -6,6 +6,7 @@ import contextvars
 import hmac
 import json
 import logging
+import string
 import sys
 import time
 from dataclasses import dataclass
@@ -22,12 +23,16 @@ from starlette.requests import Request as StarletteRequest
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.config import get_settings
+from app.shared.proxy_headers import is_trusted_proxy, parse_ip, trusted_proxy_networks
 from app.shared.rate_limit import get_ip_key
 
 SECURITY_LOGGER_NAME = "stima.security"
 CORRELATION_HEADER_NAME = "X-Correlation-ID"
 _HANDLER_SENTINEL = "_stima_security_handler"
 _SECURITY_LOGGER = logging.getLogger(SECURITY_LOGGER_NAME)
+_CORRELATION_ID_MIN_LENGTH = 8
+_CORRELATION_ID_MAX_LENGTH = 128
+_CORRELATION_ID_ALLOWED_CHARS = frozenset(string.ascii_letters + string.digits + "-_.")
 _correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "stima_correlation_id",
     default=None,
@@ -70,7 +75,7 @@ class RequestObservabilityMiddleware:
             return
 
         request = StarletteRequest(scope, receive=receive)
-        correlation_id = uuid4().hex
+        correlation_id = _resolve_request_correlation_id(scope, request)
         method = request.method.upper()
         route_template = sanitize_route_template(request.url.path)
         client_ip_hash = hash_client_ip(get_ip_key(request))
@@ -161,10 +166,16 @@ def reset_observability_state() -> None:
     _rate_limited_events.clear()
 
 
-def bind_worker_correlation(*, job_name: str, job_id: str) -> contextvars.Token[str | None]:
-    """Bind a fresh background correlation id for one worker job execution."""
+def bind_worker_correlation(
+    *,
+    job_name: str,
+    job_id: str,
+    correlation_id: str | None = None,
+) -> contextvars.Token[str | None]:
+    """Bind worker correlation context, preserving validated API ids when provided."""
     del job_name, job_id
-    return _correlation_id_var.set(uuid4().hex)
+    normalized_correlation = _normalize_correlation_id(correlation_id)
+    return _correlation_id_var.set(normalized_correlation or uuid4().hex)
 
 
 def suspend_request_context() -> contextvars.Token[RequestLogContext | None]:
@@ -200,6 +211,37 @@ def current_correlation_id() -> str:
     generated = uuid4().hex
     _correlation_id_var.set(generated)
     return generated
+
+
+def _resolve_request_correlation_id(scope: Scope, request: StarletteRequest) -> str:
+    header_value = request.headers.get(CORRELATION_HEADER_NAME)
+    if _is_trusted_ingress(scope):
+        normalized_header = _normalize_correlation_id(header_value)
+        if normalized_header is not None:
+            return normalized_header
+    return uuid4().hex
+
+
+def _is_trusted_ingress(scope: Scope) -> bool:
+    trusted_networks = trusted_proxy_networks(get_settings().trusted_proxy_ips)
+    if not trusted_networks:
+        return False
+    client_addr = scope.get("client")
+    peer_ip = parse_ip(client_addr[0]) if client_addr is not None else None
+    if peer_ip is None:
+        return False
+    return is_trusted_proxy(peer_ip, trusted_networks)
+
+
+def _normalize_correlation_id(candidate: str | None) -> str | None:
+    if candidate is None:
+        return None
+    normalized_candidate = candidate.strip()
+    if not (_CORRELATION_ID_MIN_LENGTH <= len(normalized_candidate) <= _CORRELATION_ID_MAX_LENGTH):
+        return None
+    if any(char not in _CORRELATION_ID_ALLOWED_CHARS for char in normalized_candidate):
+        return None
+    return normalized_candidate
 
 
 def log_security_event(
