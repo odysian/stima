@@ -362,13 +362,13 @@ export function QuoteList(): React.ReactElement {
               <button
                 type="button"
                 aria-label="Close search"
-                className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${headerIconButtonClasses}`}
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-full p-1 text-outline transition-all hover:bg-surface-container-low active:scale-95"
                 onClick={() => {
                   setSearchQuery("");
                   setIsSearchOpen(false);
                 }}
               >
-                <span className="material-symbols-outlined block text-[1.125rem] leading-none">close</span>
+                <span className="material-symbols-outlined text-base">close</span>
               </button>
             </div>
           ) : null}
