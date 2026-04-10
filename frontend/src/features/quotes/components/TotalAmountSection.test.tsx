@@ -75,6 +75,21 @@ describe("TotalAmountSection", () => {
     expect(screen.queryByRole("checkbox", { name: "Tax" })).not.toBeInTheDocument();
   });
 
+  it("does not pre-enable tax when taxRate is null, and pre-fills suggested value after enabling", () => {
+    renderSection({ initialTaxRate: null, suggestedTaxRate: 0.0825 });
+
+    fireEvent.click(screen.getByRole("button", { name: /optional pricing/i }));
+
+    const taxCheckbox = screen.getByRole("checkbox", { name: "Tax" });
+    expect(taxCheckbox).not.toBeChecked();
+    expect(screen.queryByRole("spinbutton", { name: /tax rate/i })).not.toBeInTheDocument();
+
+    fireEvent.click(taxCheckbox);
+
+    const taxInput = screen.getByRole("spinbutton", { name: /tax rate/i }) as HTMLInputElement;
+    expect(taxInput.value).toBe("8.25");
+  });
+
   it("applies the suggested tax rate only after tax is enabled", () => {
     renderSection();
 

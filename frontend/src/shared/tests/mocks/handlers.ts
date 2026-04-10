@@ -10,7 +10,10 @@ import type { QuoteCreateRequest } from "@/features/quotes/types/quote.types";
 
 function requireCsrf(request: Request): Response | null {
   if (!request.headers.get("X-CSRF-Token")) {
-    return HttpResponse.json({ detail: "CSRF token missing" }, { status: 403 }) as unknown as Response;
+    return HttpResponse.json(
+      { detail: "CSRF token missing" },
+      { status: 403 },
+    ) as unknown as Response;
   }
   return null;
 }
@@ -276,27 +279,30 @@ export const handlers = [
     );
   }),
 
-  http.post("/api/quotes/:id/append-extraction", async ({ request, params }) => {
-    const csrfError = requireCsrf(request);
-    if (csrfError) return csrfError;
+  http.post(
+    "/api/quotes/:id/append-extraction",
+    async ({ request, params }) => {
+      const csrfError = requireCsrf(request);
+      if (csrfError) return csrfError;
 
-    return HttpResponse.json(
-      {
-        quote_id: String(params.id),
-        transcript: "Appended transcript",
-        line_items: [
-          {
-            description: "Extra cleanup",
-            details: "One additional pass",
-            price: 45,
-          },
-        ],
-        total: 165,
-        confidence_notes: ["Confirm cleanup scope before sending"],
-      },
-      { status: 200 },
-    );
-  }),
+      return HttpResponse.json(
+        {
+          quote_id: String(params.id),
+          transcript: "Appended transcript",
+          line_items: [
+            {
+              description: "Extra cleanup",
+              details: "One additional pass",
+              price: 45,
+            },
+          ],
+          total: 165,
+          confidence_notes: ["Confirm cleanup scope before sending"],
+        },
+        { status: 200 },
+      );
+    },
+  ),
 
   http.get("/api/jobs/:jobId", ({ params }) => {
     return HttpResponse.json(
@@ -609,8 +615,9 @@ export const handlers = [
 
     const invoiceId = String(params.id);
     const body = (await request.json()) as InvoiceUpdateRequest;
-    const hasField = <K extends keyof InvoiceUpdateRequest>(field: K): boolean =>
-      Object.prototype.hasOwnProperty.call(body, field);
+    const hasField = <K extends keyof InvoiceUpdateRequest>(
+      field: K,
+    ): boolean => Object.prototype.hasOwnProperty.call(body, field);
     const lineItems = hasField("line_items")
       ? (body.line_items ?? []).map((lineItem, index) => ({
           id: `line-${index + 1}`,
@@ -635,8 +642,12 @@ export const handlers = [
         doc_number: "I-001",
         title: hasField("title") ? (body.title ?? null) : "Spring cleanup",
         status: "draft",
-        total_amount: hasField("total_amount") ? (body.total_amount ?? null) : 120,
-        notes: hasField("notes") ? (body.notes ?? null) : "Thanks for your business",
+        total_amount: hasField("total_amount")
+          ? (body.total_amount ?? null)
+          : 120,
+        notes: hasField("notes")
+          ? (body.notes ?? null)
+          : "Thanks for your business",
         due_date: hasField("due_date") ? (body.due_date ?? null) : "2026-04-19",
         shared_at: null,
         share_token: null,

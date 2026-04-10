@@ -18,8 +18,9 @@ type DocumentStatus = QuoteListItem["status"] | InvoiceListItem["status"];
 
 interface DocumentRow {
   id: string;
-  primaryLabel: string;
-  supportingDetails: string;
+  customerLabel: string;
+  titleLabel?: string | null;
+  docAndDate: string;
   totalAmount: number | null;
   status: DocumentStatus;
   destination: string;
@@ -36,9 +37,9 @@ interface DocumentRowsSectionProps {
   onRowClick: (row: DocumentRow) => void;
 }
 
-const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const draftRowClasses = "w-full cursor-pointer rounded-xl border-l-4 border-warning-accent bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} bg-warning-container text-warning`;
+const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+const draftRowClasses = "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} shrink-0 whitespace-nowrap bg-warning-container text-warning`;
 
 function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
   return (
@@ -59,21 +60,30 @@ function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionPro
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="font-headline font-bold text-on-surface">
-                    {row.primaryLabel}
+                    {row.customerLabel}
                   </p>
                   <p className="font-headline font-bold text-on-surface">
                     {formatCurrency(row.totalAmount)}
                   </p>
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <p className="text-sm text-on-surface-variant">
-                    {row.supportingDetails}
-                  </p>
-                  {row.needsCustomerAssignment ? (
-                    <span className={needsCustomerBadgeClasses}>Needs customer</span>
-                  ) : (
-                    <StatusBadge variant={row.status} />
-                  )}
+                <div className="mt-1 space-y-1">
+                  {row.titleLabel ? (
+                    <p className="text-sm text-on-surface-variant">
+                      {row.titleLabel}
+                    </p>
+                  ) : null}
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm text-on-surface-variant">
+                      {row.docAndDate}
+                    </p>
+                    {row.needsCustomerAssignment ? (
+                      <span className={`${needsCustomerBadgeClasses} ml-auto`}>Needs customer</span>
+                    ) : (
+                      <span className="ml-auto">
+                        <StatusBadge variant={row.status} />
+                      </span>
+                    )}
+                  </div>
                 </div>
               </button>
             </li>
@@ -231,11 +241,11 @@ export function QuoteList(): React.ReactElement {
   const draftQuoteRows = useMemo<DocumentRow[]>(
     () => draftQuotes.map((quote) => ({
       id: quote.id,
-      primaryLabel: quote.customer_name ?? "Unassigned",
-      supportingDetails: [
+      customerLabel: quote.customer_name ?? "Unassigned",
+      titleLabel: quote.title ?? null,
+      docAndDate: [
         quote.doc_number,
         formatDate(quote.created_at, timezone),
-        `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
       ].join(" · "),
       totalAmount: quote.total_amount,
       status: quote.status,
@@ -250,13 +260,12 @@ export function QuoteList(): React.ReactElement {
   const nonDraftQuoteRows = useMemo<DocumentRow[]>(
     () => nonDraftQuotes.map((quote) => ({
       id: quote.id,
-      primaryLabel: quote.title ?? quote.doc_number,
-      supportingDetails: [
-        quote.customer_name ?? "Unassigned customer",
-        ...(quote.title ? [quote.doc_number] : []),
+      customerLabel: quote.customer_name ?? "Unassigned",
+      titleLabel: quote.title ?? null,
+      docAndDate: [
+        quote.doc_number,
         formatDate(quote.created_at, timezone),
-        `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`,
-      ].join(" · "),
+        ].join(" · "),
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/quotes/${quote.id}/preview`,
@@ -267,10 +276,10 @@ export function QuoteList(): React.ReactElement {
   const invoiceRows = useMemo<DocumentRow[]>(
     () => filteredInvoices.map((invoice) => ({
       id: invoice.id,
-      primaryLabel: invoice.title ?? invoice.doc_number,
-      supportingDetails: [
-        invoice.customer_name,
-        ...(invoice.title ? [invoice.doc_number] : []),
+      customerLabel: invoice.customer_name,
+      titleLabel: invoice.title ?? null,
+      docAndDate: [
+        invoice.doc_number,
         formatDate(invoice.created_at, timezone),
       ].join(" · "),
       totalAmount: invoice.total_amount,
@@ -355,11 +364,13 @@ export function QuoteList(): React.ReactElement {
                   />
                 ) : null}
                 {nonDraftQuoteRows.length > 0 ? (
-                  <DocumentRowsSection
-                    label="PAST QUOTES"
-                    rows={nonDraftQuoteRows}
-                    onRowClick={(row) => navigate(row.destination)}
-                  />
+                  <div className={draftQuoteRows.length > 0 ? "mt-2" : undefined}>
+                    <DocumentRowsSection
+                      label="PAST QUOTES"
+                      rows={nonDraftQuoteRows}
+                      onRowClick={(row) => navigate(row.destination)}
+                    />
+                  </div>
                 ) : null}
               </>
             ) : (

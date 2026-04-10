@@ -253,7 +253,13 @@ class InvoiceRepository:
         if row is None:
             return None
 
-        document, customer, quote, pdf_artifact_job_status, pdf_artifact_terminal_error = row
+        (
+            document,
+            customer,
+            quote,
+            pdf_artifact_job_status,
+            pdf_artifact_terminal_error,
+        ) = row
         return InvoiceDetailRow(
             id=document.id,
             customer_id=cast(UUID, document.customer_id),
