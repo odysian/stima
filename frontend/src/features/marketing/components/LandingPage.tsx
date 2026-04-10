@@ -34,14 +34,6 @@ export function LandingPage(): React.ReactElement {
       <header className="glass-surface glass-shadow-top fixed top-0 z-50 w-full border-b border-outline-variant/20 backdrop-blur-md">
         <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
           <p className="font-headline text-[2rem] font-bold leading-none text-primary">Stima</p>
-          <nav aria-label="Landing sections" className="hidden items-center gap-5 sm:flex">
-            <a href="#workflow" className="text-sm font-semibold text-on-surface-variant transition hover:text-on-surface">
-              Workflow
-            </a>
-            <a href="#credibility" className="text-sm font-semibold text-on-surface-variant transition hover:text-on-surface">
-              Product
-            </a>
-          </nav>
           <div className="flex items-center gap-3">
             <Link className="text-sm font-semibold text-primary hover:underline" to="/login">
               Sign in
@@ -140,14 +132,6 @@ export function LandingPage(): React.ReactElement {
             <Link className="text-sm font-semibold text-on-primary hover:underline" to="/login">
               Sign in
             </Link>
-            <a
-              className="rounded-lg border border-on-primary/40 px-5 py-3 text-sm font-semibold text-on-primary transition hover:bg-on-primary/10"
-              href={STIMA_GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub
-            </a>
           </div>
         </section>
       </div>
