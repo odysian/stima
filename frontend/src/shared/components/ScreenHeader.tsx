@@ -34,9 +34,9 @@ export function ScreenHeader({
             type="button"
             onClick={onBack}
             aria-label={backLabel}
-            className="cursor-pointer rounded-full p-2 text-primary transition-all hover:bg-surface-container-low active:scale-95"
+            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-primary transition-all hover:bg-surface-container-low active:scale-95"
           >
-            <span className="material-symbols-outlined">arrow_back</span>
+            <span className="material-symbols-outlined block text-[1.125rem] leading-none">arrow_back</span>
           </button>
         ) : null}
         {isTopLevelLayout ? (

@@ -40,6 +40,7 @@ interface DocumentRowsSectionProps {
 const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const draftRowClasses = "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} shrink-0 whitespace-nowrap bg-warning-container text-warning`;
+const headerIconButtonClasses = "inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95";
 
 function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
   return (
@@ -139,6 +140,7 @@ export function QuoteList(): React.ReactElement {
   const [documentMode, setDocumentMode] = useState<DocumentMode>("quotes");
   const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingQuotes, setIsLoadingQuotes] = useState(true);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
@@ -195,6 +197,17 @@ export function QuoteList(): React.ReactElement {
       isActive = false;
     };
   }, [documentMode]);
+
+  useEffect(() => {
+    if (!isSearchOpen) {
+      return;
+    }
+
+    const inputElement = document.getElementById("document-search");
+    if (inputElement instanceof HTMLInputElement) {
+      inputElement.focus();
+    }
+  }, [isSearchOpen]);
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQuotes = useMemo(() => {
@@ -294,43 +307,71 @@ export function QuoteList(): React.ReactElement {
       <ScreenHeader title={headerTitle} subtitle={headerSubtitle} layout="top-level" />
       <section className="mx-auto w-full max-w-3xl pb-2 pt-20">
         <div className="mb-4 px-4">
-          <div
-            aria-label="Document type filter"
-            className="mb-4 inline-flex rounded-full bg-surface-container-low p-1"
-          >
-            <button
-              type="button"
-              aria-pressed={documentMode === "quotes"}
-              className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
-                documentMode === "quotes"
-                  ? "ghost-shadow bg-surface-container-lowest text-primary"
-                  : "text-on-surface-variant"
-              }`}
-              onClick={() => setDocumentMode("quotes")}
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div
+              aria-label="Document type filter"
+              className="inline-flex rounded-full bg-surface-container-low p-1"
             >
-              Quotes
-            </button>
-            <button
-              type="button"
-              aria-pressed={documentMode === "invoices"}
-              className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
-                documentMode === "invoices"
-                  ? "ghost-shadow bg-surface-container-lowest text-primary"
-                  : "text-on-surface-variant"
-              }`}
-              onClick={() => setDocumentMode("invoices")}
-            >
-              Invoices
-            </button>
+              <button
+                type="button"
+                aria-pressed={documentMode === "quotes"}
+                className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  documentMode === "quotes"
+                    ? "ghost-shadow bg-surface-container-lowest text-primary"
+                    : "text-on-surface-variant"
+                }`}
+                onClick={() => setDocumentMode("quotes")}
+              >
+                Quotes
+              </button>
+              <button
+                type="button"
+                aria-pressed={documentMode === "invoices"}
+                className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  documentMode === "invoices"
+                    ? "ghost-shadow bg-surface-container-lowest text-primary"
+                    : "text-on-surface-variant"
+                }`}
+                onClick={() => setDocumentMode("invoices")}
+              >
+                Invoices
+              </button>
+            </div>
+            {!isSearchOpen ? (
+              <button
+                type="button"
+                aria-label="Open search"
+                className={headerIconButtonClasses}
+                onClick={() => setIsSearchOpen(true)}
+              >
+                <span className="material-symbols-outlined block text-[1.125rem] leading-none">search</span>
+              </button>
+            ) : null}
           </div>
-          <Input
-            label={searchLabel}
-            id="document-search"
-            placeholder={searchPlaceholder}
-            hideLabel
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
+          {isSearchOpen ? (
+            <div className="relative">
+              <Input
+                label={searchLabel}
+                id="document-search"
+                placeholder={searchPlaceholder}
+                hideLabel
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="pr-14"
+              />
+              <button
+                type="button"
+                aria-label="Close search"
+                className="absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-outline transition-all hover:bg-surface-container-low active:scale-95"
+                onClick={() => {
+                  setSearchQuery("");
+                  setIsSearchOpen(false);
+                }}
+              >
+                <span className="material-symbols-outlined block text-base leading-none">close</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {isLoading ? (

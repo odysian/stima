@@ -104,6 +104,11 @@ function renderScreen(): void {
   );
 }
 
+async function openSearch(label: "Search quotes" | "Search invoices" = "Search quotes"): Promise<HTMLInputElement> {
+  fireEvent.click(screen.getByRole("button", { name: "Open search" }));
+  return await screen.findByLabelText(label) as HTMLInputElement;
+}
+
 beforeEach(() => {
   mockProfile();
 });
@@ -113,6 +118,76 @@ afterEach(() => {
 });
 
 describe("QuoteList", () => {
+  it("hides search input by default and shows the open-search button", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    expect(screen.queryByLabelText("Search quotes")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open search" })).toBeInTheDocument();
+  });
+
+  it("opens search, focuses the input, and hides the open-search button", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    const searchInput = await openSearch();
+    await waitFor(() => {
+      expect(searchInput).toHaveFocus();
+    });
+    expect(screen.queryByRole("button", { name: "Open search" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close search" })).toBeInTheDocument();
+  });
+
+  it("closes search and clears the query, and reopening starts empty", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    const searchInput = await openSearch();
+    fireEvent.change(searchInput, { target: { value: "alice" } });
+    expect(searchInput).toHaveValue("alice");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close search" }));
+    expect(screen.queryByLabelText("Search quotes")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open search" })).toBeInTheDocument();
+
+    const reopenedSearchInput = await openSearch();
+    expect(reopenedSearchInput).toHaveValue("");
+  });
+
+  it("preserves open search state and query when switching tabs", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+    mockedInvoiceService.listInvoices.mockResolvedValueOnce([
+      makeInvoiceListItem(),
+      makeInvoiceListItem({
+        id: "invoice-2",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "I-002",
+      }),
+    ]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    const quoteSearchInput = await openSearch();
+    fireEvent.change(quoteSearchInput, { target: { value: "bob" } });
+    expect(quoteSearchInput).toHaveValue("bob");
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
+
+    const invoiceSearchInput = await screen.findByLabelText("Search invoices");
+    expect(invoiceSearchInput).toHaveValue("bob");
+    expect(screen.queryByRole("button", { name: "Open search" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close search" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /bob brown/i })).toBeInTheDocument();
+  });
+
   it("uses token-backed emphasis for the active filter and create button", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
@@ -287,7 +362,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText(/Q-001/);
 
-    fireEvent.change(screen.getByLabelText("Search quotes"), {
+    fireEvent.change(await openSearch(), {
       target: { value: "bob" },
     });
 
@@ -312,7 +387,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText(/Q-001/);
 
-    fireEvent.change(screen.getByLabelText("Search quotes"), {
+    fireEvent.change(await openSearch(), {
       target: { value: "spring" },
     });
 
@@ -326,7 +401,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText(/Q-001/);
 
-    fireEvent.change(screen.getByLabelText("Search quotes"), {
+    fireEvent.change(await openSearch(), {
       target: { value: "does-not-exist" },
     });
 
@@ -482,7 +557,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText(/Q-001/);
 
-    const searchInput = screen.getByLabelText("Search quotes");
+    const searchInput = await openSearch();
     const searchLabel = document.querySelector('label[for="document-search"]');
 
     expect(searchInput).toBeInTheDocument();
