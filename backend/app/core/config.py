@@ -180,6 +180,18 @@ class Settings(BaseSettings):
         default="claude-haiku-4-5-20251001",
         validation_alias="EXTRACTION_MODEL",
     )
+    extraction_fallback_model: str | None = Field(
+        default=None,
+        validation_alias="EXTRACTION_FALLBACK_MODEL",
+    )
+    extraction_primary_prompt_variant: str = Field(
+        default="primary_default",
+        validation_alias="EXTRACTION_PRIMARY_PROMPT_VARIANT",
+    )
+    extraction_fallback_prompt_variant: str = Field(
+        default="fallback_default",
+        validation_alias="EXTRACTION_FALLBACK_PROMPT_VARIANT",
+    )
     transcription_model: str = Field(
         default="whisper-1",
         validation_alias="TRANSCRIPTION_MODEL",
@@ -231,6 +243,7 @@ class Settings(BaseSettings):
         "resend_api_key",
         "email_from_address",
         "email_from_name",
+        "extraction_fallback_model",
         mode="before",
     )
     @classmethod
@@ -244,6 +257,19 @@ class Settings(BaseSettings):
                 return None
             return normalized_value
         return str(value)
+
+    @field_validator(
+        "extraction_primary_prompt_variant",
+        "extraction_fallback_prompt_variant",
+        mode="before",
+    )
+    @classmethod
+    def normalize_prompt_variant(cls, value: Any) -> str:
+        """Reject blank extraction prompt variant tags used for log segmentation."""
+        normalized_value = str(value).strip()
+        if not normalized_value:
+            raise ValueError("Extraction prompt variant tags must be non-empty")
+        return normalized_value
 
     @field_validator("redis_key_prefix", mode="before")
     @classmethod

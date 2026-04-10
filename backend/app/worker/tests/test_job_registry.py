@@ -304,6 +304,8 @@ async def test_extraction_job_uses_enqueued_correlation_id_and_logs_failure_meta
     assert extraction_failure["job_id"] == str(record.id)  # nosec B101 - pytest assertion
     assert extraction_failure["correlation_id"] == ingress_correlation_id  # nosec B101 - pytest assertion
     assert extraction_failure["last_model_id"] == "claude-haiku-4-5-20251001"  # nosec B101 - pytest assertion
+    assert extraction_failure["extraction_invocation_tier"] == "fallback"  # nosec B101 - pytest assertion
+    assert extraction_failure["extraction_prompt_variant"] == "fallback_default"  # nosec B101 - pytest assertion
     assert extraction_failure["error_class"] == "_NonRetryableProviderError"  # nosec B101 - pytest assertion
     assert isinstance(extraction_failure["latency_ms"], int)  # nosec B101 - pytest assertion
     assert extraction_failure["token_usage"] == {  # nosec B101 - pytest assertion
@@ -389,6 +391,8 @@ class _MetadataFailureExtractionIntegration:
         return ExtractionCallMetadata(
             model_id=self.model_id,
             token_usage={"input_tokens": 91, "output_tokens": 0},
+            invocation_tier="fallback",
+            prompt_variant="fallback_default",
         )
 
 

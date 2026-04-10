@@ -7,7 +7,7 @@ import contextvars
 import json
 import secrets
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import anthropic
 from anthropic import AsyncAnthropic
@@ -81,6 +81,11 @@ EXTRACTION_REPAIR_SYSTEM_PROMPT = (
 )
 
 EXTRACTION_DEGRADED_REASON_VALIDATION_REPAIR_FAILED = "validation_repair_failed"
+EXTRACTION_INVOCATION_TIER_PRIMARY: Literal["primary"] = "primary"
+EXTRACTION_INVOCATION_TIER_FALLBACK: Literal["fallback"] = "fallback"
+EXTRACTION_PROMPT_VARIANT_PRIMARY_DEFAULT = "primary_default"
+EXTRACTION_PROMPT_VARIANT_FALLBACK_DEFAULT = "fallback_default"
+EXTRACTION_PROMPT_VARIANT_REPAIR_SUFFIX = "repair"
 
 _RETRY_BASE_DELAY_SECONDS = 0.25
 _RETRY_MAX_DELAY_SECONDS = 2.0
@@ -96,9 +101,18 @@ class ExtractionCallMetadata:
 
     model_id: str | None
     token_usage: dict[str, int] | None
+    invocation_tier: Literal["primary", "fallback"] = EXTRACTION_INVOCATION_TIER_PRIMARY
+    prompt_variant: str | None = None
     repair_attempted: bool = False
     repair_outcome: str | None = None
     repair_validation_error_count: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _ExtractionTierConfig:
+    tier: Literal["primary", "fallback"]
+    model_id: str
+    prompt_variant: str
 
 
 _LAST_CALL_METADATA_VAR: contextvars.ContextVar[ExtractionCallMetadata | None] = (
@@ -114,14 +128,26 @@ class ExtractionIntegration:
         *,
         api_key: str,
         model: str,
+        fallback_model: str | None = None,
         timeout_seconds: float = 30.0,
         max_attempts: int = 3,
+        primary_prompt_variant: str = EXTRACTION_PROMPT_VARIANT_PRIMARY_DEFAULT,
+        fallback_prompt_variant: str = EXTRACTION_PROMPT_VARIANT_FALLBACK_DEFAULT,
         client: object | None = None,
     ) -> None:
         self._api_key = api_key
-        self._model = model
+        self._primary_model = model
+        self._fallback_model = fallback_model.strip() if isinstance(fallback_model, str) else None
+        if self._fallback_model == "":
+            self._fallback_model = None
         self._timeout_seconds = timeout_seconds
         self._max_attempts = max_attempts
+        self._primary_prompt_variant = (
+            primary_prompt_variant.strip() or EXTRACTION_PROMPT_VARIANT_PRIMARY_DEFAULT
+        )
+        self._fallback_prompt_variant = (
+            fallback_prompt_variant.strip() or EXTRACTION_PROMPT_VARIANT_FALLBACK_DEFAULT
+        )
         self._client = client
 
     async def extract(self, notes: str) -> ExtractionResult:
@@ -129,7 +155,12 @@ class ExtractionIntegration:
         normalized_notes = notes.strip()
         if not normalized_notes:
             raise ExtractionError("notes cannot be empty")
-        _set_last_call_metadata(model_id=self._model, token_usage=None)
+        _set_last_call_metadata(
+            model_id=self._primary_model,
+            token_usage=None,
+            invocation_tier=EXTRACTION_INVOCATION_TIER_PRIMARY,
+            prompt_variant=self._primary_prompt_variant,
+        )
 
         if self._client is None:
             if not self._api_key:
@@ -145,12 +176,79 @@ class ExtractionIntegration:
             raise ExtractionError("Claude client was not initialized")
         typed_client = cast(Any, client)
 
-        response = await self._request_with_retry(typed_client, normalized_notes)
-        response_model_id = getattr(response, "model", None) or self._model
+        tier_sequence = self._build_tier_sequence()
+        last_error: ExtractionError | None = None
+        for tier in tier_sequence:
+            try:
+                return await self._extract_for_tier(
+                    typed_client,
+                    normalized_notes,
+                    tier=tier,
+                )
+            except ExtractionError as exc:
+                last_error = exc
+                continue
+
+        if last_error is None:  # pragma: no cover - defensive invariant
+            raise ExtractionError("Claude request failed")
+        raise last_error
+
+    @property
+    def model_id(self) -> str:
+        """Return the configured primary provider model id for extraction calls."""
+        return self._primary_model
+
+    def pop_last_call_metadata(self) -> ExtractionCallMetadata | None:
+        """Return and clear per-task extraction telemetry from the latest call."""
+        metadata = _LAST_CALL_METADATA_VAR.get()
+        _LAST_CALL_METADATA_VAR.set(None)
+        return metadata
+
+    def _build_tier_sequence(self) -> tuple[_ExtractionTierConfig, ...]:
+        primary_tier = _ExtractionTierConfig(
+            tier=EXTRACTION_INVOCATION_TIER_PRIMARY,
+            model_id=self._primary_model,
+            prompt_variant=self._primary_prompt_variant,
+        )
+        if self._fallback_model is None:
+            return (primary_tier,)
+        return (
+            primary_tier,
+            _ExtractionTierConfig(
+                tier=EXTRACTION_INVOCATION_TIER_FALLBACK,
+                model_id=self._fallback_model,
+                prompt_variant=self._fallback_prompt_variant,
+            ),
+        )
+
+    async def _extract_for_tier(
+        self,
+        typed_client: Any,
+        normalized_notes: str,
+        *,
+        tier: _ExtractionTierConfig,
+    ) -> ExtractionResult:
+        _set_last_call_metadata(
+            model_id=tier.model_id,
+            token_usage=None,
+            invocation_tier=tier.tier,
+            prompt_variant=tier.prompt_variant,
+        )
+
+        response = await self._request_with_retry(
+            typed_client,
+            normalized_notes,
+            model_id=tier.model_id,
+            invocation_tier=tier.tier,
+            prompt_variant=tier.prompt_variant,
+        )
+        response_model_id = getattr(response, "model", None) or tier.model_id
         response_token_usage = _extract_token_usage(response)
         _set_last_call_metadata(
             model_id=response_model_id,
             token_usage=response_token_usage,
+            invocation_tier=tier.tier,
+            prompt_variant=tier.prompt_variant,
             repair_attempted=False,
             repair_outcome="not_attempted",
             repair_validation_error_count=None,
@@ -165,6 +263,9 @@ class ExtractionIntegration:
             return ExtractionResult.model_validate(payload)
         except ValidationError as exc:
             validation_errors = _compact_validation_errors(exc)
+            repair_prompt_variant = (
+                f"{tier.prompt_variant}:{EXTRACTION_PROMPT_VARIANT_REPAIR_SUFFIX}"
+            )
             try:
                 repair_response = await self._request_with_retry(
                     typed_client,
@@ -173,19 +274,24 @@ class ExtractionIntegration:
                         invalid_payload=payload,
                         validation_errors=validation_errors,
                     ),
+                    model_id=tier.model_id,
+                    invocation_tier=tier.tier,
+                    prompt_variant=repair_prompt_variant,
                     system_prompt=EXTRACTION_REPAIR_SYSTEM_PROMPT,
                 )
             except ExtractionError:
                 _set_last_call_metadata(
                     model_id=response_model_id,
                     token_usage=response_token_usage,
+                    invocation_tier=tier.tier,
+                    prompt_variant=repair_prompt_variant,
                     repair_attempted=True,
                     repair_outcome="repair_request_failed",
                     repair_validation_error_count=len(validation_errors),
                 )
                 raise
             repair_usage = _extract_token_usage(repair_response)
-            repair_model_id = getattr(repair_response, "model", None) or self._model
+            repair_model_id = getattr(repair_response, "model", None) or tier.model_id
             repair_payload = _extract_tool_payload(repair_response)
             repair_payload.setdefault("transcript", normalized_notes)
             repair_payload.setdefault("line_items", [])
@@ -196,6 +302,8 @@ class ExtractionIntegration:
                 _set_last_call_metadata(
                     model_id=repair_model_id,
                     token_usage=repair_usage,
+                    invocation_tier=tier.tier,
+                    prompt_variant=repair_prompt_variant,
                     repair_attempted=True,
                     repair_outcome="repair_invalid",
                     repair_validation_error_count=len(validation_errors),
@@ -204,35 +312,29 @@ class ExtractionIntegration:
             _set_last_call_metadata(
                 model_id=repair_model_id,
                 token_usage=repair_usage,
+                invocation_tier=tier.tier,
+                prompt_variant=repair_prompt_variant,
                 repair_attempted=True,
                 repair_outcome="repair_succeeded",
                 repair_validation_error_count=len(validation_errors),
             )
             return repaired_result
 
-    @property
-    def model_id(self) -> str:
-        """Return the configured provider model id for extraction calls."""
-        return self._model
-
-    def pop_last_call_metadata(self) -> ExtractionCallMetadata | None:
-        """Return and clear per-task extraction telemetry from the latest call."""
-        metadata = _LAST_CALL_METADATA_VAR.get()
-        _LAST_CALL_METADATA_VAR.set(None)
-        return metadata
-
     async def _request_with_retry(
         self,
         typed_client: Any,
         request_content: str,
         *,
+        model_id: str,
+        invocation_tier: Literal["primary", "fallback"],
+        prompt_variant: str,
         system_prompt: str = EXTRACTION_SYSTEM_PROMPT,
     ) -> object:
         last_error: Exception | None = None
         for attempt in range(1, self._max_attempts + 1):
             try:
                 return await typed_client.messages.create(
-                    model=self._model,
+                    model=model_id,
                     max_tokens=800,
                     temperature=0,
                     system=system_prompt,
@@ -264,6 +366,9 @@ class ExtractionIntegration:
                             upstream_status=upstream_status,
                             attempt=attempt,
                             max_attempts=self._max_attempts,
+                            extraction_invocation_tier=invocation_tier,
+                            extraction_model_id=model_id,
+                            extraction_prompt_variant=prompt_variant,
                         )
                     break
                 retry_delay_seconds = _retry_delay_seconds(attempt)
@@ -274,6 +379,9 @@ class ExtractionIntegration:
                         attempt=attempt,
                         max_attempts=self._max_attempts,
                         backoff_ms=int(retry_delay_seconds * 1000),
+                        extraction_invocation_tier=invocation_tier,
+                        extraction_model_id=model_id,
+                        extraction_prompt_variant=prompt_variant,
                     )
                 await asyncio.sleep(retry_delay_seconds)
 
@@ -360,6 +468,8 @@ def _set_last_call_metadata(
     *,
     model_id: str | None,
     token_usage: dict[str, int] | None,
+    invocation_tier: Literal["primary", "fallback"] = EXTRACTION_INVOCATION_TIER_PRIMARY,
+    prompt_variant: str | None = None,
     repair_attempted: bool = False,
     repair_outcome: str | None = None,
     repair_validation_error_count: int | None = None,
@@ -368,6 +478,8 @@ def _set_last_call_metadata(
         ExtractionCallMetadata(
             model_id=model_id,
             token_usage=token_usage,
+            invocation_tier=invocation_tier,
+            prompt_variant=prompt_variant,
             repair_attempted=repair_attempted,
             repair_outcome=repair_outcome,
             repair_validation_error_count=repair_validation_error_count,

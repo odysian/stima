@@ -297,6 +297,7 @@ def log_provider_retry(
     attempt: int,
     max_attempts: int,
     backoff_ms: int,
+    **fields: Any,
 ) -> None:
     """Emit a structured provider retry-cycle event."""
     log_security_event(
@@ -309,6 +310,7 @@ def log_provider_retry(
         max_attempts=max_attempts,
         backoff_ms=backoff_ms,
         reason="provider_retryable_error",
+        **fields,
     )
 
 
@@ -318,6 +320,7 @@ def log_provider_quota_exhausted(
     upstream_status: int,
     attempt: int,
     max_attempts: int,
+    **fields: Any,
 ) -> None:
     """Emit a structured provider quota exhaustion event."""
     log_security_event(
@@ -332,6 +335,7 @@ def log_provider_quota_exhausted(
         reason="provider_rate_limited",
         rate_limit_key=f"provider:{provider}:{upstream_status}",
         rate_limit_seconds=60,
+        **fields,
     )
 
 
