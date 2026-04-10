@@ -478,7 +478,7 @@ describe("CaptureScreen", () => {
     );
   });
 
-  it("shows inline error and does not navigate when extraction fails", async () => {
+  it("shows persistent error toast and does not navigate when extraction fails", async () => {
     mockedQuoteService.extract.mockRejectedValueOnce(new Error("Extraction failed"));
     renderScreen();
 
@@ -489,6 +489,35 @@ describe("CaptureScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed");
     expect(navigateMock).not.toHaveBeenCalledWith("/quotes/quote-1/review");
+  });
+
+  it("dismisses submission errors via local error state without clearing voice capture", async () => {
+    mockedQuoteService.extract.mockRejectedValueOnce(new Error("Extraction failed"));
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed");
+    clearVoiceErrorMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+    expect(clearVoiceErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("dismisses recoverable voice-capture runtime errors via clearError", async () => {
+    mockVoiceCapture({ error: "Microphone permission denied" });
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Microphone permission denied");
+    fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+
+    expect(clearVoiceErrorMock).toHaveBeenCalledTimes(1);
   });
 
   it("derives the total audio limit error from the shared byte ceiling", async () => {
@@ -713,7 +742,7 @@ describe("CaptureScreen", () => {
     expect(navigateMock).not.toHaveBeenCalledWith("/quotes/quote-1/review");
   });
 
-  it("shows a retry affordance when an async extraction job reaches terminal failure", async () => {
+  it("shows a dismissable error toast when an async extraction job reaches terminal failure", async () => {
     mockedQuoteService.extract.mockResolvedValueOnce({ type: "async", jobId: "job-1" });
     mockedJobService.getJobStatus.mockResolvedValueOnce(
       makeJobStatusResponse({
@@ -732,9 +761,10 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed. Please try again.");
-    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /extract line items/i })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });

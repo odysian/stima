@@ -190,7 +190,7 @@ describe("SettingsScreen", () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it("submits profile updates, refreshes auth user, and shows inline success feedback", async () => {
+  it("submits profile updates, refreshes auth user, and shows toast success feedback", async () => {
     const refreshUser = vi.fn(async () => undefined);
     mockedUseAuth.mockReturnValue({
       user: {
@@ -244,7 +244,10 @@ describe("SettingsScreen", () => {
       });
     });
     expect(refreshUser).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText("Saved")).toHaveClass("rounded-lg");
+    const savedToast = await screen.findByRole("status");
+    expect(savedToast).toHaveTextContent("Saved");
+    expect(savedToast).toHaveClass("bg-on-surface");
+    expect(savedToast).not.toHaveClass("bg-success-container");
   });
 
   it("updates the theme preference immediately from the dropdown", async () => {
@@ -339,7 +342,9 @@ describe("SettingsScreen", () => {
 
     await waitFor(() => expect(mockedProfileService.updateProfile).toHaveBeenCalledTimes(1));
     expect(refreshUser).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    const savedToast = await screen.findByRole("status");
+    expect(savedToast).toHaveTextContent("Saved");
+    expect(savedToast).toHaveClass("bg-on-surface");
     expect(screen.queryByText("Unable to save settings")).not.toBeInTheDocument();
   });
 

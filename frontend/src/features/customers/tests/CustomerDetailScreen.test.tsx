@@ -248,7 +248,10 @@ describe("CustomerDetailScreen", () => {
       );
     });
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Saved");
+    const savedToast = await screen.findByRole("status");
+    expect(savedToast).toHaveTextContent("Saved");
+    expect(savedToast).toHaveClass("bg-on-surface");
+    expect(savedToast).not.toHaveClass("bg-success-container");
     expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 1, name: "Alice A. Johnson" }),

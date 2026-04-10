@@ -14,6 +14,7 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { Toast } from "@/shared/components/Toast";
 import { useTheme } from "@/shared/hooks/useTheme";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
@@ -192,12 +193,6 @@ export function SettingsScreen(): React.ReactElement {
 
         {!isLoadingProfile && !loadError ? (
           <form className="space-y-4 pb-8" onSubmit={onSubmit}>
-            {saveSuccess ? (
-              <p role="status" className="rounded-lg bg-success-container p-3 text-sm text-success">
-                {saveSuccess}
-              </p>
-            ) : null}
-
             {saveError ? (
               <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
             ) : null}
@@ -416,6 +411,7 @@ export function SettingsScreen(): React.ReactElement {
       </section>
 
       <BottomNav active="settings" />
+      <Toast message={saveSuccess} onDismiss={() => setSaveSuccess(null)} />
 
       {isRemoveLogoOpen ? (
         <ConfirmModal
