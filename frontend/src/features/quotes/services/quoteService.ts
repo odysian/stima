@@ -106,6 +106,8 @@ async function submitExtraction(
       line_items: persistedExtraction.line_items,
       total: persistedExtraction.total,
       confidence_notes: persistedExtraction.confidence_notes,
+      extraction_tier: persistedExtraction.extraction_tier,
+      extraction_degraded_reason_code: persistedExtraction.extraction_degraded_reason_code,
     },
   };
 }

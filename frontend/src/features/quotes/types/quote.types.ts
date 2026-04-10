@@ -22,6 +22,8 @@ export interface ExtractionResult {
   line_items: LineItemExtracted[];
   total: number | null;
   confidence_notes: string[];
+  extraction_tier: ExtractionTier;
+  extraction_degraded_reason_code: string | null;
 }
 
 export type JobStatus = "pending" | "running" | "success" | "failed" | "terminal";
