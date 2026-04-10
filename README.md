@@ -89,6 +89,13 @@ Its main idea is simple: **capture first, refine second**. Instead of pushing th
 - Redis-backed controls support production-style rate limiting and async workflows
 - Stima is an actively evolving portfolio project built with internet-facing deployment concerns in mind
 
+## Extraction Eval Harness
+
+- Run `make extraction-eval` to execute the manual extraction eval harness offline with fake provider responses.
+- Use this command before changing extraction prompts, extraction models, or fallback tier settings.
+- Optional operator-only live probes can be included with `EXTRACTION_EVAL_LIVE=1 make extraction-eval` (requires `ANTHROPIC_API_KEY` in `backend/.env`).
+- `make extraction-eval` is intentionally separate from `make backend-verify` so it does not gate standard verification.
+
 ## License
 
 MIT
