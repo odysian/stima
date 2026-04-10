@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import json
+import re
 import secrets
 from dataclasses import dataclass
 from typing import Any, Literal, cast
@@ -13,7 +14,7 @@ import anthropic
 from anthropic import AsyncAnthropic
 from pydantic import ValidationError
 
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
 from app.shared.input_limits import (
     CONFIDENCE_NOTE_MAX_CHARS,
     CONFIDENCE_NOTES_MAX_ITEMS,
@@ -86,6 +87,23 @@ EXTRACTION_INVOCATION_TIER_FALLBACK: Literal["fallback"] = "fallback"
 EXTRACTION_PROMPT_VARIANT_PRIMARY_DEFAULT = "primary_default"
 EXTRACTION_PROMPT_VARIANT_FALLBACK_DEFAULT = "fallback_default"
 EXTRACTION_PROMPT_VARIANT_REPAIR_SUFFIX = "repair"
+
+SEMANTIC_DEGRADED_REASON_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT = (
+    "semantic_empty_line_items_substantial_transcript"
+)
+_SEMANTIC_EMPTY_LINE_ITEMS_MIN_TRANSCRIPT_CHARS = 120
+_SEMANTIC_EMPTY_LINE_ITEMS_MIN_WORDS = 18
+_SEMANTIC_NOTE_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT = (
+    "No line items were extracted from a substantial transcript; manual review is required."
+)
+_SEMANTIC_NOTE_TOTAL_WITHOUT_PRICED_ITEMS = (
+    "Total was extracted without any priced line items; review pricing details."
+)
+_SEMANTIC_NOTE_DUPLICATE_LINE_ITEMS = (
+    "Duplicate extracted line items were detected and flagged for review."
+)
+_SEMANTIC_FLAG_REASON_DUPLICATE_LINE_ITEM = "Possible duplicate line item from extraction output"
+_WHITESPACE_PATTERN = re.compile(r"\s+")
 
 _RETRY_BASE_DELAY_SECONDS = 0.25
 _RETRY_MAX_DELAY_SECONDS = 2.0
@@ -260,7 +278,8 @@ class ExtractionIntegration:
         payload.setdefault("confidence_notes", [])
 
         try:
-            return ExtractionResult.model_validate(payload)
+            validated_result = ExtractionResult.model_validate(payload)
+            return _apply_semantic_guard_rules(validated_result)
         except ValidationError as exc:
             validation_errors = _compact_validation_errors(exc)
             repair_prompt_variant = (
@@ -318,7 +337,7 @@ class ExtractionIntegration:
                 repair_outcome="repair_succeeded",
                 repair_validation_error_count=len(validation_errors),
             )
-            return repaired_result
+            return _apply_semantic_guard_rules(repaired_result)
 
     async def _request_with_retry(
         self,
@@ -554,3 +573,103 @@ def _build_validation_repair_failed_result(*, transcript: str) -> ExtractionResu
         extraction_tier="degraded",
         extraction_degraded_reason_code=EXTRACTION_DEGRADED_REASON_VALIDATION_REPAIR_FAILED,
     )
+
+
+def _apply_semantic_guard_rules(result: ExtractionResult) -> ExtractionResult:
+    """Apply incident-informed semantic checks after schema validation succeeds.
+
+    Rule outcomes are intentionally constrained:
+    - Empty line items + substantial transcript -> degraded (allowlisted structural failure).
+    - Total without priced line items -> warning note only (tier remains primary).
+    - Duplicate extracted line items -> line-level flags + warning note only.
+    """
+
+    confidence_notes = list(result.confidence_notes)
+    line_items = list(result.line_items)
+    extraction_tier = result.extraction_tier
+    degraded_reason_code = result.extraction_degraded_reason_code
+
+    if _should_degrade_for_empty_line_items_with_substantial_transcript(result):
+        extraction_tier = "degraded"
+        degraded_reason_code = SEMANTIC_DEGRADED_REASON_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT
+        _append_semantic_note(
+            confidence_notes,
+            _SEMANTIC_NOTE_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT,
+        )
+
+    if _should_warn_for_total_without_priced_items(result):
+        _append_semantic_note(confidence_notes, _SEMANTIC_NOTE_TOTAL_WITHOUT_PRICED_ITEMS)
+
+    line_items = _apply_duplicate_line_item_flags(line_items, confidence_notes)
+
+    return result.model_copy(
+        update={
+            "line_items": line_items,
+            "confidence_notes": confidence_notes,
+            "extraction_tier": extraction_tier,
+            "extraction_degraded_reason_code": degraded_reason_code,
+        }
+    )
+
+
+def _should_degrade_for_empty_line_items_with_substantial_transcript(
+    result: ExtractionResult,
+) -> bool:
+    if result.extraction_tier == "degraded" or result.line_items:
+        return False
+    normalized_transcript = result.transcript.strip()
+    if len(normalized_transcript) < _SEMANTIC_EMPTY_LINE_ITEMS_MIN_TRANSCRIPT_CHARS:
+        return False
+    return len(normalized_transcript.split()) >= _SEMANTIC_EMPTY_LINE_ITEMS_MIN_WORDS
+
+
+def _should_warn_for_total_without_priced_items(result: ExtractionResult) -> bool:
+    return (
+        result.total is not None
+        and bool(result.line_items)
+        and not any(item.price is not None for item in result.line_items)
+    )
+
+
+def _apply_duplicate_line_item_flags(
+    line_items: list[LineItemExtracted],
+    confidence_notes: list[str],
+) -> list[LineItemExtracted]:
+    duplicate_groups: dict[tuple[str, float | None], list[int]] = {}
+    for index, item in enumerate(line_items):
+        normalized_description = _normalize_line_item_description(item.description)
+        if not normalized_description:
+            continue
+        key = (normalized_description, item.price)
+        duplicate_groups.setdefault(key, []).append(index)
+
+    duplicate_indexes = sorted(
+        index for indexes in duplicate_groups.values() if len(indexes) > 1 for index in indexes
+    )
+    if not duplicate_indexes:
+        return line_items
+
+    _append_semantic_note(confidence_notes, _SEMANTIC_NOTE_DUPLICATE_LINE_ITEMS)
+    updated_items = list(line_items)
+    for index in duplicate_indexes:
+        existing = updated_items[index]
+        updated_items[index] = existing.model_copy(
+            update={
+                "flagged": True,
+                "flag_reason": existing.flag_reason or _SEMANTIC_FLAG_REASON_DUPLICATE_LINE_ITEM,
+            }
+        )
+    return updated_items
+
+
+def _normalize_line_item_description(value: str) -> str:
+    collapsed_whitespace = _WHITESPACE_PATTERN.sub(" ", value.strip())
+    return collapsed_whitespace.casefold()
+
+
+def _append_semantic_note(confidence_notes: list[str], note: str) -> None:
+    if note in confidence_notes:
+        return
+    if len(confidence_notes) >= CONFIDENCE_NOTES_MAX_ITEMS:
+        return
+    confidence_notes.append(note)
