@@ -83,10 +83,10 @@ describe("theme helpers", () => {
     document.documentElement.style.color = "";
   });
 
-  it("falls back to system and clears invalid saved preferences", () => {
+  it("falls back to dark and clears invalid saved preferences", () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, "midnight");
 
-    expect(getStoredThemePreference()).toBe("system");
+    expect(getStoredThemePreference()).toBe("dark");
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
   });
 
@@ -125,9 +125,9 @@ describe("ThemeProvider", () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByText("Preference: system")).toBeInTheDocument();
-    expect(screen.getByText("Effective: light")).toBeInTheDocument();
-    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(screen.getByText("Preference: dark")).toBeInTheDocument();
+    expect(screen.getByText("Effective: dark")).toBeInTheDocument();
+    expect(document.documentElement.dataset.theme).toBe("dark");
 
     await act(async () => {
       matchMedia.setMatches(true);
@@ -136,7 +136,7 @@ describe("ThemeProvider", () => {
     await waitFor(() => {
       expect(screen.getByText("Effective: dark")).toBeInTheDocument();
     });
-    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
   it("keeps an explicit preference even if the OS theme changes", async () => {

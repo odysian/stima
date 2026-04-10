@@ -22,28 +22,9 @@ const workflowSteps = [
 export function LandingPage(): React.ReactElement {
   useEffect(() => {
     const previousTitle = document.title;
-    const root = document.documentElement;
-    const hadDataTheme = root.hasAttribute("data-theme");
-    const previousDataTheme = root.getAttribute("data-theme");
-    const previousColorScheme = root.style.colorScheme;
-    const previousBackgroundColor = root.style.backgroundColor;
-    const previousColor = root.style.color;
-
-    root.dataset.theme = "dark";
-    root.style.colorScheme = "dark";
-    root.style.backgroundColor = "#0b1013";
-    root.style.color = "#eef2ef";
     document.title = "Stima - Capture first, quote faster";
 
     return () => {
-      if (hadDataTheme) {
-        root.dataset.theme = previousDataTheme ?? "light";
-      } else {
-        root.removeAttribute("data-theme");
-      }
-      root.style.colorScheme = previousColorScheme;
-      root.style.backgroundColor = previousBackgroundColor;
-      root.style.color = previousColor;
       document.title = previousTitle;
     };
   }, []);

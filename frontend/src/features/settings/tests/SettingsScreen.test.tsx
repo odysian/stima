@@ -259,7 +259,7 @@ describe("SettingsScreen", () => {
 
     const themeSelect = screen.getByRole("combobox", { name: "Theme" });
 
-    expect(themeSelect).toHaveValue("system");
+    expect(themeSelect).toHaveValue("dark");
     expect(screen.getByRole("option", { name: "System default" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Light" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Dark" })).toBeInTheDocument();
