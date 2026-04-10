@@ -40,6 +40,7 @@ interface DocumentRowsSectionProps {
 const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const draftRowClasses = "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} shrink-0 whitespace-nowrap bg-warning-container text-warning`;
+const headerIconButtonClasses = "inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95";
 
 function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
   return (
@@ -340,10 +341,10 @@ export function QuoteList(): React.ReactElement {
               <button
                 type="button"
                 aria-label="Open search"
-                className="cursor-pointer rounded-full p-2 text-outline transition-all hover:bg-surface-container-low active:scale-95"
+                className={headerIconButtonClasses}
                 onClick={() => setIsSearchOpen(true)}
               >
-                <span className="material-symbols-outlined">search</span>
+                <span className="material-symbols-outlined block text-[1.125rem] leading-none">search</span>
               </button>
             ) : null}
           </div>
@@ -356,18 +357,18 @@ export function QuoteList(): React.ReactElement {
                 hideLabel
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="pr-10"
+                className="pr-14"
               />
               <button
                 type="button"
                 aria-label="Close search"
-                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-full p-1 text-outline transition-all hover:bg-surface-container-low active:scale-95"
+                className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${headerIconButtonClasses}`}
                 onClick={() => {
                   setSearchQuery("");
                   setIsSearchOpen(false);
                 }}
               >
-                <span className="material-symbols-outlined text-base">close</span>
+                <span className="material-symbols-outlined block text-[1.125rem] leading-none">close</span>
               </button>
             </div>
           ) : null}
