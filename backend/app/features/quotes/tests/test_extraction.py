@@ -260,6 +260,50 @@ async def test_extract_attempts_one_repair_then_accepts_valid_repaired_payload()
     assert "Schema validation errors:" in repair_user_content
 
 
+async def test_extract_sets_repair_failure_metadata_when_repair_request_errors() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    rate_limit_error = anthropic.RateLimitError(
+        "rate limited",
+        response=httpx.Response(429, request=request),
+        body=None,
+    )
+    client = _SequencedClient(
+        [
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": "invalid-shape",
+                            "total": 435,
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+            rate_limit_error,
+        ]
+    )
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="test-model",
+        max_attempts=1,
+        client=client,
+    )
+
+    with pytest.raises(ExtractionError, match="Claude request failed"):
+        await integration.extract(transcript)
+
+    metadata = integration.pop_last_call_metadata()
+    assert metadata is not None
+    assert metadata.repair_attempted is True
+    assert metadata.repair_outcome == "repair_request_failed"
+    assert metadata.repair_validation_error_count == 1
+    assert len(client.messages.calls) == 2
+
+
 async def test_extract_builds_client_with_configured_timeout_and_disabled_sdk_retries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

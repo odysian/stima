@@ -146,9 +146,11 @@ class ExtractionIntegration:
         typed_client = cast(Any, client)
 
         response = await self._request_with_retry(typed_client, normalized_notes)
+        response_model_id = getattr(response, "model", None) or self._model
+        response_token_usage = _extract_token_usage(response)
         _set_last_call_metadata(
-            model_id=getattr(response, "model", None) or self._model,
-            token_usage=_extract_token_usage(response),
+            model_id=response_model_id,
+            token_usage=response_token_usage,
             repair_attempted=False,
             repair_outcome="not_attempted",
             repair_validation_error_count=None,
@@ -163,15 +165,25 @@ class ExtractionIntegration:
             return ExtractionResult.model_validate(payload)
         except ValidationError as exc:
             validation_errors = _compact_validation_errors(exc)
-            repair_response = await self._request_with_retry(
-                typed_client,
-                _build_repair_request(
-                    notes=normalized_notes,
-                    invalid_payload=payload,
-                    validation_errors=validation_errors,
-                ),
-                system_prompt=EXTRACTION_REPAIR_SYSTEM_PROMPT,
-            )
+            try:
+                repair_response = await self._request_with_retry(
+                    typed_client,
+                    _build_repair_request(
+                        notes=normalized_notes,
+                        invalid_payload=payload,
+                        validation_errors=validation_errors,
+                    ),
+                    system_prompt=EXTRACTION_REPAIR_SYSTEM_PROMPT,
+                )
+            except ExtractionError:
+                _set_last_call_metadata(
+                    model_id=response_model_id,
+                    token_usage=response_token_usage,
+                    repair_attempted=True,
+                    repair_outcome="repair_request_failed",
+                    repair_validation_error_count=len(validation_errors),
+                )
+                raise
             repair_usage = _extract_token_usage(repair_response)
             repair_model_id = getattr(repair_response, "model", None) or self._model
             repair_payload = _extract_tool_payload(repair_response)
