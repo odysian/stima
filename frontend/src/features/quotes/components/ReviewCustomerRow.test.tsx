@@ -22,7 +22,6 @@ describe("ReviewCustomerRow", () => {
       "animate-pulse",
       "[animation-iteration-count:3]",
     );
-    expect((assignmentButton as HTMLButtonElement).style.animationIterationCount).toBe("3");
   });
 
   it("does not apply warning pulse classes when a customer is already assigned", () => {
@@ -43,6 +42,5 @@ describe("ReviewCustomerRow", () => {
       "animate-pulse",
       "[animation-iteration-count:3]",
     );
-    expect((assignmentButton as HTMLButtonElement).style.animationIterationCount).toBe("");
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 interface ToastProps {
   message: string | null;
@@ -15,7 +15,7 @@ export function Toast({
 }: ToastProps): React.ReactElement | null {
   const onDismissRef = useRef(onDismiss);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     onDismissRef.current = onDismiss;
   }, [onDismiss]);
 
