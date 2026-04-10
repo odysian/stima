@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useBeforeUnload, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { profileService } from "@/features/profile/services/profileService";
@@ -7,6 +7,7 @@ import { ReviewCustomerAssignmentSheet } from "@/features/quotes/components/Revi
 import { ReviewFormContent } from "@/features/quotes/components/ReviewFormContent";
 import { LineItemEditSheet } from "@/features/quotes/components/LineItemEditSheet";
 import { applyLineItemSheetDelete, applyLineItemSheetSave, resolveLineItemSheetInitialItem, type ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
+import { buildReviewUpdatePayload } from "@/features/quotes/components/reviewUpdatePayload";
 import { EMPTY_LINE_ITEM, isInvalidLineItem, normalizeLineItem } from "@/features/quotes/components/reviewScreenUtils";
 import { mapQuoteToEditDraft, usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -14,13 +15,11 @@ import type { LineItemDraft, QuoteDetail } from "@/features/quotes/types/quote.t
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { buildDraftSnapshot, readReviewLocationState, resolveBackTarget } from "@/features/quotes/utils/reviewScreenState";
 import { readQuoteConfidenceNotes, writeQuoteConfidenceNotes } from "@/features/quotes/utils/reviewConfidenceNotes";
-import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Toast } from "@/shared/components/Toast";
 import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
-import { getPricingValidationMessage } from "@/shared/lib/pricing";
 
 function buildQuoteSnapshotKey(quote: QuoteDetail): string {
   const canonicalDraft = mapQuoteToEditDraft(quote);
@@ -57,6 +56,7 @@ export function ReviewScreen(): React.ReactElement {
   const [confidenceNotes, setConfidenceNotes] = useState<string[]>([]);
   const [hasAppliedReseedFromLocation, setHasAppliedReseedFromLocation] = useState(false);
   const [lineItemSheetState, setLineItemSheetState] = useState<ReviewLineItemSheetState | null>(null);
+  const isAddVoiceNoteInFlightRef = useRef(false);
   const locationState = useMemo(() => readReviewLocationState(location.state), [location.state]);
   const requiresCustomerAssignment = useMemo(() => {
     if (!quote) {
@@ -232,47 +232,58 @@ export function ReviewScreen(): React.ReactElement {
     ? resolveLineItemSheetInitialItem(activeDraft, lineItemSheetState, EMPTY_LINE_ITEM)
     : EMPTY_LINE_ITEM;
 
+  async function tryAutoSaveDraft(): Promise<void> {
+    const { payload } = buildReviewUpdatePayload({
+      draft: activeDraft,
+      lineItemsForSubmit,
+      hasInvalidLineItems,
+    });
+    if (!payload) {
+      return;
+    }
+
+    try {
+      await quoteService.updateQuote(quoteId, payload);
+    } catch {
+      // Best-effort autosave should never block append-capture navigation.
+    }
+  }
+
+  async function handleAddVoiceNote(): Promise<void> {
+    if (isAddVoiceNoteInFlightRef.current) {
+      return;
+    }
+
+    isAddVoiceNoteInFlightRef.current = true;
+
+    try {
+      await tryAutoSaveDraft();
+      navigate(`/quotes/${quoteId}/review/append-capture`, {
+        state: { launchOrigin: `/quotes/${quoteId}/review` },
+      });
+    } finally {
+      isAddVoiceNoteInFlightRef.current = false;
+    }
+  }
+
   async function saveDraft(nextAction: "save" | "continue"): Promise<void> {
     setSaveError(null);
     setToastMessage(null);
 
-    if (lineItemsForSubmit.length === 0) {
-      setSaveError("Add at least one line item description before saving the quote.");
-      return;
-    }
-
-    if (hasInvalidLineItems) {
-      setSaveError("Each line item with details or price needs a description.");
-      return;
-    }
-
-    const pricingError = getPricingValidationMessage({
-      totalAmount: activeDraft.total,
-      taxRate: activeDraft.taxRate,
-      discountType: activeDraft.discountType,
-      discountValue: activeDraft.discountValue,
-      depositAmount: activeDraft.depositAmount,
+    const { payload, validationMessage } = buildReviewUpdatePayload({
+      draft: activeDraft,
+      lineItemsForSubmit,
+      hasInvalidLineItems,
     });
-
-    if (pricingError) {
-      setSaveError(pricingError);
+    if (!payload) {
+      setSaveError(validationMessage ?? "Unable to save quote.");
       return;
     }
 
     setSubmitAction(nextAction);
 
     try {
-      await quoteService.updateQuote(quoteId, {
-        title: normalizeOptionalTitle(activeDraft.title),
-        transcript: activeDraft.transcript ?? "",
-        line_items: lineItemsForSubmit,
-        total_amount: activeDraft.total,
-        tax_rate: activeDraft.taxRate,
-        discount_type: activeDraft.discountType,
-        discount_value: activeDraft.discountValue,
-        deposit_amount: activeDraft.depositAmount,
-        notes: activeDraft.notes.trim().length > 0 ? activeDraft.notes.trim() : null,
-      });
+      await quoteService.updateQuote(quoteId, payload);
       const refreshedQuote = await refreshQuote({ reseedDraft: true });
       setSavedSnapshotKey(buildQuoteSnapshotKey(refreshedQuote));
 
@@ -330,9 +341,7 @@ export function ReviewScreen(): React.ReactElement {
         suggestedTaxRate={suggestedTaxRate}
         onRequestAssignment={() => setIsAssignmentSheetOpen(true)}
         onAddVoiceNote={() => {
-          navigate(`/quotes/${quoteId}/review/append-capture`, {
-            state: { launchOrigin: `/quotes/${quoteId}/review` },
-          });
+          void handleAddVoiceNote();
         }}
         onDismissConfidence={(noteIndex) => {
           const nextNotes = confidenceNotes.filter((_, index) => index !== noteIndex);
