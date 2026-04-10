@@ -13,6 +13,7 @@ import pytest
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
 from app.integrations.extraction import (
     EXTRACTION_TOOL_SCHEMA,
+    SEMANTIC_DEGRADED_REASON_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT,
     ExtractionError,
     ExtractionIntegration,
 )
@@ -558,6 +559,112 @@ async def test_extract_defaults_flag_fields_when_omitted() -> None:
 
     assert result.line_items[0].flagged is False
     assert result.line_items[0].flag_reason is None
+
+
+async def test_extract_degrades_when_substantial_transcript_has_no_line_items() -> None:
+    transcript = (
+        "Customer asked for gutter cleaning, downspout flush, roof debris sweep, driveway edge "
+        "cleanup, and mulch touch-up around front beds, then asked us to confirm schedule, "
+        "materials, and final scope details before the next rain."
+    )
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [],
+                        "total": None,
+                        "confidence_notes": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.extraction_tier == "degraded"
+    assert (
+        result.extraction_degraded_reason_code
+        == SEMANTIC_DEGRADED_REASON_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT
+    )
+    assert any("No line items were extracted" in note for note in result.confidence_notes)
+
+
+async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> None:
+    transcript = TRANSCRIPTS["total_only"]
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Driveway repair and reseal",
+                                "details": None,
+                                "price": None,
+                            }
+                        ],
+                        "total": 2100,
+                        "confidence_notes": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.extraction_tier == "primary"
+    assert result.extraction_degraded_reason_code is None
+    assert any(
+        "Total was extracted without any priced line items" in note
+        for note in result.confidence_notes
+    )
+
+
+async def test_extract_flags_duplicate_line_items_with_warning_note() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Brown mulch",
+                                "details": "Front beds",
+                                "price": 120,
+                            },
+                            {
+                                "description": "brown   mulch",
+                                "details": "Walkway beds",
+                                "price": 120,
+                            },
+                        ],
+                        "total": 240,
+                        "confidence_notes": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.extraction_tier == "primary"
+    assert all(item.flagged is True for item in result.line_items)
+    assert all(item.flag_reason for item in result.line_items)
+    assert any("Duplicate extracted line items" in note for note in result.confidence_notes)
 
 
 async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
