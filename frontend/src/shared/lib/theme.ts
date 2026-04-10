@@ -20,7 +20,7 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 }
 
 export function sanitizeThemePreference(value: unknown): ThemePreference {
-  return isThemePreference(value) ? value : "system";
+  return isThemePreference(value) ? value : "dark";
 }
 
 function getThemeStorage(storage?: Storage | null): Storage | null {
@@ -41,23 +41,23 @@ function getThemeStorage(storage?: Storage | null): Storage | null {
 
 export function getStoredThemePreference(storage = getThemeStorage()): ThemePreference {
   if (!storage) {
-    return "system";
+    return "dark";
   }
 
   try {
     const storedPreference = storage.getItem(THEME_STORAGE_KEY);
     if (storedPreference === null) {
-      return "system";
+      return "dark";
     }
 
     const preference = sanitizeThemePreference(storedPreference);
-    if (preference === "system" && storedPreference !== "system") {
+    if (preference !== storedPreference) {
       storage.removeItem(THEME_STORAGE_KEY);
     }
 
     return preference;
   } catch {
-    return "system";
+    return "dark";
   }
 }
 

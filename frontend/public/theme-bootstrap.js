@@ -7,7 +7,7 @@
   const lightForeground = "#0d1c2e";
   const validPreferences = new Set(["system", "light", "dark"]);
 
-  let savedPreference = "system";
+  let savedPreference = "dark";
 
   try {
     const storedValue = window.localStorage.getItem(storageKey);
@@ -17,7 +17,7 @@
       window.localStorage.removeItem(storageKey);
     }
   } catch {
-    savedPreference = "system";
+    savedPreference = "dark";
   }
 
   const systemTheme =

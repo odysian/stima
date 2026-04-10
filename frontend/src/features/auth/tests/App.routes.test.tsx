@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "@/App";
@@ -17,6 +17,24 @@ vi.mock("@/features/auth/services/authService", () => ({
 }));
 
 const mockedAuthService = vi.mocked(authService);
+
+interface RouteLocationState {
+  from?: {
+    pathname?: string;
+  };
+}
+
+function LocationProbe(): React.ReactElement {
+  const location = useLocation();
+  const fromPathname = (location.state as RouteLocationState | undefined)?.from?.pathname ?? "";
+
+  return (
+    <>
+      <p data-testid="location-pathname">{location.pathname}</p>
+      <p data-testid="location-from-pathname">{fromPathname}</p>
+    </>
+  );
+}
 
 function renderApp(path: string): void {
   Object.defineProperty(window, "matchMedia", {
@@ -38,6 +56,7 @@ function renderApp(path: string): void {
       <MemoryRouter initialEntries={[path]}>
         <AuthProvider>
           <App />
+          <LocationProbe />
         </AuthProvider>
       </MemoryRouter>
     </ThemeProvider>,
@@ -114,12 +133,22 @@ describe("App routes", () => {
     expect(screen.queryByText(/settings coming soon/i)).not.toBeInTheDocument();
   });
 
-  it("redirects unauthenticated users from protected route to login", async () => {
+  it("renders the landing page for unauthenticated users at root", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
 
     renderApp("/");
 
+    expect(await screen.findByRole("heading", { name: /capture the job first/i })).toBeInTheDocument();
+  });
+
+  it("preserves the protected route in login state so users return after sign-in", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderApp("/settings");
+
     expect(await screen.findByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/login");
+    expect(screen.getByTestId("location-from-pathname")).toHaveTextContent("/settings");
   });
 
   it("routes retired quote line-item edit deep links to the default fallback", async () => {
