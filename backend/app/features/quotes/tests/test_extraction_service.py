@@ -84,7 +84,7 @@ async def test_convert_notes_captures_extraction_errors(monkeypatch: pytest.Monk
     assert isinstance(captured[0], ExtractionError)
 
 
-async def test_capture_audio_captures_audio_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_extract_combined_captures_audio_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[BaseException] = []
     monkeypatch.setattr(sentry_sdk, "capture_exception", captured.append)
     service = ExtractionService(
@@ -94,13 +94,13 @@ async def test_capture_audio_captures_audio_errors(monkeypatch: pytest.MonkeyPat
     )
 
     with pytest.raises(QuoteServiceError, match="mock audio failure"):
-        await service.capture_audio([_clip()])
+        await service.extract_combined([_clip()], None)
 
     assert len(captured) == 1
     assert isinstance(captured[0], AudioError)
 
 
-async def test_capture_audio_captures_transcription_errors(
+async def test_extract_combined_captures_transcription_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: list[BaseException] = []
@@ -112,7 +112,7 @@ async def test_capture_audio_captures_transcription_errors(
     )
 
     with pytest.raises(QuoteServiceError, match="Transcription failed"):
-        await service.capture_audio([_clip()])
+        await service.extract_combined([_clip()], None)
 
     assert len(captured) == 1
     assert isinstance(captured[0], TranscriptionError)

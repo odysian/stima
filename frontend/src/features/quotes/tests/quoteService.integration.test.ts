@@ -428,56 +428,6 @@ describe("quoteService integration (MSW)", () => {
     expect(capturedCustomerId).toBe("cust-1");
   });
 
-  it("captureAudio sends multipart clips and returns ExtractionResult", async () => {
-    setCsrfToken("integration-csrf-token");
-    let capturedCsrfHeader: string | null = null;
-    let capturedContentType: string | null = null;
-
-    server.use(
-      http.post("/api/quotes/capture-audio", async ({ request }) => {
-        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
-        capturedContentType = request.headers.get("Content-Type");
-
-        return HttpResponse.json({
-          transcript: "transcript from voice",
-          line_items: [
-            {
-              description: "Mulch",
-              details: "5 yards",
-              price: 120,
-              flagged: true,
-              flag_reason: "Unit phrasing may be ambiguous",
-            },
-          ],
-          total: 120,
-          confidence_notes: [],
-        });
-      }),
-    );
-
-    const result = await quoteService.captureAudio([
-      new Blob(["clip-1"], { type: "audio/webm" }),
-      new Blob(["clip-2"], { type: "audio/webm" }),
-    ]);
-
-    expect(capturedCsrfHeader).toBe("integration-csrf-token");
-    expect(capturedContentType).not.toContain("application/json");
-    expect(result).toEqual({
-      transcript: "transcript from voice",
-      line_items: [
-        {
-          description: "Mulch",
-          details: "5 yards",
-          price: 120,
-          flagged: true,
-          flag_reason: "Unit phrasing may be ambiguous",
-        },
-      ],
-      total: 120,
-      confidence_notes: [],
-    });
-  });
-
   it("extract sends multipart clips with CSRF protection", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;

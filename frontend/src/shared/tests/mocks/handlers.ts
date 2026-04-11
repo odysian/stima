@@ -280,27 +280,6 @@ export const handlers = [
     );
   }),
 
-  http.post("/api/quotes/capture-audio", ({ request }) => {
-    const csrfError = requireCsrf(request);
-    if (csrfError) return csrfError;
-
-    return HttpResponse.json(
-      {
-        transcript: "Transcribed clip transcript",
-        line_items: [
-          {
-            description: "Brown mulch",
-            details: "5 yards",
-            price: 120,
-          },
-        ],
-        total: 120,
-        confidence_notes: [],
-      },
-      { status: 200 },
-    );
-  }),
-
   http.post("/api/quotes/extract", async ({ request }) => {
     const csrfError = requireCsrf(request);
     if (csrfError) return csrfError;

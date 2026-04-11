@@ -224,29 +224,6 @@ async def create_manual_draft(
 
 
 @router.post(
-    "/capture-audio",
-    response_model=ExtractionResult,
-    dependencies=[Depends(require_csrf)],
-)
-@limiter.limit(lambda: get_settings().quote_audio_capture_rate_limit, key_func=get_user_key)
-async def capture_audio(
-    request: Request,
-    clips: Annotated[list[UploadFile], File(...)],
-    user: Annotated[User, Depends(get_current_user)],
-    extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
-) -> ExtractionResult:
-    """Convert audio clips into extraction output without creating a persisted draft."""
-    del request
-    async with extraction_capacity_guard(user.id):
-        clip_inputs = await _parse_upload_clips(clips)
-
-        try:
-            return await extraction_service.capture_audio(clip_inputs)
-        except QuoteServiceError as exc:
-            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-
-
-@router.post(
     "/extract",
     response_model=PersistedExtractionResponse | JobRecordResponse,
     dependencies=[Depends(require_csrf)],
