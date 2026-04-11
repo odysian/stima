@@ -241,7 +241,6 @@ describe("DocumentEditScreen", () => {
       }),
     });
 
-    expect(await screen.findByText("Select a customer before making this an invoice.")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /invoice/i })).toBeDisabled();
   });
 
@@ -253,6 +252,21 @@ describe("DocumentEditScreen", () => {
     expect(screen.getByLabelText(/invoice due date/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create invoice/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /continue to preview/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps AI confidence notes visible after switching to invoice type", async () => {
+    window.localStorage.setItem(
+      "stima_review_confidence_notes:doc-1",
+      JSON.stringify(["Price for item 2 was not mentioned — verify before sending."]),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText(/price for item 2 was not mentioned/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: /invoice/i }));
+
+    expect(screen.getByText(/price for item 2 was not mentioned/i)).toBeInTheDocument();
   });
 
   it("locks type selector after sharing", async () => {

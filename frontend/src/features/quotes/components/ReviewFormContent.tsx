@@ -93,7 +93,7 @@ export function ReviewFormContent({
   return (
     <form
       id="quote-review-form"
-      className="mx-auto w-full max-w-2xl space-y-5 px-4 pb-24 pt-20"
+      className="mx-auto w-full max-w-2xl space-y-4 px-4 pb-24 pt-20"
       onSubmit={(event) => event.preventDefault()}
     >
       {locationNotice ? (
@@ -188,7 +188,7 @@ export function ReviewFormContent({
         </section>
       ) : null}
 
-      {showQuoteOnlySections && hasVisibleConfidenceNotes ? (
+      {hasVisibleConfidenceNotes ? (
         <div className="space-y-2">
           {confidenceNotes.map((note, index) => (
             <AIConfidenceBanner
