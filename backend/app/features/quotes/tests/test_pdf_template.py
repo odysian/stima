@@ -23,6 +23,7 @@ from app.integrations.pdf import PdfIntegration
 
 def _make_context(
     *,
+    business_name: str | None = "Acme Landscaping",
     title: str | None = None,
     doc_label: str = "Quote",
     doc_number: str = "Q-201",
@@ -54,7 +55,7 @@ def _make_context(
         quote_id=uuid4(),
         user_id=uuid4(),
         customer_id=uuid4(),
-        business_name="Acme Landscaping",
+        business_name=business_name,
         first_name=first_name,
         last_name=last_name,
         phone_number=phone_number,
@@ -438,6 +439,73 @@ def test_render_hides_owner_name_when_both_name_fields_are_null(
 
     assert result == b"fake-pdf"
     assert 'class="owner-name"' not in captured_html[0]
+
+
+def test_render_falls_back_to_owner_name_when_business_name_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            business_name=None,
+            first_name="Jamie",
+            last_name="Owner",
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert '<h1 class="company-name">Jamie Owner</h1>' in rendered_html
+    assert 'class="owner-name"' not in rendered_html
+    assert "Stima" not in rendered_html
+
+
+def test_render_omits_company_name_when_business_and_owner_names_are_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            business_name=None,
+            first_name=None,
+            last_name=None,
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert 'class="company-name"' not in rendered_html
+    assert "Stima" not in rendered_html
 
 
 def test_render_includes_logo_image_only_when_logo_data_uri_is_present(

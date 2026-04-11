@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Stima {{ doc_label }}</title>
+    <title>{{ (business_name or (((first_name or "") ~ " " ~ (last_name or "")).strip()) or doc_label) }} {{ doc_label }}</title>
     <style>
       @page {
         size: A4;
@@ -273,14 +273,18 @@
   </head>
   <body>
     <main>
+      {% set business_name = (business_name or "").strip() %}
       {% set owner_name = ((first_name or "") ~ " " ~ (last_name or "")).strip() %}
+      {% set display_name = business_name or owner_name %}
       <header class="header">
         <table class="header-grid">
           <tbody>
             <tr>
               <td>
-                <h1 class="company-name">{{ business_name or ("Stima " ~ doc_label) }}</h1>
-                {% if owner_name %}
+                {% if display_name %}
+                <h1 class="company-name">{{ display_name }}</h1>
+                {% endif %}
+                {% if business_name and owner_name %}
                 <p class="owner-name">{{ owner_name }}</p>
                 {% endif %}
                 {% if phone_number %}

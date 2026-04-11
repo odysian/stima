@@ -959,6 +959,7 @@ async def get_public_quote(
         return PublicInvoiceResponse(
             doc_type="invoice",
             business_name=_resolve_public_business_name(quote),
+            owner_name=_resolve_public_owner_name(quote),
             customer_name=quote.customer_name,
             doc_number=quote.doc_number,
             title=quote.title,
@@ -983,6 +984,7 @@ async def get_public_quote(
     return PublicQuoteResponse(
         doc_type="quote",
         business_name=_resolve_public_business_name(quote),
+        owner_name=_resolve_public_owner_name(quote),
         customer_name=quote.customer_name,
         doc_number=quote.doc_number,
         title=quote.title,
@@ -1046,10 +1048,15 @@ def _resolve_public_business_name(quote: _BusinessNameContext) -> str | None:
     if quote.business_name and quote.business_name.strip():
         return quote.business_name.strip()
 
-    fallback_name = " ".join(
+    return _resolve_public_owner_name(quote)
+
+
+def _resolve_public_owner_name(quote: _BusinessNameContext) -> str | None:
+    """Return owner full name when profile first/last name fields are present."""
+    owner_name = " ".join(
         value.strip() for value in (quote.first_name, quote.last_name) if value and value.strip()
     )
-    return fallback_name or None
+    return owner_name or None
 
 
 def _build_authenticated_pdf_artifact_response(

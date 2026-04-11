@@ -30,11 +30,17 @@ function getDisplayTitle(documentData: PublicDocument | null): string {
   return documentData.title?.trim() || documentData.doc_number;
 }
 
-function getDisplayBusinessName(documentData: PublicDocument | null): string {
+function getDisplayBusinessName(documentData: PublicDocument | null): string | null {
   if (!documentData) {
-    return "Stima";
+    return null;
   }
-  return documentData.business_name?.trim() || "Stima";
+  const businessName = documentData.business_name?.trim();
+  if (businessName) {
+    return businessName;
+  }
+
+  const ownerName = documentData.owner_name?.trim();
+  return ownerName || null;
 }
 
 function getDocumentLabel(documentData: PublicDocument | null): string {
@@ -86,7 +92,9 @@ export function PublicQuotePage(): React.ReactElement {
       document.title = "Shared Document";
       return;
     }
-    document.title = `${getDisplayTitle(documentData)} | ${getDisplayBusinessName(documentData)}`;
+    const businessName = getDisplayBusinessName(documentData);
+    const displayTitle = getDisplayTitle(documentData);
+    document.title = businessName ? `${displayTitle} | ${businessName}` : displayTitle;
   }, [documentData, hasToken, loadState]);
 
   useEffect(() => {
@@ -174,7 +182,8 @@ export function PublicQuotePage(): React.ReactElement {
     && (documentData.status === "approved" || documentData.status === "declined")
     ? statusCopy[documentData.status]
     : null;
-  const businessInitial = getDisplayBusinessName(documentData).slice(0, 1).toUpperCase();
+  const displayBusinessName = getDisplayBusinessName(documentData);
+  const businessInitial = (displayBusinessName ?? getDocumentLabel(documentData)).slice(0, 1).toUpperCase();
   const pricingBreakdown = calculatePricingFromPersisted(
     {
       totalAmount: documentData.total_amount,
@@ -196,7 +205,7 @@ export function PublicQuotePage(): React.ReactElement {
                 {showLogo ? (
                   <img
                     src={documentData.logo_url}
-                    alt={`${getDisplayBusinessName(documentData)} logo`}
+                    alt={displayBusinessName ? `${displayBusinessName} logo` : `${getDocumentLabel(documentData)} logo`}
                     className="h-full w-full object-cover"
                     onError={() => setHiddenLogoUrl(documentData.logo_url)}
                   />
@@ -205,9 +214,11 @@ export function PublicQuotePage(): React.ReactElement {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-on-primary/70">
-                  {getDisplayBusinessName(documentData)}
-                </p>
+                {displayBusinessName ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-on-primary/70">
+                    {displayBusinessName}
+                  </p>
+                ) : null}
                 <h1 className="mt-3 text-3xl font-semibold leading-tight">
                   {getDisplayTitle(documentData)}
                 </h1>
