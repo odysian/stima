@@ -6,6 +6,7 @@ import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { InvoiceDetail } from "@/features/invoices/types/invoice.types";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
+import { HttpRequestError } from "@/shared/lib/http";
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
@@ -189,7 +190,7 @@ describe("usePersistedReview", () => {
   });
 
   it("falls back to invoice endpoint when quote lookup returns not found", async () => {
-    mockedQuoteService.getQuote.mockRejectedValueOnce(new Error("Not found"));
+    mockedQuoteService.getQuote.mockRejectedValueOnce(new HttpRequestError("Not found", 404, null));
     mockedInvoiceService.getInvoice.mockResolvedValueOnce(makeInvoice());
 
     const { result } = renderHook(() => usePersistedReview("doc-1"));
@@ -200,5 +201,20 @@ describe("usePersistedReview", () => {
 
     expect(result.current.document?.doc_number).toBe("I-001");
     expect(result.current.draft?.docType).toBe("invoice");
+  });
+
+  it("propagates non-404 quote errors without falling back to invoice endpoint", async () => {
+    mockedQuoteService.getQuote.mockRejectedValueOnce(
+      new HttpRequestError("Internal Server Error", 500, null),
+    );
+
+    const { result } = renderHook(() => usePersistedReview("doc-1"));
+
+    await waitFor(() => {
+      expect(result.current.isLoadingDocument).toBe(false);
+    });
+
+    expect(result.current.loadError).toBeTruthy();
+    expect(mockedInvoiceService.getInvoice).not.toHaveBeenCalled();
   });
 });

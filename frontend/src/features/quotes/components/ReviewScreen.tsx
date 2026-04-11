@@ -5,10 +5,9 @@ import { profileService } from "@/features/profile/services/profileService";
 import { DocumentEditScreenView } from "@/features/quotes/components/DocumentEditScreenView";
 import { buildDefaultInvoiceDueDate, buildDocumentSnapshotKey, buildSaveValidationMessage, isInvoiceDocument, persistDocumentDraft } from "@/features/quotes/components/documentEditUtils";
 import { applyLineItemSheetDelete, applyLineItemSheetSave, resolveLineItemSheetInitialItem, type ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
-import { EMPTY_LINE_ITEM, isInvalidLineItem, normalizeLineItem } from "@/features/quotes/components/reviewScreenUtils";
+import { buildLineItemSubmitState, EMPTY_LINE_ITEM } from "@/features/quotes/components/reviewScreenUtils";
 import { usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { LineItemDraft } from "@/features/quotes/types/quote.types";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { buildDraftSnapshot, readReviewLocationState, resolveBackTarget } from "@/features/quotes/utils/reviewScreenState";
 import { readQuoteConfidenceNotes, writeQuoteConfidenceNotes } from "@/features/quotes/utils/reviewConfidenceNotes";
@@ -216,21 +215,11 @@ export function DocumentEditScreen(): React.ReactElement {
   const activeDocument = document;
   const activeDraft = draft;
 
-  const normalizedLineItems = activeDraft.lineItems.map(normalizeLineItem);
-  const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
-  const lineItemsForSubmit: LineItemDraft[] = normalizedLineItems
-    .filter((lineItem) => lineItem.description.length > 0)
-    .map((lineItem) => ({
-      description: lineItem.description,
-      details: lineItem.details,
-      price: lineItem.price,
-    }));
-  const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
-    if (lineItem.price === null) {
-      return runningTotal;
-    }
-    return runningTotal + lineItem.price;
-  }, 0);
+  const {
+    hasInvalidLineItems,
+    lineItemsForSubmit,
+    lineItemSum,
+  } = buildLineItemSubmitState(activeDraft.lineItems);
 
   const isInteractionLocked = submitAction !== null || isAssigningCustomer;
   const lineItemSheetInitialItem = lineItemSheetState
@@ -305,6 +294,11 @@ export function DocumentEditScreen(): React.ReactElement {
       });
       const refreshedDocument = await refreshDocument({ reseedDraft: true });
       setSavedSnapshotKey(buildDocumentSnapshotKey(refreshedDocument));
+
+      const typeChanged = isInvoiceDocument(activeDocument) !== isInvoiceDocument(refreshedDocument);
+      if (typeChanged) {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
 
       if (nextAction === "continue") {
         if (activeDraft.docType === "invoice") {

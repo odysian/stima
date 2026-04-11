@@ -14,7 +14,10 @@ export function isInvoiceDocument(document: PersistedEditableDocument): document
 export function buildDefaultInvoiceDueDate(): string {
   const nextDate = new Date();
   nextDate.setDate(nextDate.getDate() + 30);
-  return nextDate.toISOString().slice(0, 10);
+  const year = nextDate.getFullYear();
+  const month = String(nextDate.getMonth() + 1).padStart(2, "0");
+  const day = String(nextDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function buildDocumentSnapshotKey(document: PersistedEditableDocument): string {

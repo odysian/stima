@@ -4,6 +4,7 @@ import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
+import { isHttpRequestError } from "@/shared/lib/http";
 import {
   clearDocumentDraftFromStorage,
   mapDocumentToEditDraft,
@@ -31,6 +32,10 @@ async function fetchEditableDocument(documentId: string): Promise<PersistedEdita
     return quote;
   } catch (quoteError) {
     if (quoteError instanceof Error && quoteError.message === "This quote can no longer be edited.") {
+      throw quoteError;
+    }
+
+    if (!isHttpRequestError(quoteError) || quoteError.status !== 404) {
       throw quoteError;
     }
 

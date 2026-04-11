@@ -1,8 +1,8 @@
 import { DocumentEditOverlays } from "@/features/quotes/components/DocumentEditOverlays";
 import { ReviewActionFooter } from "@/features/quotes/components/ReviewActionFooter";
 import { ReviewFormContent } from "@/features/quotes/components/ReviewFormContent";
+import { isInvoiceDocument } from "@/features/quotes/components/documentEditUtils";
 import type { ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
-import type { InvoiceDetail } from "@/features/invoices/types/invoice.types";
 import { type DocumentEditDraft, type PersistedEditableDocument } from "@/features/quotes/hooks/usePersistedReview";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
@@ -57,10 +57,6 @@ interface DocumentEditScreenViewProps {
   onDismissToast: () => void;
   onLeaveConfirm: () => void;
   onLeaveCancel: () => void;
-}
-
-function isInvoiceDocument(document: PersistedEditableDocument): document is InvoiceDetail {
-  return "customer" in document;
 }
 
 export function DocumentEditScreenView({
