@@ -286,7 +286,7 @@ export function CustomerDetailScreen(): React.ReactElement {
                         state: createCaptureLocationState(`/customers/${customer.id}`),
                       })}
                     >
-                      Create Quote
+                      Create Document
                     </Button>
                     <button
                       type="button"
