@@ -89,6 +89,16 @@ Runbooks:
 | created_at | DateTime(tz) | server default |
 | revoked_at | DateTime(tz) | nullable, soft-revoke |
 
+### `password_reset_tokens`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → users) | indexed, cascade delete |
+| token_hash | String(64) | SHA-256, unique, indexed |
+| expires_at | DateTime(tz) | |
+| used_at | DateTime(tz) | nullable, set after one-time use |
+| created_at | DateTime(tz) | server default |
+
 ### `customers`
 | Column | Type | Notes |
 |---|---|---|
@@ -114,6 +124,8 @@ Runbooks:
 | status | String(20) | `draft \| ready \| shared \| viewed \| approved \| declined \| sent \| paid \| void` with DB check constraint; `sent`, `paid`, and `void` are invoice-only |
 | source_type | String(20) | `"text"` or `"voice"` based on capture mode |
 | transcript | Text | stored source transcript/notes inherited from capture flow |
+| extraction_tier | String(20) | nullable extraction quality tier (`primary` or `degraded`) persisted for extraction-created quote drafts |
+| extraction_degraded_reason_code | String(64) | nullable degraded extraction reason; only present when `extraction_tier = 'degraded'` |
 | total_amount | Numeric(10,2) | nullable, user-editable |
 | notes | Text | nullable, customer-facing notes |
 | due_date | Date | nullable; used by invoice documents |
@@ -130,6 +142,12 @@ Runbooks:
 Unique constraints:
 - `(user_id, doc_type, doc_sequence)`
 - partial unique invoice-source index on `source_document_id` where `doc_type = 'invoice'`
+
+Relevant check constraints:
+- `ck_documents_invoice_customer_required`: invoice rows require a non-null `customer_id`
+- `ck_documents_extraction_tier_valid`: `extraction_tier IS NULL OR extraction_tier IN ('primary', 'degraded')`
+- `ck_documents_degraded_reason_requires_tier`: `extraction_degraded_reason_code IS NULL OR extraction_tier = 'degraded'`
+- `ck_documents_invoice_extraction_fields_null`: invoice rows keep extraction-outcome columns null
 
 ### `line_items`
 | Column | Type | Notes |
@@ -168,6 +186,7 @@ Pilot event set:
 - `quote_started`
 - `audio_uploaded`
 - `draft_generated`
+- `manual_draft_created`
 - `quote_append_extracted`
 - `draft_generation_failed`
 - `quote_pdf_generated`
@@ -180,6 +199,8 @@ Pilot event set:
 - `invoice_viewed`
 - `invoice_paid`
 - `invoice_voided`
+
+`draft_generated` event metadata includes `extraction_outcome` with canonical values `primary` or `degraded`.
 
 These underscore names are the canonical quote-flow vocabulary for pilot instrumentation; dot-notation events such as `quote.created`, `quote.updated`, `quote.deleted`, and `customer.created` remain separate operational logs outside the pilot analytics scope.
 
@@ -222,7 +243,7 @@ Internal analytics access:
 | `/customers` | POST | yes | cookie | `{ name, phone?, email?, address? }` | `201 Customer` |
 | `/customers/{id}` | GET | no | cookie | — | `200 Customer` or `404 { detail: "Not found" }` |
 | `/customers/{id}` | PATCH | yes | cookie | partial `{ name?, phone?, email?, address? }` | `200 Customer` or `404 { detail: "Not found" }` |
-| `/customers/{id}` | DELETE | yes | cookie | — | `204` or `404 { detail: "Not found" }` |
+| `/customers/{id}` | DELETE | yes | cookie | — | `204` or `404 { detail: "Not found" }`; successful deletes rely on FK cascade and remove owned quote/invoice rows for that customer |
 
 ### Quote extraction + CRUD endpoints (`/api/quotes`)
 
@@ -285,9 +306,10 @@ For `job_type = "extraction"`:
 | `/quotes/{id}/append-extraction` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `202 JobRecordResponse` when ARQ is available, otherwise `200 PersistedExtractionResponse`; appends extracted line items to the existing owned quote, preserves existing rows/order, recomputes totals from the full line-item list, and appends transcript entries under one `Added later:` bullet-list section; returns `404` for unknown or foreign-owned quotes, `429` on extraction guard exhaustion, and `503 { detail: "Unable to start extraction right now. Please try again." }` when enqueue fails |
 | `/jobs/{job_id}` | GET | no | cookie | — | `200 JobRecordResponse` for owned jobs, with `quote_id` populated on successful extraction jobs and `extraction_result` retained for backward compatibility; `404 { detail: "Not found" }` for unknown or foreign-owned jobs |
 | `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"`; this route remains customer-required, while extraction-created unassigned drafts are reserved for the extraction worker flow |
+| `/quotes/manual-draft` | POST | yes | cookie | `{ customer_id? }` | `201 Quote` with `status: "draft"`, no extraction required, emits structured `manual_draft_created` event |
 | `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`; `customer_id` / `customer_name` may be `null` for unassigned drafts and each row includes `requires_customer_assignment` plus `can_reassign_customer`) |
 | `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + nullable `customer_name`, `customer_email`, `customer_phone`, helper flags `requires_customer_assignment` / `can_reassign_customer` / `has_active_share`, and `linked_invoice`) or `404 { detail: "Not found" }` |
-| `/quotes/{id}` | PATCH | yes | cookie | partial `{ customer_id?, title?, transcript?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes; allows `customer_id: null -> UUID` assignment plus draft/ready reassignment, rejects clearing an assigned customer with `409 { detail: "Customer cannot be cleared from a quote." }`, rejects reassignment after sharing or invoice conversion with `409 { detail: "Customer cannot be changed after sharing or invoice conversion." }`, or `404 { detail: "Not found" }` |
+| `/quotes/{id}` | PATCH | yes | cookie | partial `{ customer_id?, title?, transcript?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount?, doc_type?, due_date? }` | `200 Quote` for editable quote states; also supports quote `doc_type` transition to `invoice` under strict constraints (see behavior rules below), otherwise returns `409` on invalid transitions or `404 { detail: "Not found" }` |
 | `/quotes/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Quote`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, preserves terminal quote status on resend, and returns `409 { detail: "Assign a customer before continuing." }` for unassigned drafts |
 | `/quotes/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current quote share token without leaking token state publicly |
 | `/quotes/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `202 JobRecordResponse` after ensuring the quote is shared, creating a durable `email` job row, and enqueueing worker delivery; replayed same-key responses return the same `202` payload with `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when quote is missing/not owned, `409` when the quote has no assigned customer, when the quote is still `draft`, when the same key is reused for a different quote, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, or `503 { detail: "Unable to start email delivery right now. Please try again." }` when enqueue fails after job creation |
@@ -311,7 +333,7 @@ Quote extraction guardrails:
 | `/invoices` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Invoice` with `doc_number` (`I-001`), `status: "draft"`, server-default `due_date`, and nullable `source_document_id` |
 | `/invoices` | GET | no | cookie | `customer_id?` (UUID query param) | `200 InvoiceListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; includes both direct invoices and quote-derived invoices) |
 | `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail` (including `has_active_share`), `404 { detail: "Not found" }` |
-| `/invoices/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, due_date?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
+| `/invoices/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, due_date?, tax_rate?, discount_type?, discount_value?, deposit_amount?, doc_type? }` | `200 Invoice` for `draft`, `ready`, `sent`, `paid`, and `void` invoices; supports invoice `doc_type` transition to `quote` only under strict constraints (see behavior rules below), or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
 | `/invoices/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Invoice`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, and transitions invoice to `sent` |
 | `/invoices/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current invoice share token without leaking token state publicly |
@@ -347,6 +369,10 @@ Public landing-page rules:
 - If `customer_id` is present and unchanged, the patch is a `200` no-op even on otherwise locked statuses.
 - If `customer_id` is present and set to `null` for an already assigned quote, the API returns `409 { "detail": "Customer cannot be cleared from a quote." }`.
 - If `customer_id` changes after the quote is `shared`, `viewed`, `approved`, or `declined`, or once a linked invoice exists, the API returns `409 { "detail": "Customer cannot be changed after sharing or invoice conversion." }`.
+- If `doc_type` is omitted, the existing doc type is preserved.
+- If `doc_type = "invoice"`, transition is allowed only when all of these hold: current type is `quote`, status is `draft` or `ready`, no active/past share token exists, customer is assigned, and no linked invoice already exists.
+- Successful quote -> invoice transition regenerates numbering (`I-###`), sets invoice `doc_sequence`, clears extraction-outcome columns, and sets `due_date` (request value when provided, otherwise default).
+- Any unsupported doc-type transition (including attempting to set back to `quote` through this endpoint) returns `409`.
 - If `title` is present, blank or whitespace-only values are normalized to `null`.
 - If `title` is omitted, the existing title is preserved.
 - If `transcript` is present, it is patchable with the same length validation as create.
@@ -354,6 +380,12 @@ Public landing-page rules:
 - If `line_items` is omitted, existing rows are preserved.
 - Editing preserves the persisted quote status and any existing `share_token` / `shared_at` values.
 - Shared, viewed, approved, and declined quotes stay editable even though they remain non-deletable customer-visible documents.
+
+`PATCH /invoices/{id}` doc-type behavior:
+- If `doc_type` is omitted, the existing doc type is preserved.
+- If `doc_type = "quote"`, transition is allowed only when all of these hold: current type is `invoice`, status is `draft` or `ready`, no active/past share token exists, and `source_document_id IS NULL` (direct invoice only).
+- Successful invoice -> quote transition regenerates numbering (`Q-###`), sets quote `doc_sequence`, and clears `due_date`.
+- Any unsupported doc-type transition (including quote-derived invoices) returns `409`.
 
 `POST /quotes/{id}/send-email` behavior:
 - `Idempotency-Key` is mandatory; missing keys return `400 { "detail": "Idempotency-Key header is required" }`.
@@ -427,6 +459,29 @@ Invoice rules:
 - editing preserves the persisted invoice status plus any existing `share_token` / `shared_at` values
 - editing a `ready` invoice keeps it in `ready`; editing a `sent`, `paid`, or `void` invoice keeps its status unchanged
 - invoice public landing pages share the same `/doc/{share_token}` route shell as quotes, but render invoice-specific fields (`due_date`, `status = sent`) without quote-only terminal-state messaging; paid/void invoices remain publicly accessible and also render `status = sent` on the public page
+
+## V1 Roadmap Cross-Reference
+
+Current implementation status against `docs/V1_ROADMAP.md` milestones:
+
+| Milestone | Roadmap Status | Implementation Status In This Codebase | Notes |
+|---|---|---|---|
+| Pre-V1 Polish | Included in build order foundations | Complete | Customer detail condensation and optional document title are reflected in documented contracts |
+| M0 Branding Foundation | Shipped | Complete | Logo upload/storage and PDF rendering are documented and live |
+| M1 Quote Status Expansion | Shipped | Complete | Expanded quote lifecycle + mark-won/mark-lost contracts are live |
+| M2 Public Quote Landing Page | Shipped | Complete | Public token-gated landing contracts and quote-view logging are live |
+| M3 Email Delivery + Copy Link | Shipped | Complete | Send-email/idempotency/share contracts are live |
+| M4 Quote PDF Presentation Refinement | Shipped | Complete | Quote PDF and render-context refinements are reflected in backend contracts |
+| M5 Won Quote -> Linked Invoice | Shipped | Complete | Quote-to-invoice conversion and linked detail contracts are live |
+| M6 Operational Visibility | Shipped | Complete | Structured events + admin analytics contract are documented |
+| M7 Optional Pricing Controls | Active Forward Path | Complete in current contracts | Optional tax/discount/deposit fields are implemented across schema/API/public rendering contracts |
+| M8 Contractor-First Document Flow | Shipped | Complete | Shared builder flow assumptions, editable status behavior, and direct invoice path are reflected in API/schema contracts |
+
+Deferred/descoped feature tags (from V1 roadmap decisions):
+- `expired` quote status: deferred; not part of persisted status contract
+- `quote_declined` event: reserved for future customer-driven decline action; not a current emitted V1 event
+- `quote_changes_requested` and `quote_expired` events: removed from V1 scope and not part of canonical event names
+- Payment collection, AR workflows, and per-line-item tax automation: explicitly out of scope for V1
 
 ### Error format
 ```json
