@@ -27,7 +27,6 @@ from app.features.invoices import (
 from app.features.invoices.repository import InvoiceRepository
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
-from app.features.quotes import api as quote_api
 from app.features.quotes import email_delivery_service
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, LineItem, QuoteStatus
@@ -56,7 +55,6 @@ from app.shared.input_limits import (
     DOCUMENT_TRANSCRIPT_MAX_CHARS,
     LINE_ITEM_DESCRIPTION_MAX_CHARS,
     LINE_ITEM_DETAILS_MAX_CHARS,
-    MAX_AUDIO_CLIPS_PER_REQUEST,
     NOTE_INPUT_MAX_CHARS,
 )
 from app.shared.rate_limit import reset_local_rate_limit_state
@@ -2869,164 +2867,6 @@ async def test_convert_notes_can_return_flagged_line_items(client: AsyncClient) 
     assert payload["line_items"][0]["flag_reason"]
 
 
-async def test_capture_audio_single_clip_success(client: AsyncClient) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[("clips", ("clip-1.webm", b"clip-a", "audio/webm"))],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["transcript"] == "transcript from stitched-1"
-    assert payload["line_items"]
-    assert payload["confidence_notes"] == []
-
-
-async def test_capture_audio_can_return_flagged_line_items(client: AsyncClient) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[("clips", ("clip-1.webm", b"clip-a", "audio/webm"))],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["line_items"][0]["flagged"] is True
-    assert payload["line_items"][0]["flag_reason"]
-
-
-async def test_capture_audio_multi_clip_success(client: AsyncClient) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[
-            ("clips", ("clip-1.webm", b"clip-a", "audio/webm")),
-            ("clips", ("clip-2.webm", b"clip-b", "audio/webm")),
-        ],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 200
-    assert response.json()["transcript"] == "transcript from stitched-2"
-
-
-async def test_capture_audio_rejects_too_many_clips(client: AsyncClient) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[
-            ("clips", (f"clip-{index}.webm", b"x", "audio/webm"))
-            for index in range(MAX_AUDIO_CLIPS_PER_REQUEST + 1)
-        ],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 400
-    assert response.json() == {
-        "detail": f"No more than {MAX_AUDIO_CLIPS_PER_REQUEST} audio clips are allowed"
-    }
-
-
-async def test_capture_audio_missing_clips_field_returns_422(
-    client: AsyncClient,
-) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 422
-
-
-async def test_capture_audio_rejects_empty_clip_with_400(client: AsyncClient) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[("clips", ("clip-1.webm", b"", "audio/webm"))],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 400
-    assert response.json() == {"detail": "Audio clip is empty"}
-
-
-async def test_capture_audio_rejects_unsupported_clip_with_400(
-    client: AsyncClient,
-) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[("clips", ("clip-1.webm", b"unsupported", "audio/webm"))],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 400
-    assert response.json() == {"detail": "Audio clip format is not supported or file is corrupted"}
-
-
-async def test_capture_audio_rejects_oversized_clip_with_400(
-    client: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(quote_api, "MAX_AUDIO_CLIP_BYTES", 4)
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[("clips", ("clip-1.webm", b"12345", "audio/webm"))],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 400
-    assert response.json() == {"detail": "Clip too large"}
-
-
-async def test_capture_audio_rejects_total_upload_limit(
-    client: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(quote_api, "MAX_AUDIO_TOTAL_BYTES", 4)
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[
-            ("clips", ("clip-1.webm", b"123", "audio/webm")),
-            ("clips", ("clip-2.webm", b"456", "audio/webm")),
-        ],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 400
-    assert response.json() == {"detail": "Total audio upload too large"}
-
-
-async def test_capture_audio_transcription_failure_returns_502(
-    client: AsyncClient,
-) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[("clips", ("clip-1.webm", b"trigger-transcription-error", "audio/webm"))],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-
-    assert response.status_code == 502
-    assert response.json()["detail"].startswith("Transcription failed:")
-
-
 async def test_extract_combined_failure_logs_pilot_failure_events_to_stdout(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -4242,19 +4082,6 @@ async def test_all_invoice_endpoints_require_authentication(
     assert response.status_code == 401
 
 
-async def test_capture_audio_requires_authentication(client: AsyncClient) -> None:
-    client.cookies.clear()
-    client.cookies.set(CSRF_COOKIE_NAME, "csrf", path="/")
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[("clips", ("clip-1.webm", b"clip-a", "audio/webm"))],
-        headers={"X-CSRF-Token": "csrf"},
-    )
-
-    assert response.status_code == 401
-
-
 async def test_extract_combined_requires_authentication(client: AsyncClient) -> None:
     client.cookies.clear()
     client.cookies.set(CSRF_COOKIE_NAME, "csrf", path="/")
@@ -4287,18 +4114,6 @@ async def test_convert_notes_requires_csrf(client: AsyncClient) -> None:
     response = await client.post(
         "/api/quotes/convert-notes",
         json={"notes": "mulch and edging"},
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {"detail": "CSRF token missing"}
-
-
-async def test_capture_audio_requires_csrf(client: AsyncClient) -> None:
-    await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/capture-audio",
-        files=[("clips", ("clip-1.webm", b"clip-a", "audio/webm"))],
     )
 
     assert response.status_code == 403

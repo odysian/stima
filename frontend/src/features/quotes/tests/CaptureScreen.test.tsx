@@ -47,7 +47,6 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     appendExtraction: vi.fn(),
     createManualDraft: vi.fn(),
     convertNotes: vi.fn(),
-    captureAudio: vi.fn(),
     createQuote: vi.fn(),
     listQuotes: vi.fn(),
     getQuote: vi.fn(),

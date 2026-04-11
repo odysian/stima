@@ -43,19 +43,6 @@ function convertNotes(notes: string): Promise<ExtractionResult> {
   });
 }
 
-function captureAudio(clips: Blob[]): Promise<ExtractionResult> {
-  const formData = new FormData();
-  clips.forEach((clip, index) => {
-    const extension = resolveAudioExtensionFromMimeType(clip.type);
-    formData.append("clips", clip, `clip-${index + 1}.${extension}`);
-  });
-
-  return request<ExtractionResult>("/api/quotes/capture-audio", {
-    method: "POST",
-    body: formData,
-  });
-}
-
 interface PersistedExtractionPayload extends ExtractionResult {
   quote_id: string;
 }
@@ -212,7 +199,6 @@ export const quoteService = {
   appendExtraction,
   createManualDraft,
   convertNotes,
-  captureAudio,
   createQuote,
   listQuotes,
   getQuote,

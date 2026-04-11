@@ -79,11 +79,6 @@ class ExtractionService:
                 status_code=422,
             ) from exc
 
-    async def capture_audio(self, clips: Sequence[CaptureAudioClip]) -> ExtractionResult:
-        """Normalize uploaded clips, transcribe audio, and extract quote line items."""
-        transcript = await self._transcribe_clips(clips)
-        return await self.convert_notes(transcript)
-
     async def prepare_combined_transcript(
         self,
         clips: Sequence[CaptureAudioClip] | None,
