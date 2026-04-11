@@ -172,6 +172,12 @@ function shareQuote(id: string): Promise<Quote> {
   });
 }
 
+function revokeShare(id: string): Promise<void> {
+  return request<null>(`/api/quotes/${id}/share`, {
+    method: "DELETE",
+  }).then(() => undefined);
+}
+
 async function sendQuoteEmail(id: string, idempotencyKey?: string): Promise<JobStatusResponse> {
   const response = await requestWithMetadata<JobStatusResponse>(`/api/quotes/${id}/send-email`, {
     method: "POST",
@@ -214,6 +220,7 @@ export const quoteService = {
   deleteQuote,
   generatePdf,
   shareQuote,
+  revokeShare,
   sendQuoteEmail,
   markQuoteWon,
   markQuoteLost,

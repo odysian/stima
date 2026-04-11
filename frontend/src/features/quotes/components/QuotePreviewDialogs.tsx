@@ -10,6 +10,7 @@ interface QuotePreviewDialogsProps {
   showMarkWonConfirm: boolean;
   showMarkLostConfirm: boolean;
   showSendEmailConfirm: boolean;
+  showRevokeShareConfirm: boolean;
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
   onMarkWonConfirm: () => void;
@@ -18,6 +19,8 @@ interface QuotePreviewDialogsProps {
   onMarkLostCancel: () => void;
   onSendEmailConfirm: () => void;
   onSendEmailCancel: () => void;
+  onRevokeShareConfirm: () => void;
+  onRevokeShareCancel: () => void;
 }
 
 export function QuotePreviewDialogs({
@@ -28,6 +31,7 @@ export function QuotePreviewDialogs({
   showMarkWonConfirm,
   showMarkLostConfirm,
   showSendEmailConfirm,
+  showRevokeShareConfirm,
   onDeleteConfirm,
   onDeleteCancel,
   onMarkWonConfirm,
@@ -36,6 +40,8 @@ export function QuotePreviewDialogs({
   onMarkLostCancel,
   onSendEmailConfirm,
   onSendEmailCancel,
+  onRevokeShareConfirm,
+  onRevokeShareCancel,
 }: QuotePreviewDialogsProps): React.ReactElement {
   const sendEmailBody: ReactNode = customerEmail ? (
     <>
@@ -89,6 +95,18 @@ export function QuotePreviewDialogs({
           cancelLabel="Cancel"
           onConfirm={onSendEmailConfirm}
           onCancel={onSendEmailCancel}
+        />
+      ) : null}
+
+      {showRevokeShareConfirm ? (
+        <ConfirmModal
+          title="Revoke share link?"
+          body="Anyone with this link will no longer be able to view this document."
+          confirmLabel="Revoke Link"
+          cancelLabel="Cancel"
+          variant="destructive"
+          onConfirm={onRevokeShareConfirm}
+          onCancel={onRevokeShareCancel}
         />
       ) : null}
     </>

@@ -20,6 +20,7 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     deleteQuote: vi.fn(),
     generatePdf: vi.fn(),
     shareQuote: vi.fn(),
+    revokeShare: vi.fn(),
     sendQuoteEmail: vi.fn(),
     markQuoteWon: vi.fn(),
     markQuoteLost: vi.fn(),
@@ -49,6 +50,8 @@ function makePdfArtifact(
 }
 
 function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
+  const hasActiveShare = overrides.has_active_share ?? Boolean(overrides.share_token);
+
   return {
     id: "quote-1",
     customer_id: "cust-1",
@@ -70,6 +73,7 @@ function makeQuoteDetail(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     notes: "Thanks for your business",
     shared_at: null,
     share_token: null,
+    has_active_share: hasActiveShare,
     linked_invoice: null,
     pdf_artifact: makePdfArtifact(),
     line_items: [
@@ -173,6 +177,7 @@ beforeEach(() => {
   mockedQuoteService.generatePdf.mockResolvedValue(pendingPdfJob);
   mockedQuoteService.deleteQuote.mockResolvedValue(undefined);
   mockedQuoteService.shareQuote.mockResolvedValue(makeQuoteResponse());
+  mockedQuoteService.revokeShare.mockResolvedValue(undefined);
   mockedQuoteService.sendQuoteEmail.mockResolvedValue(pendingEmailJob);
   mockedQuoteService.markQuoteWon.mockResolvedValue(
     makeQuoteResponse({ status: "approved" }),
@@ -436,6 +441,53 @@ describe("QuotePreview", () => {
       expect(screen.getByRole("menuitem", { name: /mark as lost/i })).toBeInTheDocument();
     },
   );
+
+  it("shows revoke link for active shares and refetches detail after revocation", async () => {
+    mockedQuoteService.getQuote
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "shared",
+          share_token: "share-token-1",
+          has_active_share: true,
+          customer_email: "customer@example.com",
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeQuoteDetail({
+          status: "shared",
+          share_token: "share-token-1",
+          has_active_share: false,
+          customer_email: "customer@example.com",
+        }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Test Customer" });
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /revoke link/i }));
+
+    const dialog = screen.getByRole("dialog", { name: /revoke share link\?/i });
+    expect(
+      within(dialog).getByText("Anyone with this link will no longer be able to view this document."),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /revoke link/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.revokeShare).toHaveBeenCalledWith("quote-1");
+    });
+    await waitFor(() => {
+      expect(mockedQuoteService.getQuote).toHaveBeenCalledTimes(2);
+    });
+
+    expect(await screen.findByText("Share link revoked.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send email/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+
+    await openOverflowMenu();
+    expect(screen.queryByRole("menuitem", { name: /revoke link/i })).not.toBeInTheDocument();
+  });
 
   it.each(["viewed", "approved", "declined"] as const)(
     "does not render the removed status strip for %s quotes",

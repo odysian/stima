@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Annotated, cast
 from uuid import UUID
 
@@ -47,6 +48,18 @@ from app.worker.job_registry import EMAIL_JOB_NAME
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 LOGGER = logging.getLogger(__name__)
 _EMAIL_QUEUE_FAILURE_DETAIL = "Unable to start email delivery right now. Please try again."
+
+
+def _has_active_share(
+    *,
+    share_token: str | None,
+    share_token_revoked_at: datetime | None,
+    share_token_expires_at: datetime | None,
+) -> bool:
+    if share_token is None or share_token_revoked_at is not None:
+        return False
+    now = datetime.now(UTC)
+    return share_token_expires_at is None or share_token_expires_at >= now
 
 
 @router.post(
@@ -112,6 +125,11 @@ async def get_invoice(
         due_date=invoice.due_date,
         shared_at=invoice.shared_at,
         share_token=invoice.share_token,
+        has_active_share=_has_active_share(
+            share_token=invoice.share_token,
+            share_token_revoked_at=invoice.share_token_revoked_at,
+            share_token_expires_at=invoice.share_token_expires_at,
+        ),
         source_document_id=invoice.source_document_id,
         source_quote_number=invoice.source_quote_number,
         line_items=[LineItemResponse.model_validate(line_item) for line_item in invoice.line_items],

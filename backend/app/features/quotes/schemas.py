@@ -232,6 +232,7 @@ class PdfArtifactResponse(BaseModel):
 class QuoteDetailResponse(QuoteResponse):
     """Quote detail payload including customer display fields."""
 
+    has_active_share: bool
     extraction_tier: Literal["primary", "degraded"] | None
     extraction_degraded_reason_code: str | None
     customer_name: str | None

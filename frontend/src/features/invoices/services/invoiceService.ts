@@ -44,6 +44,12 @@ function shareInvoice(id: string): Promise<Invoice> {
   });
 }
 
+function revokeShare(id: string): Promise<void> {
+  return request<null>(`/api/invoices/${id}/share`, {
+    method: "DELETE",
+  }).then(() => undefined);
+}
+
 function markInvoicePaid(id: string): Promise<Invoice> {
   return request<Invoice>(`/api/invoices/${id}/mark-paid`, {
     method: "POST",
@@ -74,6 +80,7 @@ export const invoiceService = {
   updateInvoice,
   generatePdf,
   shareInvoice,
+  revokeShare,
   markInvoicePaid,
   markInvoiceVoid,
   sendInvoiceEmail,

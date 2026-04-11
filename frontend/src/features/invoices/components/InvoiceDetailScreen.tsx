@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
+import { useState } from "react";
 import { useInvoiceDetailActions } from "@/features/invoices/hooks/useInvoiceDetailActions";
 import { useInvoiceDetail } from "@/features/invoices/hooks/useInvoiceDetail";
 import { buildInvoiceOutcomeOverflowItems } from "@/features/invoices/components/invoiceDetail.helpers";
@@ -29,6 +30,7 @@ import { canNavigateBack } from "@/shared/lib/navigation";
 export function InvoiceDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [showRevokeShareConfirm, setShowRevokeShareConfirm] = useState(false);
   const {
     invoice,
     setInvoice,
@@ -40,6 +42,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
     isGeneratingPdf,
     pdfError,
     isSharing,
+    isRevokingShare,
     shareError,
     shareMessage,
     manualCopyUrl,
@@ -55,6 +58,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
     onCopyLink,
     onRequestSendEmail,
     onConfirmSendEmail,
+    onRevokeShare,
     onMarkInvoicePaid,
     onMarkInvoiceVoid,
   } = useInvoiceDetailActions({
@@ -70,14 +74,16 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const canEdit = Boolean(invoice && id && isInvoiceEditableStatus(invoice.status));
   const emailActionLabel = invoice?.status === "ready"
     ? "Send Email"
-    : invoice?.status === "sent" || invoice?.status === "paid" || invoice?.status === "void" ? "Resend Email" : null;
+    : invoice?.status === "sent" || invoice?.status === "paid" || invoice?.status === "void"
+      ? (invoice.has_active_share ? "Resend Email" : "Send Email")
+      : null;
   const shouldRenderNotes = Boolean(invoice?.notes?.trim());
   const clientContact = invoice?.customer.phone?.trim()
     || invoice?.customer.email?.trim()
     || "No contact details";
   const isPdfBusy = isGeneratingPdf || invoice?.pdf_artifact.status === "pending";
   const isOutcomeBusy = isMarkingPaid || isMarkingVoid;
-  const isBusy = isPdfBusy || isSharing || isSendingEmail || isOutcomeBusy;
+  const isBusy = isPdfBusy || isSharing || isRevokingShare || isSendingEmail || isOutcomeBusy;
   const resolvedPdfError = pdfError ?? (
     invoice?.pdf_artifact.status === "failed"
       ? "Invoice PDF failed. Please try again."
@@ -94,12 +100,17 @@ export function InvoiceDetailScreen(): React.ReactElement {
     : isSendingEmail ? "Sending invoice email..."
     : isMarkingPaid ? "Recording invoice as paid..."
     : isMarkingVoid ? "Recording invoice as void..."
+    : isRevokingShare ? "Revoking share link..."
     : isSharing ? "Copying share link..."
     : null;
 
   const overflowItems = buildInvoiceOutcomeOverflowItems({
     status: invoice?.status ?? null,
+    hasActiveShare: Boolean(invoice?.has_active_share),
     isBusy,
+    onRevokeShareRequest: () => {
+      setShowRevokeShareConfirm(true);
+    },
     onMarkPaidRequest: () => {
       void onMarkInvoicePaid();
     },
@@ -327,6 +338,21 @@ export function InvoiceDetailScreen(): React.ReactElement {
             void onConfirmSendEmail();
           }}
           onCancel={() => setShowSendEmailConfirm(false)}
+        />
+      ) : null}
+
+      {showRevokeShareConfirm ? (
+        <ConfirmModal
+          title="Revoke share link?"
+          body="Anyone with this link will no longer be able to view this document."
+          confirmLabel="Revoke Link"
+          cancelLabel="Cancel"
+          variant="destructive"
+          onConfirm={() => {
+            setShowRevokeShareConfirm(false);
+            void onRevokeShare();
+          }}
+          onCancel={() => setShowRevokeShareConfirm(false)}
         />
       ) : null}
 

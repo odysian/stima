@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
@@ -35,9 +36,13 @@ export function QuotePreview(): React.ReactElement {
     refetchQuote,
   } = useQuoteDetail(id);
 
-  const shareUrl = quote?.share_token ? `${window.location.origin}/doc/${quote.share_token}` : null;
+  const [showRevokeShareConfirm, setShowRevokeShareConfirm] = useState(false);
+
+  const shareUrl = quote?.has_active_share && quote.share_token
+    ? `${window.location.origin}/doc/${quote.share_token}`
+    : null;
   const actionState = resolveActionState(quote);
-  const emailActionLabel = getEmailActionLabel(actionState);
+  const emailActionLabel = getEmailActionLabel(actionState, Boolean(quote?.has_active_share));
   const hasCustomerEmail = Boolean(readOptionalQuoteText(quote, "customer_email"));
   const customerEmail = readOptionalQuoteText(quote, "customer_email");
   const openPdfUrl = quote?.pdf_artifact.download_url ?? null;
@@ -65,6 +70,7 @@ export function QuotePreview(): React.ReactElement {
     isGeneratingPdf,
     pdfError,
     isSharing,
+    isRevokingShare,
     isSendingEmail,
     shareMessage,
     shareError,
@@ -76,6 +82,7 @@ export function QuotePreview(): React.ReactElement {
     onRequestSendEmail,
     onConfirmSendEmail,
     onCopyLink,
+    onRevokeShare,
   } = useQuoteDocumentActions({
     quoteId: id,
     quote,
@@ -111,7 +118,14 @@ export function QuotePreview(): React.ReactElement {
       : null
   );
   const isPdfBusy = isGeneratingPdf || quote?.pdf_artifact.status === "pending";
-  const isBusy = isPdfBusy || isSharing || isSendingEmail || isMarkingWon || isMarkingLost || isDeleting || isConvertingInvoice;
+  const isBusy = isPdfBusy
+    || isSharing
+    || isRevokingShare
+    || isSendingEmail
+    || isMarkingWon
+    || isMarkingLost
+    || isDeleting
+    || isConvertingInvoice;
 
   function handleBack(): void {
     if (canNavigateBack()) return void navigate(-1);
@@ -120,8 +134,10 @@ export function QuotePreview(): React.ReactElement {
 
   const overflowItems = buildOverflowItems({
     hasQuote: Boolean(quote),
+    hasActiveShare: Boolean(quote?.has_active_share),
     actionState,
     isBusy,
+    onRevokeShareRequest: () => setShowRevokeShareConfirm(true),
     onDeleteRequest: () => setShowDeleteConfirm(true),
     onMarkWonRequest: () => setShowMarkWonConfirm(true),
     onMarkLostRequest: () => setShowMarkLostConfirm(true),
@@ -254,6 +270,7 @@ export function QuotePreview(): React.ReactElement {
           showMarkWonConfirm={showMarkWonConfirm}
           showMarkLostConfirm={showMarkLostConfirm}
           showSendEmailConfirm={showSendEmailConfirm}
+          showRevokeShareConfirm={showRevokeShareConfirm}
           onDeleteConfirm={() => void onDelete()}
           onDeleteCancel={() => setShowDeleteConfirm(false)}
           onMarkWonConfirm={() => void onConfirmMarkWon()}
@@ -262,6 +279,11 @@ export function QuotePreview(): React.ReactElement {
           onMarkLostCancel={() => setShowMarkLostConfirm(false)}
           onSendEmailConfirm={() => void onConfirmSendEmail()}
           onSendEmailCancel={() => setShowSendEmailConfirm(false)}
+          onRevokeShareConfirm={() => {
+            setShowRevokeShareConfirm(false);
+            void onRevokeShare();
+          }}
+          onRevokeShareCancel={() => setShowRevokeShareConfirm(false)}
         />
       ) : null}
 

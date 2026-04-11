@@ -285,7 +285,7 @@ For `job_type = "extraction"`:
 | `/jobs/{job_id}` | GET | no | cookie | — | `200 JobRecordResponse` for owned jobs, with `quote_id` populated on successful extraction jobs and `extraction_result` retained for backward compatibility; `404 { detail: "Not found" }` for unknown or foreign-owned jobs |
 | `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"`; this route remains customer-required, while extraction-created unassigned drafts are reserved for the extraction worker flow |
 | `/quotes` | GET | no | cookie | `customer_id?` (UUID query param) | `200 QuoteListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; quote rows only where `doc_type = 'quote'`; `customer_id` / `customer_name` may be `null` for unassigned drafts and each row includes `requires_customer_assignment` plus `can_reassign_customer`) |
-| `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + nullable `customer_name`, `customer_email`, `customer_phone`, helper flags `requires_customer_assignment` / `can_reassign_customer`, and `linked_invoice`) or `404 { detail: "Not found" }` |
+| `/quotes/{id}` | GET | no | cookie | — | `200 QuoteDetailResponse` (`Quote` + nullable `customer_name`, `customer_email`, `customer_phone`, helper flags `requires_customer_assignment` / `can_reassign_customer` / `has_active_share`, and `linked_invoice`) or `404 { detail: "Not found" }` |
 | `/quotes/{id}` | PATCH | yes | cookie | partial `{ customer_id?, title?, transcript?, line_items?, total_amount?, notes?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Quote` for `draft`, `ready`, `shared`, `viewed`, `approved`, and `declined` quotes; allows `customer_id: null -> UUID` assignment plus draft/ready reassignment, rejects clearing an assigned customer with `409 { detail: "Customer cannot be cleared from a quote." }`, rejects reassignment after sharing or invoice conversion with `409 { detail: "Customer cannot be changed after sharing or invoice conversion." }`, or `404 { detail: "Not found" }` |
 | `/quotes/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Quote`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, preserves terminal quote status on resend, and returns `409 { detail: "Assign a customer before continuing." }` for unassigned drafts |
 | `/quotes/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current quote share token without leaking token state publicly |
@@ -309,7 +309,7 @@ Quote extraction guardrails:
 |---|---|---|---|---|---|
 | `/invoices` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Invoice` with `doc_number` (`I-001`), `status: "draft"`, server-default `due_date`, and nullable `source_document_id` |
 | `/invoices` | GET | no | cookie | `customer_id?` (UUID query param) | `200 InvoiceListItem[]` ordered `created_at DESC, doc_sequence DESC` (owned by current user; filtered to customer when `customer_id` provided; includes both direct invoices and quote-derived invoices) |
-| `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail`, `404 { detail: "Not found" }` |
+| `/invoices/{id}` | GET | no | cookie | — | `200 InvoiceDetail` (including `has_active_share`), `404 { detail: "Not found" }` |
 | `/invoices/{id}` | PATCH | yes | cookie | partial `{ title?, line_items?, total_amount?, notes?, due_date?, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `200 Invoice` for `draft`, `ready`, and `sent` invoices, or `404 { detail: "Not found" }` |
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
 | `/invoices/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Invoice`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, and transitions invoice to `sent` |
@@ -402,11 +402,11 @@ Public landing-page rules:
 `QuoteDetailResponse` fields:
 - Standard `Quote` fields, including `id`, nullable `customer_id`, `doc_type`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
 - Customer display fields: nullable `customer_name`, `customer_email`, `customer_phone`
-- Helper flags: `requires_customer_assignment`, `can_reassign_customer`
+- Helper flags: `requires_customer_assignment`, `can_reassign_customer`, `has_active_share`
 - `linked_invoice`: `{ id, doc_number, status, due_date, total_amount, created_at } | null`
 
 `InvoiceDetail` fields:
-- Standard invoice fields: `id`, `customer_id`, `doc_type`, `doc_number`, `title`, `status`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `due_date`, `shared_at`, `share_token`, `source_document_id`, `line_items`, `created_at`, and `updated_at`
+- Standard invoice fields: `id`, `customer_id`, `doc_type`, `doc_number`, `title`, `status`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `due_date`, `shared_at`, `share_token`, `has_active_share`, `source_document_id`, `line_items`, `created_at`, and `updated_at`
 - `source_quote_number` (`null` for direct invoices with no parent quote)
 - `customer`: `{ id, name, email, phone }`
 

@@ -22,6 +22,7 @@ interface UseQuoteDocumentActionsResult {
   isGeneratingPdf: boolean;
   pdfError: string | null;
   isSharing: boolean;
+  isRevokingShare: boolean;
   isSendingEmail: boolean;
   shareMessage: string | null;
   shareError: string | null;
@@ -36,6 +37,7 @@ interface UseQuoteDocumentActionsResult {
   }) => void;
   onConfirmSendEmail: () => Promise<void>;
   onCopyLink: () => Promise<void>;
+  onRevokeShare: () => Promise<void>;
 }
 
 export function useQuoteDocumentActions({
@@ -47,6 +49,7 @@ export function useQuoteDocumentActions({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [isRevokingShare, setIsRevokingShare] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -107,7 +110,7 @@ export function useQuoteDocumentActions({
       throw new Error("Share link unavailable");
     }
 
-    if (quote.share_token) {
+    if (quote.has_active_share && quote.share_token) {
       return {
         url: `${window.location.origin}/doc/${quote.share_token}`,
         shareTitle: quote.title ?? `Quote ${quote.doc_number}`,
@@ -126,6 +129,7 @@ export function useQuoteDocumentActions({
         status: updatedQuote.status,
         shared_at: updatedQuote.shared_at,
         share_token: updatedQuote.share_token,
+        has_active_share: true,
         updated_at: updatedQuote.updated_at,
       };
     });
@@ -181,6 +185,26 @@ export function useQuoteDocumentActions({
     }
   }
 
+  async function onRevokeShare(): Promise<void> {
+    if (!quoteId) {
+      return;
+    }
+
+    clearShareFeedback();
+    setIsRevokingShare(true);
+
+    try {
+      await quoteService.revokeShare(quoteId);
+      await refetchQuote(quoteId);
+      setShareMessage("Share link revoked.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to revoke share link";
+      setShareError(message);
+    } finally {
+      setIsRevokingShare(false);
+    }
+  }
+
   function onRequestSendEmail({
     hasCustomerEmail,
     emailActionLabel,
@@ -227,6 +251,7 @@ export function useQuoteDocumentActions({
     isGeneratingPdf,
     pdfError,
     isSharing,
+    isRevokingShare,
     isSendingEmail,
     shareMessage,
     shareError,
@@ -238,5 +263,6 @@ export function useQuoteDocumentActions({
     onRequestSendEmail,
     onConfirmSendEmail,
     onCopyLink,
+    onRevokeShare,
   };
 }

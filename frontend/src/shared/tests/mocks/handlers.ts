@@ -427,6 +427,7 @@ export const handlers = [
         notes: "Thanks for your business",
         shared_at: null,
         share_token: null,
+        has_active_share: false,
         linked_invoice: null,
         line_items: [
           {
@@ -529,6 +530,7 @@ export const handlers = [
         due_date: "2026-04-19",
         shared_at: null,
         share_token: null,
+        has_active_share: false,
         source_document_id: "quote-1",
         line_items: [
           {

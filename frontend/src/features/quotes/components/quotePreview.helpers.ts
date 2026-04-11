@@ -59,7 +59,10 @@ export function resolveActionState(
 
   return "draft";
 }
-export function getEmailActionLabel(actionState: QuotePreviewActionState): string | null {
+export function getEmailActionLabel(
+  actionState: QuotePreviewActionState,
+  hasActiveShare: boolean,
+): string | null {
   if (actionState === "ready") {
     return "Send Email";
   }
@@ -69,7 +72,7 @@ export function getEmailActionLabel(actionState: QuotePreviewActionState): strin
     || actionState === "approved"
     || actionState === "declined"
   ) {
-    return "Resend Email";
+    return hasActiveShare ? "Resend Email" : "Send Email";
   }
   return null;
 }
@@ -111,8 +114,10 @@ export function getSendEmailErrorMessage(error: unknown): string {
 
 interface BuildOverflowItemsArgs {
   hasQuote: boolean;
+  hasActiveShare: boolean;
   actionState: QuotePreviewActionState;
   isBusy: boolean;
+  onRevokeShareRequest: () => void;
   onDeleteRequest: () => void;
   onMarkWonRequest: () => void;
   onMarkLostRequest: () => void;
@@ -120,8 +125,10 @@ interface BuildOverflowItemsArgs {
 
 export function buildOverflowItems({
   hasQuote,
+  hasActiveShare,
   actionState,
   isBusy,
+  onRevokeShareRequest,
   onDeleteRequest,
   onMarkWonRequest,
   onMarkLostRequest,
@@ -130,8 +137,10 @@ export function buildOverflowItems({
     return [];
   }
 
+  let items: OverflowMenuItem[] = [];
+
   if (actionState === "draft") {
-    return [
+    items = [
       {
         label: "Delete Quote",
         icon: "delete",
@@ -153,10 +162,8 @@ export function buildOverflowItems({
         onSelect: onMarkLostRequest,
       },
     ];
-  }
-
-  if (actionState === "ready") {
-    return [
+  } else if (actionState === "ready") {
+    items = [
       {
         label: "Delete Quote",
         icon: "delete",
@@ -178,15 +185,13 @@ export function buildOverflowItems({
         onSelect: onMarkLostRequest,
       },
     ];
-  }
-
-  if (
+  } else if (
     actionState === "shared"
     || actionState === "viewed"
     || actionState === "approved"
     || actionState === "declined"
   ) {
-    return [
+    items = [
       {
         label: "Mark as Won",
         icon: "check_circle",
@@ -203,5 +208,15 @@ export function buildOverflowItems({
     ];
   }
 
-  return [];
+  if (hasActiveShare) {
+    items.unshift({
+      label: "Revoke Link",
+      icon: "link_off",
+      tone: "destructive",
+      disabled: isBusy,
+      onSelect: onRevokeShareRequest,
+    });
+  }
+
+  return items;
 }
