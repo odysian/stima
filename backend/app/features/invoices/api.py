@@ -95,6 +95,7 @@ async def get_invoice(
     return InvoiceDetailResponse(
         id=invoice.id,
         customer_id=invoice.customer_id,
+        doc_type="invoice",
         doc_number=invoice.doc_number,
         title=invoice.title,
         status=invoice.status,  # type: ignore[arg-type]

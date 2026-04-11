@@ -419,6 +419,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
         "id",
         "customer_id",
         "customer_name",
+        "doc_type",
         "doc_number",
         "title",
         "status",
@@ -2723,6 +2724,7 @@ async def test_list_quotes_can_filter_by_customer_id(client: AsyncClient) -> Non
             "id": quote_b["id"],
             "customer_id": customer_id_b,
             "customer_name": "Customer B",
+            "doc_type": "quote",
             "doc_number": "Q-002",
             "title": None,
             "status": "draft",
@@ -4789,6 +4791,7 @@ async def test_mark_quote_outcome_updates_status_and_persists_event_log(
     assert set(payload) == {
         "id",
         "customer_id",
+        "doc_type",
         "doc_number",
         "title",
         "status",
@@ -5143,6 +5146,30 @@ async def test_patch_quote_doc_type_after_share_returns_409(client: AsyncClient)
     assert response.json() == {"detail": "Document type cannot be changed after sharing."}
 
 
+async def test_patch_quote_doc_type_to_invoice_rejects_non_changeable_status_without_share_token(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
+    await _set_quote_status(db_session, quote_id, QuoteStatus.APPROVED)
+
+    response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"doc_type": "invoice"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Document type can only be changed in draft or ready status."
+    }
+
+
 async def test_patch_customerless_quote_doc_type_to_invoice_returns_409(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -5436,6 +5463,7 @@ async def test_list_invoices_returns_direct_and_quote_derived_summaries_newest_f
             "id": direct_invoice["id"],
             "customer_id": direct_customer_id,
             "customer_name": "Direct Customer",
+            "doc_type": "invoice",
             "doc_number": "I-002",
             "title": "Direct invoice",
             "status": "draft",
@@ -5448,6 +5476,7 @@ async def test_list_invoices_returns_direct_and_quote_derived_summaries_newest_f
             "id": linked_invoice["id"],
             "customer_id": quote_customer_id,
             "customer_name": "Quote Customer",
+            "doc_type": "invoice",
             "doc_number": "I-001",
             "title": None,
             "status": "draft",
@@ -5489,6 +5518,7 @@ async def test_list_invoices_can_filter_by_customer_id(client: AsyncClient) -> N
             "id": invoice_b["id"],
             "customer_id": customer_id_b,
             "customer_name": "Customer B",
+            "doc_type": "invoice",
             "doc_number": "I-002",
             "title": "Invoice for B",
             "status": "draft",
@@ -5603,6 +5633,38 @@ async def test_patch_invoice_doc_type_after_share_returns_409(client: AsyncClien
 
     assert response.status_code == 409
     assert response.json() == {"detail": "Document type cannot be changed after sharing."}
+
+
+async def test_patch_invoice_doc_type_to_quote_rejects_non_changeable_status_without_share_token(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    direct_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Direct invoice",
+        transcript="direct invoice transcript",
+        total_amount=220,
+    )
+    invoice_id = direct_invoice["id"]
+    assert isinstance(invoice_id, str)
+
+    await _set_invoice_status(db_session, invoice_id, QuoteStatus.READY)
+    await _set_invoice_status(db_session, invoice_id, QuoteStatus.SENT)
+
+    response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"doc_type": "quote"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Document type can only be changed in draft or ready status."
+    }
 
 
 async def test_patch_invoice_doc_type_to_quote_rejects_linked_source_invoice(

@@ -593,43 +593,96 @@ class QuoteService:
             or doc_type_changed
         )
 
-        updated_quote = await self._repository.update(
-            document=quote,
-            customer_id=next_customer_id,
-            update_customer_id="customer_id" in data.model_fields_set,
-            title=data.title,
-            update_title="title" in data.model_fields_set,
-            transcript=data.transcript,
-            update_transcript="transcript" in data.model_fields_set,
-            total_amount=document_field_float_or_none(current_pricing.total_amount),
-            update_total_amount="total_amount" in data.model_fields_set
-            or ("line_items" in data.model_fields_set and line_items_define_subtotal)
-            or "discount_type" in data.model_fields_set
-            or "discount_value" in data.model_fields_set
-            or "tax_rate" in data.model_fields_set,
-            tax_rate=document_field_float_or_none(current_pricing.tax_rate),
-            update_tax_rate="tax_rate" in data.model_fields_set,
-            discount_type=current_pricing.discount_type,
-            update_discount_type=(
-                "discount_type" in data.model_fields_set
-                or (
-                    "discount_value" in data.model_fields_set
-                    and current_pricing.discount_type is None
+        if doc_type_changed:
+            try:
+                updated_quote = await self._repository.update(
+                    document=quote,
+                    customer_id=next_customer_id,
+                    update_customer_id="customer_id" in data.model_fields_set,
+                    title=data.title,
+                    update_title="title" in data.model_fields_set,
+                    transcript=data.transcript,
+                    update_transcript="transcript" in data.model_fields_set,
+                    total_amount=document_field_float_or_none(current_pricing.total_amount),
+                    update_total_amount="total_amount" in data.model_fields_set
+                    or ("line_items" in data.model_fields_set and line_items_define_subtotal)
+                    or "discount_type" in data.model_fields_set
+                    or "discount_value" in data.model_fields_set
+                    or "tax_rate" in data.model_fields_set,
+                    tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+                    update_tax_rate="tax_rate" in data.model_fields_set,
+                    discount_type=current_pricing.discount_type,
+                    update_discount_type=(
+                        "discount_type" in data.model_fields_set
+                        or (
+                            "discount_value" in data.model_fields_set
+                            and current_pricing.discount_type is None
+                        )
+                    ),
+                    discount_value=document_field_float_or_none(current_pricing.discount_value),
+                    update_discount_value="discount_value" in data.model_fields_set,
+                    deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+                    update_deposit_amount="deposit_amount" in data.model_fields_set,
+                    notes=data.notes,
+                    update_notes="notes" in data.model_fields_set,
+                    line_items=data.line_items,
+                    replace_line_items="line_items" in data.model_fields_set,
                 )
-            ),
-            discount_value=document_field_float_or_none(current_pricing.discount_value),
-            update_discount_value="discount_value" in data.model_fields_set,
-            deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
-            update_deposit_amount="deposit_amount" in data.model_fields_set,
-            notes=data.notes,
-            update_notes="notes" in data.model_fields_set,
-            line_items=data.line_items,
-            replace_line_items="line_items" in data.model_fields_set,
-        )
-        obsolete_artifact_path = None
-        if rendered_fields_changed:
-            obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
-        await self._repository.commit()
+                obsolete_artifact_path = None
+                if rendered_fields_changed:
+                    obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(
+                        updated_quote
+                    )
+                await self._repository.commit()
+            except IntegrityError as exc:
+                if _is_doc_sequence_collision(exc):
+                    await self._repository.rollback()
+                    raise QuoteServiceError(
+                        detail="Document type change failed, please retry.",
+                        status_code=409,
+                    ) from exc
+                raise
+        else:
+            updated_quote = await self._repository.update(
+                document=quote,
+                customer_id=next_customer_id,
+                update_customer_id="customer_id" in data.model_fields_set,
+                title=data.title,
+                update_title="title" in data.model_fields_set,
+                transcript=data.transcript,
+                update_transcript="transcript" in data.model_fields_set,
+                total_amount=document_field_float_or_none(current_pricing.total_amount),
+                update_total_amount="total_amount" in data.model_fields_set
+                or ("line_items" in data.model_fields_set and line_items_define_subtotal)
+                or "discount_type" in data.model_fields_set
+                or "discount_value" in data.model_fields_set
+                or "tax_rate" in data.model_fields_set,
+                tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+                update_tax_rate="tax_rate" in data.model_fields_set,
+                discount_type=current_pricing.discount_type,
+                update_discount_type=(
+                    "discount_type" in data.model_fields_set
+                    or (
+                        "discount_value" in data.model_fields_set
+                        and current_pricing.discount_type is None
+                    )
+                ),
+                discount_value=document_field_float_or_none(current_pricing.discount_value),
+                update_discount_value="discount_value" in data.model_fields_set,
+                deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+                update_deposit_amount="deposit_amount" in data.model_fields_set,
+                notes=data.notes,
+                update_notes="notes" in data.model_fields_set,
+                line_items=data.line_items,
+                replace_line_items="line_items" in data.model_fields_set,
+            )
+            obsolete_artifact_path = None
+            if rendered_fields_changed:
+                obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(
+                    updated_quote
+                )
+            await self._repository.commit()
+
         await self._delete_obsolete_artifact(obsolete_artifact_path)
         log_event(
             "quote.updated",
@@ -995,7 +1048,7 @@ class QuoteService:
         )
         quote.doc_type = "invoice"
         quote.doc_sequence = next_sequence
-        quote.doc_number = _build_doc_number(doc_type="invoice", sequence=next_sequence)
+        quote.doc_number = build_doc_number(doc_type="invoice", sequence=next_sequence)
         quote.due_date = (
             requested_due_date
             if requested_due_date is not None
@@ -1198,7 +1251,7 @@ def _build_default_invoice_due_date() -> date:
     return _utcnow().date() + timedelta(days=30)
 
 
-def _build_doc_number(*, doc_type: str, sequence: int) -> str:
+def build_doc_number(*, doc_type: str, sequence: int) -> str:
     prefix = "I" if doc_type == "invoice" else "Q"
     return f"{prefix}-{sequence:03d}"
 

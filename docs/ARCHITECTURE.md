@@ -400,13 +400,13 @@ Public landing-page rules:
 - `source_document_id`
 
 `QuoteDetailResponse` fields:
-- Standard `Quote` fields, including `id`, nullable `customer_id`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
+- Standard `Quote` fields, including `id`, nullable `customer_id`, `doc_type`, `doc_number`, `title`, `status`, `source_type`, `transcript`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `shared_at`, `share_token`, `line_items`, `created_at`, and `updated_at`
 - Customer display fields: nullable `customer_name`, `customer_email`, `customer_phone`
 - Helper flags: `requires_customer_assignment`, `can_reassign_customer`
 - `linked_invoice`: `{ id, doc_number, status, due_date, total_amount, created_at } | null`
 
 `InvoiceDetail` fields:
-- Standard invoice fields: `id`, `customer_id`, `doc_number`, `title`, `status`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `due_date`, `shared_at`, `share_token`, `source_document_id`, `line_items`, `created_at`, and `updated_at`
+- Standard invoice fields: `id`, `customer_id`, `doc_type`, `doc_number`, `title`, `status`, `total_amount`, `tax_rate`, `discount_type`, `discount_value`, `deposit_amount`, `notes`, `due_date`, `shared_at`, `share_token`, `source_document_id`, `line_items`, `created_at`, and `updated_at`
 - `source_quote_number` (`null` for direct invoices with no parent quote)
 - `customer`: `{ id, name, email, phone }`
 

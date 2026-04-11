@@ -164,6 +164,7 @@ class QuoteListItemResponse(BaseModel):
     id: UUID
     customer_id: UUID | None
     customer_name: str | None
+    doc_type: Literal["quote"] = "quote"
     doc_number: str
     title: str | None
     status: str
@@ -181,6 +182,7 @@ class QuoteResponse(BaseModel):
 
     id: UUID
     customer_id: UUID | None
+    doc_type: str
     doc_number: str
     title: str | None
     status: str

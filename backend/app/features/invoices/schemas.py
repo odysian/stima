@@ -57,6 +57,7 @@ class InvoiceResponse(BaseModel):
 
     id: UUID
     customer_id: UUID
+    doc_type: str
     doc_number: str
     title: str | None
     status: Literal["draft", "ready", "sent", "paid", "void"]
@@ -83,6 +84,7 @@ class InvoiceListItemResponse(BaseModel):
     id: UUID
     customer_id: UUID
     customer_name: str
+    doc_type: Literal["invoice"] = "invoice"
     doc_number: str
     title: str | None
     status: Literal["draft", "ready", "sent", "paid", "void"]
