@@ -94,20 +94,6 @@ class AuthRepository:
         await self._session.flush()
         return reset_token
 
-    async def count_recent_reset_tokens_for_user(
-        self,
-        *,
-        user_id: UUID,
-        since: datetime,
-    ) -> int:
-        """Count password reset requests created in a time window for one user."""
-        stmt = select(PasswordResetToken.id).where(
-            PasswordResetToken.user_id == user_id,
-            PasswordResetToken.created_at >= since,
-        )
-        result = await self._session.execute(stmt)
-        return len(result.scalars().all())
-
     async def get_valid_reset_token(
         self,
         *,

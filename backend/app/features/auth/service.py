@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 from secrets import token_urlsafe
 from typing import Protocol
@@ -144,13 +145,10 @@ class AuthService:
         self._email_service = email_service
         base_frontend_url = (frontend_url or "").strip().rstrip("/")
         self._frontend_url = base_frontend_url
-        resolved_template_dir = template_dir or (Path(__file__).resolve().parents[2] / "templates")
-        self._template_environment = Environment(
-            loader=FileSystemLoader(str(resolved_template_dir)),
-            autoescape=select_autoescape(["html", "xml"]),
-            trim_blocks=True,
-            lstrip_blocks=True,
-        )
+        resolved_template_dir = (
+            template_dir or (Path(__file__).resolve().parents[2] / "templates")
+        ).resolve()
+        self._template_environment = _template_environment_for(resolved_template_dir)
 
     async def register(self, *, email: str, password: str) -> User:
         """Register a new user with email/password credentials."""
@@ -364,4 +362,14 @@ def _render_reset_password_text(*, reset_link: str) -> str:
         "We received a request to reset your Stima password.\n\n"
         f"Reset your password: {reset_link}\n\n"
         "This link expires in 1 hour. If you did not request this, you can ignore this email."
+    )
+
+
+@lru_cache(maxsize=4)
+def _template_environment_for(template_dir: Path) -> Environment:
+    return Environment(
+        loader=FileSystemLoader(str(template_dir)),
+        autoescape=select_autoescape(["html", "xml"]),
+        trim_blocks=True,
+        lstrip_blocks=True,
     )

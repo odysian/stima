@@ -196,6 +196,8 @@ Internal analytics access:
 |---|---|---|---|---|---|---|
 | `/register` | POST | 3/hr | no | no | `{ email, password }` | `201 { user: { id, email, is_active, is_onboarded, timezone } }` |
 | `/login` | POST | 5/min | no | no | `{ email, password }` | `200 { user: { id, email, is_active, is_onboarded, timezone }, csrf_token }` + sets cookies |
+| `/forgot-password` | POST | 3/hr (per email) | no | no | `{ email }` | `200 { detail }` (same response for known/unknown emails) |
+| `/reset-password` | POST | — | no | no | `{ token, new_password }` | `200 { detail }` on success, `400 { detail: "Invalid or expired token" }` for invalid/expired/used tokens |
 | `/refresh` | POST | 10/min | yes | cookie | — | `200 { user: { id, email, is_active, is_onboarded, timezone }, csrf_token }` + rotates cookies |
 | `/logout` | POST | 10/min | yes | cookie | — | `204` + clears cookies |
 | `/me` | GET | — | no | cookie | — | `200 { id, email, is_active, is_onboarded, timezone }` |
