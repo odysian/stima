@@ -57,6 +57,9 @@ Label selection rules:
 10. After Task PR creation, run a lean reviewer follow-up pass and return `APPROVED` or `ACTIONABLE`.
 11. If scope is a no-contract refactor, include a parity lock checklist in the Task acceptance criteria.
 12. For greenfield repos, align issue scope with `docs/GREENFIELD_BLUEPRINT.md` boundaries and structure defaults.
+13. Parallel local execution is allowed only when each in-flight Task has its own Task issue, its own dedicated branch, disjoint enough scope to review and merge independently, and no unresolved dependency on another in-flight Task.
+14. Operator syntax for isolated local execution is `execution=parallel`. This does not change issue lifecycle rules; it only changes how the implementation checkout is created locally.
+15. Default safety rule: do not use parallel local execution for migrations, shared API-contract changes, shared state-machine changes, or other tightly coupled backend/state work unless explicitly planned and accepted.
 
 Guiding principle: be strict about scope, contracts, acceptance criteria, verification, and layer boundaries. Be flexible about internal decomposition and helper structure as long as the implementation stays readable, testable, and consistent with repo patterns.
 

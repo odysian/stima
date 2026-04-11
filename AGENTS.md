@@ -30,6 +30,7 @@ Read conditionally (only when relevant):
 - Canonical kickoff types:
   - Planning kickoff (issue planning only): `Run kickoff for feature <feature-id> from <filename> mode=<single|gated|fast>, planning-only (no code changes, no PR).`
   - Execution kickoff (implementation): `Run kickoff for existing Task #<task-id> mode=single.`
+  - Execution kickoff (isolated parallel local execution): `Run kickoff for existing Task #<task-id> mode=single execution=parallel.`
   - If an Execution Brief exists, reference it after the Task prompt and use it as the working handoff; the GitHub Task issue remains authoritative.
   - If `mode` is omitted, default to `single`.
   - Do not switch to `gated` or `fast` unless explicitly requested.
@@ -88,6 +89,21 @@ Read conditionally (only when relevant):
   - frontend hooks/services target `<=180` LOC
   - backend route/service/repository modules target `<=220` LOC
   - split or create linked follow-up when any frontend module exceeds `450/300` LOC (component vs hook/service) or backend route/service/repository exceeds `350` LOC
+
+## Parallel Local Execution (Optional)
+
+Use only when the operator explicitly requests `execution=parallel`.
+
+- `mode` still controls the issue workflow (`single`, `gated`, `fast`).
+- `execution=parallel` controls local implementation isolation only.
+
+Rules:
+- one Task issue -> one branch -> one worktree -> one PR
+- run `scripts/worktree-init.sh <task-id> [slug]` before any code changes; use the printed `WORKTREE_READY` path as the working directory
+- never use `git worktree add --force`
+- if the branch or worktree path already exists, stop and report instead of improvising
+- keep the main checkout as the control-plane workspace (planning, review coordination, merge, post-merge sync)
+- do not default to parallel execution for migrations, shared API-contract changes, auth/state-machine changes, or other tightly coupled backend/stateful work unless explicitly planned
 
 ## Decision Brief (Conditional)
 

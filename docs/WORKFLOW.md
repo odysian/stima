@@ -50,6 +50,30 @@ Use this as the default human-in-the-loop sequence to reduce handoff overhead:
 7. Merge PR and sync local branch.
 8. If this Task belongs to a Spec, check whether all sibling Tasks are now done or deferred; if so, close the Spec issue.
 
+## Optional Parallel Local Execution
+
+For independent Task issues, the operator may request isolated local execution:
+
+```text
+Run kickoff for existing Task #<id> mode=single execution=parallel.
+```
+
+This is a local checkout strategy, not a new issue workflow mode.
+
+Rules:
+- GitHub issues remain the execution source of truth
+- the main checkout is the control-plane workspace
+- each parallel Task gets its own dedicated branch and linked worktree via `scripts/worktree-init.sh`
+- reviewers use the PR diff / branch diff as the entrypoint; they do not create worktrees
+- do not use parallel execution by default for migrations, shared contracts, or tightly coupled stateful work
+
+Post-merge cleanup (operator, in the main checkout):
+```bash
+git worktree remove ../stima-wt/task-<id>-<slug>
+git branch -d task-<id>-<slug>
+git fetch --prune origin
+```
+
 ## Issues Workflow (Control Plane)
 
 Read `docs/ISSUES_WORKFLOW.md` before implementation.
