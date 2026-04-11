@@ -376,6 +376,53 @@ class QuoteService:
             ) from exc
         return quote
 
+    async def create_manual_draft(
+        self,
+        *,
+        user_id: UUID,
+        customer_id: UUID | None,
+    ) -> Document:
+        """Persist one blank draft quote without running extraction."""
+        await self.ensure_customer_exists_for_user(
+            user_id=user_id,
+            customer_id=customer_id,
+        )
+        try:
+            quote = await _create_quote_document(
+                self,
+                user_id=user_id,
+                customer_id=customer_id,
+                title=None,
+                transcript="",
+                line_items=[],
+                total_amount=None,
+                tax_rate=None,
+                discount_type=None,
+                discount_value=None,
+                deposit_amount=None,
+                notes=None,
+                source_type="text",
+            )
+        except QuoteServiceError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            await self._repository.rollback()
+            raise QuoteServiceError(
+                detail="Unable to save manual draft right now. Please try again.",
+                status_code=503,
+            ) from exc
+
+        try:
+            await self._repository.commit()
+        except Exception as exc:  # noqa: BLE001
+            await self._repository.rollback()
+            raise QuoteServiceError(
+                detail="Unable to save manual draft right now. Please try again.",
+                status_code=503,
+            ) from exc
+
+        return quote
+
     async def ensure_quote_appendable(
         self,
         *,
