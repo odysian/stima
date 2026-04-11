@@ -1,14 +1,18 @@
-import type { QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { syncDraftTotalWithLineItems } from "@/features/quotes/utils/lineItemDraftTotals";
 import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
+
+interface DraftWithLineItems {
+  lineItems: LineItemDraftWithFlags[];
+  total: number | null;
+}
 
 export type ReviewLineItemSheetState =
   | { mode: "add" }
   | { mode: "edit"; index: number };
 
 export function resolveLineItemSheetInitialItem(
-  draft: QuoteEditDraft,
+  draft: DraftWithLineItems,
   sheetState: ReviewLineItemSheetState,
   emptyLineItem: LineItemDraftWithFlags,
 ): LineItemDraftWithFlags {
@@ -18,11 +22,11 @@ export function resolveLineItemSheetInitialItem(
   return draft.lineItems[sheetState.index] ?? emptyLineItem;
 }
 
-export function applyLineItemSheetSave(
-  draft: QuoteEditDraft,
+export function applyLineItemSheetSave<TDraft extends DraftWithLineItems>(
+  draft: TDraft,
   sheetState: ReviewLineItemSheetState,
   nextLineItem: LineItemDraftWithFlags,
-): QuoteEditDraft {
+): TDraft {
   if (sheetState.mode === "edit") {
     if (sheetState.index < 0 || sheetState.index >= draft.lineItems.length) {
       return draft;
@@ -51,10 +55,10 @@ export function applyLineItemSheetSave(
   };
 }
 
-export function applyLineItemSheetDelete(
-  draft: QuoteEditDraft,
+export function applyLineItemSheetDelete<TDraft extends DraftWithLineItems>(
+  draft: TDraft,
   sheetState: ReviewLineItemSheetState,
-): QuoteEditDraft {
+): TDraft {
   if (sheetState.mode !== "edit" || sheetState.index < 0 || sheetState.index >= draft.lineItems.length) {
     return draft;
   }

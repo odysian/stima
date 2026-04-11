@@ -89,6 +89,7 @@ export interface QuotePricingFields {
 export interface Quote {
   id: string;
   customer_id: string | null;
+  doc_type?: "quote" | "invoice";
   doc_number: string;
   title: string | null;
   status: QuoteStatus;
@@ -160,6 +161,8 @@ export interface QuoteUpdateRequest {
   customer_id?: string | null;
   title?: string | null;
   transcript?: string;
+  doc_type?: "quote" | "invoice";
+  due_date?: string;
   line_items?: LineItemDraft[];
   total_amount?: number | null;
   tax_rate?: number | null;

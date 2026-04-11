@@ -118,7 +118,7 @@ function renderScreen(path = "/invoices/invoice-1"): void {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
-        <Route path="/invoices/:id/edit" element={<div>Invoice Edit Screen</div>} />
+        <Route path="/documents/:id/edit" element={<div>Document Edit Screen</div>} />
         <Route path="/quotes/:id/preview" element={<div>Quote Preview Screen</div>} />
         <Route path="/" element={<div>Quote List Screen</div>} />
       </Routes>
@@ -482,7 +482,7 @@ describe("InvoiceDetailScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /edit invoice/i }));
 
-    expect(await screen.findByText("Invoice Edit Screen")).toBeInTheDocument();
+    expect(await screen.findByText("Document Edit Screen")).toBeInTheDocument();
   });
 
   it("shares the invoice using the raw /share token URL", async () => {

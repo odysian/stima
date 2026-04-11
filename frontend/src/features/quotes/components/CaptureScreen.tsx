@@ -76,7 +76,7 @@ export function CaptureScreen(): React.ReactElement {
     : getExtractionHelperCopy(hasClips, hasNotes);
   const launchOrigin = isAppendMode
     ? (readCaptureLaunchOrigin(location.state) ??
-      `/quotes/${appendQuoteId}/review`)
+      `/documents/${appendQuoteId}/edit`)
     : resolveCaptureLaunchOrigin({
         customerId,
         locationState: location.state,
@@ -159,12 +159,12 @@ export function CaptureScreen(): React.ReactElement {
 
   function navigateToReview(quoteId: string): void {
     if (isAppendMode) {
-      navigate(`/quotes/${quoteId}/review`, {
+      navigate(`/documents/${quoteId}/edit`, {
         state: { reseedDraft: true },
       });
       return;
     }
-    navigate(`/quotes/${quoteId}/review`);
+    navigate(`/documents/${quoteId}/edit`);
   }
 
   async function onExtract(): Promise<void> {

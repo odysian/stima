@@ -24,6 +24,7 @@ export interface InvoiceCreateRequest {
 export interface Invoice {
   id: string;
   customer_id: string;
+  doc_type?: "quote" | "invoice";
   doc_number: string;
   title: string | null;
   status: InvoiceStatus;
@@ -76,4 +77,5 @@ export interface InvoiceUpdateRequest {
   deposit_amount?: number | null;
   notes?: string | null;
   due_date?: string;
+  doc_type?: "quote" | "invoice";
 }

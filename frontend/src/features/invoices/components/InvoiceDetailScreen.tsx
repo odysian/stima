@@ -132,7 +132,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
             {canEdit ? (
               <button
                 type="button"
-                onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
+                onClick={() => navigate(`/documents/${invoice.id}/edit`)}
                 aria-label="Edit invoice"
                 className="inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
               >

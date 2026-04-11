@@ -11,6 +11,7 @@ export interface ReviewLocationState {
 }
 
 export interface DraftSnapshot {
+  docType: "quote" | "invoice";
   title: string;
   transcript: string;
   lineItems: LineItemDraft[];
@@ -20,10 +21,12 @@ export interface DraftSnapshot {
   discountValue: number | null;
   depositAmount: number | null;
   notes: string;
+  dueDate: string;
 }
 
 export function buildDraftSnapshot(
   draft: {
+    docType?: "quote" | "invoice";
     title: string;
     transcript?: string;
     lineItems: { description: string; details: string | null; price: number | null }[];
@@ -33,6 +36,7 @@ export function buildDraftSnapshot(
     discountValue: number | null;
     depositAmount: number | null;
     notes: string;
+    dueDate?: string;
   },
 ): DraftSnapshot {
   const normalizedLineItems = draft.lineItems
@@ -49,6 +53,7 @@ export function buildDraftSnapshot(
     }));
 
   return {
+    docType: draft.docType === "invoice" ? "invoice" : "quote",
     title: draft.title,
     transcript: draft.transcript ?? "",
     lineItems: normalizedLineItems,
@@ -58,6 +63,7 @@ export function buildDraftSnapshot(
     discountValue: draft.discountValue,
     depositAmount: draft.depositAmount,
     notes: draft.notes,
+    dueDate: draft.dueDate ?? "",
   };
 }
 
