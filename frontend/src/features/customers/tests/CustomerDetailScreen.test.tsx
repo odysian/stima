@@ -326,7 +326,7 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
     await screen.findByText("Q-001");
 
-    fireEvent.click(screen.getByRole("button", { name: /create quote/i }));
+    fireEvent.click(screen.getByRole("button", { name: /create document/i }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-1", {
       state: { launchOrigin: "/customers/cust-1" },
