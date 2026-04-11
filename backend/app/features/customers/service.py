@@ -51,8 +51,6 @@ class CustomerRepositoryProtocol(Protocol):
         customer_id: UUID,
     ) -> tuple[int, int]: ...
 
-    async def verify_customer_document_cascade(self) -> bool: ...
-
     async def delete(self, customer: Customer) -> None: ...
 
     async def commit(self) -> None: ...
@@ -138,12 +136,6 @@ class CustomerService:
         customer = await self._repository.get_by_id(customer_id, user.id)
         if customer is None:
             raise CustomerServiceError(detail="Not found", status_code=404)
-
-        if not await self._repository.verify_customer_document_cascade():
-            raise CustomerServiceError(
-                detail="Customer deletion is temporarily unavailable",
-                status_code=503,
-            )
 
         quote_count, invoice_count = await self._repository.count_documents_by_type_for_customer(
             user_id=user.id,

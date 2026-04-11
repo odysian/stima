@@ -66,7 +66,7 @@ export function ConfirmModal({
         />
         <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0">
           <Dialog.Content
-            aria-describedby={undefined}
+            {...(!body ? { "aria-describedby": undefined } : {})}
             className="modal-shadow pointer-events-auto w-full max-w-md rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
@@ -75,9 +75,9 @@ export function ConfirmModal({
           >
             <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">{title}</Dialog.Title>
             {body ? (
-              <div className="mt-2 wrap-break-word text-sm leading-6 text-on-surface-variant">
+              <Dialog.Description className="mt-2 break-words text-sm leading-6 text-on-surface-variant">
                 {body}
-              </div>
+              </Dialog.Description>
             ) : null}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
               <button

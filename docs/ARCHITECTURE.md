@@ -222,6 +222,7 @@ Internal analytics access:
 | `/customers` | POST | yes | cookie | `{ name, phone?, email?, address? }` | `201 Customer` |
 | `/customers/{id}` | GET | no | cookie | — | `200 Customer` or `404 { detail: "Not found" }` |
 | `/customers/{id}` | PATCH | yes | cookie | partial `{ name?, phone?, email?, address? }` | `200 Customer` or `404 { detail: "Not found" }` |
+| `/customers/{id}` | DELETE | yes | cookie | — | `204` or `404 { detail: "Not found" }` |
 
 ### Quote extraction + CRUD endpoints (`/api/quotes`)
 

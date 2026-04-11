@@ -10,7 +10,7 @@ import pytest
 import app.features.customers.service as customer_service_module
 from app.features.auth.models import User
 from app.features.customers.schemas import CustomerUpdateRequest
-from app.features.customers.service import CustomerService, CustomerServiceError
+from app.features.customers.service import CustomerService
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,9 +46,6 @@ class _CustomerRepository:
         del user_id
         del customer_id
         return 0, 0
-
-    async def verify_customer_document_cascade(self) -> bool:
-        return True
 
     async def delete(self, customer):  # noqa: ANN001
         del customer
@@ -100,22 +97,12 @@ class _DeleteCustomerRepository(_CustomerRepository):
         assert customer_id == self._customer.id  # nosec B101 - pytest assertion
         return 2, 1
 
-    async def verify_customer_document_cascade(self) -> bool:
-        self.operation_log.append("verify-cascade")
-        return True
-
     async def delete(self, customer):  # noqa: ANN001
         self.operation_log.append("delete")
         self.deleted_customer_id = customer.id
 
     async def commit(self) -> None:
         self.operation_log.append("commit")
-
-
-class _NoCascadeCustomerRepository(_DeleteCustomerRepository):
-    async def verify_customer_document_cascade(self) -> bool:
-        self.operation_log.append("verify-cascade")
-        return False
 
 
 class _DeleteArtifactRepository(_PdfArtifactRepository):
@@ -206,7 +193,6 @@ async def test_delete_customer_invalidates_artifacts_then_deletes_and_logs_count
     await service.delete_customer(user, customer.id)
 
     assert operation_log == [  # nosec B101 - pytest assertion
-        "verify-cascade",
         "counts",
         "invalidate",
         "storage:artifacts/customer-a.pdf",
@@ -223,32 +209,3 @@ async def test_delete_customer_invalidates_artifacts_then_deletes_and_logs_count
             "detail": "deleted_quote_count=2,deleted_invoice_count=1",
         }
     ]
-
-
-async def test_delete_customer_rejects_when_fk_cascade_contract_is_missing() -> None:
-    user = User(
-        email="owner@example.com",
-        password_hash="hash",  # nosec B106 - test-only stub value
-    )
-    user.id = uuid4()
-    customer = SimpleNamespace(
-        id=uuid4(),
-        user_id=user.id,
-        name="Alice Johnson",
-        phone="555-0100",
-        address="1 Main St",
-    )
-    operation_log: list[str] = []
-    repository = _NoCascadeCustomerRepository(customer, operation_log)
-    service = CustomerService(
-        repository,
-        pdf_artifact_repository=_DeleteArtifactRepository(operation_log),
-        storage_service=_OrderedStorageService(operation_log),
-    )
-
-    with pytest.raises(CustomerServiceError) as exc_info:
-        await service.delete_customer(user, customer.id)
-
-    assert exc_info.value.status_code == 503  # nosec B101 - pytest assertion
-    assert exc_info.value.detail == "Customer deletion is temporarily unavailable"  # nosec B101 - pytest assertion
-    assert operation_log == ["verify-cascade"]  # nosec B101 - pytest assertion

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.customers.models import Customer
@@ -84,33 +84,6 @@ class CustomerRepository:
         )
         counts = {doc_type: count for doc_type, count in result.all()}
         return int(counts.get("quote", 0)), int(counts.get("invoice", 0))
-
-    async def verify_customer_document_cascade(self) -> bool:
-        """Verify live FK behavior deletes documents when customers are removed."""
-        definition = await self._session.scalar(
-            text(
-                """
-                SELECT pg_get_constraintdef(constraint_def.oid)
-                FROM pg_constraint AS constraint_def
-                JOIN pg_class AS child_table ON child_table.oid = constraint_def.conrelid
-                JOIN pg_namespace AS child_schema ON child_schema.oid = child_table.relnamespace
-                JOIN pg_class AS parent_table ON parent_table.oid = constraint_def.confrelid
-                JOIN pg_attribute AS child_column
-                  ON child_column.attrelid = child_table.oid
-                 AND child_column.attnum = ANY(constraint_def.conkey)
-                WHERE constraint_def.contype = 'f'
-                  AND child_schema.nspname = current_schema()
-                  AND child_table.relname = 'documents'
-                  AND parent_table.relname = 'customers'
-                  AND child_column.attname = 'customer_id'
-                ORDER BY constraint_def.oid DESC
-                LIMIT 1
-                """
-            )
-        )
-        if definition is None:
-            return False
-        return "ON DELETE CASCADE" in definition.upper()
 
     async def delete(self, customer: Customer) -> None:
         """Delete one customer entity."""
