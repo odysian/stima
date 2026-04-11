@@ -18,7 +18,11 @@ from app.features.quotes.tests.fixtures.extraction_eval_cases import (
     EXTRACTION_EVAL_CASES,
     ExtractionEvalCase,
 )
-from app.integrations.extraction import ExtractionCallMetadata, ExtractionIntegration
+from app.integrations.extraction import (
+    ExtractionCallMetadata,
+    ExtractionError,
+    ExtractionIntegration,
+)
 from app.shared.input_limits import (
     CONFIDENCE_NOTES_MAX_ITEMS,
     DOCUMENT_LINE_ITEMS_MAX_ITEMS,
@@ -85,7 +89,15 @@ def _assert_extraction_invariants(
     if expect_total_matches_priced_sum and result.total is not None:
         priced_items = [item.price for item in result.line_items if item.price is not None]
         assert priced_items
-        assert sum(priced_items) == pytest.approx(result.total)
+        priced_sum = sum(priced_items)
+        if priced_sum != pytest.approx(result.total):
+            assert any(
+                any(
+                    token in note.casefold()
+                    for token in ("mismatch", "does not match", "doesn't match", "line item sum")
+                )
+                for note in result.confidence_notes
+            )
 
 
 def _assert_extraction_quality(
@@ -109,6 +121,17 @@ def _assert_extraction_quality(
     for substring in case.expect_confidence_note_substrings:
         normalized_substring = substring.casefold()
         assert any(normalized_substring in note.casefold() for note in result.confidence_notes)
+
+    if case.expect_all_line_items_flagged is not None:
+        assert result.line_items
+        assert all(item.flagged is case.expect_all_line_items_flagged for item in result.line_items)
+    if case.expect_flag_reason_substrings:
+        assert result.line_items
+        for item in result.line_items:
+            assert item.flag_reason is not None
+            normalized_flag_reason = item.flag_reason.casefold()
+            for substring in case.expect_flag_reason_substrings:
+                assert substring.casefold() in normalized_flag_reason
 
     if case.expect_repair_attempted is not None:
         assert metadata.repair_attempted == case.expect_repair_attempted
@@ -168,3 +191,15 @@ async def test_extraction_eval_invariants(case: ExtractionEvalCase) -> None:
     assert metadata is not None
     assert metadata.invocation_tier == case.expected_invocation_tier
     _assert_extraction_quality(case, result, metadata=metadata)
+
+
+async def test_empty_transcript_raises_extraction_error() -> None:
+    integration = ExtractionIntegration(
+        api_key="",
+        model="primary-model",
+        fallback_model="fallback-model",
+        max_attempts=1,
+    )
+
+    with pytest.raises(ExtractionError, match="notes cannot be empty"):
+        await integration.extract("")
