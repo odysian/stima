@@ -115,4 +115,13 @@ describe("LoginForm", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid credentials");
   });
+
+  it("shows forgot-password link", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderLogin();
+
+    const forgotPasswordLink = await screen.findByRole("link", { name: /forgot password\?/i });
+    expect(forgotPasswordLink).toHaveAttribute("href", "/forgot-password");
+  });
 });

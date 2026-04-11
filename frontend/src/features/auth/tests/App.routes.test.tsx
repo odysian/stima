@@ -141,6 +141,22 @@ describe("App routes", () => {
     expect(await screen.findByRole("heading", { name: /capture the job first/i })).toBeInTheDocument();
   });
 
+  it("renders forgot-password for unauthenticated users", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderApp("/forgot-password");
+
+    expect(await screen.findByRole("heading", { name: /forgot password\?/i })).toBeInTheDocument();
+  });
+
+  it("renders reset-password for unauthenticated users", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderApp("/reset-password?token=sample-token");
+
+    expect(await screen.findByRole("heading", { name: /reset password/i })).toBeInTheDocument();
+  });
+
   it("preserves the protected route in login state so users return after sign-in", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
 
