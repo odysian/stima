@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Iterator, Sequence
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Annotated, TypedDict, cast
 from uuid import UUID, uuid4
@@ -419,6 +419,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
         "id",
         "customer_id",
         "customer_name",
+        "doc_type",
         "doc_number",
         "title",
         "status",
@@ -2723,6 +2724,7 @@ async def test_list_quotes_can_filter_by_customer_id(client: AsyncClient) -> Non
             "id": quote_b["id"],
             "customer_id": customer_id_b,
             "customer_name": "Customer B",
+            "doc_type": "quote",
             "doc_number": "Q-002",
             "title": None,
             "status": "draft",
@@ -4789,6 +4791,7 @@ async def test_mark_quote_outcome_updates_status_and_persists_event_log(
     assert set(payload) == {
         "id",
         "customer_id",
+        "doc_type",
         "doc_number",
         "title",
         "status",
@@ -5069,6 +5072,161 @@ async def test_convert_quote_to_invoice_creates_linked_invoice_and_keeps_quote_l
     assert invoice_count == 1
 
 
+@pytest.mark.parametrize("starting_status", [QuoteStatus.DRAFT, QuoteStatus.READY])
+async def test_patch_quote_doc_type_to_invoice_regenerates_number_and_sets_default_due_date(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    starting_status: QuoteStatus,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    if starting_status is QuoteStatus.READY:
+        await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
+
+    response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"doc_type": "invoice"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["doc_number"].startswith("I-")
+
+    invoice_detail_response = await client.get(f"/api/invoices/{quote_id}")
+    assert invoice_detail_response.status_code == 200
+    invoice_detail = invoice_detail_response.json()
+    assert invoice_detail["doc_number"].startswith("I-")
+    assert invoice_detail["due_date"] == (datetime.now(UTC).date() + timedelta(days=30)).isoformat()
+
+
+async def test_patch_quote_doc_type_to_invoice_accepts_explicit_due_date(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"doc_type": "invoice", "due_date": "2026-05-20"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["doc_number"].startswith("I-")
+
+    invoice_detail_response = await client.get(f"/api/invoices/{quote_id}")
+    assert invoice_detail_response.status_code == 200
+    assert invoice_detail_response.json()["due_date"] == "2026-05-20"
+
+
+async def test_patch_quote_doc_type_after_share_returns_409(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    response = await client.patch(
+        f"/api/quotes/{quote['id']}",
+        json={"doc_type": "invoice"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Document type cannot be changed after sharing."}
+
+
+async def test_patch_quote_doc_type_to_invoice_rejects_non_changeable_status_without_share_token(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
+    await _set_quote_status(db_session, quote_id, QuoteStatus.APPROVED)
+
+    response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"doc_type": "invoice"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Document type can only be changed in draft or ready status."
+    }
+
+
+async def test_patch_customerless_quote_doc_type_to_invoice_returns_409(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    user = await _get_user_by_email(db_session, credentials["email"])
+    repository = QuoteRepository(db_session)
+    unassigned_quote = await repository.create(
+        user_id=user.id,
+        customer_id=None,
+        title=None,
+        transcript="unassigned quote",
+        line_items=[],
+        total_amount=None,
+        tax_rate=None,
+        discount_type=None,
+        discount_value=None,
+        deposit_amount=None,
+        notes=None,
+        source_type="text",
+    )
+    await repository.commit()
+
+    response = await client.patch(
+        f"/api/quotes/{unassigned_quote.id}",
+        json={"doc_type": "invoice"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Assign a customer before continuing."}
+
+
+async def test_patch_quote_doc_type_to_invoice_rejects_existing_linked_invoice(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+
+    response = await client.patch(
+        f"/api/quotes/{quote['id']}",
+        json={"doc_type": "invoice"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "An invoice already exists for this quote"}
+
+
 async def test_optional_pricing_persists_on_quotes_public_payloads_and_converted_invoices(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -5305,6 +5463,7 @@ async def test_list_invoices_returns_direct_and_quote_derived_summaries_newest_f
             "id": direct_invoice["id"],
             "customer_id": direct_customer_id,
             "customer_name": "Direct Customer",
+            "doc_type": "invoice",
             "doc_number": "I-002",
             "title": "Direct invoice",
             "status": "draft",
@@ -5317,6 +5476,7 @@ async def test_list_invoices_returns_direct_and_quote_derived_summaries_newest_f
             "id": linked_invoice["id"],
             "customer_id": quote_customer_id,
             "customer_name": "Quote Customer",
+            "doc_type": "invoice",
             "doc_number": "I-001",
             "title": None,
             "status": "draft",
@@ -5358,6 +5518,7 @@ async def test_list_invoices_can_filter_by_customer_id(client: AsyncClient) -> N
             "id": invoice_b["id"],
             "customer_id": customer_id_b,
             "customer_name": "Customer B",
+            "doc_type": "invoice",
             "doc_number": "I-002",
             "title": "Invoice for B",
             "status": "draft",
@@ -5384,6 +5545,7 @@ async def test_invoice_patch_preserves_omitted_fields_and_ready_status_for_direc
         total_amount=220,
     )
     invoice_id = direct_invoice["id"]
+    assert isinstance(invoice_id, str)
 
     await _set_invoice_status(db_session, invoice_id, QuoteStatus.READY)
 
@@ -5402,6 +5564,133 @@ async def test_invoice_patch_preserves_omitted_fields_and_ready_status_for_direc
     assert patched_invoice["line_items"] == direct_invoice["line_items"]
     assert patched_invoice["share_token"] is None
     assert patched_invoice["shared_at"] is None
+
+
+@pytest.mark.parametrize("starting_status", [QuoteStatus.DRAFT, QuoteStatus.READY])
+async def test_patch_invoice_doc_type_to_quote_regenerates_number_and_clears_due_date(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    starting_status: QuoteStatus,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    direct_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Direct invoice",
+        transcript="direct invoice transcript",
+        total_amount=220,
+    )
+    invoice_id = direct_invoice["id"]
+    assert isinstance(invoice_id, str)
+
+    if starting_status is QuoteStatus.READY:
+        await _set_invoice_status(db_session, invoice_id, QuoteStatus.READY)
+
+    response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"doc_type": "quote"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["doc_number"].startswith("Q-")
+
+    stored_document = await db_session.scalar(
+        select(Document).where(Document.id == UUID(invoice_id))
+    )
+    assert stored_document is not None
+    assert stored_document.doc_type == "quote"
+    assert stored_document.due_date is None
+
+
+async def test_patch_invoice_doc_type_after_share_returns_409(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    direct_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Direct invoice",
+        transcript="direct invoice transcript",
+        total_amount=220,
+    )
+    invoice_id = direct_invoice["id"]
+
+    share_response = await client.post(
+        f"/api/invoices/{invoice_id}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"doc_type": "quote"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Document type cannot be changed after sharing."}
+
+
+async def test_patch_invoice_doc_type_to_quote_rejects_non_changeable_status_without_share_token(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    direct_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Direct invoice",
+        transcript="direct invoice transcript",
+        total_amount=220,
+    )
+    invoice_id = direct_invoice["id"]
+    assert isinstance(invoice_id, str)
+
+    await _set_invoice_status(db_session, invoice_id, QuoteStatus.READY)
+    await _set_invoice_status(db_session, invoice_id, QuoteStatus.SENT)
+
+    response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"doc_type": "quote"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Document type can only be changed in draft or ready status."
+    }
+
+
+async def test_patch_invoice_doc_type_to_quote_rejects_linked_source_invoice(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    convert_response = await client.post(
+        f"/api/quotes/{quote['id']}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    response = await client.patch(
+        f"/api/invoices/{invoice_id}",
+        json={"doc_type": "quote"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Invoices created from quotes cannot be converted to quotes."
+    }
 
 
 async def test_invoice_patch_rejects_invalid_optional_pricing_without_partial_write(

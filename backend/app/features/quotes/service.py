@@ -7,7 +7,7 @@ import base64
 import logging
 import re
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal, Protocol, cast
 from uuid import UUID, uuid4
 
@@ -82,7 +82,12 @@ _POST_SHARE_NON_REGRESSION_STATUSES = frozenset(
 _CUSTOMER_ASSIGNMENT_REQUIRED_DETAIL = "Assign a customer before continuing."
 _CUSTOMER_CLEAR_BLOCKED_DETAIL = "Customer cannot be cleared from a quote."
 _CUSTOMER_CHANGE_BLOCKED_DETAIL = "Customer cannot be changed after sharing or invoice conversion."
+_DOC_TYPE_CHANGE_STATUS_BLOCKED_DETAIL = (
+    "Document type can only be changed in draft or ready status."
+)
+_DOC_TYPE_CHANGE_SHARED_BLOCKED_DETAIL = "Document type cannot be changed after sharing."
 _CUSTOMER_REASSIGNABLE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY})
+_DOC_TYPE_CHANGEABLE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY})
 _APPENDABLE_QUOTE_STATUSES = frozenset(
     {
         QuoteStatus.DRAFT,
@@ -128,6 +133,8 @@ class QuoteRepositoryProtocol(Protocol):
         source_document_id: UUID,
         user_id: UUID,
     ) -> bool: ...
+
+    async def get_next_doc_sequence_for_type(self, *, user_id: UUID, doc_type: str) -> int: ...
 
     async def get_render_context(
         self, quote_id: UUID, user_id: UUID
@@ -491,6 +498,7 @@ class QuoteService:
         quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
+        has_linked_invoice: bool | None = None
         next_customer_id = quote.customer_id
         if "customer_id" in data.model_fields_set:
             has_linked_invoice = await self._repository.has_linked_invoice(
@@ -503,6 +511,20 @@ class QuoteService:
                 requested_customer_id=data.customer_id,
                 has_linked_invoice=has_linked_invoice,
             )
+        requested_doc_type = (
+            data.doc_type
+            if "doc_type" in data.model_fields_set
+            else getattr(quote, "doc_type", "quote")
+        )
+        if requested_doc_type is None:
+            raise QuoteServiceError(detail="doc_type cannot be null", status_code=422)
+        doc_type_changed = await self._apply_doc_type_transition(
+            user_id=user_id,
+            quote=quote,
+            requested_doc_type=requested_doc_type,
+            requested_due_date=(data.due_date if "due_date" in data.model_fields_set else None),
+            has_linked_invoice=has_linked_invoice,
+        )
 
         next_line_items = (
             data.line_items if "line_items" in data.model_fields_set else quote.line_items
@@ -554,57 +576,72 @@ class QuoteService:
                 else document_field_float_or_none(quote.deposit_amount)
             ),
         )
-        rendered_fields_changed = _quote_render_inputs_changed(
-            quote=quote,
-            update_fields=data.model_fields_set,
-            next_customer_id=next_customer_id,
-            next_line_items=next_line_items,
-            next_total_amount=document_field_float_or_none(current_pricing.total_amount),
-            next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
-            next_discount_type=current_pricing.discount_type,
-            next_discount_value=document_field_float_or_none(current_pricing.discount_value),
-            next_deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
-            next_title=data.title if "title" in data.model_fields_set else quote.title,
-            next_notes=data.notes if "notes" in data.model_fields_set else quote.notes,
+        rendered_fields_changed = (
+            _quote_render_inputs_changed(
+                quote=quote,
+                update_fields=data.model_fields_set,
+                next_customer_id=next_customer_id,
+                next_line_items=next_line_items,
+                next_total_amount=document_field_float_or_none(current_pricing.total_amount),
+                next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+                next_discount_type=current_pricing.discount_type,
+                next_discount_value=document_field_float_or_none(current_pricing.discount_value),
+                next_deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+                next_title=data.title if "title" in data.model_fields_set else quote.title,
+                next_notes=data.notes if "notes" in data.model_fields_set else quote.notes,
+            )
+            or doc_type_changed
         )
 
-        updated_quote = await self._repository.update(
-            document=quote,
-            customer_id=next_customer_id,
-            update_customer_id="customer_id" in data.model_fields_set,
-            title=data.title,
-            update_title="title" in data.model_fields_set,
-            transcript=data.transcript,
-            update_transcript="transcript" in data.model_fields_set,
-            total_amount=document_field_float_or_none(current_pricing.total_amount),
-            update_total_amount="total_amount" in data.model_fields_set
-            or ("line_items" in data.model_fields_set and line_items_define_subtotal)
-            or "discount_type" in data.model_fields_set
-            or "discount_value" in data.model_fields_set
-            or "tax_rate" in data.model_fields_set,
-            tax_rate=document_field_float_or_none(current_pricing.tax_rate),
-            update_tax_rate="tax_rate" in data.model_fields_set,
-            discount_type=current_pricing.discount_type,
-            update_discount_type=(
-                "discount_type" in data.model_fields_set
-                or (
-                    "discount_value" in data.model_fields_set
-                    and current_pricing.discount_type is None
+        try:
+            updated_quote = await self._repository.update(
+                document=quote,
+                customer_id=next_customer_id,
+                update_customer_id="customer_id" in data.model_fields_set,
+                title=data.title,
+                update_title="title" in data.model_fields_set,
+                transcript=data.transcript,
+                update_transcript="transcript" in data.model_fields_set,
+                total_amount=document_field_float_or_none(current_pricing.total_amount),
+                update_total_amount="total_amount" in data.model_fields_set
+                or ("line_items" in data.model_fields_set and line_items_define_subtotal)
+                or "discount_type" in data.model_fields_set
+                or "discount_value" in data.model_fields_set
+                or "tax_rate" in data.model_fields_set,
+                tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+                update_tax_rate="tax_rate" in data.model_fields_set,
+                discount_type=current_pricing.discount_type,
+                update_discount_type=(
+                    "discount_type" in data.model_fields_set
+                    or (
+                        "discount_value" in data.model_fields_set
+                        and current_pricing.discount_type is None
+                    )
+                ),
+                discount_value=document_field_float_or_none(current_pricing.discount_value),
+                update_discount_value="discount_value" in data.model_fields_set,
+                deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+                update_deposit_amount="deposit_amount" in data.model_fields_set,
+                notes=data.notes,
+                update_notes="notes" in data.model_fields_set,
+                line_items=data.line_items,
+                replace_line_items="line_items" in data.model_fields_set,
+            )
+            obsolete_artifact_path = None
+            if rendered_fields_changed:
+                obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(
+                    updated_quote
                 )
-            ),
-            discount_value=document_field_float_or_none(current_pricing.discount_value),
-            update_discount_value="discount_value" in data.model_fields_set,
-            deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
-            update_deposit_amount="deposit_amount" in data.model_fields_set,
-            notes=data.notes,
-            update_notes="notes" in data.model_fields_set,
-            line_items=data.line_items,
-            replace_line_items="line_items" in data.model_fields_set,
-        )
-        obsolete_artifact_path = None
-        if rendered_fields_changed:
-            obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
-        await self._repository.commit()
+            await self._repository.commit()
+        except IntegrityError as exc:
+            await self._repository.rollback()
+            if doc_type_changed and _is_doc_sequence_collision(exc):
+                raise QuoteServiceError(
+                    detail="Document type change failed, please retry.",
+                    status_code=409,
+                ) from exc
+            raise
+
         await self._delete_obsolete_artifact(obsolete_artifact_path)
         log_event(
             "quote.updated",
@@ -846,7 +883,6 @@ class QuoteService:
             LOGGER.warning("Failed to delete invalidated quote PDF artifact", exc_info=True)
 
     def _log_public_quote_viewed(self, transition: QuoteViewTransition) -> None:
-        """Emit the first public quote view event."""
         log_event(
             "quote_viewed",
             user_id=transition.user_id,
@@ -923,6 +959,61 @@ class QuoteService:
             customer_id=refreshed_quote.customer_id,
         )
         return refreshed_quote
+
+    async def _apply_doc_type_transition(
+        self,
+        *,
+        user_id: UUID,
+        quote: Document,
+        requested_doc_type: str,
+        requested_due_date: date | None,
+        has_linked_invoice: bool | None,
+    ) -> bool:
+        current_doc_type = getattr(quote, "doc_type", "quote")
+        if requested_doc_type == current_doc_type:
+            return False
+        if requested_doc_type != "invoice":
+            raise QuoteServiceError(
+                detail="Unsupported document type transition",
+                status_code=409,
+            )
+        if quote.share_token is not None:
+            raise QuoteServiceError(
+                detail=_DOC_TYPE_CHANGE_SHARED_BLOCKED_DETAIL,
+                status_code=409,
+            )
+        if quote.status not in _DOC_TYPE_CHANGEABLE_STATUSES:
+            raise QuoteServiceError(
+                detail=_DOC_TYPE_CHANGE_STATUS_BLOCKED_DETAIL,
+                status_code=409,
+            )
+
+        linked_invoice = has_linked_invoice
+        if linked_invoice is None:
+            linked_invoice = await self._repository.has_linked_invoice(
+                source_document_id=quote.id,
+                user_id=user_id,
+            )
+        if linked_invoice:
+            raise QuoteServiceError(
+                detail="An invoice already exists for this quote",
+                status_code=409,
+            )
+
+        ensure_quote_customer_assigned(quote)
+        next_sequence = await self._repository.get_next_doc_sequence_for_type(
+            user_id=user_id,
+            doc_type="invoice",
+        )
+        quote.doc_type = "invoice"
+        quote.doc_sequence = next_sequence
+        quote.doc_number = build_doc_number(doc_type="invoice", sequence=next_sequence)
+        quote.due_date = (
+            requested_due_date
+            if requested_due_date is not None
+            else _build_default_invoice_due_date()
+        )
+        return True
 
     async def revoke_public_share(self, user: User, quote_id: UUID) -> None:
         """Revoke the currently active public share token for one quote."""
@@ -1113,6 +1204,15 @@ def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _build_default_invoice_due_date() -> date:
+    return _utcnow().date() + timedelta(days=30)
+
+
+def build_doc_number(*, doc_type: str, sequence: int) -> str:
+    prefix = "I" if doc_type == "invoice" else "Q"
+    return f"{prefix}-{sequence:03d}"
 
 
 def _build_share_token_expiry(created_at: datetime) -> datetime:

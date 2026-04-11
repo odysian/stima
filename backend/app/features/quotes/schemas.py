@@ -115,6 +115,8 @@ class QuoteUpdateRequest(BaseModel):
     discount_value: float | None = None
     deposit_amount: float | None = None
     notes: str | None = Field(default=None, max_length=DOCUMENT_NOTES_MAX_CHARS)
+    doc_type: Literal["quote", "invoice"] | None = None
+    due_date: date | None = None
 
     _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
 
@@ -125,6 +127,10 @@ class QuoteUpdateRequest(BaseModel):
             raise ValueError("line_items cannot be null")
         if "transcript" in self.model_fields_set and self.transcript is None:
             raise ValueError("transcript cannot be null")
+        if "doc_type" in self.model_fields_set and self.doc_type is None:
+            raise ValueError("doc_type cannot be null")
+        if "due_date" in self.model_fields_set and self.due_date is None:
+            raise ValueError("due_date cannot be null")
         return self
 
 
@@ -158,6 +164,7 @@ class QuoteListItemResponse(BaseModel):
     id: UUID
     customer_id: UUID | None
     customer_name: str | None
+    doc_type: Literal["quote"] = "quote"
     doc_number: str
     title: str | None
     status: str
@@ -175,6 +182,7 @@ class QuoteResponse(BaseModel):
 
     id: UUID
     customer_id: UUID | None
+    doc_type: str
     doc_number: str
     title: str | None
     status: str

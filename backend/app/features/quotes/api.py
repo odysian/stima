@@ -482,6 +482,7 @@ async def get_quote(
     return QuoteDetailResponse(
         id=quote.id,
         customer_id=quote.customer_id,
+        doc_type="quote",
         doc_number=quote.doc_number,
         title=quote.title,
         status=cast(str, quote.status),
