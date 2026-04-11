@@ -1,4 +1,4 @@
-.PHONY: help verify backend-verify frontend-verify db-verify template-verify extraction-live extraction-eval
+.PHONY: help verify backend-verify frontend-verify db-verify template-verify extraction-live extraction-eval extraction-quality
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-20s %s\n", $$1, $$2}'
@@ -17,7 +17,7 @@ backend-verify: ## Run backend lint, type checks, security scan, and tests
 		.venv/bin/ruff format --check . && \
 		.venv/bin/mypy . --cache-dir .mypy_cache && \
 		.venv/bin/bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/profile/tests,app/features/quotes/tests,app/shared/tests && \
-		.venv/bin/pytest -v -m "not live and not extraction_eval" -o cache_dir=.pytest_cache
+		.venv/bin/pytest -v -m "not live and not extraction_eval and not extraction_quality" -o cache_dir=.pytest_cache
 
 frontend-verify: ## Run frontend type checks, lint, tests, and build
 	@if [ "$(SKIP_FILE_SIZE_CHECK)" != "1" ]; then bash scripts/check_file_sizes.sh --scope frontend; fi
@@ -46,3 +46,7 @@ extraction-eval: ## Run manual extraction eval harness (offline by default, set 
 		echo "Running optional live extraction probes (requires ANTHROPIC_API_KEY in backend/.env)"; \
 		cd backend && .venv/bin/pytest app/features/quotes/tests/test_extraction_live.py -m live -s -v -o cache_dir=.pytest_cache; \
 	fi
+
+extraction-quality: ## Run extraction quality eval against real API (requires ANTHROPIC_API_KEY)
+	@test -x backend/.venv/bin/pytest || (echo "Missing backend/.venv. Run: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" && exit 1)
+	@cd backend && .venv/bin/pytest app/features/quotes/tests/test_extraction_quality.py -m extraction_quality -s -v -o cache_dir=.pytest_cache
