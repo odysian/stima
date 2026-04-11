@@ -59,7 +59,22 @@ from app.shared.pricing import (
 )
 
 LOGGER = logging.getLogger(__name__)
-_EDITABLE_INVOICE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY, QuoteStatus.SENT})
+_EDITABLE_INVOICE_STATUSES = frozenset(
+    {
+        QuoteStatus.DRAFT,
+        QuoteStatus.READY,
+        QuoteStatus.SENT,
+        QuoteStatus.PAID,
+        QuoteStatus.VOID,
+    }
+)
+_INVOICE_OUTCOME_MUTABLE_STATUSES = frozenset(
+    {
+        QuoteStatus.SENT,
+        QuoteStatus.PAID,
+        QuoteStatus.VOID,
+    }
+)
 _PDF_JOB_NAME = "jobs.pdf"
 _PDF_QUEUE_FAILURE_DETAIL = "Unable to start PDF generation right now. Please try again."
 
@@ -335,6 +350,26 @@ class InvoiceService:
             raise QuoteServiceError(detail="Not found", status_code=404)
         return row
 
+    async def mark_invoice_paid(self, user: User, invoice_id: UUID) -> Document:
+        """Mark one invoice as paid without changing share/access capabilities."""
+        return await self._mark_invoice_outcome(
+            user,
+            invoice_id,
+            next_status=QuoteStatus.PAID,
+            event_name="invoice_paid",
+            action_label="paid",
+        )
+
+    async def mark_invoice_voided(self, user: User, invoice_id: UUID) -> Document:
+        """Mark one invoice as void without changing share/access capabilities."""
+        return await self._mark_invoice_outcome(
+            user,
+            invoice_id,
+            next_status=QuoteStatus.VOID,
+            event_name="invoice_voided",
+            action_label="void",
+        )
+
     async def update_invoice(
         self,
         user: User,
@@ -545,7 +580,7 @@ class InvoiceService:
         *,
         regenerate: bool = False,
     ) -> Document:
-        """Create/reuse a share token and transition the invoice to sent."""
+        """Create/reuse a share token without regressing paid/void outcome labels."""
         user_id = _resolve_user_id(user)
         invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
         if invoice is None:
@@ -557,7 +592,7 @@ class InvoiceService:
             or invoice.share_token_revoked_at is not None
             or _share_token_has_expired(invoice.share_token_expires_at, now)
         )
-        if invoice.status == QuoteStatus.SENT and not should_refresh_token:
+        if invoice.status in _INVOICE_OUTCOME_MUTABLE_STATUSES and not should_refresh_token:
             return invoice
 
         if should_refresh_token:
@@ -566,8 +601,11 @@ class InvoiceService:
             invoice.share_token_expires_at = _build_share_token_expiry(now)
             invoice.share_token_revoked_at = None
 
-        invoice.shared_at = now
-        invoice.status = QuoteStatus.SENT
+        if invoice.status not in _INVOICE_OUTCOME_MUTABLE_STATUSES:
+            invoice.shared_at = now
+            invoice.status = QuoteStatus.SENT
+        elif invoice.shared_at is None:
+            invoice.shared_at = now
         await self._invoice_repository.commit()
         return await self._invoice_repository.refresh(invoice)
 
@@ -584,7 +622,7 @@ class InvoiceService:
         await self._invoice_repository.commit()
 
     async def generate_shared_pdf(self, share_token: str) -> tuple[str, bytes]:
-        """Render and return a sent invoice PDF by share token."""
+        """Render and return one shared invoice PDF by share token."""
         context = await self._get_public_invoice_context(share_token)
         await self._attach_logo_data_uri(context)
 
@@ -697,6 +735,38 @@ class InvoiceService:
         ):
             return None
         return job
+
+    async def _mark_invoice_outcome(
+        self,
+        user: User,
+        invoice_id: UUID,
+        *,
+        next_status: QuoteStatus,
+        event_name: str,
+        action_label: str,
+    ) -> Document:
+        user_id = _resolve_user_id(user)
+        invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
+        if invoice is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+        if invoice.status == next_status:
+            return invoice
+        if invoice.status not in _INVOICE_OUTCOME_MUTABLE_STATUSES:
+            raise QuoteServiceError(
+                detail=f"Only sent, paid, or void invoices can be marked {action_label}.",
+                status_code=409,
+            )
+
+        invoice.status = next_status
+        await self._invoice_repository.commit()
+        refreshed_invoice = await self._invoice_repository.refresh(invoice)
+        log_event(
+            event_name,
+            user_id=user_id,
+            invoice_id=refreshed_invoice.id,
+            customer_id=refreshed_invoice.customer_id,
+        )
+        return refreshed_invoice
 
     def _log_public_share_denied(
         self,

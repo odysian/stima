@@ -59,7 +59,7 @@ class InvoiceResponse(BaseModel):
     customer_id: UUID
     doc_number: str
     title: str | None
-    status: Literal["draft", "ready", "sent"]
+    status: Literal["draft", "ready", "sent", "paid", "void"]
     total_amount: float | None
     tax_rate: float | None
     discount_type: DiscountType | None
@@ -85,7 +85,7 @@ class InvoiceListItemResponse(BaseModel):
     customer_name: str
     doc_number: str
     title: str | None
-    status: Literal["draft", "ready", "sent"]
+    status: Literal["draft", "ready", "sent", "paid", "void"]
     total_amount: float | None
     due_date: date | None
     created_at: datetime
