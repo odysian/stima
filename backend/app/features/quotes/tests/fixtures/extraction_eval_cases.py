@@ -7,6 +7,15 @@ from typing import Any, Literal
 
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
 
+_SEMANTIC_EMPTY_LINE_ITEMS_BELOW_TRANSCRIPT = (
+    "Clean gutters flush drains sweep roof patch fascia trim shrubs edge beds "
+    "check lights and confirm work schedule."
+)
+_SEMANTIC_EMPTY_LINE_ITEMS_ABOVE_TRANSCRIPT = (
+    "Clean gutters flush drains sweep roof patch fascia trim shrubs edge beds "
+    "check lights and confirm full work schedule tomorrow morning."
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ExtractionEvalCase:
@@ -18,6 +27,23 @@ class ExtractionEvalCase:
     expected_models: tuple[str, ...]
     expected_invocation_tier: Literal["primary", "fallback"]
     expect_total_matches_priced_sum: bool
+    expect_extraction_tier: Literal["primary", "degraded"] | None = None
+    expect_degraded_reason_code: str | None = None
+    expect_line_item_count_min: int | None = None
+    expect_line_item_count_max: int | None = None
+    expect_confidence_note_substrings: tuple[str, ...] = ()
+    expect_repair_attempted: bool | None = None
+    expect_repair_outcome: (
+        Literal[
+            "not_attempted",
+            "repair_succeeded",
+            "repair_invalid",
+            "repair_request_failed",
+        ]
+        | None
+    ) = None
+    expect_repair_validation_error_count: int | None = None
+    human_notes: str | None = None
 
 
 EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
@@ -49,6 +75,12 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expected_models=("primary-model",),
         expected_invocation_tier="primary",
         expect_total_matches_priced_sum=True,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=2,
+        expect_line_item_count_max=2,
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes="Baseline primary extraction invariants remain stable.",
     ),
     ExtractionEvalCase(
         name="fallback_tier_after_primary_rate_limit",
@@ -83,5 +115,139 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expected_models=("primary-model", "fallback-model"),
         expected_invocation_tier="fallback",
         expect_total_matches_priced_sum=True,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=2,
+        expect_line_item_count_max=2,
+        expect_confidence_note_substrings=("fallback tier produced extraction output",),
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes="Fallback invocation should remain quote-facing primary when usable.",
+    ),
+    ExtractionEvalCase(
+        name="repair_succeeds_after_one_invalid_payload",
+        transcript=TRANSCRIPTS["clean_with_total"],
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": TRANSCRIPTS["clean_with_total"],
+                    "line_items": "invalid-shape",
+                    "total": 435,
+                    "confidence_notes": [],
+                },
+            },
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": TRANSCRIPTS["clean_with_total"],
+                    "line_items": [
+                        {
+                            "description": "Trim shrubs",
+                            "details": "Front beds",
+                            "price": 125,
+                        }
+                    ],
+                    "total": 125,
+                    "confidence_notes": [],
+                },
+            },
+        ),
+        expected_models=("primary-model", "primary-model"),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=True,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=1,
+        expect_line_item_count_max=1,
+        expect_repair_attempted=True,
+        expect_repair_outcome="repair_succeeded",
+        expect_repair_validation_error_count=1,
+        human_notes="One repair turn should recover invalid initial tool output.",
+    ),
+    ExtractionEvalCase(
+        name="repair_still_invalid_degrades_with_reason_code",
+        transcript=TRANSCRIPTS["clean_with_total"],
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": TRANSCRIPTS["clean_with_total"],
+                    "line_items": "invalid-shape",
+                    "total": 435,
+                    "confidence_notes": [],
+                },
+            },
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": TRANSCRIPTS["clean_with_total"],
+                    "line_items": "still-invalid",
+                    "total": 435,
+                    "confidence_notes": [],
+                },
+            },
+        ),
+        expected_models=("primary-model", "primary-model"),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=False,
+        expect_extraction_tier="degraded",
+        expect_degraded_reason_code="validation_repair_failed",
+        expect_line_item_count_min=0,
+        expect_line_item_count_max=0,
+        expect_repair_attempted=True,
+        expect_repair_outcome="repair_invalid",
+        expect_repair_validation_error_count=1,
+        human_notes="Invalid repair payload should degrade with validation repair failure.",
+    ),
+    ExtractionEvalCase(
+        name="semantic_empty_items_below_threshold_stays_primary",
+        transcript=_SEMANTIC_EMPTY_LINE_ITEMS_BELOW_TRANSCRIPT,
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": _SEMANTIC_EMPTY_LINE_ITEMS_BELOW_TRANSCRIPT,
+                    "line_items": [],
+                    "total": None,
+                    "confidence_notes": [],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=False,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=0,
+        expect_line_item_count_max=0,
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes="Boundary probe just below transcript-char threshold.",
+    ),
+    ExtractionEvalCase(
+        name="semantic_empty_items_at_or_above_threshold_degrades",
+        transcript=_SEMANTIC_EMPTY_LINE_ITEMS_ABOVE_TRANSCRIPT,
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": _SEMANTIC_EMPTY_LINE_ITEMS_ABOVE_TRANSCRIPT,
+                    "line_items": [],
+                    "total": None,
+                    "confidence_notes": [],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=False,
+        expect_extraction_tier="degraded",
+        expect_degraded_reason_code="semantic_empty_line_items_substantial_transcript",
+        expect_line_item_count_min=0,
+        expect_line_item_count_max=0,
+        expect_confidence_note_substrings=(
+            "No line items were extracted from a substantial transcript",
+        ),
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes="Boundary probe at/above semantic transcript + word thresholds.",
     ),
 )
