@@ -22,10 +22,7 @@ import {
 } from "@/features/quotes/utils/reviewConfidenceNotes";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type {
-  ExtractionResult,
-  QuoteSourceType,
-} from "@/features/quotes/types/quote.types";
+import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
@@ -33,10 +30,9 @@ import { Toast } from "@/shared/components/Toast";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { jobService } from "@/shared/lib/jobService";
 import { formatByteLimit } from "@/shared/lib/formatters";
-import {
-  MAX_AUDIO_CLIPS_PER_REQUEST,
-  MAX_AUDIO_TOTAL_BYTES,
-} from "@/shared/lib/inputLimits";
+import { MAX_AUDIO_CLIPS_PER_REQUEST, MAX_AUDIO_TOTAL_BYTES } from "@/shared/lib/inputLimits";
+
+const START_BLANK_GUARD_TARGET = "__start_blank__";
 
 export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -62,9 +58,7 @@ export function CaptureScreen(): React.ReactElement {
 
   const [notes, setNotes] = useState("");
   const [extractionStage, setExtractionStage] = useState<string | null>(null);
-  const [pendingExitTarget, setPendingExitTarget] = useState<string | null>(
-    null,
-  );
+  const [pendingExitTarget, setPendingExitTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStartingBlank, setIsStartingBlank] = useState(false);
   const isExtracting = extractionStage !== null;
@@ -344,6 +338,14 @@ export function CaptureScreen(): React.ReactElement {
     requestExit(HOME_ROUTE);
   }
 
+  function onStartBlankClick(): void {
+    if (hasUnsavedWork()) {
+      setPendingExitTarget(START_BLANK_GUARD_TARGET);
+      return;
+    }
+    void onStartBlank();
+  }
+
   const displayedError = error ?? voiceError;
   const hasReachedClipLimit = clips.length >= MAX_AUDIO_CLIPS_PER_REQUEST;
   const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording;
@@ -385,16 +387,8 @@ export function CaptureScreen(): React.ReactElement {
               void startRecording();
             }}
             onStopRecording={stopRecording}
-            onStartBlank={
-              isAppendMode
-                ? undefined
-                : () => {
-                    void onStartBlank();
-                  }
-            }
-            isStartBlankDisabled={
-              isExtracting || isRecording || isStartingBlank
-            }
+            onStartBlank={isAppendMode ? undefined : onStartBlankClick}
+            isStartBlankDisabled={isExtracting || isRecording || isStartingBlank}
           />
         </div>
       </section>
@@ -439,6 +433,10 @@ export function CaptureScreen(): React.ReactElement {
           onConfirm={() => {
             const nextTarget = pendingExitTarget;
             setPendingExitTarget(null);
+            if (nextTarget === START_BLANK_GUARD_TARGET) {
+              void onStartBlank();
+              return;
+            }
             navigate(nextTarget, { replace: true });
           }}
           onCancel={() => setPendingExitTarget(null)}

@@ -442,6 +442,37 @@ describe("CaptureScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/documents/quote-manual-1/edit");
   });
 
+  it("guards Start Blank with confirmation when unsaved notes and clips exist", async () => {
+    mockVoiceCapture({ clips: [clipFixture] });
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Or start with a blank document" }),
+    );
+
+    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
+    expect(mockedQuoteService.createManualDraft).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Stay" }));
+    expect(screen.queryByRole("dialog", { name: "Leave this screen?" })).not.toBeInTheDocument();
+    expect(mockedQuoteService.createManualDraft).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Or start with a blank document" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.createManualDraft).toHaveBeenCalledWith({
+        customerId: "cust-1",
+      });
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-manual-1/edit");
+  });
+
   it("starts a blank draft without customer context and routes to edit", async () => {
     mockedQuoteService.createManualDraft.mockResolvedValueOnce({
       id: "quote-manual-home",
