@@ -1,6 +1,7 @@
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { SkeletonBlock } from "@/shared/components/SkeletonBlock";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 interface InvoiceHistoryListProps {
@@ -36,9 +37,20 @@ export function InvoiceHistoryList({
       ) : null}
 
       {isLoading ? (
-        <p role="status" className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline ghost-shadow">
-          Loading invoices...
-        </p>
+        <div role="status" aria-label="Loading invoices" className="space-y-3 rounded-xl bg-surface-container-low p-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={`invoice-history-skeleton-${index}`} className="rounded-xl bg-surface-container-lowest p-4 ghost-shadow">
+              <div className="flex items-baseline justify-between gap-3">
+                <SkeletonBlock width="42%" height="1rem" />
+                <SkeletonBlock width="26%" height="1rem" />
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <SkeletonBlock width="58%" height="0.875rem" />
+                <SkeletonBlock width="24%" height="1.5rem" borderRadius="9999px" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : null}
 
       {!isLoading && loadError ? <FeedbackMessage variant="error">{loadError}</FeedbackMessage> : null}
