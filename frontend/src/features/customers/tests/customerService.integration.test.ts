@@ -113,4 +113,21 @@ describe("customerService integration (MSW)", () => {
       updated_at: "2026-03-20T00:00:00.000Z",
     });
   });
+
+  it("deleteCustomer sends CSRF header and accepts 204 response", async () => {
+    setCsrfToken("integration-csrf-token");
+
+    let capturedCsrfHeader: string | null = null;
+
+    server.use(
+      http.delete("/api/customers/:customerId", ({ request, params }) => {
+        capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        expect(params.customerId).toBe("cust-delete");
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await expect(customerService.deleteCustomer("cust-delete")).resolves.toBeUndefined();
+    expect(capturedCsrfHeader).toBe("integration-csrf-token");
+  });
 });

@@ -43,6 +43,26 @@ describe("ConfirmModal", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps confirm button disabled when requested", () => {
+    const onConfirm = vi.fn();
+
+    render(
+      <ConfirmModal
+        title="Delete customer?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={onConfirm}
+        onCancel={vi.fn()}
+        confirmDisabled
+      />,
+    );
+
+    const confirmButton = screen.getByRole("button", { name: "Delete" });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(confirmButton);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it("fires onCancel when cancel button is clicked", () => {
     const onCancel = vi.fn();
 

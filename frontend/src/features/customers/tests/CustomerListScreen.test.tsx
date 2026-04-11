@@ -22,6 +22,7 @@ vi.mock("@/features/customers/services/customerService", () => ({
     createCustomer: vi.fn(),
     getCustomer: vi.fn(),
     updateCustomer: vi.fn(),
+    deleteCustomer: vi.fn(),
   },
 }));
 
@@ -40,9 +41,11 @@ function makeCustomer(overrides: Partial<Customer> = {}): Customer {
   };
 }
 
-function renderScreen(): void {
+function renderScreen(
+  initialEntries: Array<string | { pathname: string; state?: unknown }> = ["/customers"],
+): void {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <CustomerListScreen />
     </MemoryRouter>,
   );
@@ -187,5 +190,18 @@ describe("CustomerListScreen", () => {
 
     expect(await screen.findByText("Unable to load customers")).toBeInTheDocument();
     expect(screen.queryByText("0 customers")).not.toBeInTheDocument();
+  });
+
+  it("renders success toast from navigation flash state", async () => {
+    mockedCustomerService.listCustomers.mockResolvedValueOnce([makeCustomer()]);
+
+    renderScreen([
+      {
+        pathname: "/customers",
+        state: { flashMessage: "Customer deleted" },
+      },
+    ]);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Customer deleted");
   });
 });

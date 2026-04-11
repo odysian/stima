@@ -9,6 +9,7 @@ interface ConfirmModalProps {
   cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmDisabled?: boolean;
   variant?: "primary" | "destructive";
 }
 
@@ -24,6 +25,7 @@ export function ConfirmModal({
   cancelLabel,
   onConfirm,
   onCancel,
+  confirmDisabled = false,
   variant = "primary",
 }: ConfirmModalProps): React.ReactElement {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
@@ -43,6 +45,9 @@ export function ConfirmModal({
   }
 
   function handleConfirm(): void {
+    if (confirmDisabled) {
+      return;
+    }
     onConfirm();
     queueMicrotask(restoreFocus);
   }
@@ -61,7 +66,7 @@ export function ConfirmModal({
         />
         <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0">
           <Dialog.Content
-            {...(!body ? { "aria-describedby": undefined } : {})}
+            aria-describedby={undefined}
             className="modal-shadow pointer-events-auto w-full max-w-md rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
@@ -70,15 +75,16 @@ export function ConfirmModal({
           >
             <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">{title}</Dialog.Title>
             {body ? (
-              <Dialog.Description className="mt-2 break-words text-sm leading-6 text-on-surface-variant">
+              <div className="mt-2 wrap-break-word text-sm leading-6 text-on-surface-variant">
                 {body}
-              </Dialog.Description>
+              </div>
             ) : null}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
               <button
                 type="button"
-                className={`inline-flex min-h-12 cursor-pointer flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] ${confirmButtonClasses[variant]}`}
+                className={`inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all ${confirmDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer active:scale-[0.98]"} ${confirmButtonClasses[variant]}`}
                 onClick={handleConfirm}
+                disabled={confirmDisabled}
               >
                 {confirmLabel}
               </button>

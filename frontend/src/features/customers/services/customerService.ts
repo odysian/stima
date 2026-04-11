@@ -27,9 +27,16 @@ function updateCustomer(id: string, data: CustomerUpdateRequest): Promise<Custom
   });
 }
 
+function deleteCustomer(id: string): Promise<void> {
+  return request<null>(`/api/customers/${id}`, {
+    method: "DELETE",
+  }).then(() => undefined);
+}
+
 export const customerService = {
   listCustomers,
   createCustomer,
   getCustomer,
   updateCustomer,
+  deleteCustomer,
 };
