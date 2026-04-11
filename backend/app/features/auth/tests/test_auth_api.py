@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Iterator
 from datetime import timedelta
 from uuid import UUID, uuid4
@@ -14,11 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_engine, get_session_maker
-from app.core.security import create_refresh_token, hash_token
-from app.features.auth.models import RefreshToken, User
+from app.core.security import create_refresh_token, hash_token, verify_password
+from app.features.auth.models import PasswordResetToken, RefreshToken, User
 from app.features.auth.service import ACCESS_COOKIE_NAME, CSRF_COOKIE_NAME, REFRESH_COOKIE_NAME
+from app.integrations.email import EmailMessage
 from app.main import app
 from app.shared import observability
+from app.shared.dependencies import get_email_service
 from app.shared.rate_limit import reset_local_rate_limit_state
 
 pytestmark = pytest.mark.asyncio
@@ -48,6 +51,22 @@ def _reset_rate_limiter() -> Iterator[None]:
     reset_local_rate_limit_state()
     yield
     reset_local_rate_limit_state()
+
+
+class _MockEmailService:
+    def __init__(self) -> None:
+        self.messages: list[EmailMessage] = []
+
+    async def send(self, message: EmailMessage) -> None:
+        self.messages.append(message)
+
+
+@pytest.fixture(autouse=True)
+def _mock_email_service() -> Iterator[_MockEmailService]:
+    service = _MockEmailService()
+    app.dependency_overrides[get_email_service] = lambda: service
+    yield service
+    app.dependency_overrides.pop(get_email_service, None)
 
 
 async def test_register_returns_201_with_user_payload(client: AsyncClient) -> None:
@@ -307,6 +326,188 @@ async def test_login_rate_limit_emits_structured_auth_throttle_event(
     assert throttle_event["route_template"] == "/api/auth/login"
     assert isinstance(throttle_event["client_ip_hash"], str)
     assert throttle_event["_level"] == logging.WARNING
+
+
+async def test_forgot_password_returns_200_for_known_and_unknown_emails(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+
+    known_response = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": credentials["email"]},
+    )
+    unknown_response = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": "missing-user@example.com"},
+    )
+
+    assert known_response.status_code == 200
+    assert unknown_response.status_code == 200
+    assert known_response.json() == {
+        "detail": "If an account exists for that email, a reset link has been sent."
+    }
+    assert unknown_response.json() == {
+        "detail": "If an account exists for that email, a reset link has been sent."
+    }
+    assert len(_mock_email_service.messages) == 1
+
+    user = await db_session.scalar(select(User).where(User.email == credentials["email"]))
+    assert user is not None
+    reset_tokens = (
+        await db_session.scalars(
+            select(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        )
+    ).all()
+    assert len(reset_tokens) == 1
+
+
+async def test_forgot_password_rate_limit_is_scoped_per_email(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("AUTH_FORGOT_PASSWORD_RATE_LIMIT", "3/hour")
+    get_settings.cache_clear()
+
+    first_user = _credentials()
+    second_user = _credentials()
+    assert (await client.post("/api/auth/register", json=first_user)).status_code == 201
+    assert (await client.post("/api/auth/register", json=second_user)).status_code == 201
+
+    for _ in range(3):
+        response = await client.post(
+            "/api/auth/forgot-password",
+            json={"email": first_user["email"]},
+        )
+        assert response.status_code == 200
+
+    blocked_response = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": first_user["email"]},
+    )
+    second_email_response = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": second_user["email"]},
+    )
+
+    assert blocked_response.status_code == 429
+    assert second_email_response.status_code == 200
+
+
+async def test_reset_password_updates_hash_marks_token_used_and_revokes_refresh_tokens(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+    login_response = await client.post("/api/auth/login", json=credentials)
+    assert login_response.status_code == 200
+
+    forgot_response = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": credentials["email"]},
+    )
+    assert forgot_response.status_code == 200
+    assert len(_mock_email_service.messages) == 1
+    raw_token = _extract_reset_token(_mock_email_service.messages[0])
+
+    reset_response = await client.post(
+        "/api/auth/reset-password",
+        json={"token": raw_token, "new_password": "NewStrongPass123!"},
+    )
+    assert reset_response.status_code == 200
+    assert reset_response.json() == {"detail": "Password has been reset."}
+
+    user = await db_session.scalar(select(User).where(User.email == credentials["email"]))
+    assert user is not None
+    assert verify_password("NewStrongPass123!", user.password_hash)
+
+    reset_token_row = await db_session.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(raw_token))
+    )
+    assert reset_token_row is not None
+    assert reset_token_row.used_at is not None
+
+    refresh_tokens = (
+        await db_session.scalars(select(RefreshToken).where(RefreshToken.user_id == user.id))
+    ).all()
+    assert refresh_tokens
+    assert all(token_row.revoked_at is not None for token_row in refresh_tokens)
+
+    old_password_login = await client.post("/api/auth/login", json=credentials)
+    new_password_login = await client.post(
+        "/api/auth/login",
+        json={"email": credentials["email"], "password": "NewStrongPass123!"},
+    )
+    assert old_password_login.status_code == 401
+    assert new_password_login.status_code == 200
+
+
+async def test_reset_password_rejects_invalid_expired_or_used_token(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _mock_email_service: _MockEmailService,
+) -> None:
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+
+    invalid_response = await client.post(
+        "/api/auth/reset-password",
+        json={"token": "invalid-token", "new_password": "NewStrongPass123!"},
+    )
+    assert invalid_response.status_code == 400
+    assert invalid_response.json() == {"detail": "Invalid or expired token"}
+
+    forgot_response = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": credentials["email"]},
+    )
+    assert forgot_response.status_code == 200
+    raw_token = _extract_reset_token(_mock_email_service.messages[-1])
+
+    first_reset = await client.post(
+        "/api/auth/reset-password",
+        json={"token": raw_token, "new_password": "NewStrongPass123!"},
+    )
+    second_reset = await client.post(
+        "/api/auth/reset-password",
+        json={"token": raw_token, "new_password": "AnotherStrongPass123!"},
+    )
+    assert first_reset.status_code == 200
+    assert second_reset.status_code == 400
+    assert second_reset.json() == {"detail": "Invalid or expired token"}
+
+    second_credentials = _credentials()
+    second_register = await client.post("/api/auth/register", json=second_credentials)
+    assert second_register.status_code == 201
+    second_forgot = await client.post(
+        "/api/auth/forgot-password",
+        json={"email": second_credentials["email"]},
+    )
+    assert second_forgot.status_code == 200
+    expired_token = _extract_reset_token(_mock_email_service.messages[-1])
+
+    expired_row = await db_session.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(expired_token))
+    )
+    assert expired_row is not None
+    expired_row.expires_at = expired_row.created_at - timedelta(minutes=1)
+    await db_session.flush()
+
+    expired_response = await client.post(
+        "/api/auth/reset-password",
+        json={"token": expired_token, "new_password": "FreshStrongPass123!"},
+    )
+    assert expired_response.status_code == 400
+    assert expired_response.json() == {"detail": "Invalid or expired token"}
 
 
 async def test_refresh_rejects_missing_csrf_header(client: AsyncClient) -> None:
@@ -609,3 +810,10 @@ def _cookie_header(set_cookie_values: list[str], cookie_name: str) -> str:
         if value.startswith(f"{cookie_name}="):
             return value
     raise AssertionError(f"Cookie {cookie_name} not found in set-cookie headers")
+
+
+def _extract_reset_token(message: EmailMessage) -> str:
+    match = re.search(r"token=([^&\s]+)", message.text_content)
+    if match is None:
+        raise AssertionError("reset token not found in email text body")
+    return match.group(1)

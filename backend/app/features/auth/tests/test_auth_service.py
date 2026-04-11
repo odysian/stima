@@ -38,6 +38,26 @@ class _IntegrityErrorRepository:
     ) -> object:
         return object()
 
+    async def create_reset_token(
+        self,
+        *,
+        user_id: object,
+        token_hash: str,
+        expires_at: object,
+    ) -> object:
+        return object()
+
+    async def get_valid_reset_token(
+        self,
+        *,
+        token_hash: str,
+        now: object,
+    ) -> object | None:
+        return None
+
+    async def mark_reset_token_used(self, *, token_id: object, used_at: object) -> None:
+        return None
+
     async def consume_and_rotate_refresh_token(
         self,
         *,
@@ -50,6 +70,9 @@ class _IntegrityErrorRepository:
         raise NotImplementedError()
 
     async def revoke_refresh_token(self, *, token_hash: str, revoked_at: object) -> None:
+        return None
+
+    async def revoke_all_user_tokens(self, *, user_id: object, revoked_at: object) -> None:
         return None
 
 

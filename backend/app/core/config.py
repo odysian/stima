@@ -80,6 +80,10 @@ class Settings(BaseSettings):
         default="5/minute",
         validation_alias="AUTH_LOGIN_RATE_LIMIT",
     )
+    auth_forgot_password_rate_limit: str = Field(
+        default="3/hour",
+        validation_alias="AUTH_FORGOT_PASSWORD_RATE_LIMIT",
+    )
     auth_refresh_rate_limit: str = Field(
         default="10/minute",
         validation_alias="AUTH_REFRESH_RATE_LIMIT",
