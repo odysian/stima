@@ -75,6 +75,12 @@ async def test_extraction_quality_suite() -> None:
         result = await integration.extract(case.transcript)
         metadata = integration.pop_last_call_metadata()
 
+        line_item_count = len(result.line_items)
+        if case.expected_line_item_count_min is not None:
+            assert line_item_count >= case.expected_line_item_count_min
+        if case.expected_line_item_count_max is not None:
+            assert line_item_count <= case.expected_line_item_count_max
+
         case_score = score_case(case, result, metadata=metadata)
         scores.append(case_score)
 
