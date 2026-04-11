@@ -23,6 +23,8 @@ class DocumentStatus(StrEnum):
     APPROVED = "approved"
     DECLINED = "declined"
     SENT = "sent"
+    PAID = "paid"
+    VOID = "void"
 
 
 QuoteStatus = DocumentStatus

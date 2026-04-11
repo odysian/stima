@@ -111,7 +111,7 @@ Runbooks:
 | doc_number | String(20) | stored display ID, format `Q-001` or `I-001` |
 | title | String(120) | nullable optional document label shown in detail views and PDFs |
 | source_document_id | UUID (self-FK → documents.id) | nullable, `ON DELETE SET NULL`; invoice rows use this for immutable quote lineage |
-| status | String(20) | `draft \| ready \| shared \| viewed \| approved \| declined \| sent` with DB check constraint; `sent` is invoice-only |
+| status | String(20) | `draft \| ready \| shared \| viewed \| approved \| declined \| sent \| paid \| void` with DB check constraint; `sent`, `paid`, and `void` are invoice-only |
 | source_type | String(20) | `"text"` or `"voice"` based on capture mode |
 | transcript | Text | stored source transcript/notes inherited from capture flow |
 | total_amount | Numeric(10,2) | nullable, user-editable |
@@ -178,6 +178,8 @@ Pilot event set:
 - `email_sent`
 - `invoice_created`
 - `invoice_viewed`
+- `invoice_paid`
+- `invoice_voided`
 
 These underscore names are the canonical quote-flow vocabulary for pilot instrumentation; dot-notation events such as `quote.created`, `quote.updated`, `quote.deleted`, and `customer.created` remain separate operational logs outside the pilot analytics scope.
 
@@ -312,6 +314,8 @@ Quote extraction guardrails:
 | `/invoices/{id}/pdf` | POST | yes | cookie | — | `200` raw PDF bytes; preview transitions `draft -> ready` |
 | `/invoices/{id}/share` | POST | yes | cookie | `regenerate?` (bool query, default `false`) | `200 Invoice`; creates/reuses the active `share_token`, regenerates when requested or when the existing token is expired/revoked, and transitions invoice to `sent` |
 | `/invoices/{id}/share` | DELETE | yes | cookie | — | `204`; revokes the current invoice share token without leaking token state publicly |
+| `/invoices/{id}/mark-paid` | POST | yes | cookie | — | `200 Invoice` with `status: "paid"`; idempotent when already `paid`; `404 { detail: "Not found" }` or `409` when invoice is `draft` or `ready` |
+| `/invoices/{id}/mark-void` | POST | yes | cookie | — | `200 Invoice` with `status: "void"`; idempotent when already `void`; `404 { detail: "Not found" }` or `409` when invoice is `draft` or `ready` |
 | `/invoices/{id}/send-email` | POST | yes | cookie | header `Idempotency-Key` required | `202 JobRecordResponse` after ensuring the invoice is shared, creating a durable `email` job row, and enqueueing worker delivery; replayed same-key responses return the same `202` payload with `Idempotency-Replayed: true`; `400` when the idempotency header is missing, `404` when invoice is missing/not owned, `409` when still `draft`, when the same key is reused for a different invoice, or when the same key is already in progress, `422` when customer email is missing/invalid, `429` when resent within 5 minutes, or `503 { detail: "Unable to start email delivery right now. Please try again." }` when enqueue fails after job creation |
 
 ### Public document landing endpoints
@@ -327,11 +331,11 @@ Public landing-page rules:
 - transactional quote emails reuse that same `/doc/{share_token}` landing page as the primary CTA and include `/share/{share_token}` as the secondary "Download PDF" link
 - the public JSON contract is a discriminated union keyed by `doc_type`:
   - quote variant: `doc_type = "quote"`, `status` in `shared | viewed | approved | declined`
-  - invoice variant: `doc_type = "invoice"`, `status = "sent"`, includes `due_date`
+  - invoice variant: `doc_type = "invoice"`, `status = "sent"` (always "sent" on the public page regardless of paid/void outcome labels), includes `due_date`
 - first public load of a `shared` quote transitions it to `viewed` and logs exactly one `quote_viewed` event
 - repeat public loads of `viewed`, `approved`, and `declined` quotes are read-only and do not create duplicate `quote_viewed` events
-- first public load of a `sent` invoice sets `invoice_first_viewed_at`, logs exactly one `invoice_viewed` event, and does not mutate invoice status
-- repeat public loads of a `sent` invoice are read-only and do not create duplicate `invoice_viewed` events
+- first public load of a `sent`, `paid`, or `void` invoice sets `invoice_first_viewed_at`, logs exactly one `invoice_viewed` event, and does not mutate invoice status
+- repeat public loads of a `sent`, `paid`, or `void` invoice are read-only and do not create duplicate `invoice_viewed` events
 - revoked, expired, and unknown tokens all return the same external `404`; internal logs retain the reason code for revoked/expired cases
 - public JSON, logo, and PDF responses are IP-keyed rate-limited and return `429` on limit exhaustion
 - public JSON, logo, and PDF responses send `X-Robots-Tag: noindex`
@@ -415,13 +419,13 @@ Invoice rules:
 - direct invoices use `source_document_id = null` and `source_quote_number = null`
 - quote-to-invoice conversion now rejects unassigned quotes before any invoice write is attempted
 - quote conversion is one-to-one; duplicate conversions are blocked by service guard plus the DB partial unique index
-- invoice lifecycle is `draft -> ready -> sent`
+- invoice lifecycle is `draft -> ready -> sent`; `paid` and `void` are terminal outcome labels that can be applied to any `sent`, `paid`, or `void` invoice
 - if `title` is present, blank or whitespace-only values are normalized to `null`
 - if `title`, `total_amount`, `notes`, or `due_date` are omitted, the existing persisted values are preserved
 - if `line_items` is present, existing rows are fully replaced; if omitted, existing rows are preserved
 - editing preserves the persisted invoice status plus any existing `share_token` / `shared_at` values
-- editing a `ready` invoice keeps it in `ready`; editing a `sent` invoice keeps it in `sent`
-- invoice public landing pages share the same `/doc/{share_token}` route shell as quotes, but render invoice-specific fields (`due_date`, `status = sent`) without quote-only terminal-state messaging
+- editing a `ready` invoice keeps it in `ready`; editing a `sent`, `paid`, or `void` invoice keeps its status unchanged
+- invoice public landing pages share the same `/doc/{share_token}` route shell as quotes, but render invoice-specific fields (`due_date`, `status = sent`) without quote-only terminal-state messaging; paid/void invoices remain publicly accessible and also render `status = sent` on the public page
 
 ### Error format
 ```json

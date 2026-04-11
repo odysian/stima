@@ -152,6 +152,42 @@ async def update_invoice(
 
 
 @router.post(
+    "/{invoice_id}/mark-paid",
+    response_model=InvoiceResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def mark_invoice_paid(
+    invoice_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+) -> InvoiceResponse:
+    """Mark one invoice as paid when it has already reached a sent/outcome state."""
+    try:
+        invoice = await invoice_service.mark_invoice_paid(user, invoice_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return InvoiceResponse.model_validate(invoice)
+
+
+@router.post(
+    "/{invoice_id}/mark-void",
+    response_model=InvoiceResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def mark_invoice_void(
+    invoice_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+) -> InvoiceResponse:
+    """Mark one invoice as void when it has already reached a sent/outcome state."""
+    try:
+        invoice = await invoice_service.mark_invoice_voided(user, invoice_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return InvoiceResponse.model_validate(invoice)
+
+
+@router.post(
     "/{invoice_id}/pdf",
     response_model=JobRecordResponse,
     status_code=status.HTTP_202_ACCEPTED,

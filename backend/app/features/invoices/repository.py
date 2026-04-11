@@ -33,7 +33,11 @@ from app.shared.pricing import (
 )
 
 _INVOICE_DOC_TYPE = "invoice"
-_SENT_INVOICE_STATUS = QuoteStatus.SENT
+_PUBLIC_INVOICE_STATUSES = (
+    QuoteStatus.SENT,
+    QuoteStatus.PAID,
+    QuoteStatus.VOID,
+)
 
 
 @dataclass(slots=True)
@@ -366,7 +370,7 @@ class InvoiceRepository:
         self,
         share_token: str,
     ) -> QuoteRenderContext | None:
-        """Return PDF render context for a sent invoice share token."""
+        """Return PDF render context for an active invoice share token."""
         result = await self._session.execute(
             select(Document, Customer, User)
             .join(Customer, Customer.id == Document.customer_id)
@@ -374,7 +378,7 @@ class InvoiceRepository:
             .where(
                 Document.share_token == share_token,
                 Document.doc_type == _INVOICE_DOC_TYPE,
-                Document.status == _SENT_INVOICE_STATUS,
+                Document.status.in_(_PUBLIC_INVOICE_STATUSES),
             )
             .options(selectinload(Document.line_items))
         )
@@ -424,13 +428,13 @@ class InvoiceRepository:
         *,
         viewed_at: datetime,
     ) -> InvoiceFirstViewTransition | None:
-        """Set the invoice first-view timestamp exactly once for a sent share token."""
+        """Set the invoice first-view timestamp exactly once for an active token."""
         row = await self._session.execute(
             update(Document)
             .where(
                 Document.share_token == share_token,
                 Document.doc_type == _INVOICE_DOC_TYPE,
-                Document.status == _SENT_INVOICE_STATUS,
+                Document.status.in_(_PUBLIC_INVOICE_STATUSES),
                 Document.invoice_first_viewed_at.is_(None),
             )
             .values(
