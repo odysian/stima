@@ -27,7 +27,6 @@ from app.features.invoices import (
 from app.features.invoices.repository import InvoiceRepository
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
-from app.features.quotes import api as quote_api
 from app.features.quotes import email_delivery_service
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, LineItem, QuoteStatus
@@ -56,7 +55,6 @@ from app.shared.input_limits import (
     DOCUMENT_TRANSCRIPT_MAX_CHARS,
     LINE_ITEM_DESCRIPTION_MAX_CHARS,
     LINE_ITEM_DETAILS_MAX_CHARS,
-    MAX_AUDIO_CLIPS_PER_REQUEST,
     NOTE_INPUT_MAX_CHARS,
 )
 from app.shared.rate_limit import reset_local_rate_limit_state
