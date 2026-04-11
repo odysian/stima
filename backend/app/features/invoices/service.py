@@ -75,6 +75,11 @@ _INVOICE_OUTCOME_MUTABLE_STATUSES = frozenset(
         QuoteStatus.VOID,
     }
 )
+_DOC_TYPE_CHANGEABLE_STATUSES = frozenset({QuoteStatus.DRAFT, QuoteStatus.READY})
+_DOC_TYPE_CHANGE_STATUS_BLOCKED_DETAIL = (
+    "Document type can only be changed in draft or ready status."
+)
+_DOC_TYPE_CHANGE_SHARED_BLOCKED_DETAIL = "Document type cannot be changed after sharing."
 _PDF_JOB_NAME = "jobs.pdf"
 _PDF_QUEUE_FAILURE_DETAIL = "Unable to start PDF generation right now. Please try again."
 
@@ -187,6 +192,8 @@ class InvoiceRepositoryProtocol(Protocol):
     async def invalidate_pdf_artifact(self, invoice: Document) -> str | None: ...
 
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None: ...
+
+    async def get_next_doc_sequence_for_type(self, *, user_id: UUID, doc_type: str) -> int: ...
 
     async def commit(self) -> None: ...
 
@@ -386,6 +393,18 @@ class InvoiceService:
                 detail="Invoice cannot be edited",
                 status_code=409,
             )
+        requested_doc_type = (
+            data.doc_type
+            if "doc_type" in data.model_fields_set
+            else getattr(invoice, "doc_type", "invoice")
+        )
+        if requested_doc_type is None:
+            raise QuoteServiceError(detail="doc_type cannot be null", status_code=422)
+        doc_type_changed_to_quote = await self._apply_doc_type_transition(
+            user_id=user_id,
+            invoice=invoice,
+            requested_doc_type=requested_doc_type,
+        )
 
         next_line_items = (
             data.line_items if "line_items" in data.model_fields_set else invoice.line_items
@@ -437,20 +456,31 @@ class InvoiceService:
                 else document_field_float_or_none(invoice.deposit_amount)
             ),
         )
-        rendered_fields_changed = _invoice_render_inputs_changed(
-            invoice=invoice,
-            update_fields=data.model_fields_set,
-            next_line_items=next_line_items,
-            next_total_amount=document_field_float_or_none(current_pricing.total_amount),
-            next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
-            next_discount_type=current_pricing.discount_type,
-            next_discount_value=document_field_float_or_none(current_pricing.discount_value),
-            next_deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
-            next_title=data.title if "title" in data.model_fields_set else invoice.title,
-            next_notes=data.notes if "notes" in data.model_fields_set else invoice.notes,
-            next_due_date=(
-                data.due_date if "due_date" in data.model_fields_set else invoice.due_date
-            ),
+        rendered_fields_changed = (
+            _invoice_render_inputs_changed(
+                invoice=invoice,
+                update_fields=data.model_fields_set,
+                next_line_items=next_line_items,
+                next_total_amount=document_field_float_or_none(current_pricing.total_amount),
+                next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+                next_discount_type=current_pricing.discount_type,
+                next_discount_value=document_field_float_or_none(current_pricing.discount_value),
+                next_deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+                next_title=data.title if "title" in data.model_fields_set else invoice.title,
+                next_notes=data.notes if "notes" in data.model_fields_set else invoice.notes,
+                next_due_date=(
+                    None
+                    if doc_type_changed_to_quote
+                    else (
+                        data.due_date if "due_date" in data.model_fields_set else invoice.due_date
+                    )
+                ),
+            )
+            or doc_type_changed_to_quote
+        )
+
+        should_update_due_date = (
+            "due_date" in data.model_fields_set and not doc_type_changed_to_quote
         )
 
         updated_invoice = await self._invoice_repository.update(
@@ -481,8 +511,8 @@ class InvoiceService:
             update_notes="notes" in data.model_fields_set,
             line_items=data.line_items,
             replace_line_items="line_items" in data.model_fields_set,
-            due_date=data.due_date,
-            update_due_date="due_date" in data.model_fields_set,
+            due_date=None if doc_type_changed_to_quote else data.due_date,
+            update_due_date=should_update_due_date,
         )
         obsolete_artifact_path = None
         if rendered_fields_changed:
@@ -492,6 +522,47 @@ class InvoiceService:
         await self._invoice_repository.commit()
         await self._delete_obsolete_artifact(obsolete_artifact_path)
         return await self._invoice_repository.refresh(updated_invoice)
+
+    async def _apply_doc_type_transition(
+        self,
+        *,
+        user_id: UUID,
+        invoice: Document,
+        requested_doc_type: str,
+    ) -> bool:
+        current_doc_type = getattr(invoice, "doc_type", "invoice")
+        if requested_doc_type == current_doc_type:
+            return False
+        if requested_doc_type != "quote":
+            raise QuoteServiceError(
+                detail="Unsupported document type transition",
+                status_code=409,
+            )
+        if invoice.share_token is not None:
+            raise QuoteServiceError(
+                detail=_DOC_TYPE_CHANGE_SHARED_BLOCKED_DETAIL,
+                status_code=409,
+            )
+        if invoice.status not in _DOC_TYPE_CHANGEABLE_STATUSES:
+            raise QuoteServiceError(
+                detail=_DOC_TYPE_CHANGE_STATUS_BLOCKED_DETAIL,
+                status_code=409,
+            )
+        if invoice.source_document_id is not None:
+            raise QuoteServiceError(
+                detail="Invoices created from quotes cannot be converted to quotes.",
+                status_code=409,
+            )
+
+        next_sequence = await self._invoice_repository.get_next_doc_sequence_for_type(
+            user_id=user_id,
+            doc_type="quote",
+        )
+        invoice.doc_type = "quote"
+        invoice.doc_sequence = next_sequence
+        invoice.doc_number = _build_doc_number(doc_type="quote", sequence=next_sequence)
+        invoice.due_date = None
+        return True
 
     async def start_pdf_generation(
         self,
@@ -847,6 +918,11 @@ def _resolve_user_id(user: User) -> UUID:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _build_doc_number(*, doc_type: str, sequence: int) -> str:
+    prefix = "I" if doc_type == "invoice" else "Q"
+    return f"{prefix}-{sequence:03d}"
 
 
 def _build_share_token_expiry(created_at: datetime) -> datetime:

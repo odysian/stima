@@ -114,6 +114,11 @@ class _RetryingInvoiceRepository:
         del user_id
         return None
 
+    async def get_next_doc_sequence_for_type(self, *, user_id, doc_type):  # noqa: ANN001
+        del user_id
+        del doc_type
+        return 1
+
     async def commit(self) -> None:
         self.commit_calls += 1
 
@@ -241,6 +246,11 @@ class _DirectInvoiceCollisionRepository:
         del invoice_id
         del user_id
         return None
+
+    async def get_next_doc_sequence_for_type(self, *, user_id, doc_type):  # noqa: ANN001
+        del user_id
+        del doc_type
+        return 1
 
     async def commit(self) -> None:
         self.commit_calls += 1
@@ -374,6 +384,11 @@ class _UpdatingInvoiceRepository:
 
     async def refresh(self, invoice):  # noqa: ANN001
         return invoice
+
+    async def get_next_doc_sequence_for_type(self, *, user_id, doc_type):  # noqa: ANN001
+        del user_id
+        del doc_type
+        return 1
 
 
 async def test_update_invoice_empty_patch_preserves_existing_pdf_artifact() -> None:
