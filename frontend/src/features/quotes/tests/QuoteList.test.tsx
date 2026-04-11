@@ -331,6 +331,22 @@ describe("QuoteList", () => {
         created_at: "2026-03-21T00:00:00.000Z",
         source_document_id: "quote-2",
       }),
+      makeInvoiceListItem({
+        id: "invoice-3",
+        customer_id: "cust-3",
+        customer_name: "Carla Crew",
+        doc_number: "I-003",
+        status: "paid",
+        total_amount: 340,
+      }),
+      makeInvoiceListItem({
+        id: "invoice-4",
+        customer_id: "cust-4",
+        customer_name: "Diego Deck",
+        doc_number: "I-004",
+        status: "void",
+        total_amount: 95,
+      }),
     ]);
 
     renderScreen();
@@ -344,6 +360,8 @@ describe("QuoteList", () => {
     expect(screen.getByText("Bob Brown")).toBeInTheDocument();
     expect(screen.getByText(/I-002\s*·\s*Mar 21, 2026/)).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Paid")).toBeInTheDocument();
+    expect(screen.getByText("Void")).toBeInTheDocument();
     expect(screen.getAllByText("$220.00")).toHaveLength(1);
     expect(screen.getByRole("region", { name: "PAST INVOICES" }).querySelector("p:empty")).toBeNull();
   });

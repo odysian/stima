@@ -1,1 +1,1 @@
-export type InvoiceStatus = "draft" | "ready" | "sent";
+export type InvoiceStatus = "draft" | "ready" | "sent" | "paid" | "void";

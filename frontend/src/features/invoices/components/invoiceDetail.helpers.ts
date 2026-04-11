@@ -1,4 +1,6 @@
 import type { Invoice, InvoiceDetail } from "@/features/invoices/types/invoice.types";
+import type { InvoiceStatus } from "@/features/invoices/types/invoice-status";
+import type { OverflowMenuItem } from "@/shared/components/OverflowMenu";
 
 export function mergeInvoiceDetailWithUpdate(
   currentInvoice: InvoiceDetail | null,
@@ -20,4 +22,61 @@ export function mergeInvoiceDetailWithUpdate(
     updated_at: updatedInvoice.updated_at,
     line_items: updatedInvoice.line_items,
   };
+}
+
+interface BuildInvoiceOutcomeOverflowItemsArgs {
+  status: InvoiceStatus | null;
+  isBusy: boolean;
+  onMarkPaidRequest: () => void;
+  onMarkVoidRequest: () => void;
+}
+
+export function buildInvoiceOutcomeOverflowItems({
+  status,
+  isBusy,
+  onMarkPaidRequest,
+  onMarkVoidRequest,
+}: BuildInvoiceOutcomeOverflowItemsArgs): OverflowMenuItem[] {
+  if (status === "sent") {
+    return [
+      {
+        label: "Mark as Paid",
+        icon: "check_circle",
+        disabled: isBusy,
+        onSelect: onMarkPaidRequest,
+      },
+      {
+        label: "Mark as Void",
+        icon: "cancel",
+        tone: "destructive",
+        disabled: isBusy,
+        onSelect: onMarkVoidRequest,
+      },
+    ];
+  }
+
+  if (status === "paid") {
+    return [
+      {
+        label: "Mark as Void",
+        icon: "cancel",
+        tone: "destructive",
+        disabled: isBusy,
+        onSelect: onMarkVoidRequest,
+      },
+    ];
+  }
+
+  if (status === "void") {
+    return [
+      {
+        label: "Mark as Paid",
+        icon: "check_circle",
+        disabled: isBusy,
+        onSelect: onMarkPaidRequest,
+      },
+    ];
+  }
+
+  return [];
 }
