@@ -250,6 +250,36 @@ export const handlers = [
     );
   }),
 
+  http.post("/api/quotes/manual-draft", async ({ request }) => {
+    const csrfError = requireCsrf(request);
+    if (csrfError) return csrfError;
+
+    const body = (await request.json()) as { customer_id?: string };
+    return HttpResponse.json(
+      {
+        id: "quote-manual-1",
+        customer_id: body.customer_id ?? null,
+        doc_number: "Q-003",
+        title: null,
+        status: "draft",
+        source_type: "text",
+        transcript: "",
+        total_amount: null,
+        tax_rate: null,
+        discount_type: null,
+        discount_value: null,
+        deposit_amount: null,
+        notes: null,
+        shared_at: null,
+        share_token: null,
+        line_items: [],
+        created_at: "2026-03-20T00:00:00.000Z",
+        updated_at: "2026-03-20T00:00:00.000Z",
+      },
+      { status: 201 },
+    );
+  }),
+
   http.post("/api/quotes/capture-audio", ({ request }) => {
     const csrfError = requireCsrf(request);
     if (csrfError) return csrfError;

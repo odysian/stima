@@ -17,6 +17,8 @@ interface CaptureInputPanelProps {
   isSupported: boolean;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  onStartBlank?: () => void;
+  isStartBlankDisabled?: boolean;
 }
 
 export function CaptureInputPanel({
@@ -31,6 +33,8 @@ export function CaptureInputPanel({
   isSupported,
   onStartRecording,
   onStopRecording,
+  onStartBlank,
+  isStartBlankDisabled = false,
 }: CaptureInputPanelProps): React.ReactElement {
   return (
     <>
@@ -105,6 +109,16 @@ export function CaptureInputPanel({
           placeholder="Add any typed details here..."
           className="w-full resize-none rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
         />
+        {onStartBlank ? (
+          <button
+            type="button"
+            className="mt-3 cursor-pointer text-sm text-primary underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:text-outline"
+            onClick={onStartBlank}
+            disabled={isStartBlankDisabled}
+          >
+            Or start with a blank document
+          </button>
+        ) : null}
       </section>
 
       {isRecording ? (

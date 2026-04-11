@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { quoteService } from "@/features/quotes/services/quoteService";
-import { requestWithMetadata } from "@/shared/lib/http";
+import { request, requestWithMetadata } from "@/shared/lib/http";
 
 vi.mock("@/shared/lib/http", () => ({
   request: vi.fn(),
@@ -10,10 +10,12 @@ vi.mock("@/shared/lib/http", () => ({
 }));
 
 const mockedRequestWithMetadata = vi.mocked(requestWithMetadata);
+const mockedRequest = vi.mocked(request);
 
 describe("quoteService.extract", () => {
   afterEach(() => {
     mockedRequestWithMetadata.mockReset();
+    mockedRequest.mockReset();
   });
 
   it("builds multipart form data with clips and trimmed notes for async extraction", async () => {
@@ -137,5 +139,31 @@ describe("quoteService.extract", () => {
     const formData = options?.body as FormData;
     expect(formData.get("notes")).toBe("add one more item");
     expect(formData.get("customer_id")).toBeNull();
+  });
+
+  it("creates manual draft with customer payload when customerId is provided", async () => {
+    mockedRequest.mockResolvedValue({
+      id: "quote-manual-1",
+    });
+
+    await quoteService.createManualDraft({ customerId: "cust-1" });
+
+    const [path, options] = mockedRequest.mock.calls[0] ?? [];
+    expect(path).toBe("/api/quotes/manual-draft");
+    expect(options?.method).toBe("POST");
+    expect(options?.body).toEqual({ customer_id: "cust-1" });
+  });
+
+  it("creates manual draft with empty payload when customerId is omitted", async () => {
+    mockedRequest.mockResolvedValue({
+      id: "quote-manual-2",
+    });
+
+    await quoteService.createManualDraft();
+
+    const [path, options] = mockedRequest.mock.calls[0] ?? [];
+    expect(path).toBe("/api/quotes/manual-draft");
+    expect(options?.method).toBe("POST");
+    expect(options?.body).toEqual({});
   });
 });

@@ -43,6 +43,7 @@ from app.features.quotes.schemas import (
     ExtractionResult,
     LineItemResponse,
     LinkedInvoiceResponse,
+    ManualDraftCreateRequest,
     PdfArtifactResponse,
     PersistedExtractionResponse,
     PublicDocumentResponse,
@@ -183,6 +184,41 @@ async def create_quote(
         quote = await quote_service.create_quote(user, payload)
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return QuoteResponse.model_validate(quote)
+
+
+@router.post(
+    "/manual-draft",
+    response_model=QuoteResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+async def create_manual_draft(
+    payload: ManualDraftCreateRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> QuoteResponse:
+    """Create a blank manual draft quote for the authenticated user."""
+    try:
+        quote = await quote_service.create_manual_draft(
+            user_id=user.id,
+            customer_id=payload.customer_id,
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    log_event(
+        "quote.created",
+        user_id=user.id,
+        quote_id=quote.id,
+        customer_id=quote.customer_id,
+    )
+    log_event(
+        "manual_draft_created",
+        user_id=user.id,
+        quote_id=quote.id,
+        customer_id=quote.customer_id,
+    )
     return QuoteResponse.model_validate(quote)
 
 

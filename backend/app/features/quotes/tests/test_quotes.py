@@ -521,6 +521,96 @@ async def test_create_quote_returns_404_for_nonexistent_customer(
     assert response.json() == {"detail": "Not found"}
 
 
+async def test_create_manual_draft_without_customer_persists_empty_draft_and_logs_manual_event(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/manual-draft",
+        json={},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["customer_id"] is None
+    assert payload["title"] is None
+    assert payload["status"] == "draft"
+    assert payload["source_type"] == "text"
+    assert payload["transcript"] == ""
+    assert payload["line_items"] == []
+    assert payload["total_amount"] is None
+
+    detail_response = await client.get(f"/api/quotes/{payload['id']}")
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert detail_payload["extraction_tier"] is None
+    assert detail_payload["extraction_degraded_reason_code"] is None
+
+    quote_event_names = [
+        event["event"] for event in emitted_events if event.get("quote_id") == payload["id"]
+    ]
+    assert "manual_draft_created" in quote_event_names
+    assert "draft_generated" not in quote_event_names
+
+
+async def test_create_manual_draft_with_owned_customer_assigns_customer(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    response = await client.post(
+        "/api/quotes/manual-draft",
+        json={"customer_id": customer_id},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["customer_id"] == customer_id
+    assert payload["line_items"] == []
+    assert payload["transcript"] == ""
+
+
+async def test_create_manual_draft_rejects_missing_or_foreign_customer(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    first_user_customer_id = await _create_customer(client, csrf_token)
+
+    missing_customer_response = await client.post(
+        "/api/quotes/manual-draft",
+        json={"customer_id": str(uuid4())},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert missing_customer_response.status_code == 404
+    assert missing_customer_response.json() == {"detail": "Not found"}
+
+    second_user_credentials = _credentials()
+    second_user_credentials["email"] = "manual-draft-second-user@example.com"
+    second_user_csrf_token = await _register_and_login(
+        client,
+        second_user_credentials,
+    )
+    foreign_customer_response = await client.post(
+        "/api/quotes/manual-draft",
+        json={"customer_id": first_user_customer_id},
+        headers={"X-CSRF-Token": second_user_csrf_token},
+    )
+    assert foreign_customer_response.status_code == 404
+    assert foreign_customer_response.json() == {"detail": "Not found"}
+
+
 async def test_create_quote_allows_empty_line_items_and_returns_empty_list(
     client: AsyncClient,
 ) -> None:
@@ -4062,6 +4152,7 @@ async def test_convert_notes_rejects_when_concurrency_limit_is_exhausted(
         ("get", "/api/quotes", None),
         ("get", "/api/quotes/00000000-0000-0000-0000-000000000000", None),
         ("post", "/api/quotes/convert-notes", {"notes": "notes"}),
+        ("post", "/api/quotes/manual-draft", {}),
         (
             "post",
             "/api/quotes",

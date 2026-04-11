@@ -74,6 +74,12 @@ class ConvertNotesRequest(BaseModel):
     notes: str = Field(min_length=1, max_length=NOTE_INPUT_MAX_CHARS)
 
 
+class ManualDraftCreateRequest(BaseModel):
+    """Request payload for creating a manual quote draft without extraction."""
+
+    customer_id: UUID | None = None
+
+
 class QuoteCreateRequest(BaseModel):
     """Request payload for creating a quote from a draft."""
 

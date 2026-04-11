@@ -45,6 +45,7 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
     extract: vi.fn(),
     appendExtraction: vi.fn(),
+    createManualDraft: vi.fn(),
     convertNotes: vi.fn(),
     captureAudio: vi.fn(),
     createQuote: vi.fn(),
@@ -160,6 +161,26 @@ beforeEach(() => {
   mockVoiceCapture();
   mockedQuoteService.extract.mockResolvedValue({ type: "sync", quoteId: "quote-1", result: extractionFixture });
   mockedQuoteService.appendExtraction.mockReset();
+  mockedQuoteService.createManualDraft.mockResolvedValue({
+    id: "quote-manual-1",
+    customer_id: "cust-1",
+    doc_number: "Q-099",
+    title: null,
+    status: "draft",
+    source_type: "text",
+    transcript: "",
+    total_amount: null,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+    deposit_amount: null,
+    notes: null,
+    shared_at: null,
+    share_token: null,
+    line_items: [],
+    created_at: "2026-03-20T00:00:00.000Z",
+    updated_at: "2026-03-20T00:00:00.000Z",
+  });
   mockedJobService.getJobStatus.mockReset();
   useParamsMock.mockReturnValue({ customerId: "cust-1" });
 });
@@ -201,6 +222,26 @@ describe("CaptureScreen", () => {
     );
     expect(
       screen.queryByText(`${notesValue.length}/${NOTE_INPUT_MAX_CHARS}`),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows Start Blank affordance in new capture mode", () => {
+    renderScreen();
+
+    expect(
+      screen.getByRole("button", { name: "Or start with a blank document" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides Start Blank affordance in append mode", () => {
+    renderScreen({
+      pathname: "/quotes/quote-1/review/append-capture",
+      customerId: null,
+      quoteId: "quote-1",
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "Or start with a blank document" }),
     ).not.toBeInTheDocument();
   });
 
@@ -384,6 +425,87 @@ describe("CaptureScreen", () => {
       }),
     );
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+  });
+
+  it("starts a blank draft with customer context and routes to edit", async () => {
+    renderScreen();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Or start with a blank document" }),
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.createManualDraft).toHaveBeenCalledWith({
+        customerId: "cust-1",
+      });
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-manual-1/edit");
+  });
+
+  it("guards Start Blank with confirmation when unsaved notes and clips exist", async () => {
+    mockVoiceCapture({ clips: [clipFixture] });
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Or start with a blank document" }),
+    );
+
+    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
+    expect(mockedQuoteService.createManualDraft).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Stay" }));
+    expect(screen.queryByRole("dialog", { name: "Leave this screen?" })).not.toBeInTheDocument();
+    expect(mockedQuoteService.createManualDraft).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Or start with a blank document" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.createManualDraft).toHaveBeenCalledWith({
+        customerId: "cust-1",
+      });
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-manual-1/edit");
+  });
+
+  it("starts a blank draft without customer context and routes to edit", async () => {
+    mockedQuoteService.createManualDraft.mockResolvedValueOnce({
+      id: "quote-manual-home",
+      customer_id: null,
+      doc_number: "Q-100",
+      title: null,
+      status: "draft",
+      source_type: "text",
+      transcript: "",
+      total_amount: null,
+      tax_rate: null,
+      discount_type: null,
+      discount_value: null,
+      deposit_amount: null,
+      notes: null,
+      shared_at: null,
+      share_token: null,
+      line_items: [],
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-20T00:00:00.000Z",
+    });
+    renderScreen({ pathname: "/quotes/capture", customerId: null });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Or start with a blank document" }),
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.createManualDraft).toHaveBeenCalledWith({
+        customerId: undefined,
+      });
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-manual-home/edit");
   });
 
   it("submits append extraction from review, requests draft reseed, and replaces prior confidence notes", async () => {

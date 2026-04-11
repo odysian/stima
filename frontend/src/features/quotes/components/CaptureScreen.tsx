@@ -22,10 +22,7 @@ import {
 } from "@/features/quotes/utils/reviewConfidenceNotes";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type {
-  ExtractionResult,
-  QuoteSourceType,
-} from "@/features/quotes/types/quote.types";
+import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
@@ -33,10 +30,9 @@ import { Toast } from "@/shared/components/Toast";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { jobService } from "@/shared/lib/jobService";
 import { formatByteLimit } from "@/shared/lib/formatters";
-import {
-  MAX_AUDIO_CLIPS_PER_REQUEST,
-  MAX_AUDIO_TOTAL_BYTES,
-} from "@/shared/lib/inputLimits";
+import { MAX_AUDIO_CLIPS_PER_REQUEST, MAX_AUDIO_TOTAL_BYTES } from "@/shared/lib/inputLimits";
+
+const START_BLANK_GUARD_TARGET = "__start_blank__";
 
 export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -62,10 +58,9 @@ export function CaptureScreen(): React.ReactElement {
 
   const [notes, setNotes] = useState("");
   const [extractionStage, setExtractionStage] = useState<string | null>(null);
-  const [pendingExitTarget, setPendingExitTarget] = useState<string | null>(
-    null,
-  );
+  const [pendingExitTarget, setPendingExitTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isStartingBlank, setIsStartingBlank] = useState(false);
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
@@ -245,7 +240,30 @@ export function CaptureScreen(): React.ReactElement {
       }
     }
   }
-
+  async function onStartBlank(): Promise<void> {
+    clearActionErrors();
+    setIsStartingBlank(true);
+    try {
+      const manualDraft = await quoteService.createManualDraft({ customerId });
+      if (!isMountedRef.current) {
+        return;
+      }
+      navigate(`/documents/${manualDraft.id}/edit`);
+    } catch (startBlankError) {
+      if (!isMountedRef.current) {
+        return;
+      }
+      const message =
+        startBlankError instanceof Error
+          ? startBlankError.message
+          : "Unable to start a blank draft";
+      setError(message);
+    } finally {
+      if (isMountedRef.current) {
+        setIsStartingBlank(false);
+      }
+    }
+  }
   async function pollExtractionJob(
     jobId: string,
     sourceType: QuoteSourceType,
@@ -287,7 +305,6 @@ export function CaptureScreen(): React.ReactElement {
       if (pollCount === EXTRACTION_MAX_POLLS - 1) {
         break;
       }
-
       await new Promise((resolve) => {
         window.setTimeout(resolve, EXTRACTION_POLL_INTERVAL_MS);
       });
@@ -304,7 +321,6 @@ export function CaptureScreen(): React.ReactElement {
   function hasUnsavedWork(): boolean {
     return clips.length > 0 || notes.trim().length > 0;
   }
-
   function requestExit(target: string): void {
     if (hasUnsavedWork()) {
       setPendingExitTarget(target);
@@ -320,6 +336,14 @@ export function CaptureScreen(): React.ReactElement {
 
   function onExitHome(): void {
     requestExit(HOME_ROUTE);
+  }
+
+  function onStartBlankClick(): void {
+    if (hasUnsavedWork()) {
+      setPendingExitTarget(START_BLANK_GUARD_TARGET);
+      return;
+    }
+    void onStartBlank();
   }
 
   const displayedError = error ?? voiceError;
@@ -363,6 +387,8 @@ export function CaptureScreen(): React.ReactElement {
               void startRecording();
             }}
             onStopRecording={stopRecording}
+            onStartBlank={isAppendMode ? undefined : onStartBlankClick}
+            isStartBlankDisabled={isExtracting || isRecording || isStartingBlank}
           />
         </div>
       </section>
@@ -407,6 +433,10 @@ export function CaptureScreen(): React.ReactElement {
           onConfirm={() => {
             const nextTarget = pendingExitTarget;
             setPendingExitTarget(null);
+            if (nextTarget === START_BLANK_GUARD_TARGET) {
+              void onStartBlank();
+              return;
+            }
             navigate(nextTarget, { replace: true });
           }}
           onCancel={() => setPendingExitTarget(null)}

@@ -123,6 +123,13 @@ async function appendExtraction(
   return submitExtraction(`/api/quotes/${quoteId}/append-extraction`, params);
 }
 
+function createManualDraft(params?: { customerId?: string }): Promise<Quote> {
+  return request<Quote>("/api/quotes/manual-draft", {
+    method: "POST",
+    body: params?.customerId ? { customer_id: params.customerId } : {},
+  });
+}
+
 function createQuote(data: QuoteCreateRequest): Promise<Quote> {
   return request<Quote>("/api/quotes", {
     method: "POST",
@@ -197,6 +204,7 @@ function convertToInvoice(id: string): Promise<Invoice> {
 export const quoteService = {
   extract,
   appendExtraction,
+  createManualDraft,
   convertNotes,
   captureAudio,
   createQuote,
