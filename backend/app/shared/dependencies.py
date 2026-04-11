@@ -111,9 +111,15 @@ def get_idempotency_store() -> IdempotencyStore:
 
 def get_auth_service(
     db: Annotated[AsyncSession, Depends(get_db)],
+    email_service: Annotated[EmailService, Depends(get_email_service)],
 ) -> AuthService:
     """Build a request-scoped auth service wired to the DB session."""
-    return AuthService(repository=AuthRepository(db))
+    settings = get_settings()
+    return AuthService(
+        repository=AuthRepository(db),
+        email_service=email_service,
+        frontend_url=settings.frontend_url,
+    )
 
 
 def get_profile_service(

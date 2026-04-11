@@ -10,7 +10,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.features.auth.models import RefreshToken, User
+from app.features.auth.models import PasswordResetToken, RefreshToken, User
 
 
 class RefreshRotationOutcome(StrEnum):
@@ -76,6 +76,72 @@ class AuthRepository:
         self._session.add(refresh_token)
         await self._session.flush()
         return refresh_token
+
+    async def create_reset_token(
+        self,
+        *,
+        user_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> PasswordResetToken:
+        """Store a new password reset token row."""
+        reset_token = PasswordResetToken(
+            user_id=user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        self._session.add(reset_token)
+        await self._session.flush()
+        return reset_token
+
+    async def count_recent_reset_tokens_for_user(
+        self,
+        *,
+        user_id: UUID,
+        since: datetime,
+    ) -> int:
+        """Count password reset requests created in a time window for one user."""
+        stmt = select(PasswordResetToken.id).where(
+            PasswordResetToken.user_id == user_id,
+            PasswordResetToken.created_at >= since,
+        )
+        result = await self._session.execute(stmt)
+        return len(result.scalars().all())
+
+    async def get_valid_reset_token(
+        self,
+        *,
+        token_hash: str,
+        now: datetime,
+    ) -> PasswordResetToken | None:
+        """Fetch an active password reset token for one-time password change."""
+        stmt = (
+            select(PasswordResetToken)
+            .options(selectinload(PasswordResetToken.user))
+            .where(
+                PasswordResetToken.token_hash == token_hash,
+                PasswordResetToken.used_at.is_(None),
+                PasswordResetToken.expires_at > now,
+            )
+            .with_for_update()
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def mark_reset_token_used(
+        self,
+        *,
+        token_id: UUID,
+        used_at: datetime,
+    ) -> None:
+        """Mark a password reset token as consumed."""
+        stmt = select(PasswordResetToken).where(PasswordResetToken.id == token_id).with_for_update()
+        result = await self._session.execute(stmt)
+        reset_token = result.scalar_one_or_none()
+        if reset_token is None:
+            return
+        reset_token.used_at = used_at
+        await self._session.flush()
 
     async def consume_and_rotate_refresh_token(
         self,

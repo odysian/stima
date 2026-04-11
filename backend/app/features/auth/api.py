@@ -10,11 +10,14 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.auth.schemas import (
+    AuthMessageResponse,
     AuthSessionResponse,
     AuthUserResponse,
+    ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
     RegisterResponse,
+    ResetPasswordRequest,
 )
 from app.features.auth.service import (
     ACCESS_COOKIE_NAME,
@@ -28,6 +31,20 @@ from app.shared.observability import log_security_event
 from app.shared.rate_limit import get_ip_key, limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+async def _bind_forgot_password_rate_limit_email(
+    request: Request,
+    payload: ForgotPasswordRequest,
+) -> None:
+    request.state.forgot_password_email = str(payload.email).strip().lower()
+
+
+def _get_forgot_password_rate_limit_key(request: Request) -> str:
+    email = getattr(request.state, "forgot_password_email", None)
+    if isinstance(email, str) and email:
+        return f"email:{email}"
+    return f"ip:{get_ip_key(request)}"
 
 
 @router.post(
@@ -89,6 +106,53 @@ async def login(
         user=_serialize_user(session.user),
         csrf_token=session.csrf_token,
     )
+
+
+@router.post(
+    "/forgot-password",
+    response_model=AuthMessageResponse,
+)
+@limiter.limit(
+    lambda: get_settings().auth_forgot_password_rate_limit,
+    key_func=_get_forgot_password_rate_limit_key,
+)
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    _bound_email: Annotated[None, Depends(_bind_forgot_password_rate_limit_email)],
+) -> AuthMessageResponse:
+    """Issue password reset instructions while preserving account enumeration resistance."""
+    del request
+    del _bound_email
+    try:
+        await auth_service.request_password_reset(email=str(payload.email))
+    except AuthServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return AuthMessageResponse(
+        detail="If an account exists for that email, a reset link has been sent.",
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=AuthMessageResponse,
+)
+async def reset_password(
+    request: Request,
+    payload: ResetPasswordRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> AuthMessageResponse:
+    """Validate reset token, update password, and revoke active sessions."""
+    del request
+    try:
+        await auth_service.reset_password(
+            token=payload.token,
+            new_password=payload.new_password,
+        )
+    except AuthServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return AuthMessageResponse(detail="Password has been reset.")
 
 
 @router.post(

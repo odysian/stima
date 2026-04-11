@@ -21,6 +21,19 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class ForgotPasswordRequest(BaseModel):
+    """Request body for password reset initiation."""
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request body for password reset completion."""
+
+    token: str = Field(min_length=1, max_length=512)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class AuthUserResponse(BaseModel):
     """Serializable auth user payload."""
 
@@ -42,3 +55,9 @@ class AuthSessionResponse(BaseModel):
 
     user: AuthUserResponse
     csrf_token: str
+
+
+class AuthMessageResponse(BaseModel):
+    """Generic auth success payload."""
+
+    detail: str
