@@ -57,6 +57,7 @@ export interface InvoiceListItem {
 }
 
 export interface InvoiceDetail extends Invoice {
+  has_active_share: boolean;
   source_quote_number: string | null;
   customer: {
     id: string;

@@ -14,6 +14,7 @@ vi.mock("@/features/invoices/services/invoiceService", () => ({
     updateInvoice: vi.fn(),
     generatePdf: vi.fn(),
     shareInvoice: vi.fn(),
+    revokeShare: vi.fn(),
     markInvoicePaid: vi.fn(),
     markInvoiceVoid: vi.fn(),
     sendInvoiceEmail: vi.fn(),
@@ -42,6 +43,8 @@ function makePdfArtifact(
 }
 
 function makeInvoiceDetail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
+  const hasActiveShare = overrides.has_active_share ?? Boolean(overrides.share_token);
+
   return {
     id: "invoice-1",
     customer_id: "cust-1",
@@ -57,6 +60,7 @@ function makeInvoiceDetail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetai
     due_date: "2026-04-19",
     shared_at: null,
     share_token: null,
+    has_active_share: hasActiveShare,
     source_document_id: "quote-1",
     source_quote_number: "Q-001",
     pdf_artifact: makePdfArtifact(),
@@ -168,6 +172,7 @@ beforeEach(() => {
       updated_at: "2026-03-20T00:15:00.000Z",
     }),
   );
+  mockedInvoiceService.revokeShare.mockResolvedValue(undefined);
   mockedInvoiceService.markInvoicePaid.mockResolvedValue(
     makeInvoice({
       status: "paid",
@@ -271,6 +276,53 @@ describe("InvoiceDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByRole("button", { name: /resend email/i })).toBeInTheDocument();
+  });
+
+  it("shows revoke link for active shares and refetches detail after revocation", async () => {
+    mockedInvoiceService.getInvoice
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          status: "sent",
+          share_token: "invoice-share-token-1",
+          has_active_share: true,
+          shared_at: "2026-03-20T00:15:00.000Z",
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeInvoiceDetail({
+          status: "sent",
+          share_token: "invoice-share-token-1",
+          has_active_share: false,
+          shared_at: "2026-03-20T00:15:00.000Z",
+        }),
+      );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /revoke link/i }));
+
+    const dialog = screen.getByRole("dialog", { name: /revoke share link\?/i });
+    expect(
+      within(dialog).getByText("Anyone with this link will no longer be able to view this document."),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /revoke link/i }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.revokeShare).toHaveBeenCalledWith("invoice-1");
+    });
+    await waitFor(() => {
+      expect(mockedInvoiceService.getInvoice).toHaveBeenCalledTimes(2);
+    });
+
+    expect(await screen.findByText("Share link revoked.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send email/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+
+    await openOverflowMenu();
+    expect(screen.queryByRole("menuitem", { name: /revoke link/i })).not.toBeInTheDocument();
   });
 
   it("shows both outcome actions in overflow for sent invoices", async () => {

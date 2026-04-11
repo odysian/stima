@@ -61,6 +61,8 @@ class InvoiceDetailRow:
     due_date: date | None
     shared_at: datetime | None
     share_token: str | None
+    share_token_expires_at: datetime | None
+    share_token_revoked_at: datetime | None
     source_document_id: UUID | None
     source_quote_number: str | None
     line_items: list[LineItem]
@@ -286,6 +288,8 @@ class InvoiceRepository:
             due_date=document.due_date,
             shared_at=document.shared_at,
             share_token=document.share_token,
+            share_token_expires_at=document.share_token_expires_at,
+            share_token_revoked_at=document.share_token_revoked_at,
             source_document_id=document.source_document_id,
             source_quote_number=quote.doc_number if quote is not None else None,
             line_items=document.line_items,

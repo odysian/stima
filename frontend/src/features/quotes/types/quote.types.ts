@@ -118,6 +118,7 @@ export interface LinkedInvoiceSummary {
 }
 
 export interface QuoteDetail extends Quote {
+  has_active_share: boolean;
   extraction_tier: ExtractionTier | null;
   extraction_degraded_reason_code: string | null;
   customer_name: string | null;

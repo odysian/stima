@@ -19,6 +19,7 @@ export function mergeInvoiceDetailWithUpdate(
     notes: updatedInvoice.notes,
     shared_at: updatedInvoice.shared_at,
     share_token: updatedInvoice.share_token,
+    has_active_share: currentInvoice.has_active_share,
     updated_at: updatedInvoice.updated_at,
     line_items: updatedInvoice.line_items,
   };
@@ -26,19 +27,31 @@ export function mergeInvoiceDetailWithUpdate(
 
 interface BuildInvoiceOutcomeOverflowItemsArgs {
   status: InvoiceStatus | null;
+  hasActiveShare: boolean;
   isBusy: boolean;
+  onRevokeShareRequest: () => void;
   onMarkPaidRequest: () => void;
   onMarkVoidRequest: () => void;
 }
 
 export function buildInvoiceOutcomeOverflowItems({
   status,
+  hasActiveShare,
   isBusy,
+  onRevokeShareRequest,
   onMarkPaidRequest,
   onMarkVoidRequest,
 }: BuildInvoiceOutcomeOverflowItemsArgs): OverflowMenuItem[] {
+  const revokeItem: OverflowMenuItem = {
+    label: "Revoke Link",
+    icon: "link_off",
+    tone: "destructive",
+    disabled: isBusy,
+    onSelect: onRevokeShareRequest,
+  };
+
   if (status === "sent") {
-    return [
+    const items: OverflowMenuItem[] = [
       {
         label: "Mark as Paid",
         icon: "check_circle",
@@ -53,10 +66,14 @@ export function buildInvoiceOutcomeOverflowItems({
         onSelect: onMarkVoidRequest,
       },
     ];
+    if (hasActiveShare) {
+      items.unshift(revokeItem);
+    }
+    return items;
   }
 
   if (status === "paid") {
-    return [
+    const items: OverflowMenuItem[] = [
       {
         label: "Mark as Void",
         icon: "cancel",
@@ -65,10 +82,14 @@ export function buildInvoiceOutcomeOverflowItems({
         onSelect: onMarkVoidRequest,
       },
     ];
+    if (hasActiveShare) {
+      items.unshift(revokeItem);
+    }
+    return items;
   }
 
   if (status === "void") {
-    return [
+    const items: OverflowMenuItem[] = [
       {
         label: "Mark as Paid",
         icon: "check_circle",
@@ -76,7 +97,11 @@ export function buildInvoiceOutcomeOverflowItems({
         onSelect: onMarkPaidRequest,
       },
     ];
+    if (hasActiveShare) {
+      items.unshift(revokeItem);
+    }
+    return items;
   }
 
-  return [];
+  return hasActiveShare ? [revokeItem] : [];
 }

@@ -265,6 +265,7 @@ describe("quoteService integration (MSW)", () => {
       notes: "Thank you",
       shared_at: null,
       share_token: null,
+      has_active_share: false,
       linked_invoice: null,
       pdf_artifact: {
         status: "missing",

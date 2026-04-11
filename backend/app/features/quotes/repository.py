@@ -143,6 +143,8 @@ class QuoteDetailRow:
     notes: str | None
     shared_at: datetime | None
     share_token: str | None
+    share_token_expires_at: datetime | None
+    share_token_revoked_at: datetime | None
     line_items: list[LineItem]
     created_at: datetime
     updated_at: datetime
@@ -347,6 +349,8 @@ class QuoteRepository:
             notes=document.notes,
             shared_at=document.shared_at,
             share_token=document.share_token,
+            share_token_expires_at=document.share_token_expires_at,
+            share_token_revoked_at=document.share_token_revoked_at,
             line_items=document.line_items,
             created_at=document.created_at,
             updated_at=document.updated_at,

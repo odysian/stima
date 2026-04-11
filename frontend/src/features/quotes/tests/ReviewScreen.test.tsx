@@ -83,6 +83,7 @@ function makeQuote(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     notes: "Thanks for your business",
     shared_at: null,
     share_token: null,
+    has_active_share: false,
     requires_customer_assignment: false,
     can_reassign_customer: true,
     linked_invoice: null,
@@ -124,6 +125,7 @@ function makeInvoice(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
     due_date: "2026-04-19",
     shared_at: null,
     share_token: null,
+    has_active_share: false,
     source_document_id: "quote-1",
     source_quote_number: "Q-001",
     pdf_artifact: {

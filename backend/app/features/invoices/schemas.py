@@ -106,6 +106,7 @@ class InvoiceCustomerResponse(BaseModel):
 class InvoiceDetailResponse(InvoiceResponse):
     """Detailed invoice payload including source quote and customer fields."""
 
+    has_active_share: bool
     source_quote_number: str | None
     customer: InvoiceCustomerResponse
     pdf_artifact: PdfArtifactResponse

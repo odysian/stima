@@ -747,6 +747,10 @@ async def test_share_sets_status_token_and_timestamp(client: AsyncClient) -> Non
     assert isinstance(payload["share_token"], str) and payload["share_token"]
     assert payload["shared_at"] is not None
 
+    detail_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["has_active_share"] is True
+
 
 async def test_share_reuses_existing_token_and_updates_timestamp(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -1224,11 +1228,20 @@ async def test_revoked_public_quote_token_returns_generic_404(
     assert share_response.status_code == 200
     share_token = share_response.json()["share_token"]
 
+    detail_before_revoke = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_before_revoke.status_code == 200
+    assert detail_before_revoke.json()["has_active_share"] is True
+
     revoke_response = await client.delete(
         f"/api/quotes/{quote['id']}/share",
         headers={"X-CSRF-Token": csrf_token},
     )
     assert revoke_response.status_code == 204
+
+    detail_after_revoke = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_after_revoke.status_code == 200
+    assert detail_after_revoke.json()["share_token"] == share_token
+    assert detail_after_revoke.json()["has_active_share"] is False
 
     client.cookies.clear()
     json_response = await client.get(f"/api/public/doc/{share_token}")
@@ -1870,6 +1883,10 @@ async def test_invoice_share_returns_sent_and_raw_share_token_renders_pdf(
     assert share_payload["status"] == "sent"
     assert share_payload["share_token"]
 
+    detail_response = await client.get(f"/api/invoices/{invoice_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["has_active_share"] is True
+
     pdf_response = await client.get(f"/share/{share_payload['share_token']}")
     assert pdf_response.status_code == 200
     assert pdf_response.headers["content-disposition"] == 'inline; filename="invoice-I-001.pdf"'
@@ -1989,11 +2006,20 @@ async def test_revoked_public_invoice_token_returns_generic_404(
     assert share_response.status_code == 200
     share_token = share_response.json()["share_token"]
 
+    detail_before_revoke = await client.get(f"/api/invoices/{invoice_id}")
+    assert detail_before_revoke.status_code == 200
+    assert detail_before_revoke.json()["has_active_share"] is True
+
     revoke_response = await client.delete(
         f"/api/invoices/{invoice_id}/share",
         headers={"X-CSRF-Token": csrf_token},
     )
     assert revoke_response.status_code == 204
+
+    detail_after_revoke = await client.get(f"/api/invoices/{invoice_id}")
+    assert detail_after_revoke.status_code == 200
+    assert detail_after_revoke.json()["share_token"] == share_token
+    assert detail_after_revoke.json()["has_active_share"] is False
 
     client.cookies.clear()
     json_response = await client.get(f"/api/public/doc/{share_token}")
