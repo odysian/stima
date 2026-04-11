@@ -46,6 +46,39 @@ describe("authService integration (MSW)", () => {
     expect(capturedBody).toEqual({ email: "new@example.com", password: "s3cret" });
   });
 
+  it("forgotPassword sends the expected email payload", async () => {
+    let capturedBody: { email: string } | null = null;
+
+    server.use(
+      http.post("/api/auth/forgot-password", async ({ request: req }) => {
+        capturedBody = (await req.json()) as { email: string };
+        return HttpResponse.json(
+          { detail: "If an account exists for that email, a reset link has been sent." },
+          { status: 200 },
+        );
+      }),
+    );
+
+    await authService.forgotPassword("missing@example.com");
+
+    expect(capturedBody).toEqual({ email: "missing@example.com" });
+  });
+
+  it("resetPassword sends token and new password payload", async () => {
+    let capturedBody: { token: string; new_password: string } | null = null;
+
+    server.use(
+      http.post("/api/auth/reset-password", async ({ request: req }) => {
+        capturedBody = (await req.json()) as { token: string; new_password: string };
+        return HttpResponse.json({ detail: "Password has been reset." }, { status: 200 });
+      }),
+    );
+
+    await authService.resetPassword("token-123", "NewStrongPass123!");
+
+    expect(capturedBody).toEqual({ token: "token-123", new_password: "NewStrongPass123!" });
+  });
+
   it("logout clears CSRF so next mutating request has no token", async () => {
     await authService.login({ email: "a@b.com", password: "pass" });
     await authService.logout();

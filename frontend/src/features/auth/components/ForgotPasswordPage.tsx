@@ -1,28 +1,22 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import type { Location } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
-import { useAuth } from "@/features/auth/hooks/useAuth";
+import { authService } from "@/features/auth/services/authService";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
-import { Toast } from "@/shared/components/Toast";
 
-interface LoginLocationState {
-  from?: Location;
+const FORGOT_PASSWORD_SUCCESS_MESSAGE =
+  "If an account exists with that email, you'll receive a reset link.";
+
+interface LoginFlashState {
   flashMessage?: string;
 }
 
-export function LoginForm(): React.ReactElement {
-  const { login } = useAuth();
+export function ForgotPasswordPage(): React.ReactElement {
   const navigate = useNavigate();
-  const location = useLocation();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [flashMessage, setFlashMessage] = useState(
-    (location.state as LoginLocationState | undefined)?.flashMessage ?? null,
-  );
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -30,11 +24,13 @@ export function LoginForm(): React.ReactElement {
     setIsSubmitting(true);
 
     try {
-      await login({ email, password });
-      const from = (location.state as LoginLocationState | undefined)?.from;
-      navigate(from?.pathname ?? "/", { replace: true });
+      await authService.forgotPassword(email);
+      navigate("/login", {
+        replace: true,
+        state: { flashMessage: FORGOT_PASSWORD_SUCCESS_MESSAGE } satisfies LoginFlashState,
+      });
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : "Login failed";
+      const message = submitError instanceof Error ? submitError.message : "Unable to send reset link";
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -45,28 +41,20 @@ export function LoginForm(): React.ReactElement {
     <main className="screen-radial-backdrop flex min-h-screen flex-col items-center justify-center px-4 py-8">
       <h1 className="mb-8 font-headline text-3xl font-bold text-primary">Stima</h1>
       <section className="w-full max-w-sm rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
-        <h2 className="mb-6 font-headline text-2xl font-bold text-on-surface">Welcome Back</h2>
+        <h2 className="mb-2 font-headline text-2xl font-bold text-on-surface">Forgot password?</h2>
+        <p className="mb-6 text-sm text-on-surface-variant">
+          Enter your email and we&apos;ll send a reset link if your account exists.
+        </p>
+
         <form className="flex flex-col gap-4" onSubmit={onSubmit}>
           <Input
             id="email"
             label="Email"
             type="email"
+            required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          <Input
-            id="password"
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-
-          <p className="-mt-1 text-right text-sm text-on-surface-variant">
-            <Link to="/forgot-password" className="font-semibold text-primary">
-              Forgot password?
-            </Link>
-          </p>
 
           {error ? (
             <div role="alert" className="rounded-lg border-l-4 border-error bg-error-container p-4">
@@ -75,18 +63,16 @@ export function LoginForm(): React.ReactElement {
           ) : null}
 
           <Button type="submit" isLoading={isSubmitting} className="w-full">
-            Sign In →
+            Send Reset Link
           </Button>
         </form>
 
         <p className="mt-6 text-sm text-on-surface-variant">
-          Don&apos;t have an account?{" "}
-          <Link to="/register" className="font-semibold text-primary">
-            Register
+          <Link to="/login" className="font-semibold text-primary">
+            Back to Login
           </Link>
         </p>
       </section>
-      <Toast message={flashMessage} onDismiss={() => setFlashMessage(null)} />
     </main>
   );
 }

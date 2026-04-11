@@ -7,8 +7,10 @@ import {
   useParams,
 } from "react-router-dom";
 
+import { ForgotPasswordPage } from "@/features/auth/components/ForgotPasswordPage";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { RegisterForm } from "@/features/auth/components/RegisterForm";
+import { ResetPasswordPage } from "@/features/auth/components/ResetPasswordPage";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerCreateScreen } from "@/features/customers/components/CustomerCreateScreen";
 import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
@@ -96,6 +98,22 @@ export default function App(): React.ReactElement {
         element={
           <PublicRoute>
             <RegisterForm />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPasswordPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPasswordPage />
           </PublicRoute>
         }
       />

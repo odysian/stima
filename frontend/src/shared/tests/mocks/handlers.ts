@@ -43,6 +43,20 @@ export const handlers = [
     );
   }),
 
+  http.post("/api/auth/forgot-password", () => {
+    return HttpResponse.json(
+      { detail: "If an account exists for that email, a reset link has been sent." },
+      { status: 200 },
+    );
+  }),
+
+  http.post("/api/auth/reset-password", () => {
+    return HttpResponse.json(
+      { detail: "Password has been reset." },
+      { status: 200 },
+    );
+  }),
+
   http.post("/api/auth/refresh", ({ request }) => {
     const csrfError = requireCsrf(request);
     if (csrfError) return csrfError;
