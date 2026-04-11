@@ -100,6 +100,7 @@ Use only when the operator explicitly requests `execution=parallel`.
 Rules:
 - one Task issue -> one branch -> one worktree -> one PR
 - run `scripts/worktree-init.sh <task-id> [slug]` before any code changes; use the printed `WORKTREE_READY` path as the working directory
+- before running verification, confirm symlinks exist for any gitignored dep directories the task needs: `backend/.venv` and/or `frontend/node_modules`; if missing, the operator must create them from the main checkout before verification will succeed
 - never use `git worktree add --force`
 - if the branch or worktree path already exists, stop and report instead of improvising
 - keep the main checkout as the control-plane workspace (planning, review coordination, merge, post-merge sync)

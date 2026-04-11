@@ -69,7 +69,7 @@ Rules:
 
 Post-merge cleanup (operator, in the main checkout):
 ```bash
-git worktree remove ../stima-wt/task-<id>-<slug>
+git worktree remove --force ../stima-wt/task-<id>-<slug>
 git branch -d task-<id>-<slug>
 git fetch --prune origin
 ```

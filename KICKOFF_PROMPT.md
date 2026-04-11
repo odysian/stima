@@ -1,3 +1,36 @@
+## Parallel Worktree Setup
+
+```bash
+# 1. Create worktree
+scripts/worktree-init.sh <task-id>
+
+# 2. Symlink deps (skip whichever the task doesn't need)
+ln -s /home/odys/stima/frontend/node_modules /home/odys/stima-wt/task-<id>-<slug>/frontend/node_modules
+ln -s /home/odys/stima/backend/.venv         /home/odys/stima-wt/task-<id>-<slug>/backend/.venv
+
+# 3. Open worktree window
+code /home/odys/stima-wt/task-<id>-<slug>
+```
+
+Run kickoff from the worktree window:
+```
+Run kickoff for existing Task #<task-id> mode=single.
+```
+
+Preview frontend changes on a separate port:
+```bash
+cd /home/odys/stima-wt/task-<id>-<slug>/frontend && npm run dev -- --port <port>
+```
+
+Post-merge cleanup:
+```bash
+git worktree remove --force ../stima-wt/task-<id>-<slug>
+git branch -d task-<id>-<slug>
+git fetch --prune origin
+```
+
+---
+
 ## Tasks + Review
 
 Run kickoff for existing Task #<task-id> mode=single.

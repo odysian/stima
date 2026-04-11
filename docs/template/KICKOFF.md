@@ -14,7 +14,7 @@ Then execute the full Task flow end-to-end:
 1. Restate goal, non-goals, acceptance criteria, and exact verification commands from the Task issue. If an Execution Brief exists, use it as the working handoff for task-local deltas only; the Task issue remains the source of truth.
 2. Branch / checkout setup:
    - default execution: create/switch to branch `task-<id>-<slug>`
-   - if `execution=parallel`: run `scripts/worktree-init.sh <task-id> [slug]`, work only inside the returned `WORKTREE_READY` path, and use the created branch there
+   - if `execution=parallel`: run `scripts/worktree-init.sh <task-id> [slug]`, work only inside the returned `WORKTREE_READY` path, and use the created branch there; before running verification confirm that `backend/.venv` and/or `frontend/node_modules` symlinks exist inside the worktree — if missing, stop and ask the operator to create them from the main checkout
 3. Implement minimally and surgically, preserving existing contracts unless issue scope says otherwise.
 4. Run relevant verification once after implementation.
 5. Open PR with `Closes #<task-id>`.
