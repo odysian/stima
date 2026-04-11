@@ -7,6 +7,7 @@ import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
+import { DocumentCardSkeleton } from "@/shared/components/DocumentCardSkeleton";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
@@ -375,9 +376,15 @@ export function QuoteList(): React.ReactElement {
         </div>
 
         {isLoading ? (
-          <p role="status" className="px-4 text-sm text-on-surface-variant">
-            {documentMode === "quotes" ? "Loading quotes..." : "Loading invoices..."}
-          </p>
+          <div
+            role="status"
+            aria-label={documentMode === "quotes" ? "Loading quotes" : "Loading invoices"}
+            className="space-y-3 px-4"
+          >
+            {Array.from({ length: 4 }).map((_, index) => (
+              <DocumentCardSkeleton key={`${documentMode}-skeleton-${index}`} />
+            ))}
+          </div>
         ) : null}
 
         {loadError ? (

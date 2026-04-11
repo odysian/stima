@@ -21,6 +21,7 @@ import { useQuoteInvoiceConversion } from "@/features/quotes/hooks/useQuoteInvoi
 import { useQuoteOutcomeActions } from "@/features/quotes/hooks/useQuoteOutcomeActions";
 import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { BottomNav } from "@/shared/components/BottomNav";
+import { DetailPageSkeleton } from "@/shared/components/DetailPageSkeleton";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { canNavigateBack } from "@/shared/lib/navigation";
@@ -177,7 +178,11 @@ export function QuotePreview(): React.ReactElement {
       />
 
       <section className="mx-auto w-full max-w-3xl">
-        {isLoadingQuote ? <p role="status" className="mt-4 px-4 text-sm text-on-surface-variant">Loading quote...</p> : null}
+        {isLoadingQuote ? (
+          <div role="status" aria-label="Loading quote" className="mt-4 px-4">
+            <DetailPageSkeleton />
+          </div>
+        ) : null}
 
         {loadError ? (
           <div className="mx-4 mt-4">

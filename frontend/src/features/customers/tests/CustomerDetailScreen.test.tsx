@@ -203,7 +203,7 @@ describe("CustomerDetailScreen", () => {
 
     renderScreen();
 
-    expect(screen.getByRole("status")).toHaveTextContent("Loading customer...");
+    expect(screen.getByRole("status", { name: /loading customer/i })).toBeInTheDocument();
   });
 
   it("shows error when customer fetch fails", async () => {
@@ -406,7 +406,7 @@ describe("CustomerDetailScreen", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Alice Johnson" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Loading invoices...");
+    expect(screen.getByRole("status", { name: /loading invoices/i })).toBeInTheDocument();
   });
 
   it("renders quote history empty state when customer has no quotes", async () => {

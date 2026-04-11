@@ -531,11 +531,11 @@ describe("QuoteList", () => {
     renderScreen();
 
     expect(screen.queryByText(/active\s*·\s*\d+\s*pending/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Loading quotes...");
+    expect(screen.getByRole("status", { name: /loading quotes/i })).toBeInTheDocument();
 
     resolveQuotes?.([makeQuoteListItem()]);
     await waitFor(() => {
-      expect(screen.queryByText("Loading quotes...")).not.toBeInTheDocument();
+      expect(screen.queryByRole("status", { name: /loading quotes/i })).not.toBeInTheDocument();
     });
     expect(screen.getByText("0 active · 1 pending")).toBeInTheDocument();
   });

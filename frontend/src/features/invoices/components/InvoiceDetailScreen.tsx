@@ -9,6 +9,7 @@ import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineIte
 import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { DetailPageSkeleton } from "@/shared/components/DetailPageSkeleton";
 import {
   DocumentActionError,
   DocumentActionHint,
@@ -157,9 +158,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
       <section className="mx-auto w-full max-w-3xl">
         {isLoadingInvoice ? (
-          <p role="status" className="mt-4 px-4 text-sm text-on-surface-variant">
-            Loading invoice...
-          </p>
+          <div role="status" aria-label="Loading invoice" className="mt-4 px-4">
+            <DetailPageSkeleton />
+          </div>
         ) : null}
 
         {loadError ? (

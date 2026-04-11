@@ -716,7 +716,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    expect(screen.getByRole("status")).toHaveTextContent("Loading quote...");
+    expect(screen.getByRole("status", { name: /loading quote/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
   });
 

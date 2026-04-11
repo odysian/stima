@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerDeleteConfirmModal } from "@/features/customers/components/CustomerDeleteConfirmModal";
 import { CustomerInfoForm } from "@/features/customers/components/CustomerInfoForm";
+import { CustomerDetailLoadingSkeleton } from "@/features/customers/components/CustomerDetailLoadingSkeleton";
 import { InvoiceHistoryList } from "@/features/customers/components/InvoiceHistoryList";
 import { QuoteHistoryList } from "@/features/customers/components/QuoteHistoryList";
 import { customerService } from "@/features/customers/services/customerService";
@@ -282,9 +283,9 @@ export function CustomerDetailScreen(): React.ReactElement {
 
       <section className="mx-auto w-full max-w-3xl space-y-4 px-4 pt-20">
         {isLoading ? (
-          <p role="status" className="text-sm text-on-surface-variant">
-            Loading customer...
-          </p>
+          <div role="status" aria-label="Loading customer" className="space-y-4">
+            <CustomerDetailLoadingSkeleton />
+          </div>
         ) : null}
 
         {loadError ? (
