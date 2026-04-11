@@ -46,4 +46,16 @@ describe("StatusBadge", () => {
 
     expect(screen.getByText("Sent")).toHaveClass("bg-info-container", "text-info");
   });
+
+  it("renders paid variant styles", () => {
+    render(<StatusBadge variant="paid" />);
+
+    expect(screen.getByText("Paid")).toHaveClass("bg-success-container", "text-success");
+  });
+
+  it("renders void variant styles", () => {
+    render(<StatusBadge variant="void" />);
+
+    expect(screen.getByText("Void")).toHaveClass("bg-neutral-container", "text-on-surface-variant", "line-through");
+  });
 });

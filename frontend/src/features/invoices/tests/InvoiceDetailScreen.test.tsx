@@ -14,6 +14,8 @@ vi.mock("@/features/invoices/services/invoiceService", () => ({
     updateInvoice: vi.fn(),
     generatePdf: vi.fn(),
     shareInvoice: vi.fn(),
+    markInvoicePaid: vi.fn(),
+    markInvoiceVoid: vi.fn(),
     sendInvoiceEmail: vi.fn(),
   },
 }));
@@ -124,6 +126,10 @@ function renderScreen(path = "/invoices/invoice-1"): void {
   );
 }
 
+async function openOverflowMenu(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: /more actions/i }));
+}
+
 beforeEach(() => {
   const pendingEmailJob: JobStatusResponse = {
     id: "job-email-invoice-1",
@@ -160,6 +166,22 @@ beforeEach(() => {
       share_token: "invoice-share-token-1",
       shared_at: "2026-03-20T00:15:00.000Z",
       updated_at: "2026-03-20T00:15:00.000Z",
+    }),
+  );
+  mockedInvoiceService.markInvoicePaid.mockResolvedValue(
+    makeInvoice({
+      status: "paid",
+      share_token: "invoice-share-token-1",
+      shared_at: "2026-03-20T00:15:00.000Z",
+      updated_at: "2026-03-20T00:20:00.000Z",
+    }),
+  );
+  mockedInvoiceService.markInvoiceVoid.mockResolvedValue(
+    makeInvoice({
+      status: "void",
+      share_token: "invoice-share-token-1",
+      shared_at: "2026-03-20T00:15:00.000Z",
+      updated_at: "2026-03-20T00:20:00.000Z",
     }),
   );
   mockedInvoiceService.sendInvoiceEmail.mockResolvedValue(pendingEmailJob);
@@ -249,6 +271,126 @@ describe("InvoiceDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByRole("button", { name: /resend email/i })).toBeInTheDocument();
+  });
+
+  it("shows both outcome actions in overflow for sent invoices", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "sent",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await openOverflowMenu();
+
+    expect(screen.getByRole("menuitem", { name: /mark as paid/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /mark as void/i })).toBeInTheDocument();
+  });
+
+  it("shows paid banner and only Mark as Void in overflow for paid invoices", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "paid",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText("This invoice is marked as paid.")).toBeInTheDocument();
+    await openOverflowMenu();
+
+    expect(screen.queryByRole("menuitem", { name: /mark as paid/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /mark as void/i })).toBeInTheDocument();
+  });
+
+  it("shows void banner and only Mark as Paid in overflow for void invoices", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "void",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText("This invoice is marked as void.")).toBeInTheDocument();
+    await openOverflowMenu();
+
+    expect(screen.getByRole("menuitem", { name: /mark as paid/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /mark as void/i })).not.toBeInTheDocument();
+  });
+
+  it.each(["paid", "void"] as const)(
+    "keeps edit/share/pdf/email actions available for %s invoices",
+    async (status) => {
+      mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+        makeInvoiceDetail({
+          status,
+          share_token: "invoice-share-token-1",
+          shared_at: "2026-03-20T00:15:00.000Z",
+          pdf_artifact: makePdfArtifact({
+            status: "ready",
+            download_url: "/api/invoices/invoice-1/pdf",
+          }),
+        }),
+      );
+
+      renderScreen();
+
+      expect(await screen.findByRole("button", { name: /edit invoice/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /copy link/i })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /open pdf/i })).toBeInTheDocument();
+    },
+  );
+
+  it("marks a sent invoice as paid from overflow and updates visible state", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "sent",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+      }),
+    );
+
+    renderScreen();
+
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /mark as paid/i }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.markInvoicePaid).toHaveBeenCalledWith("invoice-1");
+    });
+
+    expect(await screen.findByText("This invoice is marked as paid.")).toBeInTheDocument();
+  });
+
+  it("marks a paid invoice as void from overflow and updates visible state", async () => {
+    mockedInvoiceService.getInvoice.mockResolvedValueOnce(
+      makeInvoiceDetail({
+        status: "paid",
+        share_token: "invoice-share-token-1",
+        shared_at: "2026-03-20T00:15:00.000Z",
+      }),
+    );
+
+    renderScreen();
+
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /mark as void/i }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.markInvoiceVoid).toHaveBeenCalledWith("invoice-1");
+    });
+
+    expect(await screen.findByText("This invoice is marked as void.")).toBeInTheDocument();
   });
 
   it("hides the email action for draft invoices", async () => {

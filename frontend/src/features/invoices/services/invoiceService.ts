@@ -44,6 +44,18 @@ function shareInvoice(id: string): Promise<Invoice> {
   });
 }
 
+function markInvoicePaid(id: string): Promise<Invoice> {
+  return request<Invoice>(`/api/invoices/${id}/mark-paid`, {
+    method: "POST",
+  });
+}
+
+function markInvoiceVoid(id: string): Promise<Invoice> {
+  return request<Invoice>(`/api/invoices/${id}/mark-void`, {
+    method: "POST",
+  });
+}
+
 async function sendInvoiceEmail(id: string, idempotencyKey?: string): Promise<JobStatusResponse> {
   const response = await requestWithMetadata<JobStatusResponse>(`/api/invoices/${id}/send-email`, {
     method: "POST",
@@ -62,5 +74,7 @@ export const invoiceService = {
   updateInvoice,
   generatePdf,
   shareInvoice,
+  markInvoicePaid,
+  markInvoiceVoid,
   sendInvoiceEmail,
 };

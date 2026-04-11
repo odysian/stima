@@ -24,8 +24,11 @@ interface UseInvoiceDetailActionsResult {
   manualCopyUrl: string | null;
   showSendEmailConfirm: boolean;
   isSendingEmail: boolean;
+  isMarkingPaid: boolean;
+  isMarkingVoid: boolean;
   emailError: string | null;
   emailMessage: string | null;
+  outcomeError: string | null;
   setShowSendEmailConfirm: Dispatch<SetStateAction<boolean>>;
   onGeneratePdf: () => Promise<void>;
   onCopyLink: () => Promise<void>;
@@ -35,6 +38,8 @@ interface UseInvoiceDetailActionsResult {
     isPdfBusy: boolean;
   }) => void;
   onConfirmSendEmail: () => Promise<void>;
+  onMarkInvoicePaid: () => Promise<void>;
+  onMarkInvoiceVoid: () => Promise<void>;
 }
 
 export function useInvoiceDetailActions({
@@ -51,8 +56,11 @@ export function useInvoiceDetailActions({
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+  const [isMarkingVoid, setIsMarkingVoid] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
+  const [outcomeError, setOutcomeError] = useState<string | null>(null);
 
   usePendingPdfArtifactResume({
     artifact: invoice?.pdf_artifact,
@@ -83,6 +91,7 @@ export function useInvoiceDetailActions({
     setPdfError(null);
     setEmailError(null);
     setEmailMessage(null);
+    setOutcomeError(null);
     setShareError(null);
     setShareMessage(null);
     setManualCopyUrl(null);
@@ -113,6 +122,7 @@ export function useInvoiceDetailActions({
     const apiBase = import.meta.env.VITE_API_URL || window.location.origin;
     setEmailError(null);
     setEmailMessage(null);
+    setOutcomeError(null);
     setShareError(null);
     setShareMessage(null);
     setManualCopyUrl(null);
@@ -160,6 +170,7 @@ export function useInvoiceDetailActions({
 
     setEmailError(null);
     setEmailMessage(null);
+    setOutcomeError(null);
     setShowSendEmailConfirm(true);
   }
 
@@ -171,6 +182,7 @@ export function useInvoiceDetailActions({
     setShowSendEmailConfirm(false);
     setEmailError(null);
     setEmailMessage(null);
+    setOutcomeError(null);
     setShareError(null);
     setShareMessage(null);
     setManualCopyUrl(null);
@@ -196,6 +208,56 @@ export function useInvoiceDetailActions({
     }
   }
 
+  async function onMarkInvoicePaid(): Promise<void> {
+    if (!invoiceId) {
+      return;
+    }
+
+    setPdfError(null);
+    setEmailError(null);
+    setEmailMessage(null);
+    setOutcomeError(null);
+    setShareError(null);
+    setShareMessage(null);
+    setManualCopyUrl(null);
+    setIsMarkingPaid(true);
+
+    try {
+      const updatedInvoice = await invoiceService.markInvoicePaid(invoiceId);
+      applyInvoiceUpdate(updatedInvoice);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to mark invoice as paid";
+      setOutcomeError(message);
+    } finally {
+      setIsMarkingPaid(false);
+    }
+  }
+
+  async function onMarkInvoiceVoid(): Promise<void> {
+    if (!invoiceId) {
+      return;
+    }
+
+    setPdfError(null);
+    setEmailError(null);
+    setEmailMessage(null);
+    setOutcomeError(null);
+    setShareError(null);
+    setShareMessage(null);
+    setManualCopyUrl(null);
+    setIsMarkingVoid(true);
+
+    try {
+      const updatedInvoice = await invoiceService.markInvoiceVoid(invoiceId);
+      applyInvoiceUpdate(updatedInvoice);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to mark invoice as void";
+      setOutcomeError(message);
+    } finally {
+      setIsMarkingVoid(false);
+    }
+  }
+
   return {
     isGeneratingPdf,
     pdfError,
@@ -205,12 +267,17 @@ export function useInvoiceDetailActions({
     manualCopyUrl,
     showSendEmailConfirm,
     isSendingEmail,
+    isMarkingPaid,
+    isMarkingVoid,
     emailError,
     emailMessage,
+    outcomeError,
     setShowSendEmailConfirm,
     onGeneratePdf,
     onCopyLink,
     onRequestSendEmail,
     onConfirmSendEmail,
+    onMarkInvoicePaid,
+    onMarkInvoiceVoid,
   };
 }

@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useInvoiceDetailActions } from "@/features/invoices/hooks/useInvoiceDetailActions";
 import { useInvoiceDetail } from "@/features/invoices/hooks/useInvoiceDetail";
+import { buildInvoiceOutcomeOverflowItems } from "@/features/invoices/components/invoiceDetail.helpers";
 import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
 import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
@@ -19,6 +20,7 @@ import {
   documentActionUtilityButtonClassName,
 } from "@/shared/components/DocumentActionSurface";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { OverflowMenu } from "@/shared/components/OverflowMenu";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatDate } from "@/shared/lib/formatters";
@@ -43,13 +45,18 @@ export function InvoiceDetailScreen(): React.ReactElement {
     manualCopyUrl,
     showSendEmailConfirm,
     isSendingEmail,
+    isMarkingPaid,
+    isMarkingVoid,
     emailError,
     emailMessage,
+    outcomeError,
     setShowSendEmailConfirm,
     onGeneratePdf,
     onCopyLink,
     onRequestSendEmail,
     onConfirmSendEmail,
+    onMarkInvoicePaid,
+    onMarkInvoiceVoid,
   } = useInvoiceDetailActions({
     invoiceId: id,
     invoice,
@@ -63,12 +70,14 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const canEdit = Boolean(invoice && id && isInvoiceEditableStatus(invoice.status));
   const emailActionLabel = invoice?.status === "ready"
     ? "Send Email"
-    : invoice?.status === "sent" ? "Resend Email" : null;
+    : invoice?.status === "sent" || invoice?.status === "paid" || invoice?.status === "void" ? "Resend Email" : null;
   const shouldRenderNotes = Boolean(invoice?.notes?.trim());
   const clientContact = invoice?.customer.phone?.trim()
     || invoice?.customer.email?.trim()
     || "No contact details";
   const isPdfBusy = isGeneratingPdf || invoice?.pdf_artifact.status === "pending";
+  const isOutcomeBusy = isMarkingPaid || isMarkingVoid;
+  const isBusy = isPdfBusy || isSharing || isSendingEmail || isOutcomeBusy;
   const resolvedPdfError = pdfError ?? (
     invoice?.pdf_artifact.status === "failed"
       ? "Invoice PDF failed. Please try again."
@@ -83,8 +92,33 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const statusCopy = isPdfBusy
     ? "Generating PDF preview. This can take a few moments."
     : isSendingEmail ? "Sending invoice email..."
+    : isMarkingPaid ? "Recording invoice as paid..."
+    : isMarkingVoid ? "Recording invoice as void..."
     : isSharing ? "Copying share link..."
     : null;
+
+  const overflowItems = buildInvoiceOutcomeOverflowItems({
+    status: invoice?.status ?? null,
+    isBusy,
+    onMarkPaidRequest: () => {
+      void onMarkInvoicePaid();
+    },
+    onMarkVoidRequest: () => {
+      void onMarkInvoiceVoid();
+    },
+  });
+
+  const outcomeBanner = invoice?.status === "paid"
+    ? {
+      className: "mx-4 mt-4 rounded-lg border border-success/30 bg-success-container p-4 text-sm text-success",
+      message: "This invoice is marked as paid.",
+    }
+    : invoice?.status === "void"
+      ? {
+        className: "mx-4 mt-4 rounded-lg border border-outline/40 bg-surface-container-low p-4 text-sm text-on-surface-variant",
+        message: "This invoice is marked as void.",
+      }
+      : null;
 
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
@@ -105,6 +139,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 <span className="material-symbols-outlined block text-[1.125rem] leading-none">edit</span>
               </button>
             ) : null}
+            <OverflowMenu items={overflowItems} />
           </div>
         ) : null}
       />
@@ -124,6 +159,12 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
         {!isLoadingInvoice && !loadError && invoice ? (
           <>
+            {outcomeBanner ? (
+              <div className={outcomeBanner.className}>
+                {outcomeBanner.message}
+              </div>
+            ) : null}
+
             <QuoteDetailsCard
               documentLabel="INVOICE"
               totalAmount={invoice.total_amount}
@@ -205,7 +246,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 <Button
                   type="button"
                   className={documentActionPrimaryButtonClassName}
-                  disabled={isSharing || isSendingEmail || isPdfBusy}
+                  disabled={isBusy}
                   onClick={() => {
                     void onGeneratePdf();
                   }}
@@ -220,7 +261,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     <button
                       type="button"
                       className={documentActionUtilityButtonClassName}
-                      disabled={!hasCustomerEmail || isPdfBusy || isSharing || isSendingEmail}
+                      disabled={!hasCustomerEmail || isBusy}
                       onClick={() => onRequestSendEmail({ emailActionLabel, hasCustomerEmail, isPdfBusy })}
                     >
                       <span className="material-symbols-outlined text-base">mail</span>
@@ -231,7 +272,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   <button
                     type="button"
                     className={documentActionUtilityButtonClassName}
-                    disabled={isSharing || isPdfBusy || isSendingEmail}
+                    disabled={isBusy}
                     onClick={() => {
                       void onCopyLink();
                     }}
@@ -253,6 +294,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 <>
                   {resolvedPdfError ? <DocumentActionError>{resolvedPdfError}</DocumentActionError> : null}
                   {emailError ? <DocumentActionError>{emailError}</DocumentActionError> : null}
+                  {outcomeError ? <DocumentActionError>{outcomeError}</DocumentActionError> : null}
                   {shareError ? <DocumentActionError>{shareError}</DocumentActionError> : null}
                   {manualCopyUrl ? (
                     <DocumentActionManualCopyField url={manualCopyUrl} />
