@@ -31,6 +31,34 @@ export function isInvalidLineItem(item: LineItemDraftWithFlags): boolean {
   return item.description.length === 0 && !isBlankLineItem(item);
 }
 
+export function buildLineItemSubmitState(lineItems: LineItemDraftWithFlags[]): {
+  hasInvalidLineItems: boolean;
+  lineItemsForSubmit: LineItemDraft[];
+  lineItemSum: number;
+} {
+  const normalizedLineItems = lineItems.map(normalizeLineItem);
+  const hasInvalidLineItems = normalizedLineItems.some(isInvalidLineItem);
+  const lineItemsForSubmit: LineItemDraft[] = normalizedLineItems
+    .filter((lineItem) => lineItem.description.length > 0)
+    .map((lineItem) => ({
+      description: lineItem.description,
+      details: lineItem.details,
+      price: lineItem.price,
+    }));
+  const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
+    if (lineItem.price === null) {
+      return runningTotal;
+    }
+    return runningTotal + lineItem.price;
+  }, 0);
+
+  return {
+    hasInvalidLineItems,
+    lineItemsForSubmit,
+    lineItemSum,
+  };
+}
+
 export function mapExtractedLineItems(extraction: ExtractionResult): LineItemDraftWithFlags[] {
   return extraction.line_items.map((lineItem) => ({
     description: lineItem.description,

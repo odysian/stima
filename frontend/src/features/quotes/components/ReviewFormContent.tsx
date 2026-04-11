@@ -1,10 +1,9 @@
 import { useState } from "react";
 
 import { ReviewCustomerRow } from "@/features/quotes/components/ReviewCustomerRow";
+import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewLineItemsSection } from "@/features/quotes/components/ReviewLineItemsSection";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
-import type { QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
-import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
@@ -13,8 +12,22 @@ import {
 
 interface ReviewFormContentProps {
   id: string;
-  quote: QuoteDetail;
-  draft: QuoteEditDraft;
+  customerName: string | null;
+  draft: {
+    title: string;
+    transcript?: string;
+    lineItems: Array<{ description: string; details: string | null; price: number | null; flagged?: boolean; flagReason?: string | null }>;
+    total: number | null;
+    taxRate: number | null;
+    discountType: "fixed" | "percent" | null;
+    discountValue: number | null;
+    depositAmount: number | null;
+    notes: string;
+    dueDate?: string;
+  };
+  documentType: ReviewDocumentType;
+  isTypeSelectorLocked: boolean;
+  isInvoiceTypeDisabled: boolean;
   locationNotice?: string;
   loadError: string | null;
   saveError: string | null;
@@ -25,6 +38,8 @@ interface ReviewFormContentProps {
   confidenceNotes: string[];
   lineItemSum: number;
   suggestedTaxRate: number | null;
+  onDocumentTypeChange: (nextType: ReviewDocumentType) => void;
+  onDueDateChange: (nextDueDate: string) => void;
   onRequestAssignment: () => void;
   onAddVoiceNote: () => void;
   onDismissConfidence: (noteIndex: number) => void;
@@ -41,8 +56,11 @@ interface ReviewFormContentProps {
 
 export function ReviewFormContent({
   id,
-  quote,
+  customerName,
   draft,
+  documentType,
+  isTypeSelectorLocked,
+  isInvoiceTypeDisabled,
   locationNotice,
   loadError,
   saveError,
@@ -53,6 +71,8 @@ export function ReviewFormContent({
   confidenceNotes,
   lineItemSum,
   suggestedTaxRate,
+  onDocumentTypeChange,
+  onDueDateChange,
   onRequestAssignment,
   onAddVoiceNote,
   onDismissConfidence,
@@ -67,11 +87,13 @@ export function ReviewFormContent({
   onNotesChange,
 }: ReviewFormContentProps): React.ReactElement {
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+  const showDueDateField = documentType === "invoice";
+  const showQuoteOnlySections = documentType === "quote";
 
   return (
     <form
       id="quote-review-form"
-      className="mx-auto w-full max-w-2xl space-y-5 px-4 pb-24 pt-20"
+      className="mx-auto w-full max-w-2xl space-y-4 px-4 pb-24 pt-20"
       onSubmit={(event) => event.preventDefault()}
     >
       {locationNotice ? (
@@ -93,7 +115,7 @@ export function ReviewFormContent({
           htmlFor="quote-review-title"
           className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
         >
-          QUOTE TITLE
+          {documentType === "invoice" ? "INVOICE TITLE" : "QUOTE TITLE"}
         </label>
         <input
           id="quote-review-title"
@@ -108,35 +130,63 @@ export function ReviewFormContent({
       </section>
 
       <ReviewCustomerRow
-        customerName={quote.customer_name}
+        customerName={customerName}
         requiresCustomerAssignment={requiresCustomerAssignment}
         canReassignCustomer={canReassignCustomer}
         isInteractionLocked={isInteractionLocked}
         onRequestAssignment={onRequestAssignment}
       />
 
-      <section className="space-y-2">
-        <button
-          type="button"
-          aria-expanded={isTranscriptExpanded}
-          aria-controls="quote-review-transcript-panel"
-          className="inline-flex cursor-pointer items-center gap-1.5 py-1 text-left text-[0.6875rem] font-bold uppercase tracking-widest text-outline transition-colors hover:text-on-surface-variant"
-          onClick={() => setIsTranscriptExpanded((current) => !current)}
-        >
-          <span>Transcript Notes</span>
-          <span className="material-symbols-outlined text-[1rem] leading-none text-outline">
-            {isTranscriptExpanded ? "expand_more" : "chevron_right"}
-          </span>
-        </button>
-        {isTranscriptExpanded ? (
-          <div
-            id="quote-review-transcript-panel"
-            className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm leading-6 text-on-surface whitespace-pre-wrap"
+      <ReviewDocumentTypeSelector
+        value={documentType}
+        disabled={isTypeSelectorLocked}
+        isInvoiceDisabled={isInvoiceTypeDisabled}
+        onChange={onDocumentTypeChange}
+      />
+
+      {showDueDateField ? (
+        <section className="space-y-2">
+          <label
+            htmlFor="document-review-due-date"
+            className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
           >
-            {draft.transcript?.trim().length ? draft.transcript : "No transcript notes captured."}
-          </div>
-        ) : null}
-      </section>
+            INVOICE DUE DATE
+          </label>
+          <input
+            id="document-review-due-date"
+            type="date"
+            value={draft.dueDate ?? ""}
+            disabled={isInteractionLocked}
+            onChange={(event) => onDueDateChange(event.target.value)}
+            className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </section>
+      ) : null}
+
+      {showQuoteOnlySections ? (
+        <section className="space-y-2">
+          <button
+            type="button"
+            aria-expanded={isTranscriptExpanded}
+            aria-controls="quote-review-transcript-panel"
+            className="inline-flex cursor-pointer items-center gap-1.5 py-1 text-left text-[0.6875rem] font-bold uppercase tracking-widest text-outline transition-colors hover:text-on-surface-variant"
+            onClick={() => setIsTranscriptExpanded((current) => !current)}
+          >
+            <span>Transcript Notes</span>
+            <span className="material-symbols-outlined text-[1rem] leading-none text-outline">
+              {isTranscriptExpanded ? "expand_more" : "chevron_right"}
+            </span>
+          </button>
+          {isTranscriptExpanded ? (
+            <div
+              id="quote-review-transcript-panel"
+              className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm leading-6 text-on-surface whitespace-pre-wrap"
+            >
+              {draft.transcript?.trim().length ? draft.transcript : "No transcript notes captured."}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {hasVisibleConfidenceNotes ? (
         <div className="space-y-2">
@@ -154,6 +204,7 @@ export function ReviewFormContent({
         lineItems={draft.lineItems}
         isInteractionLocked={isInteractionLocked}
         onEditLineItem={onEditLineItem}
+        showCaptureMoreNotes={showQuoteOnlySections}
         onCaptureMoreNotes={onAddVoiceNote}
         onAddLineItem={onAddLineItem}
       />

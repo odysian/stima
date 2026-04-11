@@ -6,8 +6,9 @@ interface ReviewActionFooterProps {
   isInteractionLocked: boolean;
   isSavingDraft: boolean;
   isContinuing: boolean;
+  primaryActionLabel: string;
   onSaveDraft: () => void;
-  onContinueToPreview: () => void;
+  onPrimaryAction: () => void;
 }
 
 export function ReviewActionFooter({
@@ -15,8 +16,9 @@ export function ReviewActionFooter({
   isInteractionLocked,
   isSavingDraft,
   isContinuing,
+  primaryActionLabel,
   onSaveDraft,
-  onContinueToPreview,
+  onPrimaryAction,
 }: ReviewActionFooterProps): React.ReactElement {
   const isContinueDisabled = requiresCustomerAssignment || isInteractionLocked;
 
@@ -30,9 +32,9 @@ export function ReviewActionFooter({
             className="w-full sm:flex-1"
             disabled={isContinueDisabled}
             isLoading={isContinuing}
-            onClick={onContinueToPreview}
+            onClick={onPrimaryAction}
           >
-            Continue to Preview
+            {primaryActionLabel}
           </Button>
           <button
             type="button"
@@ -45,7 +47,7 @@ export function ReviewActionFooter({
         </div>
         {requiresCustomerAssignment ? (
           <p className="text-center text-xs text-warning">
-            Continue to Preview is disabled until a customer is assigned.
+            {primaryActionLabel} is disabled until a customer is assigned.
           </p>
         ) : null}
       </div>

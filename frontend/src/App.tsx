@@ -15,16 +15,14 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerCreateScreen } from "@/features/customers/components/CustomerCreateScreen";
 import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
 import { CustomerListScreen } from "@/features/customers/components/CustomerListScreen";
-import { EditInvoiceLineItemScreen } from "@/features/invoices/components/EditInvoiceLineItemScreen";
 import { InvoiceDetailScreen } from "@/features/invoices/components/InvoiceDetailScreen";
-import { InvoiceEditScreen } from "@/features/invoices/components/InvoiceEditScreen";
 import { LandingPage } from "@/features/marketing/components/LandingPage";
 import { PublicQuotePage } from "@/features/public/components/PublicQuotePage";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
+import { DocumentEditScreen } from "@/features/quotes/components/ReviewScreen";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { QuotePreview } from "@/features/quotes/components/QuotePreview";
-import { ReviewScreen } from "@/features/quotes/components/ReviewScreen";
 import { SettingsScreen } from "@/features/settings/components/SettingsScreen";
 
 function ProtectedRoute(): React.ReactElement {
@@ -79,7 +77,12 @@ function RootHome(): React.ReactElement {
 
 function QuoteEditRedirect(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
-  return <Navigate to={id ? `/quotes/${id}/review` : "/"} replace />;
+  return <Navigate to={id ? `/documents/${id}/edit` : "/"} replace />;
+}
+
+function InvoiceEditRedirect(): React.ReactElement {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/documents/${id}/edit` : "/"} replace />;
 }
 
 export default function App(): React.ReactElement {
@@ -128,12 +131,13 @@ export default function App(): React.ReactElement {
         <Route path="/customers/:id" element={<CustomerDetailScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
-        <Route path="/invoices/:id/edit" element={<InvoiceEditScreen />} />
-        <Route path="/invoices/:id/edit/line-items/:lineItemIndex/edit" element={<EditInvoiceLineItemScreen />} />
+        <Route path="/invoices/:id/edit" element={<InvoiceEditRedirect />} />
+        <Route path="/invoices/:id/edit/line-items/:lineItemIndex/edit" element={<InvoiceEditRedirect />} />
         <Route path="/quotes/new" element={<Navigate to="/quotes/capture" replace />} />
         <Route path="/quotes/capture" element={<CaptureScreen />} />
         <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
-        <Route path="/quotes/:id/review" element={<ReviewScreen />} />
+        <Route path="/documents/:id/edit" element={<DocumentEditScreen />} />
+        <Route path="/quotes/:id/review" element={<QuoteEditRedirect />} />
         <Route path="/quotes/:id/review/append-capture" element={<CaptureScreen />} />
         <Route path="/quotes/:id/edit" element={<QuoteEditRedirect />} />
         <Route path="/quotes/:id/preview" element={<QuotePreview />} />

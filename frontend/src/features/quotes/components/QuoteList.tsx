@@ -262,7 +262,7 @@ export function QuoteList(): React.ReactElement {
       ].join(" · "),
       totalAmount: quote.total_amount,
       status: quote.status,
-      destination: `/quotes/${quote.id}/review`,
+      destination: `/documents/${quote.id}/edit`,
       destinationState: { origin: "list" },
       isDraft: true,
       needsCustomerAssignment: quote.requires_customer_assignment === true,

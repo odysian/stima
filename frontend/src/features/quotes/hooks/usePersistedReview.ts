@@ -1,151 +1,166 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { invoiceService } from "@/features/invoices/services/invoiceService";
+import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { QuoteDetail } from "@/features/quotes/types/quote.types";
 import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
-import { useQuoteEdit, type QuoteEditDraft } from "@/features/quotes/hooks/useQuoteEdit";
+import { isHttpRequestError } from "@/shared/lib/http";
 import {
-  calculatePricingFromPersisted,
-  resolveLineItemSum,
-} from "@/shared/lib/pricing";
+  clearDocumentDraftFromStorage,
+  mapDocumentToEditDraft,
+  mapInvoiceToEditDraft,
+  mapQuoteToEditDraft,
+  persistDocumentDraftToStorage,
+  readDocumentDraftFromStorage,
+  type DocumentEditDraft,
+  type PersistedEditableDocument,
+} from "@/features/quotes/hooks/persistedDocumentDraft";
 
-export function mapQuoteToEditDraft(quote: QuoteDetail): QuoteEditDraft {
-  const lineItemSum = resolveLineItemSum(quote.line_items.map((item) => item.price));
-  const breakdown = calculatePricingFromPersisted(
-    {
-      totalAmount: quote.total_amount,
-      taxRate: quote.tax_rate,
-      discountType: quote.discount_type,
-      discountValue: quote.discount_value,
-      depositAmount: quote.deposit_amount,
-    },
-    lineItemSum,
-  );
+export {
+  mapInvoiceToEditDraft,
+  mapQuoteToEditDraft,
+  type DocumentEditDraft,
+  type PersistedEditableDocument,
+};
 
-  return {
-    quoteId: quote.id,
-    title: quote.title?.trim() ?? "",
-    transcript: quote.transcript,
-    lineItems: quote.line_items.map((item) => ({
-      description: item.description,
-      details: item.details,
-      price: item.price,
-    })),
-    total: breakdown.subtotal ?? quote.total_amount,
-    taxRate: quote.tax_rate,
-    discountType: quote.discount_type,
-    discountValue: quote.discount_value,
-    depositAmount: quote.deposit_amount,
-    notes: quote.notes ?? "",
-  };
+async function fetchEditableDocument(documentId: string): Promise<PersistedEditableDocument> {
+  try {
+    const quote = await quoteService.getQuote(documentId);
+    if (!isQuoteEditableStatus(quote.status)) {
+      throw new Error("This quote can no longer be edited.");
+    }
+    return quote;
+  } catch (quoteError) {
+    if (quoteError instanceof Error && quoteError.message === "This quote can no longer be edited.") {
+      throw quoteError;
+    }
+
+    if (!isHttpRequestError(quoteError) || quoteError.status !== 404) {
+      throw quoteError;
+    }
+
+    const invoice = await invoiceService.getInvoice(documentId);
+    if (!isInvoiceEditableStatus(invoice.status)) {
+      throw new Error("This invoice can no longer be edited.");
+    }
+    return invoice;
+  }
 }
 
 interface UsePersistedReviewResult {
-  quote: QuoteDetail | null;
-  draft: QuoteEditDraft | null;
-  setDraft: (nextDraft: QuoteEditDraft | ((current: QuoteEditDraft) => QuoteEditDraft)) => void;
+  document: PersistedEditableDocument | null;
+  draft: DocumentEditDraft | null;
+  setDraft: (nextDraft: DocumentEditDraft | ((current: DocumentEditDraft) => DocumentEditDraft)) => void;
   clearDraft: () => void;
-  isLoadingQuote: boolean;
+  isLoadingDocument: boolean;
   loadError: string | null;
-  refreshQuote: (options?: { reseedDraft?: boolean }) => Promise<QuoteDetail>;
+  refreshDocument: (options?: { reseedDraft?: boolean }) => Promise<PersistedEditableDocument>;
 }
 
-export function usePersistedReview(quoteId: string | undefined): UsePersistedReviewResult {
-  const { draft, setDraft, clearDraft } = useQuoteEdit();
-  const [quote, setQuote] = useState<QuoteDetail | null>(null);
-  const [isLoadingQuote, setIsLoadingQuote] = useState(true);
+export function usePersistedReview(documentId: string | undefined): UsePersistedReviewResult {
+  const [draft, setDraftState] = useState<DocumentEditDraft | null>(() => readDocumentDraftFromStorage());
+  const [document, setDocument] = useState<PersistedEditableDocument | null>(null);
+  const [isLoadingDocument, setIsLoadingDocument] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const refreshQuote = useCallback(async (
+  const setDraft = useCallback((
+    nextDraft: DocumentEditDraft | ((current: DocumentEditDraft) => DocumentEditDraft),
+  ) => {
+    setDraftState((currentDraft) => {
+      const resolvedDraft =
+        typeof nextDraft === "function"
+          ? (currentDraft ? nextDraft(currentDraft) : currentDraft)
+          : nextDraft;
+
+      if (!resolvedDraft) {
+        return currentDraft;
+      }
+
+      persistDocumentDraftToStorage(resolvedDraft);
+      return resolvedDraft;
+    });
+  }, []);
+
+  const clearDraft = useCallback(() => {
+    clearDocumentDraftFromStorage();
+    setDraftState(null);
+  }, []);
+
+  const refreshDocument = useCallback(async (
     options?: { reseedDraft?: boolean },
-  ): Promise<QuoteDetail> => {
-    if (!quoteId) {
-      throw new Error("Missing quote id.");
+  ): Promise<PersistedEditableDocument> => {
+    if (!documentId) {
+      throw new Error("Missing document id.");
     }
 
-    const refreshedQuote = await quoteService.getQuote(quoteId);
-    setQuote(refreshedQuote);
+    const refreshedDocument = await fetchEditableDocument(documentId);
+    setDocument(refreshedDocument);
     if (options?.reseedDraft) {
-      setDraft(mapQuoteToEditDraft(refreshedQuote));
+      setDraft(mapDocumentToEditDraft(refreshedDocument));
     }
-    return refreshedQuote;
-  }, [quoteId, setDraft]);
+    return refreshedDocument;
+  }, [documentId, setDraft]);
 
   useEffect(() => {
     let isActive = true;
 
-    async function fetchQuote(): Promise<void> {
-      if (!quoteId) {
-        setLoadError("Missing quote id.");
-        setIsLoadingQuote(false);
+    async function fetchDocument(): Promise<void> {
+      if (!documentId) {
+        setLoadError("Missing document id.");
+        setIsLoadingDocument(false);
         return;
       }
 
-      setIsLoadingQuote(true);
+      setIsLoadingDocument(true);
       setLoadError(null);
 
       try {
-        const fetchedQuote = await quoteService.getQuote(quoteId);
+        const fetchedDocument = await fetchEditableDocument(documentId);
         if (!isActive) {
           return;
         }
 
-        if (!isQuoteEditableStatus(fetchedQuote.status)) {
-          setQuote(null);
-          setLoadError("This quote can no longer be edited.");
-          setIsLoadingQuote(false);
-          return;
-        }
-
-        setQuote(fetchedQuote);
+        setDocument(fetchedDocument);
       } catch (error) {
         if (!isActive) {
           return;
         }
 
-        const message = error instanceof Error ? error.message : "Unable to load quote";
+        const message = error instanceof Error ? error.message : "Unable to load document";
         setLoadError(message);
       } finally {
         if (isActive) {
-          setIsLoadingQuote(false);
+          setIsLoadingDocument(false);
         }
       }
     }
 
-    void fetchQuote();
+    void fetchDocument();
 
     return () => {
       isActive = false;
     };
-  }, [quoteId]);
+  }, [documentId]);
 
   useEffect(() => {
-    if (!quote) {
+    if (!document) {
       return;
     }
 
-    if (!draft || draft.quoteId !== quote.id) {
-      setDraft(mapQuoteToEditDraft(quote));
-      return;
+    if (!draft || draft.documentId !== document.id) {
+      setDraft(mapDocumentToEditDraft(document));
     }
+  }, [document, draft, setDraft]);
 
-    if (typeof draft.transcript !== "string") {
-      setDraft((currentDraft) => ({
-        ...currentDraft,
-        transcript: quote.transcript,
-      }));
-    }
-  }, [draft, quote, setDraft]);
-
-  const currentDraft = draft && quote && draft.quoteId === quote.id ? draft : null;
+  const currentDraft = draft && document && draft.documentId === document.id ? draft : null;
 
   return {
-    quote,
+    document,
     draft: currentDraft,
     setDraft,
     clearDraft,
-    isLoadingQuote,
+    isLoadingDocument,
     loadError,
-    refreshQuote,
+    refreshDocument,
   };
 }

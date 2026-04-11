@@ -298,7 +298,7 @@ describe("QuoteList", () => {
     );
 
     fireEvent.click(within(draftsSection).getByRole("button", { name: /unassigned/i }));
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-draft-unassigned/review", {
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-draft-unassigned/edit", {
       state: { origin: "list" },
     });
 

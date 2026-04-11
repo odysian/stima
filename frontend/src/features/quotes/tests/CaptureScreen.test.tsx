@@ -376,7 +376,7 @@ describe("CaptureScreen", () => {
         customerId: "cust-1",
       });
     });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review");
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-1/edit");
     expect(setDraftMock).toHaveBeenCalledWith(
       expect.objectContaining({
         quoteId: "quote-1",
@@ -416,7 +416,7 @@ describe("CaptureScreen", () => {
         notes: "  add one more cleanup item  ",
       });
     });
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-1/review", {
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-1/edit", {
       state: { reseedDraft: true },
     });
     expect(setDraftMock).not.toHaveBeenCalled();
@@ -449,7 +449,7 @@ describe("CaptureScreen", () => {
       });
     });
     expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-home");
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-home/review");
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-home/edit");
     expect(setDraftMock).toHaveBeenCalledWith(
       expect.objectContaining({
         quoteId: "quote-home",
@@ -471,7 +471,7 @@ describe("CaptureScreen", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-notes/review"));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/documents/quote-notes/edit"));
     expect(setDraftMock).toHaveBeenCalledWith(
       expect.objectContaining({
         quoteId: "quote-notes",
@@ -490,7 +490,7 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed");
-    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/quote-1/review");
+    expect(navigateMock).not.toHaveBeenCalledWith("/documents/quote-1/edit");
   });
 
   it("dismisses submission errors via local error state without clearing voice capture", async () => {
@@ -711,7 +711,7 @@ describe("CaptureScreen", () => {
       await Promise.resolve();
     });
     expect(mockedJobService.getJobStatus).toHaveBeenCalledTimes(2);
-    expect(navigateMock).toHaveBeenCalledWith("/quotes/quote-async/review");
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-async/edit");
     expect(setDraftMock).toHaveBeenCalledWith(
       expect.objectContaining({
         quoteId: "quote-async",
@@ -741,7 +741,7 @@ describe("CaptureScreen", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Extraction completed without a persisted draft. Please try again.",
     );
-    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/quote-1/review");
+    expect(navigateMock).not.toHaveBeenCalledWith("/documents/quote-1/edit");
   });
 
   it("shows a dismissable error toast when an async extraction job reaches terminal failure", async () => {
@@ -828,6 +828,6 @@ describe("CaptureScreen", () => {
       await Promise.resolve();
     });
 
-    expect(navigateMock).not.toHaveBeenCalledWith("/quotes/quote-1/review");
+    expect(navigateMock).not.toHaveBeenCalledWith("/documents/quote-1/edit");
   });
 });

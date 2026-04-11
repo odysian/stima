@@ -132,7 +132,7 @@ export function QuotePreview(): React.ReactElement {
       return;
     }
 
-    navigate(`/quotes/${id}/review`, {
+    navigate(`/documents/${id}/edit`, {
       replace: true,
       state: {
         origin: "preview",
@@ -152,7 +152,7 @@ export function QuotePreview(): React.ReactElement {
             status={quote.status}
             canEdit={canEdit}
             onEdit={() =>
-              navigate(`/quotes/${id}/review`, {
+              navigate(`/documents/${id}/edit`, {
                 state: { origin: "preview" },
               })}
             overflowItems={overflowItems}
