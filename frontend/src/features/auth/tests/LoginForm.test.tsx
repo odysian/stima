@@ -124,4 +124,17 @@ describe("LoginForm", () => {
     const forgotPasswordLink = await screen.findByRole("link", { name: /forgot password\?/i });
     expect(forgotPasswordLink).toHaveAttribute("href", "/forgot-password");
   });
+
+  it("renders a success toast when flashMessage exists in location state", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderLogin({
+      pathname: "/login",
+      state: { flashMessage: "Password reset successful. Please sign in." },
+    });
+
+    expect(
+      await screen.findByText("Password reset successful. Please sign in."),
+    ).toBeInTheDocument();
+  });
 });
