@@ -1006,6 +1006,8 @@ class QuoteService:
             doc_type="invoice",
         )
         quote.doc_type = "invoice"
+        quote.extraction_tier = None
+        quote.extraction_degraded_reason_code = None
         quote.doc_sequence = next_sequence
         quote.doc_number = build_doc_number(doc_type="invoice", sequence=next_sequence)
         quote.due_date = (
