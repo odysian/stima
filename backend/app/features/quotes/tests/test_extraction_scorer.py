@@ -67,9 +67,7 @@ def test_score_case_zero_division_guards_no_must_match_items() -> None:
     case = ExtractionQualityCase(
         name="no_must_match",
         transcript="optional only",
-        expected_line_items=(
-            ExpectedLineItem(description="optional service", must_match=False),
-        ),
+        expected_line_items=(ExpectedLineItem(description="optional service", must_match=False),),
         expected_total=None,
     )
 
