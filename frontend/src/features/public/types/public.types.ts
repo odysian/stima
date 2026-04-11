@@ -11,6 +11,7 @@ export interface PublicDocumentLineItem {
 
 interface PublicDocumentBase {
   business_name: string | null;
+  owner_name?: string | null;
   customer_name: string;
   doc_number: string;
   title: string | null;

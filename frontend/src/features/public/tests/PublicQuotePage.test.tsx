@@ -28,6 +28,7 @@ function makePublicQuote(overrides: Partial<PublicQuote> = {}): PublicQuote {
   return {
     doc_type: "quote",
     business_name: "Northline Landscaping",
+    owner_name: "Taylor Owner",
     customer_name: "Taylor Morgan",
     doc_number: "Q-001",
     title: "Spring Cleanup",
@@ -61,6 +62,7 @@ function makePublicInvoice(overrides: Partial<PublicInvoice> = {}): PublicInvoic
   return {
     doc_type: "invoice",
     business_name: "Northline Landscaping",
+    owner_name: "Taylor Owner",
     customer_name: "Taylor Morgan",
     doc_number: "I-001",
     title: "Spring Cleanup Invoice",
@@ -207,5 +209,35 @@ describe("PublicQuotePage", () => {
     expect(screen.getByText("Due Date")).toBeInTheDocument();
     expect(screen.getByText("May 04, 2026")).toBeInTheDocument();
     expect(screen.queryByText("This quote has been accepted")).not.toBeInTheDocument();
+  });
+
+  it("falls back to owner name when business name is missing", async () => {
+    mockedPublicService.getDocument.mockResolvedValueOnce(
+      makePublicQuote({
+        business_name: null,
+        owner_name: "Jamie Owner",
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText("Jamie Owner")).toBeInTheDocument();
+    expect(document.title).toContain("Jamie Owner");
+  });
+
+  it("omits the business name line when both business and owner names are missing", async () => {
+    mockedPublicService.getDocument.mockResolvedValueOnce(
+      makePublicQuote({
+        business_name: null,
+        owner_name: null,
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByRole("heading", { name: "Spring Cleanup" })).toBeInTheDocument();
+    expect(screen.queryByText("Northline Landscaping")).not.toBeInTheDocument();
+    expect(screen.queryByText("Taylor Owner")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /quote logo/i })).toBeInTheDocument();
   });
 });

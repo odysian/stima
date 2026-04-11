@@ -234,6 +234,7 @@ class PublicQuoteResponse(BaseModel):
 
     doc_type: Literal["quote"]
     business_name: str | None
+    owner_name: str | None = None
     customer_name: str
     doc_number: str
     title: str | None
@@ -255,6 +256,7 @@ class PublicInvoiceResponse(BaseModel):
 
     doc_type: Literal["invoice"]
     business_name: str | None
+    owner_name: str | None = None
     customer_name: str
     doc_number: str
     title: str | None
