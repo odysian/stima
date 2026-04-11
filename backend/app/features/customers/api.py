@@ -79,3 +79,20 @@ async def update_customer(
     except CustomerServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return CustomerResponse.model_validate(customer)
+
+
+@router.delete(
+    "/{customer_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def delete_customer(
+    customer_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    customer_service: Annotated[CustomerService, Depends(get_customer_service)],
+) -> None:
+    """Delete one customer for the authenticated user."""
+    try:
+        await customer_service.delete_customer(user, customer_id)
+    except CustomerServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

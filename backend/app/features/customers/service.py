@@ -44,6 +44,15 @@ class CustomerRepositoryProtocol(Protocol):
 
     async def update(self, customer: Customer, **fields: str | None) -> Customer: ...
 
+    async def count_documents_by_type_for_customer(
+        self,
+        *,
+        user_id: UUID,
+        customer_id: UUID,
+    ) -> tuple[int, int]: ...
+
+    async def delete(self, customer: Customer) -> None: ...
+
     async def commit(self) -> None: ...
 
 
@@ -121,6 +130,30 @@ class CustomerService:
         await self._repository.commit()
         await self._delete_artifacts(artifact_paths_to_delete)
         return updated_customer
+
+    async def delete_customer(self, user: User, customer_id: UUID) -> None:
+        """Delete one customer and rely on cascade to remove related documents."""
+        customer = await self._repository.get_by_id(customer_id, user.id)
+        if customer is None:
+            raise CustomerServiceError(detail="Not found", status_code=404)
+
+        quote_count, invoice_count = await self._repository.count_documents_by_type_for_customer(
+            user_id=user.id,
+            customer_id=customer_id,
+        )
+        artifact_paths_to_delete = await self._pdf_artifact_repository.invalidate_for_customer(
+            user_id=user.id,
+            customer_id=customer_id,
+        )
+        await self._delete_artifacts(artifact_paths_to_delete)
+        await self._repository.delete(customer)
+        await self._repository.commit()
+        log_event(
+            "customer.deleted",
+            user_id=user.id,
+            customer_id=customer.id,
+            detail=f"deleted_quote_count={quote_count},deleted_invoice_count={invoice_count}",
+        )
 
     async def _delete_artifacts(self, object_paths: list[str]) -> None:
         for object_path in object_paths:

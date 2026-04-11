@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer } from "@/features/customers/types/customer.types";
@@ -7,6 +7,11 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { Toast } from "@/shared/components/Toast";
+
+interface CustomerListLocationState {
+  flashMessage?: string;
+}
 
 function contactLine(customer: Customer): string {
   return [customer.phone, customer.email].filter(Boolean).join(" · ");
@@ -14,10 +19,14 @@ function contactLine(customer: Customer): string {
 
 export function CustomerListScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const location = useLocation();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [flashMessage, setFlashMessage] = useState(
+    (location.state as CustomerListLocationState | undefined)?.flashMessage ?? null,
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -142,6 +151,7 @@ export function CustomerListScreen(): React.ReactElement {
       </button>
 
       <BottomNav active="customers" />
+      <Toast message={flashMessage} onDismiss={() => setFlashMessage(null)} />
     </main>
   );
 }

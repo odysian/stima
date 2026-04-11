@@ -138,6 +138,59 @@ async def test_patch_customer_returns_404_for_nonexistent_id(client: AsyncClient
     assert response.json() == {"detail": "Not found"}
 
 
+async def test_delete_customer_deletes_owned_customer_and_cascades_documents(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    created_customer = await _create_customer(
+        client,
+        csrf_token,
+        {"name": "Alice Johnson"},
+    )
+    quote = await _create_quote_for_customer(
+        client,
+        csrf_token,
+        customer_id=str(created_customer["id"]),
+    )
+    invoice = await _create_invoice_for_customer(
+        client,
+        csrf_token,
+        customer_id=str(created_customer["id"]),
+    )
+
+    response = await client.delete(
+        f"/api/customers/{created_customer['id']}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    customer_response = await client.get(f"/api/customers/{created_customer['id']}")
+    assert customer_response.status_code == 404
+    assert customer_response.json() == {"detail": "Not found"}
+
+    quote_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert quote_response.status_code == 404
+    assert quote_response.json() == {"detail": "Not found"}
+
+    invoice_response = await client.get(f"/api/invoices/{invoice['id']}")
+    assert invoice_response.status_code == 404
+    assert invoice_response.json() == {"detail": "Not found"}
+
+
+async def test_delete_customer_returns_404_for_nonexistent_id(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.delete(
+        f"/api/customers/{uuid4()}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
 async def test_patch_customer_updates_only_provided_fields(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     created_customer = await _create_customer(
@@ -232,6 +285,20 @@ async def test_patch_customer_requires_csrf(client: AsyncClient) -> None:
     assert response.json() == {"detail": "CSRF token missing"}
 
 
+async def test_delete_customer_requires_csrf(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    created_customer = await _create_customer(
+        client,
+        csrf_token,
+        {"name": "Alice Johnson"},
+    )
+
+    response = await client.delete(f"/api/customers/{created_customer['id']}")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
 async def test_get_customer_returns_404_for_different_users_customer(
     client: AsyncClient,
 ) -> None:
@@ -263,6 +330,26 @@ async def test_patch_customer_returns_404_for_different_users_customer(
     response = await client.patch(
         f"/api/customers/{created_customer['id']}",
         json={"name": "Hijacked Name"},
+        headers={"X-CSRF-Token": csrf_token_user_b},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_delete_customer_returns_404_for_different_users_customer(
+    client: AsyncClient,
+) -> None:
+    csrf_token_user_a = await _register_and_login(client, _credentials())
+    created_customer = await _create_customer(
+        client,
+        csrf_token_user_a,
+        {"name": "Alice Johnson"},
+    )
+
+    csrf_token_user_b = await _register_and_login(client, _credentials())
+    response = await client.delete(
+        f"/api/customers/{created_customer['id']}",
         headers={"X-CSRF-Token": csrf_token_user_b},
     )
 
@@ -307,11 +394,57 @@ async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) 
 async def _create_customer(
     client: AsyncClient,
     csrf_token: str,
-    payload: dict[str, str],
-) -> dict[str, str]:
+    payload: dict[str, object],
+) -> dict[str, object]:
     response = await client.post(
         "/api/customers",
         json=payload,
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+async def _create_quote_for_customer(
+    client: AsyncClient,
+    csrf_token: str,
+    *,
+    customer_id: str,
+) -> dict[str, object]:
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "title": "Cleanup quote",
+            "transcript": "Spring cleanup scope",
+            "line_items": [{"description": "Mulch", "details": None, "price": 125}],
+            "total_amount": 125,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+async def _create_invoice_for_customer(
+    client: AsyncClient,
+    csrf_token: str,
+    *,
+    customer_id: str,
+) -> dict[str, object]:
+    response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "title": "Cleanup invoice",
+            "transcript": "Invoice for spring cleanup",
+            "line_items": [{"description": "Mulch", "details": None, "price": 125}],
+            "total_amount": 125,
+            "notes": None,
+            "source_type": "text",
+        },
         headers={"X-CSRF-Token": csrf_token},
     )
     assert response.status_code == 201

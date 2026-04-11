@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.customers.models import Customer
+from app.features.quotes.models import Document
 
 
 class CustomerRepository:
@@ -64,6 +65,29 @@ class CustomerRepository:
         await self._session.flush()
         await self._session.refresh(customer)
         return customer
+
+    async def count_documents_by_type_for_customer(
+        self,
+        *,
+        user_id: UUID,
+        customer_id: UUID,
+    ) -> tuple[int, int]:
+        """Return related quote and invoice counts for one user-owned customer."""
+        result = await self._session.execute(
+            select(Document.doc_type, func.count(Document.id))
+            .where(
+                Document.user_id == user_id,
+                Document.customer_id == customer_id,
+                Document.doc_type.in_(("quote", "invoice")),
+            )
+            .group_by(Document.doc_type)
+        )
+        counts = {doc_type: count for doc_type, count in result.all()}
+        return int(counts.get("quote", 0)), int(counts.get("invoice", 0))
+
+    async def delete(self, customer: Customer) -> None:
+        """Delete one customer entity."""
+        await self._session.delete(customer)
 
     async def commit(self) -> None:
         """Commit pending customer writes."""

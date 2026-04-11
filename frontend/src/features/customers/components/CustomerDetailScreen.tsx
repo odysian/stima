@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { CustomerDeleteConfirmModal } from "@/features/customers/components/CustomerDeleteConfirmModal";
 import { CustomerInfoForm } from "@/features/customers/components/CustomerInfoForm";
 import { InvoiceHistoryList } from "@/features/customers/components/InvoiceHistoryList";
 import { QuoteHistoryList } from "@/features/customers/components/QuoteHistoryList";
@@ -58,6 +59,10 @@ export function CustomerDetailScreen(): React.ReactElement {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [historyMode, setHistoryMode] = useState<HistoryMode>("quotes");
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   function populateDraftFields(nextCustomer: Customer): void {
     const draftValues = getCustomerDraftValues(nextCustomer);
@@ -214,6 +219,46 @@ export function CustomerDetailScreen(): React.ReactElement {
     }
   }
 
+  function openDeleteConfirmation(): void {
+    if (!customer) {
+      return;
+    }
+    setDeleteConfirmationName("");
+    setDeleteError(null);
+    setIsDeleteConfirmOpen(true);
+  }
+
+  function closeDeleteConfirmation(): void {
+    if (isDeleting) {
+      return;
+    }
+    setIsDeleteConfirmOpen(false);
+    setDeleteConfirmationName("");
+    setDeleteError(null);
+  }
+
+  async function onDeleteCustomer(): Promise<void> {
+    if (!id || !customer || deleteConfirmationName !== customer.name) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await customerService.deleteCustomer(id);
+      navigate("/customers", {
+        replace: true,
+        state: { flashMessage: "Customer deleted" },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to delete customer";
+      setDeleteError(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   function formatSummaryValue(value: string | null | undefined, fallback: string): string {
     if (!value) {
       return fallback;
@@ -225,6 +270,7 @@ export function CustomerDetailScreen(): React.ReactElement {
 
   const activeHistoryCount = historyMode === "quotes" ? customerQuotes.length : customerInvoices.length;
   const activeHistoryCountLabel = `${activeHistoryCount} ${activeHistoryCount === 1 ? "ITEM" : "ITEMS"}`;
+  const deleteConfirmationMatches = customer ? deleteConfirmationName === customer.name : false;
 
   return (
     <main className="min-h-screen bg-background pb-24">
@@ -294,6 +340,13 @@ export function CustomerDetailScreen(): React.ReactElement {
                       className="cursor-pointer rounded-lg border border-outline/20 px-4 py-4 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low active:scale-[0.98]"
                     >
                       Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openDeleteConfirmation}
+                      className="cursor-pointer rounded-lg border border-error/40 px-4 py-4 text-sm font-semibold text-error transition-all hover:bg-error/10 active:scale-[0.98]"
+                    >
+                      Delete Customer
                     </button>
                   </div>
                 </div>
@@ -372,6 +425,21 @@ export function CustomerDetailScreen(): React.ReactElement {
           </>
         ) : null}
       </section>
+
+      {isDeleteConfirmOpen && customer ? (
+        <CustomerDeleteConfirmModal
+          customerName={customer.name}
+          quoteCount={customerQuotes.length}
+          invoiceCount={customerInvoices.length}
+          confirmationName={deleteConfirmationName}
+          deleteError={deleteError}
+          isDeleting={isDeleting}
+          confirmationMatches={deleteConfirmationMatches}
+          onConfirmationChange={setDeleteConfirmationName}
+          onConfirm={() => void onDeleteCustomer()}
+          onCancel={closeDeleteConfirmation}
+        />
+      ) : null}
 
       <BottomNav active="customers" />
       <Toast message={saveSuccess} onDismiss={() => setSaveSuccess(null)} />

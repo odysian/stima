@@ -30,6 +30,7 @@ vi.mock("@/features/customers/services/customerService", () => ({
     createCustomer: vi.fn(),
     getCustomer: vi.fn(),
     updateCustomer: vi.fn(),
+    deleteCustomer: vi.fn(),
   },
 }));
 
@@ -158,6 +159,7 @@ beforeEach(() => {
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-21T00:00:00.000Z",
   });
+  mockedCustomerService.deleteCustomer.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -423,5 +425,62 @@ describe("CustomerDetailScreen", () => {
     expect(
       screen.getByRole("button", { name: /group customers/i }),
     ).toHaveClass("text-primary");
+  });
+
+  it("requires exact typed confirmation before enabling customer deletion", async () => {
+    renderScreen();
+    await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
+
+    fireEvent.click(screen.getByRole("button", { name: /delete customer/i }));
+
+    expect(await screen.findByRole("dialog", { name: "Delete customer?" })).toBeInTheDocument();
+    expect(screen.getByText("This cannot be undone.")).toBeInTheDocument();
+    const deleteButton = screen.getByRole("button", { name: /^delete customer$/i });
+    expect(deleteButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Type Alice Johnson to confirm"), {
+      target: { value: "Alice" },
+    });
+    expect(deleteButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Type Alice Johnson to confirm"), {
+      target: { value: "Alice Johnson" },
+    });
+    expect(deleteButton).toBeEnabled();
+  });
+
+  it("deletes customer and navigates to customer list with flash message", async () => {
+    renderScreen();
+    await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
+
+    fireEvent.click(screen.getByRole("button", { name: /delete customer/i }));
+    fireEvent.change(screen.getByLabelText("Type Alice Johnson to confirm"), {
+      target: { value: "Alice Johnson" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^delete customer$/i }));
+
+    await waitFor(() => {
+      expect(mockedCustomerService.deleteCustomer).toHaveBeenCalledWith("cust-1");
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/customers", {
+      replace: true,
+      state: { flashMessage: "Customer deleted" },
+    });
+  });
+
+  it("shows modal error when customer deletion fails", async () => {
+    mockedCustomerService.deleteCustomer.mockRejectedValueOnce(
+      new Error("Unable to delete customer"),
+    );
+    renderScreen();
+    await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
+
+    fireEvent.click(screen.getByRole("button", { name: /delete customer/i }));
+    fireEvent.change(screen.getByLabelText("Type Alice Johnson to confirm"), {
+      target: { value: "Alice Johnson" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^delete customer$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to delete customer");
   });
 });

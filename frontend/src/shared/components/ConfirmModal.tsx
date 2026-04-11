@@ -9,6 +9,7 @@ interface ConfirmModalProps {
   cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmDisabled?: boolean;
   variant?: "primary" | "destructive";
 }
 
@@ -24,6 +25,7 @@ export function ConfirmModal({
   cancelLabel,
   onConfirm,
   onCancel,
+  confirmDisabled = false,
   variant = "primary",
 }: ConfirmModalProps): React.ReactElement {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
@@ -43,6 +45,9 @@ export function ConfirmModal({
   }
 
   function handleConfirm(): void {
+    if (confirmDisabled) {
+      return;
+    }
     onConfirm();
     queueMicrotask(restoreFocus);
   }
@@ -77,8 +82,9 @@ export function ConfirmModal({
             <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
               <button
                 type="button"
-                className={`inline-flex min-h-12 cursor-pointer flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] ${confirmButtonClasses[variant]}`}
+                className={`inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all ${confirmDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer active:scale-[0.98]"} ${confirmButtonClasses[variant]}`}
                 onClick={handleConfirm}
+                disabled={confirmDisabled}
               >
                 {confirmLabel}
               </button>
