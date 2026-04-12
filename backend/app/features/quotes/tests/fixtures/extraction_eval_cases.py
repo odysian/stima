@@ -32,6 +32,8 @@ class ExtractionEvalCase:
     expect_line_item_count_min: int | None = None
     expect_line_item_count_max: int | None = None
     expect_confidence_note_substrings: tuple[str, ...] = ()
+    expect_all_line_items_flagged: bool | None = None
+    expect_flag_reason_substrings: tuple[str, ...] = ()
     expect_repair_attempted: bool | None = None
     expect_repair_outcome: (
         Literal[
@@ -249,5 +251,117 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
         human_notes="Boundary probe at/above semantic transcript + word thresholds.",
+    ),
+    ExtractionEvalCase(
+        name="total_mismatch_transcript",
+        transcript=(
+            "Paint fence for 150 and replace gate latch for 100. Customer says total should be 225."
+        ),
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": (
+                        "Paint fence for 150 and replace gate latch for 100. "
+                        "Customer says total should be 225."
+                    ),
+                    "line_items": [
+                        {
+                            "description": "Paint fence",
+                            "details": None,
+                            "price": 150,
+                        },
+                        {
+                            "description": "Replace gate latch",
+                            "details": None,
+                            "price": 100,
+                        },
+                    ],
+                    "total": 225,
+                    "confidence_notes": [
+                        "Stated total does not match line item sum; review total before sending."
+                    ],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=True,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=2,
+        expect_line_item_count_max=2,
+        expect_confidence_note_substrings=("does not match line item sum",),
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes="Total mismatch should recalculate or provide explicit mismatch guidance.",
+    ),
+    ExtractionEvalCase(
+        name="duplicate_line_items_in_transcript",
+        transcript=("Clean gutters for 150, also clean the gutters on the back for 150."),
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": (
+                        "Clean gutters for 150, also clean the gutters on the back for 150."
+                    ),
+                    "line_items": [
+                        {
+                            "description": "Clean gutters",
+                            "details": "Front",
+                            "price": 150,
+                        },
+                        {
+                            "description": "Clean gutters",
+                            "details": "Back",
+                            "price": 150,
+                        },
+                    ],
+                    "total": 300,
+                    "confidence_notes": [],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=True,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=2,
+        expect_line_item_count_max=2,
+        expect_all_line_items_flagged=True,
+        expect_flag_reason_substrings=("duplicate",),
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes="Duplicate post-validation semantic flagging should mark both entries.",
+    ),
+    ExtractionEvalCase(
+        name="very_short_transcript",
+        transcript="Mow lawn 50",
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "transcript": "Mow lawn 50",
+                    "line_items": [
+                        {
+                            "description": "Mow lawn",
+                            "details": None,
+                            "price": 50,
+                        }
+                    ],
+                    "total": 50,
+                    "confidence_notes": [],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=True,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=1,
+        expect_line_item_count_max=1,
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes="Very short transcripts should not trip empty-items semantic degradation.",
     ),
 )
