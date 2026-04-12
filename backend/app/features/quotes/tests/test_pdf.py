@@ -1636,6 +1636,54 @@ async def test_public_quote_endpoint_returns_visible_terminal_statuses(
     assert response.json()["status"] == expected_message
 
 
+async def test_public_quote_access_touches_timestamp_for_already_visible_status(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+    share_token = share_response.json()["share_token"]
+
+    await _set_quote_status(db_session, quote["id"], QuoteStatus.APPROVED)
+    seeded_accessed_at = datetime.now(UTC) - timedelta(minutes=5)
+    quote_row = await db_session.scalar(select(Document).where(Document.id == UUID(quote["id"])))
+    assert quote_row is not None
+    quote_row.last_public_accessed_at = seeded_accessed_at
+    await db_session.commit()
+
+    client.cookies.clear()
+    json_response = await client.get(f"/api/public/doc/{share_token}")
+    assert json_response.status_code == 200
+    assert json_response.json()["status"] == "approved"
+
+    row_after_json = await db_session.scalar(
+        select(Document).where(Document.id == UUID(quote["id"]))
+    )
+    assert row_after_json is not None
+    assert row_after_json.status == QuoteStatus.APPROVED
+    assert row_after_json.last_public_accessed_at is not None
+    assert row_after_json.last_public_accessed_at > seeded_accessed_at
+    first_accessed_at = row_after_json.last_public_accessed_at
+
+    pdf_response = await client.get(f"/share/{share_token}")
+    assert pdf_response.status_code == 200
+
+    row_after_pdf = await db_session.scalar(
+        select(Document).where(Document.id == UUID(quote["id"]))
+    )
+    assert row_after_pdf is not None
+    assert row_after_pdf.status == QuoteStatus.APPROVED
+    assert row_after_pdf.last_public_accessed_at is not None
+    assert row_after_pdf.last_public_accessed_at > first_accessed_at
+
+
 async def test_public_logo_endpoint_returns_image_bytes(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     await _upload_logo(client, csrf_token)

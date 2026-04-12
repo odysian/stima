@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import logging
 import re
 from collections.abc import Sequence
@@ -35,16 +34,8 @@ from app.features.quotes.schemas import (
     QuoteUpdateRequest,
 )
 from app.features.quotes.share import QuoteShareService
-from app.features.quotes.share.tokens import _share_token_has_expired
-from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.event_logger import log_event
-from app.shared.image_signatures import detect_image_content_type
-from app.shared.observability import (
-    current_request_context,
-    hash_token_reference,
-    log_security_event,
-)
 from app.shared.pdf_artifacts import PDF_ARTIFACT_NOT_READY_DETAIL
 from app.shared.pricing import (
     PricingValidationError,
@@ -245,6 +236,8 @@ class QuoteService:
         self._storage_service = storage_service
         self._share_service = QuoteShareService(
             repository=repository,
+            pdf_integration=pdf_integration,
+            storage_service=storage_service,
             ensure_quote_customer_assigned=ensure_quote_customer_assigned,
         )
 
@@ -789,104 +782,15 @@ class QuoteService:
 
     async def generate_shared_pdf(self, share_token: str) -> tuple[str, bytes]:
         """Render and return a publicly shared quote PDF by token."""
-        context = await self._get_public_quote_context(share_token)
-        await self._attach_logo_data_uri(context)
-
-        try:
-            pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
-        except PdfRenderError as exc:
-            raise QuoteServiceError(detail=str(exc), status_code=422) from exc
-
-        await self._mark_public_quote_viewed_once(context, share_token)
-        return context.doc_number, pdf_bytes
+        return await self._share_service.generate_shared_pdf(share_token)
 
     async def get_public_quote(self, share_token: str) -> QuoteRenderContext:
         """Return public quote data and apply the first shared->viewed transition once."""
-        context = await self._get_public_quote_context(share_token)
-        await self._mark_public_quote_viewed_once(context, share_token)
-        return context
+        return await self._share_service.get_public_quote(share_token)
 
     async def get_public_logo(self, share_token: str) -> tuple[bytes, str]:
         """Return public logo bytes/content type for one shared quote token."""
-        context = await self._get_public_quote_context(share_token)
-        if context.logo_path is None:
-            raise QuoteServiceError(detail="Logo not found", status_code=404)
-
-        try:
-            logo_bytes = await asyncio.to_thread(
-                self._storage_service.fetch_bytes,
-                context.logo_path,
-            )
-        except StorageNotFoundError as exc:
-            raise QuoteServiceError(detail="Logo not found", status_code=404) from exc
-        except Exception as exc:  # noqa: BLE001
-            raise QuoteServiceError(detail="Unable to load logo", status_code=500) from exc
-
-        content_type = detect_image_content_type(logo_bytes)
-        if content_type is None:
-            raise QuoteServiceError(detail="Unable to load logo", status_code=500)
-
-        return logo_bytes, content_type
-
-    async def _get_public_quote_context(self, share_token: str) -> QuoteRenderContext:
-        """Load public quote context for a share token or raise a 404."""
-        now = _utcnow()
-        share_record = await self._repository.get_public_share_record(share_token)
-        if share_record is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if share_record.share_token_revoked_at is not None:
-            self._log_public_share_denied(
-                share_record,
-                share_token=share_token,
-                reason_code="revoked",
-            )
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if _share_token_has_expired(share_record.share_token_expires_at, now):
-            self._log_public_share_denied(
-                share_record,
-                share_token=share_token,
-                reason_code="expired",
-            )
-            raise QuoteServiceError(detail="Not found", status_code=404)
-
-        context = await self._repository.get_render_context_by_share_token(share_token)
-        if context is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        return context
-
-    async def _mark_public_quote_viewed_once(
-        self,
-        context: QuoteRenderContext,
-        share_token: str,
-    ) -> None:
-        """Advance a shared public quote to viewed and log the first successful access."""
-        accessed_at = _utcnow()
-        if context.status != QuoteStatus.SHARED.value:
-            await self._repository.touch_last_public_accessed_at_by_share_token(
-                share_token,
-                accessed_at=accessed_at,
-            )
-            await self._repository.commit()
-            return
-
-        transition = await self._repository.transition_to_viewed_by_share_token(
-            share_token,
-            accessed_at=accessed_at,
-        )
-        if transition is not None:
-            await self._repository.commit()
-            self._log_public_quote_viewed(transition)
-            context.status = QuoteStatus.VIEWED.value
-            return
-
-        await self._repository.touch_last_public_accessed_at_by_share_token(
-            share_token,
-            accessed_at=accessed_at,
-        )
-        await self._repository.commit()
-        refreshed_context = await self._repository.get_render_context_by_share_token(share_token)
-        if refreshed_context is not None:
-            context.status = refreshed_context.status
+        return await self._share_service.get_public_logo(share_token)
 
     async def _get_reusable_pdf_job(
         self,
@@ -918,39 +822,6 @@ class QuoteService:
             await asyncio.to_thread(self._storage_service.delete, object_path)
         except Exception:  # noqa: BLE001
             LOGGER.warning("Failed to delete invalidated quote PDF artifact", exc_info=True)
-
-    def _log_public_quote_viewed(self, transition: QuoteViewTransition) -> None:
-        log_event(
-            "quote_viewed",
-            user_id=transition.user_id,
-            quote_id=transition.quote_id,
-            customer_id=transition.customer_id,
-        )
-
-    def _log_public_share_denied(
-        self,
-        share_record: PublicShareRecord,
-        *,
-        share_token: str,
-        reason_code: Literal["revoked", "expired"],
-    ) -> None:
-        """Record the internal reason when a quote token is denied publicly."""
-        log_security_event(
-            "public_share.token_denied",
-            outcome="denied",
-            level=logging.WARNING,
-            status_code=404,
-            reason=reason_code,
-            token_ref=share_token,
-            rate_limit_key=_build_public_share_denial_rate_limit_key(
-                document_type="quote",
-                reason_code=reason_code,
-                share_token=share_token,
-            ),
-            rate_limit_seconds=60,
-            document_id=str(share_record.document_id),
-            document_type="quote",
-        )
 
     async def share_quote(
         self,
@@ -1110,34 +981,6 @@ class QuoteService:
 
         return requested_customer_id
 
-    async def _attach_logo_data_uri(self, context: QuoteRenderContext) -> None:
-        if context.logo_path is None:
-            context.logo_data_uri = None
-            return
-
-        try:
-            logo_bytes = await asyncio.to_thread(
-                self._storage_service.fetch_bytes,
-                context.logo_path,
-            )
-        except StorageNotFoundError:
-            LOGGER.warning("Quote logo missing in storage; omitting from PDF render")
-            context.logo_data_uri = None
-            return
-        except Exception:  # noqa: BLE001
-            LOGGER.warning("Failed to load quote logo for PDF render; omitting logo", exc_info=True)
-            context.logo_data_uri = None
-            return
-
-        content_type = detect_image_content_type(logo_bytes)
-        if content_type is None:
-            LOGGER.warning("Quote logo bytes were invalid; omitting from PDF render")
-            context.logo_data_uri = None
-            return
-
-        encoded_logo = base64.b64encode(logo_bytes).decode("ascii")
-        context.logo_data_uri = f"data:{content_type};base64,{encoded_logo}"
-
 
 async def _create_quote_document(
     service: QuoteService,
@@ -1218,21 +1061,6 @@ def _build_default_invoice_due_date() -> date:
 def build_doc_number(*, doc_type: str, sequence: int) -> str:
     prefix = "I" if doc_type == "invoice" else "Q"
     return f"{prefix}-{sequence:03d}"
-
-
-def _build_public_share_denial_rate_limit_key(
-    *,
-    document_type: str,
-    reason_code: str,
-    share_token: str,
-) -> str:
-    request_context = current_request_context()
-    source = (
-        request_context.client_ip_hash
-        if request_context is not None
-        else hash_token_reference(share_token)
-    )
-    return f"public-share:{document_type}:{reason_code}:{source}"
 
 
 def _validate_document_pricing_for_quote(
