@@ -255,8 +255,7 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
     ExtractionEvalCase(
         name="total_mismatch_transcript",
         transcript=(
-            "Paint fence for 150 and replace gate latch for 100. "
-            "Customer says total should be 225."
+            "Paint fence for 150 and replace gate latch for 100. Customer says total should be 225."
         ),
         provider_events=(
             {
@@ -298,9 +297,7 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
     ),
     ExtractionEvalCase(
         name="duplicate_line_items_in_transcript",
-        transcript=(
-            "Clean gutters for 150, also clean the gutters on the back for 150."
-        ),
+        transcript=("Clean gutters for 150, also clean the gutters on the back for 150."),
         provider_events=(
             {
                 "type": "tool_use",
