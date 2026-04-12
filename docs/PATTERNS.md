@@ -9,6 +9,14 @@ Record conventions that already exist in code.
 - Repositories contain persistence/query logic only, no transport concerns.
 - Enforced by `scripts/check_backend_boundaries.py` (runs in `make backend-verify`).
 
+## Backend Modularity (Mandatory For Backend Refactors)
+- Use [BACKEND_MODULARITY.md](./BACKEND_MODULARITY.md) when decomposing oversized backend feature services or creating internal behavior slices.
+- Keep the existing feature service as the public facade unless a task explicitly authorizes a public architecture change.
+- Organize extracted internals by behavior slice, not generic `policies/`, `helpers/`, `utils/`, or `use_cases/` buckets.
+- Each slice package exposes one coordinator/service to the public facade; package roots stay minimal.
+- Slices depend on narrow slice-specific repository protocols backed by the existing repository unless a task explicitly scopes a new repository.
+- Treat first-pass modularity work as no-contract refactors and prove parity with targeted behavior checks plus `make backend-verify`.
+
 ## SQLAlchemy 2.0 Style (Mandatory)
 - Use SQLAlchemy 2.0 typed ORM style: `Mapped[...]` with `mapped_column(...)`.
 - Use async 2.0 query style with `select(...)` and async session methods (`scalar`, `scalars`, `execute`) with `await`.
