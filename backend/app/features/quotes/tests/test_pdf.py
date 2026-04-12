@@ -1213,6 +1213,75 @@ async def test_public_quote_endpoint_returns_json_and_marks_first_view_once(
     assert emitted_events[0]["customer_id"] == customer_id
 
 
+async def test_revoke_share_is_idempotent_when_quote_has_no_token(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    revoke_response = await client.delete(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert revoke_response.status_code == 204
+
+    detail_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["share_token"] is None
+    assert detail_response.json()["has_active_share"] is False
+
+    quote_row = await db_session.scalar(select(Document).where(Document.id == UUID(quote["id"])))
+    assert quote_row is not None
+    assert quote_row.share_token is None
+    assert quote_row.share_token_revoked_at is None
+
+
+async def test_revoke_share_is_idempotent_when_quote_token_already_revoked(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    share_response = await client.post(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert share_response.status_code == 200
+
+    first_revoke_response = await client.delete(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert first_revoke_response.status_code == 204
+
+    first_quote_row = await db_session.scalar(
+        select(Document).where(Document.id == UUID(quote["id"]))
+    )
+    assert first_quote_row is not None
+    first_revoked_at = first_quote_row.share_token_revoked_at
+    assert first_revoked_at is not None
+
+    second_revoke_response = await client.delete(
+        f"/api/quotes/{quote['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert second_revoke_response.status_code == 204
+
+    detail_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["has_active_share"] is False
+
+    second_quote_row = await db_session.scalar(
+        select(Document).where(Document.id == UUID(quote["id"]))
+    )
+    assert second_quote_row is not None
+    assert second_quote_row.share_token_revoked_at == first_revoked_at
+
+
 async def test_revoked_public_quote_token_returns_generic_404(
     client: AsyncClient,
     db_session: AsyncSession,

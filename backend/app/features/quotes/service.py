@@ -9,16 +9,16 @@ import re
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal, Protocol, cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from arq.connections import ArqRedis
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
-from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.service import JobService
+from app.features.quotes.errors import QuoteServiceError
 from app.features.quotes.extraction_outcomes import classify_extraction_result
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import (
@@ -34,6 +34,8 @@ from app.features.quotes.schemas import (
     QuoteCreateRequest,
     QuoteUpdateRequest,
 )
+from app.features.quotes.share import QuoteShareService
+from app.features.quotes.share.tokens import _share_token_has_expired
 from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.event_logger import log_event
@@ -72,13 +74,6 @@ _QUOTE_OUTCOME_ELIGIBLE_STATUSES = (
     QuoteStatus.APPROVED,
     QuoteStatus.DECLINED,
 )
-_POST_SHARE_NON_REGRESSION_STATUSES = frozenset(
-    {
-        QuoteStatus.VIEWED,
-        QuoteStatus.APPROVED,
-        QuoteStatus.DECLINED,
-    }
-)
 _CUSTOMER_ASSIGNMENT_REQUIRED_DETAIL = "Assign a customer before continuing."
 _CUSTOMER_CLEAR_BLOCKED_DETAIL = "Customer cannot be cleared from a quote."
 _CUSTOMER_CHANGE_BLOCKED_DETAIL = "Customer cannot be changed after sharing or invoice conversion."
@@ -101,15 +96,6 @@ _APPENDABLE_QUOTE_STATUSES = frozenset(
 _APPEND_UNAVAILABLE_DETAIL = "This quote can no longer be edited."
 _APPEND_TRANSCRIPT_SEPARATOR_PATTERN = re.compile(r"(?:^|\n\n)Added later(?: \(\d+\))?:\n")
 _APPEND_TRANSCRIPT_BULLET_PREFIXES = ("- ", "* ")
-
-
-class QuoteServiceError(Exception):
-    """Quote-domain exception mapped to an HTTP status code."""
-
-    def __init__(self, *, detail: str, status_code: int) -> None:
-        super().__init__(detail)
-        self.detail = detail
-        self.status_code = status_code
 
 
 class QuoteRepositoryProtocol(Protocol):
@@ -257,6 +243,10 @@ class QuoteService:
         self._repository = repository
         self._pdf = pdf_integration
         self._storage_service = storage_service
+        self._share_service = QuoteShareService(
+            repository=repository,
+            ensure_quote_customer_assigned=ensure_quote_customer_assigned,
+        )
 
     async def create_quote(self, user: User, data: QuoteCreateRequest) -> Document:
         """Create a user-owned quote and retry once on sequence collisions."""
@@ -969,43 +959,13 @@ class QuoteService:
         *,
         regenerate: bool = False,
     ) -> Document:
-        """Set share token/timestamp and transition quote status to shared."""
+        """Delegate owner-facing share lifecycle behavior to the share slice."""
         user_id = _resolve_user_id(user)
-        quote = await self._repository.get_by_id(quote_id, user_id)
-        if quote is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        ensure_quote_customer_assigned(quote)
-        now = _utcnow()
-        should_refresh_token = (
-            regenerate
-            or quote.share_token is None
-            or quote.share_token_revoked_at is not None
-            or _share_token_has_expired(quote.share_token_expires_at, now)
-        )
-        if quote.status in _POST_SHARE_NON_REGRESSION_STATUSES and not should_refresh_token:
-            return quote
-
-        if should_refresh_token:
-            quote.share_token = str(uuid4())
-            quote.share_token_created_at = now
-            quote.share_token_expires_at = _build_share_token_expiry(now)
-            quote.share_token_revoked_at = None
-
-        if quote.status not in _POST_SHARE_NON_REGRESSION_STATUSES:
-            quote.shared_at = now
-            quote.status = QuoteStatus.SHARED
-        elif quote.shared_at is None:
-            quote.shared_at = now
-
-        await self._repository.commit()
-        refreshed_quote = await self._repository.refresh(quote)
-        log_event(
-            "quote_shared",
+        return await self._share_service.share_quote(
             user_id=user_id,
-            quote_id=refreshed_quote.id,
-            customer_id=refreshed_quote.customer_id,
+            quote_id=quote_id,
+            regenerate=regenerate,
         )
-        return refreshed_quote
 
     async def _apply_doc_type_transition(
         self,
@@ -1065,16 +1025,12 @@ class QuoteService:
         return True
 
     async def revoke_public_share(self, user: User, quote_id: UUID) -> None:
-        """Revoke the currently active public share token for one quote."""
+        """Delegate owner-facing share revocation behavior to the share slice."""
         user_id = _resolve_user_id(user)
-        quote = await self._repository.get_by_id(quote_id, user_id)
-        if quote is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.share_token is None or quote.share_token_revoked_at is not None:
-            return
-
-        quote.share_token_revoked_at = _utcnow()
-        await self._repository.commit()
+        await self._share_service.revoke_public_share(
+            user_id=user_id,
+            quote_id=quote_id,
+        )
 
     async def mark_quote_outcome(
         self,
@@ -1262,14 +1218,6 @@ def _build_default_invoice_due_date() -> date:
 def build_doc_number(*, doc_type: str, sequence: int) -> str:
     prefix = "I" if doc_type == "invoice" else "Q"
     return f"{prefix}-{sequence:03d}"
-
-
-def _build_share_token_expiry(created_at: datetime) -> datetime:
-    return created_at + timedelta(days=get_settings().public_share_link_expire_days)
-
-
-def _share_token_has_expired(expires_at: datetime | None, now: datetime) -> bool:
-    return expires_at is not None and expires_at < now
 
 
 def _build_public_share_denial_rate_limit_key(
