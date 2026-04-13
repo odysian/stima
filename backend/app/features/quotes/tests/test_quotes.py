@@ -3365,6 +3365,46 @@ async def test_append_extraction_sync_appends_line_items_and_merges_transcript_e
     assert "Added later (2):" not in payload["transcript"]
 
 
+async def test_append_extraction_sync_cleans_obsolete_pdf_artifact_after_commit(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deleted_paths: list[str] = []
+
+    def _capture_delete(self, object_path: str) -> None:  # noqa: ANN001
+        del self
+        deleted_paths.append(object_path)
+
+    monkeypatch.setattr(_MockStorageService, "delete", _capture_delete)
+
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = UUID(quote["id"])
+    app.state.arq_pool = None
+
+    persisted_quote = await db_session.get(Document, quote_id)
+    assert persisted_quote is not None
+    initial_revision = persisted_quote.pdf_artifact_revision
+    persisted_quote.pdf_artifact_path = "quotes/obsolete-artifact.pdf"
+    await db_session.commit()
+
+    append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "append artifact cleanup"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert append_response.status_code == 200
+    assert deleted_paths == ["quotes/obsolete-artifact.pdf"]
+
+    refreshed_quote = await db_session.get(Document, quote_id)
+    assert refreshed_quote is not None
+    assert refreshed_quote.pdf_artifact_path is None
+    assert refreshed_quote.pdf_artifact_revision == initial_revision + 1
+
+
 async def test_append_extraction_enqueues_async_job_for_owned_quote(
     client: AsyncClient,
     db_session: AsyncSession,
