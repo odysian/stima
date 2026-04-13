@@ -36,7 +36,6 @@ from app.features.quotes.schemas import (
 )
 from app.features.quotes.share import QuoteShareService
 from app.integrations.storage import StorageServiceProtocol
-from app.shared.event_logger import log_event  # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 _TERMINAL_QUOTE_STATUSES = frozenset({QuoteStatus.APPROVED, QuoteStatus.DECLINED})
