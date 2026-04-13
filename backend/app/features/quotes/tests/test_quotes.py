@@ -4422,6 +4422,37 @@ async def test_patch_quote_returns_404_for_different_users_quote(
     assert response.json() == {"detail": "Not found"}
 
 
+async def test_mark_won_quote_returns_404_for_different_users_quote(
+    client: AsyncClient,
+) -> None:
+    csrf_token_user_a = await _register_and_login(client, _credentials())
+    customer_id_user_a = await _create_customer(client, csrf_token_user_a)
+
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id_user_a,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token_user_a},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+
+    csrf_token_user_b = await _register_and_login(client, _credentials())
+    response = await client.post(
+        f"/api/quotes/{quote_id}/mark-won",
+        headers={"X-CSRF-Token": csrf_token_user_b},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
 @pytest.mark.parametrize("make_ready", [False, True], ids=["draft", "ready"])
 async def test_delete_quote_returns_204_for_owned_draft_and_ready_quotes_and_cascades(
     client: AsyncClient,

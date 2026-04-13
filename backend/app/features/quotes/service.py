@@ -21,6 +21,7 @@ from app.features.quotes.errors import QuoteServiceError
 from app.features.quotes.extraction_outcomes import classify_extraction_result
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.mutation import QuoteMutationService
+from app.features.quotes.outcomes import QuoteOutcomeService
 from app.features.quotes.pdf_artifacts import QuotePdfArtifactService
 from app.features.quotes.repository import (
     PublicShareRecord,
@@ -48,14 +49,6 @@ from app.shared.pricing import (
 
 LOGGER = logging.getLogger(__name__)
 _TERMINAL_QUOTE_STATUSES = frozenset({QuoteStatus.APPROVED, QuoteStatus.DECLINED})
-_QUOTE_OUTCOME_ELIGIBLE_STATUSES = (
-    QuoteStatus.DRAFT,
-    QuoteStatus.READY,
-    QuoteStatus.SHARED,
-    QuoteStatus.VIEWED,
-    QuoteStatus.APPROVED,
-    QuoteStatus.DECLINED,
-)
 _CUSTOMER_ASSIGNMENT_REQUIRED_DETAIL = "Assign a customer before continuing."
 _APPENDABLE_QUOTE_STATUSES = frozenset(
     {
@@ -234,6 +227,7 @@ class QuoteService:
             ensure_quote_customer_assigned=ensure_quote_customer_assigned,
         )
         self._deletion_service = QuoteDeletionService(repository=repository)
+        self._outcome_service = QuoteOutcomeService(repository=repository)
 
     async def create_quote(self, user: User, data: QuoteCreateRequest) -> Document:
         """Create a user-owned quote and retry once on sequence collisions."""
@@ -599,42 +593,12 @@ class QuoteService:
         quote_id: UUID,
         outcome: Literal["approved", "declined"],
     ) -> Document:
-        """Record a contractor-controlled quote outcome without changing share state."""
-        user_id = _resolve_user_id(user)
-        quote = await self._repository.get_by_id(quote_id, user_id)
-        if quote is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        next_status = QuoteStatus.APPROVED if outcome == "approved" else QuoteStatus.DECLINED
-        if quote.status == next_status:
-            return quote
-
-        event_name = "quote_approved" if outcome == "approved" else "quote_marked_lost"
-        updated_quote = await self._repository.set_quote_outcome(
+        """Delegate quote outcome lifecycle behavior to the outcome slice."""
+        return await self._outcome_service.mark_quote_outcome(
+            user_id=_resolve_user_id(user),
             quote_id=quote_id,
-            user_id=user_id,
-            status=next_status,
-            allowed_current_statuses=tuple(
-                status for status in _QUOTE_OUTCOME_ELIGIBLE_STATUSES if status != next_status
-            ),
+            outcome=outcome,
         )
-        if updated_quote is None:
-            current_quote = await self._repository.get_by_id(quote_id, user_id)
-            if current_quote is not None and current_quote.status == next_status:
-                return current_quote
-            raise QuoteServiceError(
-                detail="Unable to update quote outcome",
-                status_code=409,
-            )
-
-        await self._repository.commit()
-        refreshed_quote = await self._repository.refresh(updated_quote)
-        log_event(
-            event_name,
-            user_id=user_id,
-            quote_id=refreshed_quote.id,
-            customer_id=refreshed_quote.customer_id,
-        )
-        return refreshed_quote
 
 
 async def _create_quote_document(
