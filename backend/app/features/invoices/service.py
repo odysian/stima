@@ -17,6 +17,7 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
 from app.features.auth.models import User
+from app.features.invoices.creation import InvoiceCreationService
 from app.features.invoices.pdf_artifacts import InvoicePdfArtifactService
 from app.features.invoices.repository import (
     InvoiceDetailRow,
@@ -24,7 +25,6 @@ from app.features.invoices.repository import (
     InvoiceListItemSummary,
     InvoicePublicShareRecord,
     InvoiceRepository,
-    build_default_due_date,
 )
 from app.features.invoices.schemas import InvoiceCreateRequest, InvoiceUpdateRequest
 from app.features.invoices.share import InvoiceShareService
@@ -37,7 +37,6 @@ from app.features.quotes.service import (
     QuoteRepositoryProtocol,
     QuoteServiceError,
     build_doc_number,
-    ensure_quote_customer_assigned,
 )
 from app.integrations.storage import StorageServiceProtocol
 from app.shared.event_logger import log_event
@@ -211,6 +210,10 @@ class InvoiceService:
         self._quote_repository = quote_repository
         self._pdf = pdf_integration
         self._storage_service = storage_service
+        self._creation_service = InvoiceCreationService(
+            invoice_repository=invoice_repository,
+            quote_repository=quote_repository,
+        )
         self._share_service = InvoiceShareService(
             repository=invoice_repository,
             pdf_integration=pdf_integration,
@@ -223,59 +226,10 @@ class InvoiceService:
 
     async def create_invoice(self, user: User, data: InvoiceCreateRequest) -> Document:
         """Create a direct invoice and retry once on sequence collisions."""
-        user_id = _resolve_user_id(user)
-        customer_exists = await self._invoice_repository.customer_exists_for_user(
-            user_id=user_id,
-            customer_id=data.customer_id,
+        return await self._creation_service.create_invoice(
+            user_id=_resolve_user_id(user),
+            data=data,
         )
-        if not customer_exists:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-
-        validated_pricing = _validate_document_pricing_for_invoice(
-            total_amount=data.total_amount,
-            line_items=data.line_items,
-            discount_type=data.discount_type,
-            discount_value=data.discount_value,
-            tax_rate=data.tax_rate,
-            deposit_amount=data.deposit_amount,
-        )
-
-        for attempt in range(2):
-            try:
-                invoice = await self._invoice_repository.create(
-                    user_id=user_id,
-                    customer_id=data.customer_id,
-                    title=data.title,
-                    transcript=data.transcript,
-                    line_items=data.line_items,
-                    total_amount=document_field_float_or_none(validated_pricing.total_amount),
-                    tax_rate=document_field_float_or_none(validated_pricing.tax_rate),
-                    discount_type=validated_pricing.discount_type,
-                    discount_value=document_field_float_or_none(validated_pricing.discount_value),
-                    deposit_amount=document_field_float_or_none(validated_pricing.deposit_amount),
-                    notes=data.notes,
-                    source_type=data.source_type,
-                    due_date=build_default_due_date(),
-                )
-                await self._invoice_repository.commit()
-                log_event(
-                    "invoice_created",
-                    user_id=user_id,
-                    customer_id=invoice.customer_id,
-                )
-                return invoice
-            except IntegrityError as exc:
-                await self._invoice_repository.rollback()
-                if attempt == 0 and _is_doc_sequence_collision(exc):
-                    continue
-                if _is_doc_sequence_collision(exc):
-                    raise QuoteServiceError(
-                        detail="Unable to create invoice",
-                        status_code=409,
-                    ) from exc
-                raise
-
-        raise QuoteServiceError(detail="Unable to create invoice", status_code=409)
 
     async def list_invoices(
         self,
@@ -290,59 +244,10 @@ class InvoiceService:
 
     async def convert_quote_to_invoice(self, user: User, quote_id: UUID) -> Document:
         """Create one invoice from a quote unless a linked invoice already exists."""
-        user_id = _resolve_user_id(user)
-        quote = await self._quote_repository.get_by_id(quote_id, user_id)
-        if quote is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        ensure_quote_customer_assigned(quote)
-
-        existing_invoice = await self._invoice_repository.get_by_source_document_id(
-            source_document_id=quote.id,
-            user_id=user_id,
+        return await self._creation_service.convert_quote_to_invoice(
+            user_id=_resolve_user_id(user),
+            quote_id=quote_id,
         )
-        if existing_invoice is not None:
-            raise QuoteServiceError(
-                detail="An invoice already exists for this quote",
-                status_code=409,
-            )
-
-        for attempt in range(2):
-            try:
-                invoice = await self._invoice_repository.create_from_quote(
-                    source_quote=quote,
-                    due_date=build_default_due_date(),
-                )
-                await self._invoice_repository.commit()
-                break
-            except IntegrityError as exc:
-                await self._invoice_repository.rollback()
-                duplicate_invoice = await self._invoice_repository.get_by_source_document_id(
-                    source_document_id=quote.id,
-                    user_id=user_id,
-                )
-                if duplicate_invoice is not None:
-                    raise QuoteServiceError(
-                        detail="An invoice already exists for this quote",
-                        status_code=409,
-                    ) from exc
-                if attempt == 0 and _is_doc_sequence_collision(exc):
-                    continue
-                if _is_doc_sequence_collision(exc):
-                    raise QuoteServiceError(
-                        detail="Unable to create invoice",
-                        status_code=409,
-                    ) from exc
-                raise
-        else:
-            raise QuoteServiceError(detail="Unable to create invoice", status_code=409)
-
-        log_event(
-            "invoice_created",
-            user_id=user_id,
-            quote_id=quote.id,
-            customer_id=invoice.customer_id,
-        )
-        return invoice
 
     async def get_invoice_detail(self, user: User, invoice_id: UUID) -> InvoiceDetailRow:
         """Return one user-owned invoice detail row or raise not found."""
