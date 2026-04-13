@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from app.features.auth.models import User
 from app.features.invoices import service as invoice_service_module
+from app.features.invoices.creation import service as invoice_creation_service_module
 from app.features.invoices.schemas import InvoiceCreateRequest, InvoiceUpdateRequest
 from app.features.invoices.service import InvoiceRepositoryProtocol, InvoiceService
 from app.features.quotes.models import QuoteStatus
@@ -270,7 +271,7 @@ async def test_convert_quote_to_invoice_retries_sequence_collision_once(
     def _capture_log_event(event: str, **payload: object) -> None:
         logged_events.append({"event": event, **payload})
 
-    monkeypatch.setattr(invoice_service_module, "log_event", _capture_log_event)
+    monkeypatch.setattr(invoice_creation_service_module, "log_event", _capture_log_event)
 
     user = User(
         email="owner@example.com",
