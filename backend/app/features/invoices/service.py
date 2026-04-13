@@ -8,18 +8,16 @@ side effects while preserving quote-service error semantics for the API layer.
 from __future__ import annotations
 
 import asyncio
-import base64
 import logging
 from collections.abc import Sequence
-from datetime import UTC, date, datetime, timedelta
-from typing import Literal, Protocol, cast
-from uuid import UUID, uuid4
+from datetime import date, datetime
+from typing import Protocol, cast
+from uuid import UUID
 
 from arq.connections import ArqRedis
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
-from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.invoices.repository import (
     InvoiceDetailRow,
@@ -30,6 +28,7 @@ from app.features.invoices.repository import (
     build_default_due_date,
 )
 from app.features.invoices.schemas import InvoiceCreateRequest, InvoiceUpdateRequest
+from app.features.invoices.share import InvoiceShareService
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.service import JobService
 from app.features.quotes.models import Document, QuoteStatus
@@ -41,15 +40,8 @@ from app.features.quotes.service import (
     build_doc_number,
     ensure_quote_customer_assigned,
 )
-from app.integrations.pdf import PdfRenderError
 from app.integrations.storage import StorageNotFoundError, StorageServiceProtocol
 from app.shared.event_logger import log_event
-from app.shared.image_signatures import detect_image_content_type
-from app.shared.observability import (
-    current_request_context,
-    hash_token_reference,
-    log_security_event,
-)
 from app.shared.pdf_artifacts import PDF_ARTIFACT_NOT_READY_DETAIL
 from app.shared.pricing import (
     PricingValidationError,
@@ -224,6 +216,11 @@ class InvoiceService:
         self._quote_repository = quote_repository
         self._pdf = pdf_integration
         self._storage_service = storage_service
+        self._share_service = InvoiceShareService(
+            repository=invoice_repository,
+            pdf_integration=pdf_integration,
+            storage_service=storage_service,
+        )
 
     async def create_invoice(self, user: User, data: InvoiceCreateRequest) -> Document:
         """Create a direct invoice and retry once on sequence collisions."""
@@ -663,137 +660,30 @@ class InvoiceService:
         regenerate: bool = False,
     ) -> Document:
         """Create/reuse a share token without regressing paid/void outcome labels."""
-        user_id = _resolve_user_id(user)
-        invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
-        if invoice is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        now = _utcnow()
-        should_refresh_token = (
-            regenerate
-            or invoice.share_token is None
-            or invoice.share_token_revoked_at is not None
-            or _share_token_has_expired(invoice.share_token_expires_at, now)
+        return await self._share_service.share_invoice(
+            user_id=_resolve_user_id(user),
+            invoice_id=invoice_id,
+            regenerate=regenerate,
         )
-        if invoice.status in _INVOICE_OUTCOME_MUTABLE_STATUSES and not should_refresh_token:
-            return invoice
-
-        if should_refresh_token:
-            invoice.share_token = str(uuid4())
-            invoice.share_token_created_at = now
-            invoice.share_token_expires_at = _build_share_token_expiry(now)
-            invoice.share_token_revoked_at = None
-
-        if invoice.status not in _INVOICE_OUTCOME_MUTABLE_STATUSES:
-            invoice.shared_at = now
-            invoice.status = QuoteStatus.SENT
-        elif invoice.shared_at is None:
-            invoice.shared_at = now
-        await self._invoice_repository.commit()
-        return await self._invoice_repository.refresh(invoice)
 
     async def revoke_public_share(self, user: User, invoice_id: UUID) -> None:
         """Revoke the currently active public share token for one invoice."""
-        user_id = _resolve_user_id(user)
-        invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
-        if invoice is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if invoice.share_token is None or invoice.share_token_revoked_at is not None:
-            return
-
-        invoice.share_token_revoked_at = _utcnow()
-        await self._invoice_repository.commit()
+        await self._share_service.revoke_public_share(
+            user_id=_resolve_user_id(user),
+            invoice_id=invoice_id,
+        )
 
     async def generate_shared_pdf(self, share_token: str) -> tuple[str, bytes]:
         """Render and return one shared invoice PDF by share token."""
-        context = await self._get_public_invoice_context(share_token)
-        await self._attach_logo_data_uri(context)
-
-        try:
-            pdf_bytes = await asyncio.to_thread(self._pdf.render, context)
-        except PdfRenderError as exc:
-            raise QuoteServiceError(detail=str(exc), status_code=422) from exc
-
-        await self._invoice_repository.touch_last_public_accessed_at_by_share_token(
-            share_token,
-            accessed_at=_utcnow(),
-        )
-        await self._invoice_repository.commit()
-        return context.doc_number, pdf_bytes
+        return await self._share_service.generate_shared_pdf(share_token)
 
     async def get_public_invoice(self, share_token: str) -> QuoteRenderContext:
         """Return public invoice data and emit the first-view event exactly once."""
-        context = await self._get_public_invoice_context(share_token)
-        viewed_at = _utcnow()
-        first_view_transition = (
-            await self._invoice_repository.mark_first_public_view_by_share_token(
-                share_token,
-                viewed_at=viewed_at,
-            )
-        )
-        if first_view_transition is None:
-            await self._invoice_repository.touch_last_public_accessed_at_by_share_token(
-                share_token,
-                accessed_at=viewed_at,
-            )
-        await self._invoice_repository.commit()
-
-        if first_view_transition is not None:
-            log_event(
-                "invoice_viewed",
-                user_id=first_view_transition.user_id,
-                invoice_id=first_view_transition.invoice_id,
-                customer_id=first_view_transition.customer_id,
-            )
-
-        return context
+        return await self._share_service.get_public_invoice(share_token)
 
     async def get_public_logo(self, share_token: str) -> tuple[bytes, str]:
         """Return public logo bytes/content type for one shared invoice token."""
-        context = await self._get_public_invoice_context(share_token)
-        if context.logo_path is None:
-            raise QuoteServiceError(detail="Logo not found", status_code=404)
-
-        try:
-            logo_bytes = await asyncio.to_thread(
-                self._storage_service.fetch_bytes,
-                context.logo_path,
-            )
-        except StorageNotFoundError as exc:
-            raise QuoteServiceError(detail="Logo not found", status_code=404) from exc
-        except Exception as exc:  # noqa: BLE001
-            raise QuoteServiceError(detail="Unable to load logo", status_code=500) from exc
-
-        content_type = detect_image_content_type(logo_bytes)
-        if content_type is None:
-            raise QuoteServiceError(detail="Unable to load logo", status_code=500)
-
-        return logo_bytes, content_type
-
-    async def _get_public_invoice_context(self, share_token: str) -> QuoteRenderContext:
-        """Load public invoice context for a share token or raise a 404."""
-        now = _utcnow()
-        share_record = await self._invoice_repository.get_public_share_record(share_token)
-        if share_record is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if share_record.share_token_revoked_at is not None:
-            self._log_public_share_denied(
-                share_record,
-                share_token=share_token,
-                reason_code="revoked",
-            )
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if _share_token_has_expired(share_record.share_token_expires_at, now):
-            self._log_public_share_denied(
-                share_record,
-                share_token=share_token,
-                reason_code="expired",
-            )
-            raise QuoteServiceError(detail="Not found", status_code=404)
-
-        context = await self._invoice_repository.get_render_context_by_share_token(share_token)
-        if context is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        return context
+        return await self._share_service.get_public_logo(share_token)
 
     async def _get_reusable_pdf_job(
         self,
@@ -850,62 +740,6 @@ class InvoiceService:
         )
         return refreshed_invoice
 
-    def _log_public_share_denied(
-        self,
-        share_record: InvoicePublicShareRecord,
-        *,
-        share_token: str,
-        reason_code: Literal["revoked", "expired"],
-    ) -> None:
-        """Record the internal reason when an invoice token is denied publicly."""
-        log_security_event(
-            "public_share.token_denied",
-            outcome="denied",
-            level=logging.WARNING,
-            status_code=404,
-            reason=reason_code,
-            token_ref=share_token,
-            rate_limit_key=_build_public_share_denial_rate_limit_key(
-                document_type="invoice",
-                reason_code=reason_code,
-                share_token=share_token,
-            ),
-            rate_limit_seconds=60,
-            document_id=str(share_record.invoice_id),
-            document_type="invoice",
-        )
-
-    async def _attach_logo_data_uri(self, context: QuoteRenderContext) -> None:
-        if context.logo_path is None:
-            context.logo_data_uri = None
-            return
-
-        try:
-            logo_bytes = await asyncio.to_thread(
-                self._storage_service.fetch_bytes,
-                context.logo_path,
-            )
-        except StorageNotFoundError:
-            LOGGER.warning("Invoice logo missing in storage; omitting from PDF render")
-            context.logo_data_uri = None
-            return
-        except Exception:  # noqa: BLE001
-            LOGGER.warning(
-                "Failed to load invoice logo for PDF render; omitting logo",
-                exc_info=True,
-            )
-            context.logo_data_uri = None
-            return
-
-        content_type = detect_image_content_type(logo_bytes)
-        if content_type is None:
-            LOGGER.warning("Invoice logo bytes were invalid; omitting from PDF render")
-            context.logo_data_uri = None
-            return
-
-        encoded_logo = base64.b64encode(logo_bytes).decode("ascii")
-        context.logo_data_uri = f"data:{content_type};base64,{encoded_logo}"
-
     async def _delete_obsolete_artifact(self, object_path: str | None) -> None:
         if object_path is None:
             return
@@ -925,33 +759,6 @@ def _resolve_user_id(user: User) -> UUID:
     if identity and identity[0] is not None:
         return cast(UUID, identity[0])
     return user.id
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
-
-
-def _build_share_token_expiry(created_at: datetime) -> datetime:
-    return created_at + timedelta(days=get_settings().public_share_link_expire_days)
-
-
-def _share_token_has_expired(expires_at: datetime | None, now: datetime) -> bool:
-    return expires_at is not None and expires_at < now
-
-
-def _build_public_share_denial_rate_limit_key(
-    *,
-    document_type: str,
-    reason_code: str,
-    share_token: str,
-) -> str:
-    request_context = current_request_context()
-    source = (
-        request_context.client_ip_hash
-        if request_context is not None
-        else hash_token_reference(share_token)
-    )
-    return f"public-share:{document_type}:{reason_code}:{source}"
 
 
 def _is_doc_sequence_collision(exc: IntegrityError) -> bool:
