@@ -249,7 +249,17 @@ describe("CaptureScreen", () => {
     renderScreen();
 
     const scrollRegion = screen.getByTestId("recorded-clips-scroll-region");
-    expect(scrollRegion).toHaveClass("overflow-y-auto", "h-[30dvh]");
+    expect(scrollRegion).toHaveClass(
+      "overflow-y-auto",
+      "h-[clamp(8rem,20dvh,13rem)]",
+    );
+  });
+
+  it("renders the written description textarea with 2 rows", () => {
+    renderScreen();
+
+    const textarea = screen.getByLabelText("WRITTEN DESCRIPTION");
+    expect(textarea).toHaveAttribute("rows", "2");
   });
 
   it("disables recording when the clip-count limit is reached", () => {

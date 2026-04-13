@@ -49,7 +49,7 @@ export function CaptureInputPanel({
         </div>
 
         {clips.length === 0 ? (
-          <div className="flex h-[30dvh] flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-outline-variant/30 bg-surface-container-lowest p-10">
+          <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 bg-surface-container-lowest p-4">
             <span className="material-symbols-outlined text-4xl text-outline">
               mic_off
             </span>
@@ -58,7 +58,7 @@ export function CaptureInputPanel({
         ) : (
           <div
             data-testid="recorded-clips-scroll-region"
-            className="h-[30dvh] space-y-2 overflow-y-auto pr-1"
+            className="h-[clamp(8rem,20dvh,13rem)] space-y-2 overflow-y-auto pr-1"
           >
             {clips.map((clip, index) => {
               const clipNumber = clip.sequenceNumber ?? index + 1;
@@ -102,7 +102,7 @@ export function CaptureInputPanel({
         </label>
         <textarea
           id="capture-written-description"
-          rows={4}
+          rows={2}
           maxLength={NOTE_INPUT_MAX_CHARS}
           value={notes}
           onChange={(event) => onNotesChange(event.target.value)}
@@ -122,7 +122,7 @@ export function CaptureInputPanel({
       </section>
 
       {isRecording ? (
-        <div className="mb-[4.5rem] mt-auto flex flex-col items-center gap-3 pt-6">
+        <div className="mt-auto flex flex-col items-center gap-3 pt-4 sm:pt-6">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-secondary" />
             <p className="text-sm font-medium text-secondary">
@@ -138,7 +138,7 @@ export function CaptureInputPanel({
           </button>
         </div>
       ) : (
-        <div className="mb-[4.5rem] mt-auto flex flex-col items-center gap-3 pt-6">
+        <div className="mt-auto flex flex-col items-center gap-3 pt-4 sm:pt-6">
           <p className="text-xs uppercase tracking-widest text-outline">
             TAP TO START
           </p>

@@ -351,7 +351,7 @@ export function CaptureScreen(): React.ReactElement {
   const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording;
 
   return (
-    <main className="h-dvh overflow-hidden bg-background">
+    <main className="min-h-dvh bg-background">
       <WorkflowScreenHeader
         title={isAppendMode ? "Capture More Job Notes" : "Capture Job Notes"}
         subtitle={
@@ -364,7 +364,7 @@ export function CaptureScreen(): React.ReactElement {
         onExitHome={onExitHome}
       />
 
-      <section className="mx-auto h-full w-full max-w-2xl overflow-hidden px-4 pb-24 pt-20">
+      <section className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4 pb-36 pt-20">
         {!isSupported ? (
           <p className="mb-4 rounded-lg border border-warning-accent/40 bg-warning-container p-3 text-sm text-warning">
             Voice capture is not supported in this browser. You can still type
@@ -372,7 +372,7 @@ export function CaptureScreen(): React.ReactElement {
           </p>
         ) : null}
 
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <CaptureInputPanel
             clips={clips}
             isExtracting={isExtracting}
