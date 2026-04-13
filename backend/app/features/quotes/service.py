@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from app.features.auth.models import User
 from app.features.jobs.models import JobRecord
 from app.features.jobs.service import JobService
+from app.features.quotes.deletion import QuoteDeletionService
 from app.features.quotes.errors import QuoteServiceError
 from app.features.quotes.extraction_outcomes import classify_extraction_result
 from app.features.quotes.models import Document, QuoteStatus
@@ -46,14 +47,6 @@ from app.shared.pricing import (
 )
 
 LOGGER = logging.getLogger(__name__)
-_NON_DELETABLE_QUOTE_STATUSES = frozenset(
-    {
-        QuoteStatus.SHARED,
-        QuoteStatus.VIEWED,
-        QuoteStatus.APPROVED,
-        QuoteStatus.DECLINED,
-    }
-)
 _TERMINAL_QUOTE_STATUSES = frozenset({QuoteStatus.APPROVED, QuoteStatus.DECLINED})
 _QUOTE_OUTCOME_ELIGIBLE_STATUSES = (
     QuoteStatus.DRAFT,
@@ -240,6 +233,7 @@ class QuoteService:
             delete_obsolete_artifact=self._delete_obsolete_artifact,
             ensure_quote_customer_assigned=ensure_quote_customer_assigned,
         )
+        self._deletion_service = QuoteDeletionService(repository=repository)
 
     async def create_quote(self, user: User, data: QuoteCreateRequest) -> Document:
         """Create a user-owned quote and retry once on sequence collisions."""
@@ -531,24 +525,10 @@ class QuoteService:
         )
 
     async def delete_quote(self, user: User, quote_id: UUID) -> None:
-        """Delete a user-owned quote unless it has already been shared."""
-        user_id = _resolve_user_id(user)
-        quote = await self._repository.get_by_id(quote_id, user_id)
-        if quote is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status in _NON_DELETABLE_QUOTE_STATUSES:
-            raise QuoteServiceError(
-                detail="Shared quotes cannot be deleted",
-                status_code=409,
-            )
-
-        await self._repository.delete(quote_id)
-        await self._repository.commit()
-        log_event(
-            "quote.deleted",
-            user_id=user_id,
-            quote_id=quote.id,
-            customer_id=quote.customer_id,
+        """Delegate owner-facing quote deletion to the deletion lifecycle slice."""
+        await self._deletion_service.delete_quote(
+            user_id=_resolve_user_id(user),
+            quote_id=quote_id,
         )
 
     async def start_pdf_generation(
