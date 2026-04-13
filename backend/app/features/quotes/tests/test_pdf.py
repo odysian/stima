@@ -330,6 +330,64 @@ async def test_generate_pdf_reuses_persisted_artifact_without_rerendering(
     assert artifact_response.content == b"PDF for Q-001"
 
 
+async def test_get_pdf_artifact_resets_missing_storage_artifact_and_keeps_revision(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    initial_job = await _generate_ready_quote_pdf(
+        client,
+        db_session,
+        csrf_token=csrf_token,
+        quote_id=quote["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+
+    stored_quote = await db_session.scalar(select(Document).where(Document.id == UUID(quote["id"])))
+    assert stored_quote is not None
+    assert stored_quote.pdf_artifact_path is not None
+    stored_revision = stored_quote.pdf_artifact_revision
+
+    _storage_service_dependency.delete(stored_quote.pdf_artifact_path)
+
+    artifact_response = await client.get(f"/api/quotes/{quote['id']}/pdf")
+    assert artifact_response.status_code == 409
+    assert artifact_response.json() == {"detail": PDF_ARTIFACT_NOT_READY_DETAIL}
+
+    db_session.expire_all()
+    recovered_quote = await db_session.scalar(
+        select(Document).where(Document.id == UUID(quote["id"]))
+    )
+    assert recovered_quote is not None
+    assert recovered_quote.pdf_artifact_path is None
+    assert recovered_quote.pdf_artifact_job_id is None
+    assert recovered_quote.pdf_artifact_revision == stored_revision
+
+    detail_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["pdf_artifact"] == {
+        "status": "missing",
+        "job_id": None,
+        "download_url": None,
+        "terminal_error": None,
+    }
+
+    next_job_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    next_job = _assert_async_pdf_job_response(next_job_response, document_id=quote["id"])
+    assert next_job["document_revision"] == stored_revision
+    assert initial_job["document_revision"] == stored_revision
+
+
 async def test_generate_pdf_reuses_existing_pending_job_instead_of_enqueuing_duplicate(
     client: AsyncClient,
     _arq_pool_dependency: _MockArqPool,
