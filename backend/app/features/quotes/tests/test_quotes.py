@@ -31,7 +31,11 @@ from app.features.quotes import email_delivery_service
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRenderContext, QuoteRepository
-from app.features.quotes.schemas import ExtractionResult, LineItemDraft, LineItemExtracted
+from app.features.quotes.schemas import (
+    ExtractionResult,
+    LineItemDraft,
+    LineItemExtracted,
+)
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.email import EmailConfigurationError, EmailMessage, EmailSendError
@@ -310,7 +314,9 @@ def _reset_rate_limiter() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
-def _mock_arq_pool_for_send_email_tests(request: pytest.FixtureRequest) -> Iterator[None]:
+def _mock_arq_pool_for_send_email_tests(
+    request: pytest.FixtureRequest,
+) -> Iterator[None]:
     node_name = request.node.name
     if (
         "send_quote_email" not in node_name
@@ -635,6 +641,52 @@ async def test_create_quote_allows_empty_line_items_and_returns_empty_list(
     list_response = await client.get("/api/quotes")
     assert list_response.status_code == 200
     assert list_response.json()[0]["item_count"] == 0
+
+
+async def test_create_quote_emits_quote_created_business_event(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+
+    credentials = _credentials()
+    csrf_token = await _register_and_login(client, credentials)
+    customer_id = await _create_customer(client, csrf_token)
+
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "quote transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    user = await _get_user_by_email(db_session, credentials["email"])
+
+    quote_created_events = [
+        event
+        for event in emitted_events
+        if event.get("event") == "quote.created" and event.get("quote_id") == payload["id"]
+    ]
+    assert len(quote_created_events) == 1
+
+    quote_created_event = quote_created_events[0]
+    assert quote_created_event["quote_id"] == payload["id"]
+    assert quote_created_event["customer_id"] == customer_id
+    assert quote_created_event["user_id"] == str(user.id)
 
 
 async def test_update_quote_preserves_line_items_when_omitted(
@@ -5102,7 +5154,9 @@ async def test_patch_quote_doc_type_to_invoice_accepts_explicit_due_date(
     assert invoice_detail_response.json()["due_date"] == "2026-05-20"
 
 
-async def test_patch_quote_doc_type_after_share_returns_409(client: AsyncClient) -> None:
+async def test_patch_quote_doc_type_after_share_returns_409(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
     quote = await _create_quote(client, csrf_token, customer_id)
@@ -5583,7 +5637,9 @@ async def test_patch_invoice_doc_type_to_quote_regenerates_number_and_clears_due
     assert stored_document.due_date is None
 
 
-async def test_patch_invoice_doc_type_after_share_returns_409(client: AsyncClient) -> None:
+async def test_patch_invoice_doc_type_after_share_returns_409(
+    client: AsyncClient,
+) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
     direct_invoice = await _create_direct_invoice(
