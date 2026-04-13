@@ -11,12 +11,17 @@
 backend/app/
   admin/         — internal-only API-key routes excluded from public schema
   core/          — config, database, security primitives
-  features/      — feature modules (auth, quotes, customers, profile)
+  features/      — feature modules (auth, quotes, invoices, customers, profile)
     registry.py  — central model import for Alembic discovery
   shared/        — cross-cutting: dependencies, rate limiting, exceptions, observability
   integrations/  — external service adapters (audio, transcription, pdf)
   worker/        — ARQ worker settings and background job entrypoints
 ```
+
+Invoices follow the thin-facade modularity pattern: `backend/app/features/invoices/service.py`
+is the stable `InvoiceService` entrypoint and delegates write/side-effect behavior to
+`share/`, `pdf_artifacts/`, `creation/`, `mutation/`, and `outcomes/`, while
+`list_invoices` and `get_invoice_detail` remain intentional facade read-surface methods.
 
 ### Frontend layout
 ```
