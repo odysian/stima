@@ -17,6 +17,7 @@ from sqlalchemy import inspect as sa_inspect
 from app.features.auth.models import User
 from app.features.invoices.creation import InvoiceCreationService
 from app.features.invoices.mutation import InvoiceMutationService
+from app.features.invoices.outcomes import InvoiceOutcomeService
 from app.features.invoices.pdf_artifacts import InvoicePdfArtifactService
 from app.features.invoices.repository import (
     InvoiceDetailRow,
@@ -29,20 +30,11 @@ from app.features.invoices.schemas import InvoiceCreateRequest, InvoiceUpdateReq
 from app.features.invoices.share import InvoiceShareService
 from app.features.jobs.models import JobRecord
 from app.features.jobs.service import JobService
-from app.features.quotes.models import Document, QuoteStatus
+from app.features.quotes.models import Document
 from app.features.quotes.repository import QuoteRenderContext
 from app.features.quotes.schemas import LineItemDraft
 from app.features.quotes.service import QuoteRepositoryProtocol, QuoteServiceError
 from app.integrations.storage import StorageServiceProtocol
-from app.shared.event_logger import log_event
-
-_INVOICE_OUTCOME_MUTABLE_STATUSES = frozenset(
-    {
-        QuoteStatus.SENT,
-        QuoteStatus.PAID,
-        QuoteStatus.VOID,
-    }
-)
 
 
 class InvoiceRepositoryProtocol(Protocol):
@@ -201,6 +193,7 @@ class InvoiceService:
             repository=invoice_repository,
             delete_obsolete_artifact=self._pdf_artifact_service.delete_obsolete_artifact,
         )
+        self._outcome_service = InvoiceOutcomeService(repository=invoice_repository)
 
     async def create_invoice(self, user: User, data: InvoiceCreateRequest) -> Document:
         """Create a direct invoice and retry once on sequence collisions."""
@@ -239,22 +232,16 @@ class InvoiceService:
 
     async def mark_invoice_paid(self, user: User, invoice_id: UUID) -> Document:
         """Mark one invoice as paid without changing share/access capabilities."""
-        return await self._mark_invoice_outcome(
-            user,
-            invoice_id,
-            next_status=QuoteStatus.PAID,
-            event_name="invoice_paid",
-            action_label="paid",
+        return await self._outcome_service.mark_invoice_paid(
+            user_id=_resolve_user_id(user),
+            invoice_id=invoice_id,
         )
 
     async def mark_invoice_voided(self, user: User, invoice_id: UUID) -> Document:
         """Mark one invoice as void without changing share/access capabilities."""
-        return await self._mark_invoice_outcome(
-            user,
-            invoice_id,
-            next_status=QuoteStatus.VOID,
-            event_name="invoice_voided",
-            action_label="void",
+        return await self._outcome_service.mark_invoice_voided(
+            user_id=_resolve_user_id(user),
+            invoice_id=invoice_id,
         )
 
     async def update_invoice(
@@ -325,38 +312,6 @@ class InvoiceService:
     async def get_public_logo(self, share_token: str) -> tuple[bytes, str]:
         """Return public logo bytes/content type for one shared invoice token."""
         return await self._share_service.get_public_logo(share_token)
-
-    async def _mark_invoice_outcome(
-        self,
-        user: User,
-        invoice_id: UUID,
-        *,
-        next_status: QuoteStatus,
-        event_name: str,
-        action_label: str,
-    ) -> Document:
-        user_id = _resolve_user_id(user)
-        invoice = await self._invoice_repository.get_by_id(invoice_id, user_id)
-        if invoice is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if invoice.status == next_status:
-            return invoice
-        if invoice.status not in _INVOICE_OUTCOME_MUTABLE_STATUSES:
-            raise QuoteServiceError(
-                detail=f"Only sent, paid, or void invoices can be marked {action_label}.",
-                status_code=409,
-            )
-
-        invoice.status = next_status
-        await self._invoice_repository.commit()
-        refreshed_invoice = await self._invoice_repository.refresh(invoice)
-        log_event(
-            event_name,
-            user_id=user_id,
-            invoice_id=refreshed_invoice.id,
-            customer_id=refreshed_invoice.customer_id,
-        )
-        return refreshed_invoice
 
 
 def get_invoice_repository(db_repository: InvoiceRepository) -> InvoiceRepository:
