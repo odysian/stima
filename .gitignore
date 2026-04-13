@@ -29,4 +29,6 @@ venv/
 *.tfstate
 *.tfstate.backup
 infra/terraform/envs/*.tfvars
-plans/
+plans/archived
+plans/*
+!plans/2026-04-12
