@@ -264,4 +264,23 @@ The key decisions were:
 - repository dependency went through a slice-specific protocol implemented by the existing repository
 - public contracts stayed unchanged
 
+The completed invoice modularity program follows the same durable shape:
+
+```text
+backend/app/features/invoices/
+  service.py
+  share/
+  pdf_artifacts/
+  creation/
+  mutation/
+  outcomes/
+```
+
+The key decisions were:
+- `InvoiceService` remains the stable public facade
+- each slice package exposes one coordinator/service for facade delegation
+- slice packages use narrow, slice-specific repository protocols over the existing repository implementation
+- routes and worker email orchestration continue depending on `InvoiceService`, not invoice slice package imports
+- read-side `list_invoices` and `get_invoice_detail` intentionally remain on the facade
+
 Future backend modularity work should use the same pattern unless a later architecture decision explicitly replaces it.

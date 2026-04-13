@@ -1,8 +1,9 @@
-"""Invoice service orchestration.
+"""Invoice service facade for invoice domain orchestration.
 
-This module applies invoice domain rules on top of repository reads/writes.
-It owns creation, quote conversion, list/detail access, and invoice PDF/share
-side effects while preserving quote-service error semantics for the API layer.
+`InvoiceService` is the stable public entrypoint for routes and sibling
+orchestrators. Write/side-effect behavior is delegated to behavior-slice
+collaborators (creation/share/pdf_artifacts/mutation/outcomes), while read-side
+list/detail access intentionally remains on the facade.
 """
 
 from __future__ import annotations
@@ -162,7 +163,7 @@ class PdfIntegrationProtocol(Protocol):
 
 
 class InvoiceService:
-    """Coordinate invoice domain rules with persistence and PDF rendering."""
+    """Stable invoice facade coordinating slice collaborators and read-side calls."""
 
     def __init__(
         self,

@@ -16,6 +16,7 @@ Record conventions that already exist in code.
 - Each slice package exposes one coordinator/service to the public facade; package roots stay minimal.
 - Slices depend on narrow slice-specific repository protocols backed by the existing repository unless a task explicitly scopes a new repository.
 - Treat first-pass modularity work as no-contract refactors and prove parity with targeted behavior checks plus `make backend-verify`.
+- Invoices now follow the same thin-facade pattern as quotes (`service.py` facade + `share/`, `pdf_artifacts/`, `creation/`, `mutation/`, `outcomes/`); use [BACKEND_MODULARITY.md](./BACKEND_MODULARITY.md) for full rules.
 
 ## SQLAlchemy 2.0 Style (Mandatory)
 - Use SQLAlchemy 2.0 typed ORM style: `Mapped[...]` with `mapped_column(...)`.
