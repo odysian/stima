@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal, Protocol, cast
@@ -18,6 +17,7 @@ from app.features.jobs.models import JobRecord
 from app.features.jobs.service import JobService
 from app.features.quotes.deletion import QuoteDeletionService
 from app.features.quotes.errors import QuoteServiceError
+from app.features.quotes.extraction_append import QuoteExtractionAppendService
 from app.features.quotes.extraction_outcomes import classify_extraction_result
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.mutation import QuoteMutationService
@@ -41,28 +41,13 @@ from app.integrations.storage import StorageServiceProtocol
 from app.shared.event_logger import log_event
 from app.shared.pricing import (
     PricingValidationError,
-    derive_document_subtotal_from_line_items,
     document_field_float_or_none,
-    resolve_document_subtotal_for_edit,
     validate_document_pricing_input,
 )
 
 LOGGER = logging.getLogger(__name__)
 _TERMINAL_QUOTE_STATUSES = frozenset({QuoteStatus.APPROVED, QuoteStatus.DECLINED})
 _CUSTOMER_ASSIGNMENT_REQUIRED_DETAIL = "Assign a customer before continuing."
-_APPENDABLE_QUOTE_STATUSES = frozenset(
-    {
-        QuoteStatus.DRAFT,
-        QuoteStatus.READY,
-        QuoteStatus.SHARED,
-        QuoteStatus.VIEWED,
-        QuoteStatus.APPROVED,
-        QuoteStatus.DECLINED,
-    }
-)
-_APPEND_UNAVAILABLE_DETAIL = "This quote can no longer be edited."
-_APPEND_TRANSCRIPT_SEPARATOR_PATTERN = re.compile(r"(?:^|\n\n)Added later(?: \(\d+\))?:\n")
-_APPEND_TRANSCRIPT_BULLET_PREFIXES = ("- ", "* ")
 
 
 class QuoteRepositoryProtocol(Protocol):
@@ -225,6 +210,10 @@ class QuoteService:
             repository=repository,
             delete_obsolete_artifact=self._delete_obsolete_artifact,
             ensure_quote_customer_assigned=ensure_quote_customer_assigned,
+        )
+        self._extraction_append_service = QuoteExtractionAppendService(
+            repository=repository,
+            delete_obsolete_artifact=self._delete_obsolete_artifact,
         )
         self._deletion_service = QuoteDeletionService(repository=repository)
         self._outcome_service = QuoteOutcomeService(repository=repository)
@@ -401,12 +390,10 @@ class QuoteService:
         quote_id: UUID,
     ) -> Document:
         """Return one owned quote that can accept append extraction updates."""
-        quote = await self._repository.get_by_id(quote_id, user_id)
-        if quote is None:
-            raise QuoteServiceError(detail="Not found", status_code=404)
-        if quote.status not in _APPENDABLE_QUOTE_STATUSES:
-            raise QuoteServiceError(detail=_APPEND_UNAVAILABLE_DETAIL, status_code=409)
-        return quote
+        return await self._extraction_append_service.ensure_quote_appendable(
+            user_id=user_id,
+            quote_id=quote_id,
+        )
 
     async def append_extraction_to_quote(
         self,
@@ -416,69 +403,13 @@ class QuoteService:
         extraction_result: ExtractionResult,
         commit: bool = True,
     ) -> tuple[Document, ExtractionResult]:
-        """Append extraction output onto an existing persisted quote."""
-        quote = await self.ensure_quote_appendable(user_id=user_id, quote_id=quote_id)
-        appended_line_items = [
-            LineItemDraft(
-                description=item.description,
-                details=item.details,
-                price=item.price,
-            )
-            for item in extraction_result.line_items
-        ]
-        merged_line_items = [
-            *[
-                LineItemDraft(
-                    description=line_item.description,
-                    details=line_item.details,
-                    price=document_field_float_or_none(line_item.price),
-                )
-                for line_item in quote.line_items
-            ],
-            *appended_line_items,
-        ]
-        line_items_define_subtotal, derived_line_item_subtotal = (
-            derive_document_subtotal_from_line_items(merged_line_items)
+        """Delegate append extraction lifecycle behavior to the append slice."""
+        return await self._extraction_append_service.append_extraction_to_quote(
+            user_id=user_id,
+            quote_id=quote_id,
+            extraction_result=extraction_result,
+            commit=commit,
         )
-        current_subtotal = resolve_document_subtotal_for_edit(
-            total_amount=quote.total_amount,
-            discount_type=quote.discount_type,
-            discount_value=quote.discount_value,
-            tax_rate=quote.tax_rate,
-            deposit_amount=quote.deposit_amount,
-            line_items=merged_line_items,
-        )
-        validated_pricing = _validate_document_pricing_for_quote(
-            total_amount=(
-                derived_line_item_subtotal if line_items_define_subtotal else current_subtotal
-            ),
-            line_items=merged_line_items,
-            discount_type=quote.discount_type,
-            discount_value=document_field_float_or_none(quote.discount_value),
-            tax_rate=document_field_float_or_none(quote.tax_rate),
-            deposit_amount=document_field_float_or_none(quote.deposit_amount),
-        )
-
-        next_transcript = _merge_append_transcript(
-            current_transcript=quote.transcript,
-            appended_transcript=extraction_result.transcript,
-        )
-        extraction_metadata = classify_extraction_result(extraction_result)
-        updated_quote = await self._repository.append_extraction(
-            document=quote,
-            transcript=next_transcript,
-            total_amount=document_field_float_or_none(validated_pricing.total_amount),
-            line_items=appended_line_items,
-            extraction_tier=extraction_metadata.tier,
-            extraction_degraded_reason_code=extraction_metadata.degraded_reason_code,
-        )
-        obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
-        if not commit:
-            return updated_quote, extraction_result
-
-        await self._repository.commit()
-        await self._delete_obsolete_artifact(obsolete_artifact_path)
-        return await self._repository.refresh(updated_quote), extraction_result
 
     async def list_quotes(
         self,
@@ -694,56 +625,3 @@ def _validate_document_pricing_for_quote(
         )
     except PricingValidationError as exc:
         raise QuoteServiceError(detail=str(exc), status_code=422) from exc
-
-
-def _merge_append_transcript(*, current_transcript: str, appended_transcript: str) -> str:
-    normalized_current = current_transcript.rstrip()
-    appended_entries = _extract_append_entries(appended_transcript)
-
-    if not normalized_current:
-        if not appended_entries:
-            return ""
-        return "Added later:\n" + "\n".join(f"- {entry}" for entry in appended_entries)
-
-    base_transcript, existing_entries = _split_transcript_and_append_entries(normalized_current)
-    merged_entries = [*existing_entries, *appended_entries]
-    if not merged_entries:
-        return base_transcript
-
-    append_section = "Added later:\n" + "\n".join(f"- {entry}" for entry in merged_entries)
-    if not base_transcript:
-        return append_section
-    return f"{base_transcript}\n\n{append_section}"
-
-
-def _split_transcript_and_append_entries(current_transcript: str) -> tuple[str, list[str]]:
-    matches = list(_APPEND_TRANSCRIPT_SEPARATOR_PATTERN.finditer(current_transcript))
-    if not matches:
-        return current_transcript, []
-
-    base_transcript = current_transcript[: matches[0].start()].rstrip()
-    entries: list[str] = []
-    for index, match in enumerate(matches):
-        body_start = match.end()
-        body_end = (
-            matches[index + 1].start() if index + 1 < len(matches) else len(current_transcript)
-        )
-        section_body = current_transcript[body_start:body_end]
-        entries.extend(_extract_append_entries(section_body))
-
-    return base_transcript, entries
-
-
-def _extract_append_entries(transcript: str) -> list[str]:
-    entries: list[str] = []
-    for raw_line in transcript.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        for prefix in _APPEND_TRANSCRIPT_BULLET_PREFIXES:
-            if line.startswith(prefix):
-                line = line[len(prefix) :].strip()
-                break
-        if line:
-            entries.append(line)
-    return entries
