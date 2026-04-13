@@ -226,6 +226,16 @@ Keep external skills high-signal and conflict-free:
 - If an external skill conflicts with repo docs, follow repo docs and treat the skill as advisory.
 - Review and prune unused or low-value skills regularly.
 
+## RTK command preference
+
+When running shell commands, prefer `rtk`-prefixed commands for token-heavy output.
+
+Examples:
+- `rtk git status`
+- `rtk git diff`
+- `rtk rg "pattern" .`
+- `rtk pytest`
+
 ## Optional Later
 
 MCP is out of scope for v1. It can be added later to automate issue creation/labeling/CI summaries.
