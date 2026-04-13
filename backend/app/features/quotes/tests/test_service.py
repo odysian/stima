@@ -11,6 +11,7 @@ import pytest
 from app.features.auth.models import User
 from app.features.quotes import service as quote_service_module
 from app.features.quotes.models import QuoteStatus
+from app.features.quotes.mutation import service as quote_mutation_service_module
 from app.features.quotes.schemas import QuoteUpdateRequest
 from app.features.quotes.service import QuoteRepositoryProtocol, QuoteService
 
@@ -108,7 +109,11 @@ class _UnusedStorageService:
 async def test_update_quote_with_unchanged_rendered_values_preserves_pdf_artifact(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(quote_service_module, "log_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        quote_mutation_service_module,
+        "log_event",
+        lambda *args, **kwargs: None,
+    )
 
     user = User(
         email="owner@example.com",
@@ -154,7 +159,11 @@ async def test_update_quote_with_unchanged_rendered_values_preserves_pdf_artifac
 async def test_update_quote_rejects_clearing_assigned_customer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(quote_service_module, "log_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        quote_mutation_service_module,
+        "log_event",
+        lambda *args, **kwargs: None,
+    )
 
     user = User(
         email="owner@example.com",
@@ -199,7 +208,11 @@ async def test_update_quote_rejects_clearing_assigned_customer(
 async def test_update_quote_rejects_reassigning_shared_quote_customer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(quote_service_module, "log_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        quote_mutation_service_module,
+        "log_event",
+        lambda *args, **kwargs: None,
+    )
 
     user = User(
         email="owner@example.com",
@@ -244,7 +257,11 @@ async def test_update_quote_rejects_reassigning_shared_quote_customer(
 async def test_update_quote_rejects_reassigning_when_linked_invoice_exists(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(quote_service_module, "log_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        quote_mutation_service_module,
+        "log_event",
+        lambda *args, **kwargs: None,
+    )
 
     user = User(
         email="owner@example.com",
@@ -289,7 +306,11 @@ async def test_update_quote_rejects_reassigning_when_linked_invoice_exists(
 async def test_update_quote_skips_linked_invoice_lookup_when_customer_not_patched(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(quote_service_module, "log_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        quote_mutation_service_module,
+        "log_event",
+        lambda *args, **kwargs: None,
+    )
 
     user = User(
         email="owner@example.com",
