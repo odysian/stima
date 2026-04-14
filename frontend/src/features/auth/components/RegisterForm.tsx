@@ -69,7 +69,7 @@ export function RegisterForm(): React.ReactElement {
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-3 text-xs font-semibold text-primary"
+                className="absolute inset-y-0 right-3 cursor-pointer text-xs font-semibold text-primary"
                 aria-label={isPasswordVisible ? "Hide password" : "Show password"}
                 aria-pressed={isPasswordVisible}
                 onClick={() => setIsPasswordVisible((visible) => !visible)}
@@ -98,7 +98,7 @@ export function RegisterForm(): React.ReactElement {
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-3 text-xs font-semibold text-primary"
+                className="absolute inset-y-0 right-3 cursor-pointer text-xs font-semibold text-primary"
                 aria-label={isConfirmPasswordVisible ? "Hide confirm password" : "Show confirm password"}
                 aria-pressed={isConfirmPasswordVisible}
                 onClick={() => setIsConfirmPasswordVisible((visible) => !visible)}
