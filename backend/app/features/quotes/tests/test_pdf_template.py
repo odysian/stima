@@ -823,7 +823,7 @@ def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
         re.DOTALL,
     )
     assert re.search(
-        r"\.signature-line\s*\{[^}]*border-bottom:\s*1px solid #d1d5db;",
+        r"\.signature-line\s*\{[^}]*border-bottom:\s*1px solid #111827;",
         rendered_html,
         re.DOTALL,
     )
