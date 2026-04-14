@@ -5,6 +5,16 @@ from __future__ import annotations
 import pytest
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.tests import test_quotes as quotes_test_module
+from app.features.quotes.tests.support.helpers import (
+    _create_approved_invoice,
+    _create_customer,
+    _create_direct_invoice,
+    _create_quote,
+    _credentials,
+    _register_and_login,
+    _set_invoice_status,
+    _set_quote_status,
+)
 from app.shared.input_limits import (
     DOCUMENT_TRANSCRIPT_MAX_CHARS,
 )
@@ -20,14 +30,6 @@ _override_storage_service_dependency = quotes_test_module._override_storage_serv
 _override_quote_service_dependency = quotes_test_module._override_quote_service_dependency
 _override_extraction_service_dependency = quotes_test_module._override_extraction_service_dependency
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
-_create_approved_invoice = quotes_test_module._create_approved_invoice
-_create_customer = quotes_test_module._create_customer
-_create_direct_invoice = quotes_test_module._create_direct_invoice
-_create_quote = quotes_test_module._create_quote
-_credentials = quotes_test_module._credentials
-_register_and_login = quotes_test_module._register_and_login
-_set_invoice_status = quotes_test_module._set_invoice_status
-_set_quote_status = quotes_test_module._set_quote_status
 
 
 async def test_create_direct_invoice_rejects_transcript_over_limit(

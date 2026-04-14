@@ -14,6 +14,17 @@ from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.schemas import LineItemDraft
 from app.features.quotes.tests import test_quotes as quotes_test_module
+from app.features.quotes.tests.support.helpers import (
+    _create_customer,
+    _create_quote,
+    _credentials,
+    _get_user_by_email,
+    _register_and_login,
+    _run_pdf_job,
+    _send_email_headers,
+    _set_quote_status,
+)
+from app.features.quotes.tests.support.mocks import _MockArqPool
 from app.main import app
 from app.shared import event_logger
 from app.shared.input_limits import (
@@ -33,15 +44,6 @@ _override_storage_service_dependency = quotes_test_module._override_storage_serv
 _override_quote_service_dependency = quotes_test_module._override_quote_service_dependency
 _override_extraction_service_dependency = quotes_test_module._override_extraction_service_dependency
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
-_MockArqPool = quotes_test_module._MockArqPool
-_create_customer = quotes_test_module._create_customer
-_create_quote = quotes_test_module._create_quote
-_credentials = quotes_test_module._credentials
-_get_user_by_email = quotes_test_module._get_user_by_email
-_register_and_login = quotes_test_module._register_and_login
-_run_pdf_job = quotes_test_module._run_pdf_job
-_send_email_headers = quotes_test_module._send_email_headers
-_set_quote_status = quotes_test_module._set_quote_status
 
 
 async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
