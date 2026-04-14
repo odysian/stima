@@ -37,6 +37,16 @@ Every feature follows:
 7. In-chat learning handoff in the approving review response
 8. Finalize
 
+## Agent Output Budget
+
+Default chat output should stay concise and non-duplicative:
+
+1. Findings-first: lead with what changed, key risks, and verification outcome.
+2. Bounded recap: when Task issue scope is already explicit, avoid long restatements.
+3. No duplicate verification blocks: report commands run and result; include only minimal failure context when needed.
+4. Completion summaries: changed files + one-line intent per file; avoid re-deriving stable repo rules.
+5. Review replies: `ACTIONABLE` should be finding-focused with minimal preamble; `APPROVED` follows the tutoring handoff contract.
+
 ## Operator Flow Optimization
 
 Use this as the default human-in-the-loop sequence to reduce handoff overhead:
@@ -44,7 +54,7 @@ Use this as the default human-in-the-loop sequence to reduce handoff overhead:
 1. Plan scope and choose mode (`single` by default; `gated`/`fast` only when explicitly requested).
 2. For issue-backed work (`single`/`gated`), use the brief-first execution flow in `docs/template/KICKOFF.md`: keep the Task issue authoritative, add an Execution Brief only for task-local deltas, and reference analog docs when relevant.
 3. Open PR with `Closes #<task-id>`.
-4. Run one reviewer pass: implementation agent posts the short kickoff from `docs/template/KICKOFF.md` section 3a; reviewer follows section 3b for scope and output shape (or uses the section 3b inline copy when requested).
+4. Run one reviewer pass: implementation agent posts the short kickoff from `docs/template/KICKOFF.md` section 3a; reviewer follows section 3b for scope/output shape and loads `.github/prompts/review-task.prompt.md` when the full brief is needed.
 5. If verdict is `ACTIONABLE`, use the delta-only patch handoff from `docs/template/KICKOFF.md` and rerun targeted verification only unless scope expands.
 6. When verdict is `APPROVED`, the approving reviewer includes the lightweight tutoring handoff in that same response; the implementation agent then finalizes without generating a second handoff.
 7. Merge PR and sync local branch.
@@ -165,7 +175,7 @@ Reviewer note for stateful/cross-layer Tasks:
 
 ## Canonical Reviewer Follow-Up Prompt
 
-After opening a Task PR, default to the short reviewer kickoff in `docs/template/KICKOFF.md` section 3a. Section 3b there is the full inline brief and the authoritative output contract; paste it only when the operator asks or the reviewer lacks repo context.
+After opening a Task PR, default to the short reviewer kickoff in `docs/template/KICKOFF.md` section 3a. Section 3b there defines the authoritative output contract and points to `.github/prompts/review-task.prompt.md` for the full brief.
 Do not redefine the format in this file; keep `docs/template/KICKOFF.md` as the single source of truth.
 
 ## Learning Handoff (Required Completion Gate)
@@ -232,6 +242,13 @@ For small tasks with no contract/behavior change, decision brief is optional.
 ## Verification
 
 Run the relevant checks before claiming completion.
+
+### Verification Tiers
+
+- Tier 1 (implementation loop): run the smallest checks that prove changed behavior.
+- Tier 2 (post-review patch): rerun only checks needed for patched findings unless scope expands.
+- Tier 3 (PR/final gate): run canonical broad verify targets for affected surfaces (`make backend-verify`, `make frontend-verify`, `make verify` as applicable).
+- Tier 4 (operator-only heavy): live/provider/manual or unusually expensive checks only when explicitly required.
 
 Agent execution note:
 - Do not run live/provider-backed verification targets from agent sessions (for example `make extraction-live`); ask the human operator to run them manually and share output.
@@ -302,9 +319,10 @@ Docs paths:
 
 ## Documentation Layout
 
-Root stays lean — only agent/Claude entrypoints:
+Root stays lean — only top-level entrypoints:
 
 - Root: `AGENTS.md`, `CLAUDE.md`.
+- Subtree entrypoints: `backend/AGENTS.md`, `frontend/AGENTS.md` (loaded conditionally by scope).
 - `docs/`: `WORKFLOW.md`, `ISSUES_WORKFLOW.md`, `GREENFIELD_BLUEPRINT.md`, `MIGRATION_GUIDE.md`, `ARCHITECTURE.md`, `PATTERNS.md`, `REVIEW_CHECKLIST.md`, ADRs, runbooks.
 - `skills/`: procedural playbooks only.
 
