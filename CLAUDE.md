@@ -1,6 +1,8 @@
 @AGENTS.md
-@docs/ARCHITECTURE.md
-@docs/DESIGN.md
-@docs/PATTERNS.md
-@docs/REVIEW_CHECKLIST.md
-@docs/WORKFLOW.md
+
+Open additional docs only when the task touches those surfaces:
+- docs/ARCHITECTURE.md
+- docs/DESIGN.md
+- docs/PATTERNS.md
+- docs/REVIEW_CHECKLIST.md
+- docs/WORKFLOW.md

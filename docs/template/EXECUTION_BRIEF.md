@@ -44,9 +44,12 @@ Use this brief only when a GitHub Task issue already exists.
 
 ## Verification
 
-- `<exact command>`
-- `<exact command>`
-- `<manual check if needed>`
+Capture commands by tier so reruns stay proportional:
+
+- Tier 1 (implementation loop): `<smallest command proving changed behavior>`
+- Tier 2 (post-review patch): `<targeted rerun for patched finding>`
+- Tier 3 (PR/final gate): `<canonical broad verify command for touched surface>`
+- Tier 4 (operator-only heavy, when needed): `<manual/live check>`
 
 ## Open Product Decisions / Blockers
 

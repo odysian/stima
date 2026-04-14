@@ -29,9 +29,23 @@ Default: this Task should represent the entire feature end-to-end unless split c
 - [ ] ...
 
 ## Verification
-```bash
-cd backend && ruff check . && mypy . && bandit -r app/ && pytest && cd ../frontend && npx tsc --noEmit && npx eslint src/ && npx vitest run && npm run build
-```
+Use tiered verification. Fill exact commands for each tier that apply.
+
+### Tier 1 - Implementation loop (smallest checks proving changed behavior)
+- Backend example: `cd backend && .venv/bin/pytest app/features/<feature>/tests/test_<scope>.py`
+- Frontend example: `cd frontend && npx vitest run src/features/<feature>/tests/<file>.test.tsx`
+- Docs/template/tooling example: `make template-verify`
+
+### Tier 2 - Post-review patch verification (targeted reruns)
+- `<exact targeted command for patched findings>`
+
+### Tier 3 - PR/final gate verification (broad checks)
+- Backend scope: `make backend-verify`
+- Frontend scope: `make frontend-verify`
+- Cross-surface scope: `make verify`
+
+### Tier 4 - Operator-only heavy verification (optional)
+- `<manual/live/provider-backed check, if required by task>`
 
 ## PR checklist
 - [ ] PR references this issue (`Closes #...`)
