@@ -194,19 +194,21 @@ export function PublicQuotePage(): React.ReactElement {
     },
     resolveLineItemSum(documentData.line_items.map((item) => item.price)),
   );
+  const isInvoice = documentData.doc_type === "invoice";
+  const summaryGridColsClass = isInvoice ? "lg:grid-cols-3" : "lg:grid-cols-2";
 
   return (
     <main className="screen-radial-backdrop min-h-screen px-4 py-6 text-on-surface sm:px-6 lg:py-10">
       <div className="mx-auto max-w-4xl">
         <section className="overflow-hidden rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest ghost-shadow">
           <div className="forest-gradient px-5 py-6 text-on-primary sm:px-8 sm:py-8">
-            <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-on-primary/15 text-xl font-semibold uppercase text-on-primary">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-on-primary/15 text-xl font-semibold uppercase text-on-primary ring-1 ring-on-primary/20 sm:h-20 sm:w-24 sm:text-2xl">
                 {showLogo ? (
                   <img
                     src={documentData.logo_url}
                     alt={displayBusinessName ? `${displayBusinessName} logo` : `${getDocumentLabel(documentData)} logo`}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain p-2"
                     onError={() => setHiddenLogoUrl(documentData.logo_url)}
                   />
                 ) : (
@@ -219,7 +221,7 @@ export function PublicQuotePage(): React.ReactElement {
                     {displayBusinessName}
                   </p>
                 ) : null}
-                <h1 className="mt-3 text-3xl font-semibold leading-tight">
+                <h1 className="mt-2 text-2xl font-semibold leading-tight sm:mt-3 sm:text-3xl">
                   {getDisplayTitle(documentData)}
                 </h1>
                 <p className="mt-2 text-sm text-on-primary/80">
@@ -236,7 +238,9 @@ export function PublicQuotePage(): React.ReactElement {
               </div>
             ) : null}
 
-            <section className="grid gap-4 rounded-2xl bg-surface-container-low p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <section
+              className={`grid gap-4 rounded-2xl bg-surface-container-low p-4 sm:grid-cols-2 ${summaryGridColsClass}`}
+            >
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
                   Customer
@@ -251,7 +255,7 @@ export function PublicQuotePage(): React.ReactElement {
                   {documentData.total_amount !== null ? formatCurrency(documentData.total_amount) : "TBD"}
                 </p>
               </div>
-              {documentData.doc_type === "invoice" ? (
+              {isInvoice ? (
                 <div className="lg:text-right">
                   <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
                     Due Date
@@ -261,6 +265,41 @@ export function PublicQuotePage(): React.ReactElement {
                   </p>
                 </div>
               ) : null}
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-outline">
+                  Line Items
+                </h2>
+                <span className="text-xs text-on-surface-variant">
+                  {documentData.line_items.length} item{documentData.line_items.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <ul className="mt-4 space-y-3">
+                {documentData.line_items.map((item, index) => (
+                  <li
+                    key={`${index}-${item.description}-${item.details ?? "none"}`}
+                    className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="font-semibold break-words [overflow-wrap:anywhere]">
+                          {item.description}
+                        </p>
+                        {item.details ? (
+                          <p className="mt-1 text-sm text-on-surface-variant break-words [overflow-wrap:anywhere]">
+                            {item.details}
+                          </p>
+                        ) : null}
+                      </div>
+                      <p className="shrink-0 text-sm font-semibold">
+                        {item.price !== null ? formatCurrency(item.price) : "TBD"}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </section>
 
             {pricingBreakdown.hasPricingBreakdown ? (
@@ -283,37 +322,6 @@ export function PublicQuotePage(): React.ReactElement {
                 </div>
               </section>
             ) : null}
-
-            <section>
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-outline">
-                  Line Items
-                </h2>
-                <span className="text-xs text-on-surface-variant">
-                  {documentData.line_items.length} item{documentData.line_items.length === 1 ? "" : "s"}
-                </span>
-              </div>
-              <ul className="mt-4 space-y-3">
-                {documentData.line_items.map((item, index) => (
-                  <li
-                    key={`${index}-${item.description}-${item.details ?? "none"}`}
-                    className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="font-semibold">{item.description}</p>
-                        {item.details ? (
-                          <p className="mt-1 text-sm text-on-surface-variant">{item.details}</p>
-                        ) : null}
-                      </div>
-                      <p className="shrink-0 text-sm font-semibold">
-                        {item.price !== null ? formatCurrency(item.price) : "TBD"}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
 
             {documentData.notes ? (
               <section className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4">

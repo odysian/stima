@@ -26,9 +26,13 @@ export function QuoteLineItemsSection({
             className="ghost-shadow flex items-start justify-between rounded-lg bg-surface-container-lowest p-3"
           >
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-on-surface">{item.description}</p>
+              <p className="font-medium text-on-surface break-words [overflow-wrap:anywhere]">
+                {item.description}
+              </p>
               {item.details ? (
-                <p className="mt-1 text-sm text-on-surface-variant">{item.details}</p>
+                <p className="mt-1 text-sm text-on-surface-variant break-words [overflow-wrap:anywhere]">
+                  {item.details}
+                </p>
               ) : null}
             </div>
             <p className="ml-4 shrink-0 font-bold text-on-surface">

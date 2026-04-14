@@ -41,6 +41,7 @@ def _make_context(
     customer_address: str | None = None,
     notes: str | None = None,
     line_item_details: str | None = None,
+    line_items: list[QuoteRenderLineItem] | None = None,
     subtotal_amount: Decimal | None = None,
     discount_type: str | None = None,
     discount_value: Decimal | None = None,
@@ -81,7 +82,9 @@ def _make_context(
         balance_due=balance_due,
         notes=notes,
         due_date=due_date,
-        line_items=[
+        line_items=line_items
+        if line_items is not None
+        else [
             QuoteRenderLineItem(
                 description="Leaf cleanup",
                 details=line_item_details,
@@ -209,6 +212,16 @@ def test_render_shows_conditional_pricing_breakdown_rows(
     assert "$11.00" in rendered_html
     assert "$30.00" in rendered_html
     assert "$91.00" in rendered_html
+    assert "-$30.00" not in rendered_html
+    assert re.search(
+        (
+            r"<div class=\"total-row total-row--deposit\">\s*"
+            r"<p class=\"total-label\">Deposit</p>\s*"
+            r"<p class=\"total-amount\">\$30.00</p>"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
 
 
 def test_render_omits_internal_quote_title_from_pdf(
@@ -281,7 +294,7 @@ def test_render_orders_customer_details_as_name_address_phone_and_omits_email(
         (
             r"<p class=\"label\">Prepared For</p>\s*"
             r"<p class=\"value\">Jamie Customer</p>\s*"
-            r"<p class=\"value\">123 Main St</p>\s*"
+            r"<p class=\"value value--multiline\">123 Main St</p>\s*"
             r"<p class=\"value\">\+1-555-000-1111</p>"
         ),
         rendered_html,
@@ -327,6 +340,38 @@ def test_render_stacks_line_item_details_in_description_column(
         re.DOTALL,
     )
     assert "<th>Details</th>" not in rendered_html
+
+
+def test_render_preserves_multiline_customer_address_in_pdf(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            customer_address="123 Main St\nSuite 200",
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert "value--multiline" in rendered_html
+    assert "123 Main St\nSuite 200" in rendered_html
 
 
 def test_render_includes_due_date_and_doc_label_for_invoices(
@@ -375,9 +420,77 @@ def test_render_includes_due_date_and_doc_label_for_invoices(
         rendered_html,
         re.DOTALL,
     )
+    assert "CUSTOMER SIGNATURE" not in rendered_html
+    assert 'class="signature-area"' not in rendered_html
 
 
-def test_render_includes_contractor_contact_details_when_present(
+def test_render_shows_quote_signature_area_only_for_quote_doc_label(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    quote_result = integration.render(
+        _make_context(
+            doc_label="Quote",
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+        )
+    )
+    invoice_result = integration.render(
+        _make_context(
+            doc_label="Invoice",
+            doc_number="I-201",
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+        )
+    )
+
+    assert quote_result == b"fake-pdf"
+    assert invoice_result == b"fake-pdf"
+    assert len(captured_html) == 2
+    quote_html, invoice_html = captured_html
+    assert "CUSTOMER SIGNATURE" in quote_html
+    assert "ACCEPTANCE" not in quote_html.upper()
+    assert "ACCEPTED BY" not in quote_html.upper()
+    assert "ACCEPTANCE" not in invoice_html.upper()
+    assert "ACCEPTED BY" not in invoice_html.upper()
+    assert re.search(
+        r"<p class=\"signature-field-label\">CUSTOMER SIGNATURE</p>",
+        quote_html,
+        re.DOTALL,
+    )
+    assert '<p class="signature-field-label">DATE</p>' not in quote_html
+    assert 'class="signature-line"' in quote_html
+    assert 'class="signature-label-row"' in quote_html
+    assert re.search(r'class="notes-column(?:\s|")', quote_html)
+    assert 'class="totals-stack totals-stack--with-signature"' in quote_html
+    total_block_pos = quote_html.find('class="total-block"')
+    signature_pos = quote_html.find('class="signature-area"')
+    signature_line_pos = quote_html.find('class="signature-line"')
+    signature_labels_pos = quote_html.find('class="signature-label-row"')
+    assert total_block_pos != -1
+    assert signature_pos != -1
+    assert signature_line_pos != -1
+    assert signature_labels_pos != -1
+    assert total_block_pos < signature_pos
+    assert signature_line_pos < signature_labels_pos
+    assert "CUSTOMER SIGNATURE" not in invoice_html
+    assert 'class="signature-area"' not in invoice_html
+
+
+def test_render_includes_contractor_contact_details_in_header_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured_html: list[str] = []
@@ -406,6 +519,8 @@ def test_render_includes_contractor_contact_details_when_present(
 
     assert result == b"fake-pdf"
     rendered_html = captured_html[0]
+    assert "Prepared By" not in rendered_html
+    assert 'class="header-contact"' in rendered_html
     assert "+1-555-111-2222" in rendered_html
     assert "owner@example.com" in rendered_html
 
@@ -538,7 +653,7 @@ def test_render_includes_logo_image_only_when_logo_data_uri_is_present(
     assert result == b"fake-pdf"
     assert len(captured_html) == 1
     assert 'class="company-logo"' in captured_html[0]
-    assert "max-height: 56px" in captured_html[0]
+    assert "max-height: 84px" in captured_html[0]
 
 
 def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
@@ -575,6 +690,28 @@ def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
     assert "@bottom-center" in rendered_html
     assert 'content: "Page " counter(page) " of " counter(pages);' in rendered_html
     assert "page-break-inside: avoid;" in rendered_html
+    assert re.search(
+        r"table\.line-items tbody td\s*\{[^}]*padding:\s*8px 8px;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        (
+            r"\.line-item-description\s*\{[^}]*display:\s*block;"
+            r"[^}]*overflow-wrap:\s*anywhere;"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        (
+            r"\.line-item-details\s*\{[^}]*margin-top:\s*1px;"
+            r"[^}]*padding-left:\s*2ch;"
+            r"[^}]*overflow-wrap:\s*anywhere;"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
     assert "overflow-wrap: break-word;" in rendered_html
     assert re.search(r"\.meta-right\s*\{[^}]*text-align:\s*right;", rendered_html, re.DOTALL)
     assert re.search(r"\.meta-details\s*\{[^}]*width:\s*auto;", rendered_html, re.DOTALL)
@@ -629,6 +766,72 @@ def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
     assert "font-weight: 700;" in rendered_html
     assert "font-size: 16px;" in rendered_html
     assert re.search(r"\.total-block\s*\{[^}]*border-top:", rendered_html, re.DOTALL)
+    assert ".post-content" in rendered_html
+    assert 'class="post-content post-content--with-notes"' in rendered_html
+    assert ".total-row--supporting" in rendered_html
+    assert ".total-row--final" in rendered_html
+    assert ".total-row--deposit" in rendered_html
+    assert ".total-row--balance" in rendered_html
+    assert re.search(
+        (
+            r"\.total-row--supporting \.total-amount\s*\{[^}]*font-size:\s*13px;"
+            r"[^}]*font-weight:\s*500;"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.total-row--final \.total-amount\s*\{[^}]*font-size:\s*17px;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        (
+            r"\.total-row--deposit \.total-amount\s*\{[^}]*font-size:\s*14px;"
+            r"[^}]*font-weight:\s*600;"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.total-row--balance \.total-amount\s*\{[^}]*font-size:\s*18px;[^}]*font-weight:\s*700;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(r"\.totals-stack\s*\{[^}]*width:\s*220px;", rendered_html, re.DOTALL)
+    assert re.search(
+        (
+            r"\.totals-stack--with-signature\s*\{[^}]*page-break-inside:\s*avoid;"
+            r"[^}]*break-inside:\s*avoid-page;"
+        ),
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.signature-area\s*\{[^}]*margin-top:\s*60px;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.signature-label-row\s*\{[^}]*justify-content:\s*flex-start;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.signature-label-row\s*\{[^}]*margin-top:\s*7px;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.signature-line\s*\{[^}]*border-bottom:\s*1px solid #111827;",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.signature-field-label\s*\{[^}]*font-size:\s*10px;[^}]*text-transform:\s*uppercase;",
+        rendered_html,
+        re.DOTALL,
+    )
     assert re.search(r"\.notes\s*\{[^}]*border-left:", rendered_html, re.DOTALL)
     assert "#9ca3af" in rendered_html
     assert not re.search(r"\.notes\s*\{[^}]*\bborder:", rendered_html, re.DOTALL)
@@ -636,6 +839,43 @@ def test_render_uses_a4_page_size_and_polished_quote_layout_styles(
     line_items_table, total_block = rendered_html.split('<section class="total-block">', maxsplit=1)
     assert "</table>" in line_items_table
     assert "<table" not in total_block
+
+
+def test_render_places_notes_in_left_column_with_totals_on_right_before_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            notes="Call before arrival",
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert 'class="post-content post-content--with-notes"' in rendered_html
+    notes_pos = rendered_html.find('class="notes"')
+    totals_pos = rendered_html.find('class="total-block"')
+    signature_pos = rendered_html.find('class="signature-area"')
+    assert notes_pos != -1
+    assert totals_pos != -1
+    assert signature_pos != -1
+    assert notes_pos < totals_pos < signature_pos
 
 
 def test_render_handles_sparse_quote_without_blank_placeholders(
@@ -677,7 +917,50 @@ def test_render_handles_sparse_quote_without_blank_placeholders(
     assert 'class="company-logo"' not in rendered_html
     assert 'class="notes"' not in rendered_html
     assert 'class="line-item-details"' not in rendered_html
+    assert "CUSTOMER SIGNATURE" in rendered_html
+    assert "ACCEPTED BY" not in rendered_html.upper()
     assert rendered_html.count("&mdash;") == 2
+
+
+def test_render_handles_denser_quote_layout_without_placeholder_regressions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            line_item_price=Decimal("120.00"),
+            total=Decimal("780.00"),
+            line_items=[
+                QuoteRenderLineItem(
+                    description=f"Line item {index}",
+                    details="Detailed scope line",
+                    price=Decimal("130.00"),
+                )
+                for index in range(1, 7)
+            ],
+            notes="Keep gate closed after service.",
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert rendered_html.count('class="line-item-description"') == 6
+    assert "page-break-inside: avoid;" in rendered_html
+    assert "$None" not in rendered_html
+    assert 'class="signature-area"' in rendered_html
 
 
 def test_build_render_context_formats_dates_in_business_timezone() -> None:
