@@ -55,7 +55,10 @@ describe("RegisterForm", () => {
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
-    fireEvent.change(await screen.findByLabelText(/password/i), {
+    fireEvent.change(await screen.findByLabelText(/^password$/i), {
+      target: { value: "strong-password" },
+    });
+    fireEvent.change(await screen.findByLabelText(/^confirm password$/i), {
       target: { value: "strong-password" },
     });
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
@@ -84,11 +87,71 @@ describe("RegisterForm", () => {
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
-    fireEvent.change(await screen.findByLabelText(/password/i), {
+    fireEvent.change(await screen.findByLabelText(/^password$/i), {
+      target: { value: "weak" },
+    });
+    fireEvent.change(await screen.findByLabelText(/^confirm password$/i), {
       target: { value: "weak" },
     });
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Email already exists");
+  });
+
+  it("blocks submit and shows inline mismatch feedback until passwords match", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderRegister();
+    expect(await screen.findByRole("main")).toHaveClass("screen-radial-backdrop");
+
+    fireEvent.change(await screen.findByLabelText(/email/i), {
+      target: { value: "new@example.com" },
+    });
+    fireEvent.change(await screen.findByLabelText(/^password$/i), {
+      target: { value: "strong-password" },
+    });
+    fireEvent.change(await screen.findByLabelText(/^confirm password$/i), {
+      target: { value: "different-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    expect(mockedAuthService.register).not.toHaveBeenCalled();
+    expect(screen.getByText("Passwords do not match.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/^confirm password$/i), {
+      target: { value: "strong-password" },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Passwords do not match.")).not.toBeInTheDocument();
+    });
+  });
+
+  it("toggles visibility for password and confirm-password fields", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderRegister();
+
+    const passwordInput = await screen.findByLabelText(/^password$/i);
+    const confirmPasswordInput = await screen.findByLabelText(/^confirm password$/i);
+    const passwordToggle = screen.getByRole("button", { name: /show password/i });
+    const confirmPasswordToggle = screen.getByRole("button", { name: /show confirm password/i });
+
+    expect(passwordInput).toHaveAttribute("type", "password");
+    expect(confirmPasswordInput).toHaveAttribute("type", "password");
+
+    fireEvent.click(passwordToggle);
+    fireEvent.click(confirmPasswordToggle);
+
+    expect(passwordInput).toHaveAttribute("type", "text");
+    expect(confirmPasswordInput).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: /hide password/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /hide confirm password/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 });

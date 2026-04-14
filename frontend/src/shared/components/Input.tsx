@@ -6,6 +6,7 @@ interface InputProps {
   placeholder?: string;
   className?: string;
   type?: string;
+  autoComplete?: string;
   required?: boolean;
   hideLabel?: boolean;
   maxLength?: number;
@@ -20,6 +21,7 @@ export function Input({
   placeholder,
   className,
   type = "text",
+  autoComplete,
   required = false,
   hideLabel = false,
   maxLength,
@@ -48,6 +50,7 @@ export function Input({
       <input
         id={id}
         type={type}
+        autoComplete={autoComplete}
         value={value}
         onChange={onChange}
         required={required}
