@@ -192,4 +192,5 @@ describe("App routes", () => {
     renderApp("/quotes/quote-1/edit/line-items/0/edit");
     expect(await screen.findByRole("heading", { name: /^quotes$/i })).toBeInTheDocument();
   });
+
 });
