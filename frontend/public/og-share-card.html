@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+  Screenshot helper for Open Graph / Discord link previews.
+  1. Run the dev server: cd frontend && npm run dev
+  2. Open http://localhost:5173/og-share-card.html
+  3. Set the browser window to 1200×630 (or use devtools device frame) and capture — no UI chrome.
+  Colors match app dark theme (see frontend/src/index.css [data-theme="dark"]).
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1200, initial-scale=1.0" />
+    <title>Stima — share card (screenshot)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        /* Dark theme tokens (aligned with frontend/src/index.css) */
+        --background: #0b1013;
+        --surface-high: #0f161b;
+        --surface-low: #121920;
+        --primary: #1b8e6c;
+        --on-surface: #eef2ef;
+        --on-surface-variant: #b5beb8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        font-family: "Space Grotesk", system-ui, sans-serif;
+        background: radial-gradient(
+          circle at 50% -10%,
+          var(--surface-high) 0%,
+          var(--background) 45%,
+          var(--surface-low) 100%
+        );
+        color: var(--on-surface);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Safe area so previews that crop slightly still show full copy */
+        padding: 7% 10%;
+      }
+
+      .stack {
+        text-align: center;
+        max-width: 52rem;
+      }
+
+      .brand {
+        margin: 0 0 0.28em;
+        font-size: clamp(3.25rem, 7.2vw, 5.25rem);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1.02;
+        color: var(--primary);
+      }
+
+      .tagline {
+        margin: 0;
+        font-size: clamp(1.65rem, 3.1vw, 2.35rem);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 1.28;
+        color: var(--on-surface);
+      }
+
+      .tagline + .tagline {
+        margin-top: 0.35em;
+        /* Same contrast as line 1 — small unfurls stay readable */
+        color: var(--on-surface);
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <h1 class="brand">Stima</h1>
+      <p class="tagline">Capture the job first.</p>
+      <p class="tagline">Refine the quote after.</p>
+    </div>
+  </body>
+</html>
