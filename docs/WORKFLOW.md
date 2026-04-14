@@ -11,6 +11,7 @@
 - Execution control plane (modes, DoR/DoD, branching, issue lifecycle): `docs/ISSUES_WORKFLOW.md` (authoritative)
 - Kickoff prompts and reviewer output contract: `docs/template/KICKOFF.md` (authoritative)
 - This file (`WORKFLOW.md`) summarizes the implementation loop and engineering defaults.
+- For narrow execute/review work, load this file by section as routed from `AGENTS.md`; a full sequential read is not required.
 
 ## Greenfield Baseline (Default)
 
@@ -86,7 +87,7 @@ git fetch --prune origin
 
 ## Issues Workflow (Control Plane)
 
-Read `docs/ISSUES_WORKFLOW.md` before implementation.
+Use `AGENTS.md` bootstrap paths to decide when `docs/ISSUES_WORKFLOW.md` must be loaded. It is required for planning, issue creation, mode/lifecycle decisions, and any control-plane uncertainty.
 
 Core rule:
 

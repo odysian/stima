@@ -31,11 +31,11 @@ This guide explains how to use this template as the foundation for a new project
 7. Keep execution mode defaults strict: default to `single`; use `gated`/`fast` only when explicitly requested.
 8. Keep ceremony conditional: second review pass only when explicitly requested; decision briefs and doc updates only when behavior/contracts/architecture changed.
 
-Recommended onboarding order for agents:
-1. `AGENTS.md`
-2. `docs/ISSUES_WORKFLOW.md`
-3. `docs/template/KICKOFF.md`
-4. `docs/WORKFLOW.md`
+Recommended onboarding paths for agents:
+1. Implement existing Task: `AGENTS.md` -> Task/Execution Brief/PR context -> `docs/template/KICKOFF.md` section 1 -> relevant `docs/WORKFLOW.md` sections only as needed.
+2. Review PR: `AGENTS.md` -> PR/Task context -> `docs/template/KICKOFF.md` section 3a (and 3b constraints) -> `.github/prompts/review-task.prompt.md` only when full prompt body is needed.
+3. Plan/create issues/choose mode: `AGENTS.md` -> `docs/ISSUES_WORKFLOW.md` -> `docs/template/KICKOFF.md` section 2.
+4. Escape hatch: if mode/labels/lifecycle/branching are unclear in any path, read `docs/ISSUES_WORKFLOW.md` before proceeding.
 
 Kickoff split:
 - Planning kickoff (`feature -> issue artifacts`) is planning-only: no code changes, no PR.

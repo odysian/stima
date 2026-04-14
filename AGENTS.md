@@ -1,20 +1,48 @@
 # AGENTS.md — Stima
 
-## Start Here (Canonical Entrypoint)
+## Bootstrap (Mode-Routed Entrypoint)
 
-Read in this order:
-1. `AGENTS.md` (this file)
-2. `docs/ISSUES_WORKFLOW.md`
-3. `docs/WORKFLOW.md`
-4. Task issue / Execution Brief / PR context
+Start here, then choose the path that matches the session's primary intent. Paths are not a lock: if the session changes (for example implementation -> planning), switch to that path's read list from that point.
 
-Read conditionally (only when relevant):
-- `docs/template/KICKOFF.md` for kickoff, review handoff, or post-review patch flows
-- `backend/AGENTS.md` for backend work (`area:backend`, `area:database`, or files under `backend/`)
-- `frontend/AGENTS.md` for frontend work (`area:frontend` or files under `frontend/`)
-- `docs/README.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/PATTERNS.md`, `docs/REVIEW_CHECKLIST.md` only when touched scope requires them
+Universal quality floor:
+- Keep changes surgical and consistent with existing style.
+- Do not change unrelated files.
+- Do not modify applied migrations; add a new migration when needed.
+- Preserve existing contracts unless task scope says otherwise.
+- Use verification tiers from `docs/WORKFLOW.md` section **Verification Tiers**.
+- Keep broad verify targets (`make backend-verify`, `make frontend-verify`, `make verify`) as PR/final gates unless scope requires earlier coverage.
+- Load `backend/AGENTS.md` for backend scope (`area:backend`, `area:database`, or files under `backend/`).
+- Load `frontend/AGENTS.md` for frontend scope (`area:frontend` or files under `frontend/`).
+
+### A) Implement Existing Task
+Read in order:
+1. Task issue / Execution Brief / PR context
+2. Relevant subtree `AGENTS.md`
+3. `docs/template/KICKOFF.md` section 1
+4. `docs/WORKFLOW.md` sections only as needed (for example: `Verification Tiers`, `Boundary And Dependency Rules`, `Stateful Cross-Layer Hardening Gate`)
+
+### B) Review PR
+Read in order:
+1. PR / Task context
+2. `docs/template/KICKOFF.md` section 3a and section 3b constraints
+3. `.github/prompts/review-task.prompt.md` when full reviewer prompt body is needed without repo context (use either section 3b inline context or this prompt body; do not double-load)
+4. Relevant subtree `AGENTS.md` only when touched scope requires it
+
+### C) Plan / Create Issues / Choose Mode
+Read:
+1. `docs/ISSUES_WORKFLOW.md` (authoritative for control plane)
+2. `docs/template/KICKOFF.md` section 2 for planning-only kickoff format
+3. Additional planning docs only when needed by touched scope
+
+### D) Docs / Architecture / Pattern Work
+Read only touched docs:
+- `docs/README.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/PATTERNS.md`, `docs/REVIEW_CHECKLIST.md`
 - `docs/GREENFIELD_BLUEPRINT.md` only for greenfield/restructure tasks
 - `skills/*` playbooks only when explicitly requested or clearly required by the task
+
+### Escape Hatch (Any Path)
+
+If control-plane rules, issue labels, execution mode, Spec/Task lifecycle, or branching requirements are unclear, read `docs/ISSUES_WORKFLOW.md` before changing process, creating/closing issues, or branching strategy.
 
 ## Nested AGENTS Discovery
 
