@@ -19,7 +19,8 @@ Use this analog when a user-triggered action validates a document, prepares a re
 - `backend/app/features/invoices/service.py`
 - `frontend/src/features/invoices/components/InvoiceDetailScreen.tsx`
 - `docs/ARCHITECTURE.md`
-- `backend/app/features/quotes/tests/test_quotes.py`
+- `backend/app/features/quotes/tests/test_quote_email.py`
+- `backend/app/features/invoices/tests/test_invoice_email.py`
 - `frontend/src/features/quotes/tests/QuotePreview.test.tsx`
 - `frontend/src/features/invoices/tests/InvoiceDetailScreen.test.tsx`
 
@@ -83,6 +84,6 @@ Invoices:
 
 - `make backend-verify`
 - `make frontend-verify`
-- For targeted backend coverage, start with `backend/app/features/quotes/tests/test_quotes.py`
+- For targeted backend send-email and idempotency coverage, start with `backend/app/features/quotes/tests/test_quote_email.py` and `backend/app/features/invoices/tests/test_invoice_email.py`
 - For targeted quote UI coverage, start with `frontend/src/features/quotes/tests/QuotePreview.test.tsx`
 - For targeted invoice UI coverage, start with `frontend/src/features/invoices/tests/InvoiceDetailScreen.test.tsx`

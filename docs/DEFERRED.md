@@ -108,13 +108,7 @@ Higher-risk tasks can be easier to review when the implementation output names t
 
 ---
 
-## Quote Behavior Test-Suite Decomposition
+## Quote behavior test-suite decomposition — addressed
 
-**Source:** 2026-04-12 quote modularity planning review
-**Where:** `backend/app/features/quotes/tests/test_quotes.py`
-
-`test_quotes.py` is a broad behavior hub. Splitting it by behavior group could improve reviewability and CI failure triage, but doing it before the quote share refactor risks mixing test-file movement with behavior-slice implementation.
-
-**Fix:** After the quote share modularity phases settle, plan a test-only task that moves existing tests into behavior-focused modules while preserving assertions and coverage intent. Include a "Do NOT duplicate" section because this is a test-focused task.
-
-**Priority:** Low to Medium — useful after the service decomposition, not a blocker for Phase 1A or 1B.
+**Source:** 2026-04-12 quote modularity planning review  
+**Resolution:** Decomposition is owned by GitHub Spec [#368](https://github.com/odysian/stima/issues/368) and `plans/2026-04-13/test-suite-organization-spec.md`. Phases 1–4 shipped via Tasks [#369](https://github.com/odysian/stima/issues/369), [#371](https://github.com/odysian/stima/issues/371), [#373](https://github.com/odysian/stima/issues/373), [#381](https://github.com/odysian/stima/issues/381). Remaining helper consolidation is Phase 5 ([#383](https://github.com/odysian/stima/issues/383)). Where to add new tests: `docs/PATTERNS.md` — **Quote and invoice API integration tests (layout)**.

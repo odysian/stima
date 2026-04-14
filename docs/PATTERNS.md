@@ -78,6 +78,13 @@ Record conventions that already exist in code.
 - Event-log DB persistence is disabled by default in backend test fixtures to avoid background-task coupling.
 - External-provider tests are opt-in via `@pytest.mark.live` and excluded from default verify (`-m "not live"`).
 
+## Quote and invoice API integration tests (layout)
+
+- Quote and invoice **HTTP API** behavior tests live in **cohort modules** under `backend/app/features/quotes/tests/` and `backend/app/features/invoices/tests/`. Examples: `test_quote_crud.py`, `test_quote_outcomes.py`, `test_quote_to_invoice.py`, `test_quote_email.py`, `test_quote_auth_csrf.py`, `test_quote_extraction.py`, `test_quote_append_extraction.py`, `test_invoice_api.py`, `test_invoice_doc_type.py`, `test_invoice_outcomes.py`, `test_invoice_email.py`. Pick the file that matches the behavior or route under test.
+- `backend/app/features/quotes/tests/test_quotes.py` is the **shared fixture and helper hub** (mocks, FastAPI `dependency_overrides`, async helpers such as `_register_and_login` and `_create_quote`). Other modules typically use `from app.features.quotes.tests import test_quotes as quotes_test_module` and re-bind the fixtures or helpers they need.
+- **Hygiene for new tests:** add cases to the **smallest** cohort module that owns the route or rule; do not treat the hub file as a new catch-all for unrelated API tests.
+- Further deduplication of the hub (for example `quotes/tests/support/`) is **Phase 5** — GitHub [#383](https://github.com/odysian/stima/issues/383), parent Spec [#368](https://github.com/odysian/stima/issues/368); scope is **Phase 5 stabilization scope** in `plans/2026-04-13/test-suite-organization-spec.md`.
+
 ## MSW Handler Design
 - Base handlers in `src/shared/tests/mocks/handlers.ts` encode the backend contract.
 - CSRF-protected endpoints (refresh, logout) must return 403 when `X-CSRF-Token` is missing — this catches regressions where code stops sending CSRF.

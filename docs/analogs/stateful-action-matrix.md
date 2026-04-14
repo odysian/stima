@@ -96,4 +96,4 @@ Invoice detail:
 - `make backend-verify` when frontend changes depend on backend status or side-effect rules
 - For quote action parity, start with `frontend/src/features/quotes/tests/QuotePreview.test.tsx` and `frontend/src/features/quotes/tests/QuotePreviewActions.test.tsx`
 - For invoice action parity, start with `frontend/src/features/invoices/tests/InvoiceDetailScreen.test.tsx`
-- For backend status and side-effect parity, inspect `backend/app/features/quotes/service.py` and the send/outcome coverage in `backend/app/features/quotes/tests/test_quotes.py`
+- For backend status and side-effect parity, inspect `backend/app/features/quotes/service.py` (and invoice `service.py` when relevant) plus the cohort tests under `backend/app/features/quotes/tests/` and `backend/app/features/invoices/tests/` — for example `test_quote_outcomes.py`, `test_quote_email.py`, `test_invoice_outcomes.py`, `test_invoice_email.py`. See `docs/PATTERNS.md` — **Quote and invoice API integration tests (layout)**.
