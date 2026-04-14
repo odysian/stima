@@ -14,6 +14,24 @@ from app.features.event_logs.models import EventLog
 from app.features.quotes.models import QuoteStatus
 from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.tests import test_quotes as quotes_test_module
+from app.features.quotes.tests.support.helpers import (
+    _assert_async_email_job_response,
+    _create_customer,
+    _create_quote,
+    _credentials,
+    _get_user_by_email,
+    _register_and_login,
+    _send_email_headers,
+    _set_profile_for_email_delivery,
+    _set_quote_status,
+    _set_user_email_and_phone_number,
+    _set_user_phone_number,
+)
+from app.features.quotes.tests.support.mocks import (
+    _FailingAbortIdempotencyStore,
+    _InProgressIdempotencyStore,
+    _MockEmailService,
+)
 from app.main import app
 from app.shared import event_logger, observability
 from app.shared.dependencies import get_idempotency_store
@@ -28,21 +46,6 @@ _override_extraction_service_dependency = quotes_test_module._override_extractio
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
 _mock_arq_pool_for_send_email_tests = quotes_test_module._mock_arq_pool_for_send_email_tests
 mock_email_service = quotes_test_module.mock_email_service
-
-_MockEmailService = quotes_test_module._MockEmailService
-_FailingAbortIdempotencyStore = quotes_test_module._FailingAbortIdempotencyStore
-_InProgressIdempotencyStore = quotes_test_module._InProgressIdempotencyStore
-_assert_async_email_job_response = quotes_test_module._assert_async_email_job_response
-_send_email_headers = quotes_test_module._send_email_headers
-_register_and_login = quotes_test_module._register_and_login
-_credentials = quotes_test_module._credentials
-_set_profile_for_email_delivery = quotes_test_module._set_profile_for_email_delivery
-_set_user_phone_number = quotes_test_module._set_user_phone_number
-_set_user_email_and_phone_number = quotes_test_module._set_user_email_and_phone_number
-_create_customer = quotes_test_module._create_customer
-_create_quote = quotes_test_module._create_quote
-_set_quote_status = quotes_test_module._set_quote_status
-_get_user_by_email = quotes_test_module._get_user_by_email
 
 
 async def test_send_quote_email_shares_quote_delivers_email_and_logs_success(

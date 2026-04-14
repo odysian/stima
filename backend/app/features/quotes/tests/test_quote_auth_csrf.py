@@ -8,6 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes.tests import test_quotes as quotes_test_module
+from app.features.quotes.tests.support.helpers import (
+    _create_approved_invoice,
+    _create_customer,
+    _create_quote,
+    _credentials,
+    _register_and_login,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -17,11 +24,6 @@ _override_storage_service_dependency = quotes_test_module._override_storage_serv
 _override_quote_service_dependency = quotes_test_module._override_quote_service_dependency
 _override_extraction_service_dependency = quotes_test_module._override_extraction_service_dependency
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
-_register_and_login = quotes_test_module._register_and_login
-_credentials = quotes_test_module._credentials
-_create_customer = quotes_test_module._create_customer
-_create_quote = quotes_test_module._create_quote
-_create_approved_invoice = quotes_test_module._create_approved_invoice
 
 
 @pytest.mark.parametrize(

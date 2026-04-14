@@ -16,6 +16,20 @@ from app.features.quotes.models import Document
 from app.features.quotes.schemas import ExtractionResult
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.features.quotes.tests import test_quotes as quotes_test_module
+from app.features.quotes.tests.support.helpers import (
+    _create_customer,
+    _create_quote,
+    _credentials,
+    _get_user_by_email,
+    _register_and_login,
+    _run_extraction_job,
+)
+from app.features.quotes.tests.support.mocks import (
+    _MockArqPool,
+    _MockExtractionIntegration,
+    _MockStorageService,
+    _RetryableProviderError,
+)
 from app.integrations.extraction import ExtractionError
 from app.main import app
 
@@ -27,16 +41,6 @@ _override_storage_service_dependency = quotes_test_module._override_storage_serv
 _override_quote_service_dependency = quotes_test_module._override_quote_service_dependency
 _override_extraction_service_dependency = quotes_test_module._override_extraction_service_dependency
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
-_register_and_login = quotes_test_module._register_and_login
-_credentials = quotes_test_module._credentials
-_create_customer = quotes_test_module._create_customer
-_create_quote = quotes_test_module._create_quote
-_get_user_by_email = quotes_test_module._get_user_by_email
-_MockArqPool = quotes_test_module._MockArqPool
-_MockStorageService = quotes_test_module._MockStorageService
-_MockExtractionIntegration = quotes_test_module._MockExtractionIntegration
-_RetryableProviderError = quotes_test_module._RetryableProviderError
-_run_extraction_job = quotes_test_module._run_extraction_job
 
 
 async def test_append_extraction_sync_retryable_failure_uses_degraded_append_semantics(

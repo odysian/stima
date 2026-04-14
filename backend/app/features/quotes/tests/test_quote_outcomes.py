@@ -12,6 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.tests import test_quotes as quotes_test_module
+from app.features.quotes.tests.support.helpers import (
+    _create_customer,
+    _create_quote,
+    _credentials,
+    _register_and_login,
+    _set_quote_status,
+)
 from app.shared import event_logger
 
 pytestmark = pytest.mark.asyncio
@@ -22,11 +29,6 @@ _override_storage_service_dependency = quotes_test_module._override_storage_serv
 _override_quote_service_dependency = quotes_test_module._override_quote_service_dependency
 _override_extraction_service_dependency = quotes_test_module._override_extraction_service_dependency
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
-_create_customer = quotes_test_module._create_customer
-_create_quote = quotes_test_module._create_quote
-_credentials = quotes_test_module._credentials
-_register_and_login = quotes_test_module._register_and_login
-_set_quote_status = quotes_test_module._set_quote_status
 
 
 async def test_mark_won_quote_returns_404_for_different_users_quote(

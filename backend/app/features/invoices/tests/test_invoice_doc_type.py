@@ -7,6 +7,14 @@ from uuid import UUID
 import pytest
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.tests import test_quotes as quotes_test_module
+from app.features.quotes.tests.support.helpers import (
+    _create_customer,
+    _create_direct_invoice,
+    _create_quote,
+    _credentials,
+    _register_and_login,
+    _set_invoice_status,
+)
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,12 +27,6 @@ _override_storage_service_dependency = quotes_test_module._override_storage_serv
 _override_quote_service_dependency = quotes_test_module._override_quote_service_dependency
 _override_extraction_service_dependency = quotes_test_module._override_extraction_service_dependency
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
-_create_customer = quotes_test_module._create_customer
-_create_direct_invoice = quotes_test_module._create_direct_invoice
-_create_quote = quotes_test_module._create_quote
-_credentials = quotes_test_module._credentials
-_register_and_login = quotes_test_module._register_and_login
-_set_invoice_status = quotes_test_module._set_invoice_status
 
 
 @pytest.mark.parametrize("starting_status", [QuoteStatus.DRAFT, QuoteStatus.READY])
