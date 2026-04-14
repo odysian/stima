@@ -88,8 +88,8 @@ function makePublicInvoice(overrides: Partial<PublicInvoice> = {}): PublicInvoic
   };
 }
 
-function renderScreen(path = "/doc/token-1"): void {
-  render(
+function renderScreen(path = "/doc/token-1") {
+  return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/doc/:token" element={<PublicQuotePage />} />
@@ -199,6 +199,76 @@ describe("PublicQuotePage", () => {
     expect(screen.getByText("$59.00")).toBeInTheDocument();
   });
 
+  it("renders line items before pricing breakdown rows for quote and invoice documents", async () => {
+    mockedPublicService.getDocument
+      .mockResolvedValueOnce(
+        makePublicQuote({
+          total_amount: 110,
+          tax_rate: 0.1,
+          line_items: [
+            {
+              description: "Mulch refresh",
+              details: "Front beds",
+              price: 100,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        makePublicInvoice({
+          total_amount: 110,
+          tax_rate: 0.1,
+          line_items: [
+            {
+              description: "Invoice service",
+              details: null,
+              price: 100,
+            },
+          ],
+        }),
+      );
+
+    const quoteView = renderScreen("/doc/token-quote");
+    const quoteLineItemsHeading = await screen.findByRole("heading", { name: "Line Items" });
+    const quoteSubtotal = screen.getByText("Subtotal");
+    expect(
+      quoteLineItemsHeading.compareDocumentPosition(quoteSubtotal) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    quoteView.unmount();
+
+    renderScreen("/doc/token-invoice");
+    const invoiceLineItemsHeading = await screen.findByRole("heading", { name: "Line Items" });
+    const invoiceSubtotal = screen.getByText("Subtotal");
+    expect(
+      invoiceLineItemsHeading.compareDocumentPosition(invoiceSubtotal) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("wraps long unbroken line-item description and details in the public preview", async () => {
+    const longDescription = "A".repeat(220);
+    const longDetails = "B".repeat(180);
+    mockedPublicService.getDocument.mockResolvedValueOnce(
+      makePublicQuote({
+        line_items: [
+          {
+            description: longDescription,
+            details: longDetails,
+            price: 200,
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    const description = await screen.findByText(longDescription);
+    const details = screen.getByText(longDetails);
+    expect(description.className).toContain("[overflow-wrap:anywhere]");
+    expect(description.className).toContain("break-words");
+    expect(details.className).toContain("[overflow-wrap:anywhere]");
+    expect(details.className).toContain("break-words");
+  });
+
   it("renders invoice variants without quote-only status messaging", async () => {
     mockedPublicService.getDocument.mockResolvedValueOnce(makePublicInvoice());
 
@@ -209,6 +279,30 @@ describe("PublicQuotePage", () => {
     expect(screen.getByText("Due Date")).toBeInTheDocument();
     expect(screen.getByText("May 04, 2026")).toBeInTheDocument();
     expect(screen.queryByText("This quote has been accepted")).not.toBeInTheDocument();
+  });
+
+  it("uses two summary columns for quotes and three for invoices on large screens", async () => {
+    mockedPublicService.getDocument
+      .mockResolvedValueOnce(makePublicQuote())
+      .mockResolvedValueOnce(makePublicInvoice());
+
+    const quoteView = renderScreen("/doc/token-quote-grid");
+    await screen.findByRole("heading", { name: "Spring Cleanup" });
+    const quoteSummarySection = screen
+      .getByText("Customer")
+      .closest("section");
+    expect(quoteSummarySection).toBeTruthy();
+    expect(quoteSummarySection?.className).toContain("lg:grid-cols-2");
+    expect(quoteSummarySection?.className).not.toContain("lg:grid-cols-3");
+    quoteView.unmount();
+
+    renderScreen("/doc/token-invoice-grid");
+    await screen.findByRole("heading", { name: "Spring Cleanup Invoice" });
+    const invoiceSummarySection = screen
+      .getByText("Customer")
+      .closest("section");
+    expect(invoiceSummarySection).toBeTruthy();
+    expect(invoiceSummarySection?.className).toContain("lg:grid-cols-3");
   });
 
   it("falls back to owner name when business name is missing", async () => {

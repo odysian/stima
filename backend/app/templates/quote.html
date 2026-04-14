@@ -40,10 +40,16 @@
         background: #ffffff;
       }
 
+      main {
+        min-height: 240mm;
+        display: flex;
+        flex-direction: column;
+      }
+
       .header {
         border-bottom: 1px solid #d1d5db;
-        padding-bottom: 20px;
-        margin-bottom: 24px;
+        padding-bottom: 14px;
+        margin-bottom: 14px;
       }
 
       .header-grid {
@@ -53,6 +59,10 @@
 
       .header-grid td {
         vertical-align: top;
+      }
+
+      .header-company-cell {
+        padding-right: 20px;
       }
 
       .header-logo-cell {
@@ -78,36 +88,37 @@
       }
 
       .owner-name {
-        margin: 8px 0 0;
+        margin: 6px 0 0;
         font-size: 14px;
         font-weight: 700;
         color: #1f2937;
       }
 
       .header-contact {
-        margin: 4px 0 0;
-        font-size: 13px;
+        margin: 3px 0 0;
+        font-size: 12px;
         color: #4b5563;
       }
 
       .company-logo {
         display: block;
-        max-height: 56px;
+        max-height: 84px;
         width: auto;
-        max-width: 200px;
+        max-width: 240px;
+        object-fit: contain;
         margin-left: auto;
       }
 
       .meta-grid {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 24px;
+        margin-bottom: 12px;
       }
 
       .meta-grid td {
         width: 50%;
         vertical-align: top;
-        padding: 0 24px 12px 0;
+        padding: 0 20px 6px 0;
       }
 
       .meta-right {
@@ -122,7 +133,7 @@
       }
 
       .meta-details td {
-        padding: 0 0 8px;
+        padding: 0 0 6px;
         vertical-align: top;
       }
 
@@ -158,14 +169,18 @@
       }
 
       .value {
-        margin: 0;
+        margin: 0 0 2px;
         font-size: 14px;
+      }
+
+      .value--multiline {
+        white-space: pre-line;
       }
 
       table.line-items {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 8px;
+        margin-top: 4px;
       }
 
       table.line-items thead th {
@@ -175,7 +190,7 @@
         letter-spacing: 0.04em;
         color: #6b7280;
         border-bottom: 1px solid #d1d5db;
-        padding: 10px 8px;
+        padding: 8px 8px;
       }
 
       table.line-items thead th.price-col {
@@ -188,7 +203,7 @@
 
       table.line-items tbody td {
         border-bottom: 1px solid #e5e7eb;
-        padding: 14px 8px;
+        padding: 8px 8px;
         font-size: 13px;
         vertical-align: top;
         overflow-wrap: break-word;
@@ -201,23 +216,64 @@
       }
 
       .line-item-description {
+        display: block;
         font-size: 14px;
         font-weight: 700;
         color: #111827;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .line-item-details {
         display: block;
-        margin-top: 4px;
+        margin-top: 1px;
+        padding-left: 2ch;
         color: #4b5563;
         font-size: 12px;
         font-weight: 400;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      .post-content {
+        display: flex;
+        align-items: flex-start;
+        gap: 18px;
+        margin-top: 8px;
+      }
+
+      .post-content--totals-only {
+        justify-content: flex-end;
+      }
+
+      .notes-column {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: calc(100% - 240px);
+      }
+
+      .totals-stack {
+        width: 220px;
+        margin: 0 0 0 auto;
+        flex: 0 0 280px;
+      }
+
+      .totals-stack--with-signature {
+        width: 360px;
+        max-width: 100%;
+        page-break-inside: avoid;
+        break-inside: avoid-page;
+      }
+
+      .totals-stack--with-signature .total-block {
+        width: 220px;
+        margin-left: auto;
       }
 
       .total-block {
-        width: 220px;
-        margin: 16px 0 0 auto;
-        padding-top: 12px;
+        width: 100%;
+        margin: 0;
+        padding-top: 6px;
         border-top: 2px solid #111827;
       }
 
@@ -225,22 +281,63 @@
         display: flex;
         align-items: baseline;
         justify-content: space-between;
-        gap: 12px;
-        margin-top: 8px;
+        gap: 10px;
+        margin-top: 3px;
       }
 
       .total-row:first-child {
         margin-top: 0;
       }
 
+      .total-row--supporting .total-label {
+        color: #6b7280;
+        font-size: 11px;
+      }
+
+      .total-row--supporting .total-amount {
+        color: #4b5563;
+        font-size: 13px;
+        font-weight: 500;
+      }
+
       .total-row--final {
-        margin-top: 12px;
-        padding-top: 10px;
+        margin-top: 6px;
+        padding-top: 4px;
         border-top: 1px solid #d1d5db;
       }
 
+      .total-row--final .total-label {
+        color: #374151;
+      }
+
+      .total-row--final .total-amount {
+        font-size: 17px;
+      }
+
+      .total-row--deposit .total-label {
+        color: #4b5563;
+      }
+
+      .total-row--deposit .total-amount {
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+      }
+
       .total-row--balance {
+        margin-top: 6px;
+        padding-top: 5px;
+        border-top: 1px solid #d1d5db;
+      }
+
+      .total-row--balance .total-label {
+        color: #111827;
+      }
+
+      .total-row--balance .total-amount {
+        font-size: 18px;
         font-weight: 700;
+        color: #111827;
       }
 
       .total-label {
@@ -259,8 +356,9 @@
       }
 
       .notes {
-        margin-top: 24px;
-        padding-left: 16px;
+        margin: 0;
+        margin-top: 5px;
+        padding-left: 12px;
         border-left: 3px solid #9ca3af;
       }
 
@@ -268,6 +366,32 @@
         margin: 0;
         font-size: 13px;
         white-space: pre-wrap;
+      }
+
+      .signature-area {
+        margin-top: 60px;
+      }
+
+      .signature-line {
+        /* border-bottom: 1px solid #d1d5db; */
+        border-bottom: 1px solid #111827;
+      }
+
+      .signature-label-row {
+        display: flex;
+        justify-content: flex-start;
+        align-items: baseline;
+        gap: 12px;
+        margin-top: 7px;
+      }
+
+      .signature-field-label {
+        margin: 0;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6b7280;
       }
     </style>
   </head>
@@ -280,7 +404,7 @@
         <table class="header-grid">
           <tbody>
             <tr>
-              <td>
+              <td class="header-company-cell">
                 {% if display_name %}
                 <h1 class="company-name">{{ display_name }}</h1>
                 {% endif %}
@@ -312,7 +436,7 @@
               <p class="label">Prepared For</p>
               <p class="value">{{ customer_name }}</p>
               {% if customer_address %}
-              <p class="value">{{ customer_address }}</p>
+              <p class="value value--multiline">{{ customer_address }}</p>
               {% endif %}
               {% if customer_phone %}
               <p class="value">{{ customer_phone }}</p>
@@ -370,9 +494,25 @@
         </tbody>
       </table>
 
-      <section class="total-block">
+      {% if notes or doc_label == "Quote" %}
+      <section class="post-content post-content--with-notes">
+        <div class="notes-column">
+          {% if notes %}
+          <section class="notes">
+            <p class="label">Notes</p>
+            <p>{{ notes }}</p>
+          </section>
+          {% endif %}
+        </div>
+        <section class="totals-stack{% if doc_label == "Quote" %} totals-stack--with-signature{% endif %}">
+          <section class="total-block">
+      {% else %}
+      <section class="post-content post-content--totals-only">
+        <section class="totals-stack">
+          <section class="total-block">
+      {% endif %}
         {% if discount_amount is not none or tax_amount is not none or deposit_amount is not none %}
-        <div class="total-row">
+        <div class="total-row total-row--supporting">
           <p class="total-label">Subtotal</p>
           <p class="total-amount">
             {% if subtotal_amount is not none %}
@@ -383,13 +523,13 @@
           </p>
         </div>
         {% if discount_amount is not none %}
-        <div class="total-row">
+        <div class="total-row total-row--supporting">
           <p class="total-label">Discount</p>
           <p class="total-amount">-${{ "{:,.2f}".format(discount_amount) }}</p>
         </div>
         {% endif %}
         {% if tax_amount is not none %}
-        <div class="total-row">
+        <div class="total-row total-row--supporting">
           <p class="total-label">Tax</p>
           <p class="total-amount">${{ "{:,.2f}".format(tax_amount) }}</p>
         </div>
@@ -405,7 +545,7 @@
           </p>
         </div>
         {% if deposit_amount is not none %}
-        <div class="total-row">
+        <div class="total-row total-row--deposit">
           <p class="total-label">Deposit</p>
           <p class="total-amount">${{ "{:,.2f}".format(deposit_amount) }}</p>
         </div>
@@ -431,13 +571,16 @@
         </p>
         {% endif %}
       </section>
-
-      {% if notes %}
-      <section class="notes">
-        <p class="label">Notes</p>
-        <p>{{ notes }}</p>
+      {% if doc_label == "Quote" %}
+      <section class="signature-area">
+        <div class="signature-line"></div>
+        <div class="signature-label-row">
+          <p class="signature-field-label">CUSTOMER SIGNATURE</p>
+        </div>
       </section>
       {% endif %}
+      </section>
+      </section>
     </main>
   </body>
 </html>

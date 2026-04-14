@@ -817,6 +817,33 @@ describe("QuotePreview", () => {
     expect(screen.getByText("TBD")).toBeInTheDocument();
   });
 
+  it("wraps long unbroken line-item description and details in quote preview", async () => {
+    const longDescription = "A".repeat(220);
+    const longDetails = "B".repeat(180);
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        line_items: [
+          {
+            id: "line-1",
+            description: longDescription,
+            details: longDetails,
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+      }),
+    );
+
+    renderScreen();
+
+    const description = await screen.findByText(longDescription);
+    const details = screen.getByText(longDetails);
+    expect(description.className).toContain("[overflow-wrap:anywhere]");
+    expect(description.className).toContain("break-words");
+    expect(details.className).toContain("[overflow-wrap:anywhere]");
+    expect(details.className).toContain("break-words");
+  });
+
   it("keeps details and line items above the primary action area", async () => {
     renderScreen();
 
