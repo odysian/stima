@@ -1,9 +1,10 @@
 # Stima Copilot Instructions
 
 Follow repo workflow and review constraints from:
-- `AGENTS.md`
-- `docs/ISSUES_WORKFLOW.md`
-- `docs/REVIEW_CHECKLIST.md`
+- `AGENTS.md` (mode-routed bootstrap)
+- `docs/template/KICKOFF.md` (execution/review prompt contract)
+- `docs/ISSUES_WORKFLOW.md` when planning/issue control-plane rules are in scope or unclear
+- `docs/REVIEW_CHECKLIST.md` when running deeper review checklist coverage
 
 Prioritize meaningful defects and risks:
 - correctness
