@@ -15,7 +15,7 @@ Run the relevant checks before claiming completion.
 
 ### Agent execution: backend tests vs sandboxes
 
-Backend integration tests are **not** in-process unit stubs: `backend/conftest.py` builds an async engine to **`TEST_DATABASE_URL`** (defaults to **PostgreSQL on `localhost:5432`**). Session fixtures create a test schema and tables. **Any** shell that cannot reach that database will error during **setup** → pytest shows **`E` (error)** for most tests, often for **every** test, with **no** failed assertions yet.
+Backend integration tests are **not** in-process unit stubs: `backend/conftest.py` builds an async engine to `**TEST_DATABASE_URL`** (defaults to **PostgreSQL on `localhost:5432`**). Session fixtures create a test schema and tables. **Any** shell that cannot reach that database will error during **setup** → pytest shows `**E` (error)** for most tests, often for **every** test, with **no** failed assertions yet.
 
 This applies to **network-isolated agent runs** (Cursor sandbox, VS Code / Copilot / Codex agent terminals with sandboxing, some CI agents without a service container, etc.). **Outside sandbox** (or on the developer’s host terminal with Postgres up), the same command usually **passes**.
 
@@ -82,3 +82,4 @@ cd backend && alembic upgrade head
 - Frontend: type-check + tests + lint + production build.
 - No-contract refactors: include parity lock results in final verification summary.
 - Template maintenance: unresolved-token guard passes (`./scripts/check-unresolved-template-tokens.sh`).
+
