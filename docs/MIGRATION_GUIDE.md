@@ -5,7 +5,8 @@ This guide explains how to use this template as the foundation for a new project
 ## What this template provides
 
 - Agent operating rules (`AGENTS.md`)
-- Core workflow (`docs/WORKFLOW.md`)
+- Core workflow index (`docs/WORKFLOW.md`)
+- Split workflow guides (`docs/workflow/IMPLEMENT.md`, `docs/workflow/REVIEW.md`, `docs/workflow/VERIFY.md`)
 - Issue-driven execution control plane (`docs/ISSUES_WORKFLOW.md`)
 - Canonical kickoff/review prompts (`docs/template/KICKOFF.md`)
 - Documentation skeletons (`docs/ARCHITECTURE.md`, `docs/PATTERNS.md`, `docs/REVIEW_CHECKLIST.md`)
@@ -32,7 +33,7 @@ This guide explains how to use this template as the foundation for a new project
 8. Keep ceremony conditional: second review pass only when explicitly requested; decision briefs and doc updates only when behavior/contracts/architecture changed.
 
 Recommended onboarding paths for agents:
-1. Implement existing Task: `AGENTS.md` -> Task/Execution Brief/PR context -> `docs/template/KICKOFF.md` section 1 -> relevant `docs/WORKFLOW.md` sections only as needed.
+1. Implement existing Task: `AGENTS.md` -> Task/Execution Brief/PR context -> `docs/template/KICKOFF.md` section 1 -> relevant `docs/workflow/IMPLEMENT.md` + `docs/workflow/VERIFY.md` sections only as needed.
 2. Review PR: `AGENTS.md` -> PR/Task context -> `docs/template/KICKOFF.md` section 3a (and 3b constraints) -> `.github/prompts/review-task.prompt.md` only when full prompt body is needed.
 3. Plan/create issues/choose mode: `AGENTS.md` -> `docs/ISSUES_WORKFLOW.md` -> `docs/template/KICKOFF.md` section 2.
 4. Escape hatch: if mode/labels/lifecycle/branching are unclear in any path, read `docs/ISSUES_WORKFLOW.md` before proceeding.

@@ -9,7 +9,7 @@ Universal quality floor:
 - Do not change unrelated files.
 - Do not modify applied migrations; add a new migration when needed.
 - Preserve existing contracts unless task scope says otherwise.
-- Use verification tiers from `docs/WORKFLOW.md` section **Verification Tiers**.
+- Use verification tiers from `docs/workflow/VERIFY.md` section **Verification Tiers**.
 - Keep broad verify targets (`make backend-verify`, `make frontend-verify`, `make verify`) as PR/final gates unless scope requires earlier coverage.
 - Load `backend/AGENTS.md` for backend scope (`area:backend`, `area:database`, or files under `backend/`).
 - Load `frontend/AGENTS.md` for frontend scope (`area:frontend` or files under `frontend/`).
@@ -19,7 +19,7 @@ Read in order:
 1. Task issue / Execution Brief / PR context
 2. Relevant subtree `AGENTS.md`
 3. `docs/template/KICKOFF.md` section 1
-4. `docs/WORKFLOW.md` sections only as needed (for example: `Verification Tiers`, `Boundary And Dependency Rules`, `Stateful Cross-Layer Hardening Gate`)
+4. `docs/workflow/IMPLEMENT.md` and `docs/workflow/VERIFY.md` sections only as needed (for example: `Boundary And Dependency Rules`, `Stateful Cross-Layer Hardening Gate`, `Verification Tiers`)
 
 ### B) Review PR
 Read in order:
@@ -70,7 +70,7 @@ Canonical kickoff prompts:
 1. Restate goal/non-goals/acceptance criteria from the Task issue.
 2. Create/switch to dedicated branch `task-<id>-<slug>` before edits.
 3. Implement minimally and preserve existing contracts unless scope says otherwise.
-4. Run verification by tier (`docs/WORKFLOW.md` Verification Tiers):
+4. Run verification by tier (`docs/workflow/VERIFY.md` Verification Tiers):
    - Tier 1 during implementation (smallest checks proving changed behavior)
    - Tier 2 after `ACTIONABLE` review patches (targeted reruns)
    - Tier 3 broad PR/final gate checks (`make backend-verify`, `make frontend-verify`, `make verify` as applicable)
@@ -95,7 +95,7 @@ Use only when the operator explicitly requests `execution=parallel`:
 
 ## Agent Output Budget
 
-Canonical norms live in `docs/WORKFLOW.md` under **Agent Output Budget**.
+Canonical norms live in `docs/workflow/REVIEW.md` under **Agent Output Budget**.
 
 ## Guardrails
 

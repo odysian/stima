@@ -11,7 +11,10 @@ Use this index to keep template docs easy to traverse.
 
 ## Workflow Docs
 
-- `WORKFLOW.md` — implementation loop and engineering defaults
+- `WORKFLOW.md` — workflow index and source-of-truth routing
+- `workflow/IMPLEMENT.md` — implementation loop and engineering defaults
+- `workflow/REVIEW.md` — review follow-up and handoff defaults
+- `workflow/VERIFY.md` — verification tiers and canonical commands
 - `ISSUES_WORKFLOW.md` — issue modes, DoR/DoD, branching rules
 - `GREENFIELD_BLUEPRINT.md` — default repo structure baseline
 - `MIGRATION_GUIDE.md` — template adoption guide for new and existing repos

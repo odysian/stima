@@ -58,7 +58,7 @@ Capture commands by tier so reruns stay proportional:
 
 ## Do Not Include
 
-- Large pasted excerpts from `AGENTS.md`, `docs/WORKFLOW.md`, `docs/ISSUES_WORKFLOW.md`, or `docs/template/KICKOFF.md`
+- Large pasted excerpts from `AGENTS.md`, `docs/WORKFLOW.md`, `docs/workflow/*.md`, `docs/ISSUES_WORKFLOW.md`, or `docs/template/KICKOFF.md`
 - Full control-plane essays unless this task introduces a task-specific exception
 - Long pasted acceptance-criteria lists or full issue bodies; link the issue and capture delta only
 - Reviewer prompt, PR boilerplate, or learning handoff text unless this task is explicitly changing that workflow

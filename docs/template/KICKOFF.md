@@ -15,7 +15,7 @@ Use these prompts to start work on already-scoped tasks without reloading unnece
 - Execution Brief is task-local compression only.
 - Use the short reviewer kickoff by default.
 - After `ACTIONABLE`, patch listed findings only unless scope expands.
-- Verification follows tiers from `docs/WORKFLOW.md`.
+- Verification follows tiers from `docs/workflow/VERIFY.md`.
 
 ## When To Load Which Asset
 

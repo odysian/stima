@@ -171,7 +171,7 @@ cd backend && ruff check . && mypy . && bandit -r app/ && pytest && cd ../fronte
 
 Prefer repo-level verify entrypoints when available (for example: `make backend-verify`, `make frontend-verify`).
 
-When a Makefile verify contract exists (see `docs/WORKFLOW.md`), use those canonical targets in Task verification sections.
+When a Makefile verify contract exists (see `docs/workflow/VERIFY.md`), use those canonical targets in Task verification sections.
 
 ## Codex + GitHub CLI Playbook
 
