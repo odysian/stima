@@ -19,7 +19,7 @@ Read in order:
 1. Task issue / Execution Brief / PR context
 2. Relevant subtree `AGENTS.md`
 3. `docs/template/KICKOFF.md` section 1
-4. `docs/workflow/IMPLEMENT.md` and `docs/workflow/VERIFY.md` sections only as needed (for example: `Boundary And Dependency Rules`, `Stateful Cross-Layer Hardening Gate`, `Verification Tiers`)
+4. `docs/workflow/IMPLEMENT.md` and `docs/workflow/VERIFY.md` sections only as needed (for example: `Boundary And Dependency Rules`, `Stateful Cross-Layer Hardening Gate`, **Verification Tiers**, **Agent execution: backend tests vs sandboxes** — read the latter before any `pytest` / `make backend-verify` from an agent)
 
 ### B) Review PR
 Read in order:
@@ -111,3 +111,14 @@ Canonical norms live in `docs/workflow/REVIEW.md` under **Agent Output Budget**.
 - Do not run `make db-verify` from agent sessions.
 - Do not run live/provider-backed checks from agent sessions (for example `make extraction-live`); ask the human operator to run and share output.
 - Prefer canonical `make` targets for Tier 3 gates when the repo defines them.
+
+### Backend integration pytest and sandboxes (read before running pytest)
+
+Backend integration tests use **`backend/conftest.py`** and a real **PostgreSQL** at `TEST_DATABASE_URL` (default `postgresql+asyncpg://...@localhost:5432/...`). If the agent’s shell **cannot open TCP to that host/port** (network-restricted or “sandboxed” runs in IDE agent extensions, default agent sandboxes, etc.), **fixture setup fails** and pytest prints **`E` (error)** on every test **before any assertion** — not `F` (failure). That is an **environment** problem, not broken test code.
+
+**Required behavior for agents:**
+
+1. Before spending time on “failing tests,” run **one** file with `cd backend && .venv/bin/pytest <path> -x --tb=short` and read the first traceback. Connection refused / timeout / asyncpg errors to `localhost:5432` mean the DB is unreachable from that shell.
+2. **Do not** retry the full suite in the same restricted environment expecting a different outcome.
+3. **Do** run the same commands **outside** the tool sandbox / **with network access to localhost** (whatever your product calls it: full permissions, trusted workspace, host terminal), **or** ask the human to run the command on their machine and paste the output.
+4. Full detail and Tier guidance: `docs/workflow/VERIFY.md` and `backend/AGENTS.md`.

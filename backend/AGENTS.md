@@ -35,6 +35,16 @@ For bug fixes, backend business logic, contract-sensitive behavior, and stateful
 
 ## Agent Runtime Constraints
 
+### Sandboxed agent terminals cannot run integration pytest here
+
+Integration tests require **PostgreSQL** reachable at `TEST_DATABASE_URL` (see `backend/conftest.py`; default is **localhost:5432**). IDE/agent **sandboxes** (including many VS Code Codex / similar agent shells) **block or isolate localhost** to that database.
+
+**Symptom:** `pytest` collects tests then every line is **`E`** (fixture/setup error), or the run **hangs** before the first test — **not** widespread assertion failures (`F`).
+
+**Fix:** run `cd backend && .venv/bin/pytest ...` or `make backend-verify` **outside** the sandbox (full network / host terminal / human-run), not repeated retries inside the sandbox.
+
+### Other constraints
+
 - Do not run bare `pytest` from agent sessions; use `cd backend && .venv/bin/pytest ...` for targeted tests.
 - Backend pytest uses host-local services in this repo; if backend tests are required, prefer escalated runs over repeated sandbox retries.
 - If sandboxed pytest hangs during startup/collection, suspect sandbox-to-local-service access first.

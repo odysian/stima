@@ -50,6 +50,10 @@ Then execute the full Task flow end-to-end:
    - `APPROVED`: finalize Task and return completion summary.
 ```
 
+### Backend integration pytest in agent/sandbox environments
+
+Before running Tier 1 `cd backend && .venv/bin/pytest ...` or Tier 3 `make backend-verify` from an **agent**: integration tests need **PostgreSQL** at `TEST_DATABASE_URL` (see `backend/conftest.py`). **Sandboxed** agent shells often cannot reach `localhost:5432` → **all tests error (`E`) during setup**, not real assertion failures. **Run outside sandbox** (network to localhost) or have the **human** run the command and paste output — do not burn retries in a blocked environment. Canonical detail: `docs/workflow/VERIFY.md` and `backend/AGENTS.md`.
+
 Behavior Matrix (required for stateful/cross-layer tasks):
 - states/statuses and allowed actions
 - externally visible success/error semantics
