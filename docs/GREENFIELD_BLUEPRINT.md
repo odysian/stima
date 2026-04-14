@@ -17,6 +17,10 @@ Stima/
   CLAUDE.md
   docs/
     WORKFLOW.md
+    workflow/
+      IMPLEMENT.md
+      REVIEW.md
+      VERIFY.md
     ISSUES_WORKFLOW.md
     GREENFIELD_BLUEPRINT.md
     MIGRATION_GUIDE.md
@@ -104,5 +108,5 @@ For refactors declared as "no API/contract change", verify:
 Root stays lean — only agent/Claude entrypoints:
 
 - Keep at root: `AGENTS.md`, `CLAUDE.md`.
-- Keep in `docs/`: `WORKFLOW.md`, `ISSUES_WORKFLOW.md`, `GREENFIELD_BLUEPRINT.md`, `MIGRATION_GUIDE.md`, `ARCHITECTURE.md`, `PATTERNS.md`, `REVIEW_CHECKLIST.md`, ADRs, runbooks.
+- Keep in `docs/`: `WORKFLOW.md`, `workflow/*.md`, `ISSUES_WORKFLOW.md`, `GREENFIELD_BLUEPRINT.md`, `MIGRATION_GUIDE.md`, `ARCHITECTURE.md`, `PATTERNS.md`, `REVIEW_CHECKLIST.md`, ADRs, runbooks.
 - Keep automation playbooks under `skills/`.

@@ -70,7 +70,7 @@ Extraction, PDF, and email jobs carry important retry, terminal-failure, stale-r
 ## Backend LOC Hard-Fail Enforcement
 
 **Source:** 2026-04-12 quote modularity planning review
-**Where:** `scripts/check_file_sizes.sh`, `Makefile`, `docs/WORKFLOW.md`, and `docs/PATTERNS.md`
+**Where:** `scripts/check_file_sizes.sh`, `Makefile`, `docs/workflow/IMPLEMENT.md`, `docs/workflow/VERIFY.md`, and `docs/PATTERNS.md`
 
 Backend file-size checks currently warn for route/service/repository modules over the target budget. The eventual hard-fail threshold should remain `>350` LOC because it matches the documented split/follow-up threshold in the workflow docs.
 
