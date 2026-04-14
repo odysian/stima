@@ -18,6 +18,7 @@ export function LoginForm(): React.ReactElement {
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [flashMessage, setFlashMessage] = useState(
@@ -51,16 +52,39 @@ export function LoginForm(): React.ReactElement {
             id="email"
             label="Email"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          <Input
-            id="password"
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <div className="flex flex-col gap-1">
+            <label htmlFor="password" className="text-sm font-medium text-on-surface">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                id="password"
+                type={isPasswordVisible ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                aria-required="true"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className={[
+                  "w-full bg-surface-container-high rounded-lg px-4 py-3 pr-20 font-body text-sm text-on-surface",
+                  "placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-surface-container-lowest transition-all",
+                ].join(" ")}
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-3 cursor-pointer text-xs font-semibold text-primary"
+                aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                aria-pressed={isPasswordVisible}
+                onClick={() => setIsPasswordVisible((visible) => !visible)}
+              >
+                {isPasswordVisible ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
 
           <p className="-mt-1 text-right text-sm text-on-surface-variant">
             <Link to="/forgot-password" className="font-semibold text-primary">

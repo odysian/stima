@@ -55,7 +55,7 @@ describe("LoginForm", () => {
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "user@example.com" },
     });
-    fireEvent.change(await screen.findByLabelText(/password/i), {
+    fireEvent.change(await screen.findByLabelText(/^password$/i), {
       target: { value: "super-secret" },
     });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
@@ -90,7 +90,7 @@ describe("LoginForm", () => {
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "user@example.com" },
     });
-    fireEvent.change(await screen.findByLabelText(/password/i), {
+    fireEvent.change(await screen.findByLabelText(/^password$/i), {
       target: { value: "super-secret" },
     });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
@@ -108,7 +108,7 @@ describe("LoginForm", () => {
     fireEvent.change(await screen.findByLabelText(/email/i), {
       target: { value: "user@example.com" },
     });
-    fireEvent.change(await screen.findByLabelText(/password/i), {
+    fireEvent.change(await screen.findByLabelText(/^password$/i), {
       target: { value: "bad" },
     });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
@@ -136,5 +136,26 @@ describe("LoginForm", () => {
     expect(
       await screen.findByText("Password reset successful. Please sign in."),
     ).toBeInTheDocument();
+  });
+
+  it("toggles password visibility with accessible button state", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderLogin();
+
+    const passwordInput = await screen.findByLabelText(/^password$/i);
+    const showToggle = screen.getByRole("button", { name: /show password/i });
+
+    expect(passwordInput).toHaveAttribute("type", "password");
+    expect(showToggle).toHaveAttribute("type", "button");
+    expect(showToggle).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(showToggle);
+
+    expect(passwordInput).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: /hide password/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 });
