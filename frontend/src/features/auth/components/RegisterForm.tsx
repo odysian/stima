@@ -60,6 +60,8 @@ export function RegisterForm(): React.ReactElement {
                 id="password"
                 type={isPasswordVisible ? "text" : "password"}
                 autoComplete="new-password"
+                required
+                aria-required="true"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 className={[
@@ -87,6 +89,8 @@ export function RegisterForm(): React.ReactElement {
                 id="confirm-password"
                 type={isConfirmPasswordVisible ? "text" : "password"}
                 autoComplete="new-password"
+                required
+                aria-required="true"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 aria-invalid={showPasswordMismatch}

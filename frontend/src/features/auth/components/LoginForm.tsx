@@ -65,6 +65,8 @@ export function LoginForm(): React.ReactElement {
                 id="password"
                 type={isPasswordVisible ? "text" : "password"}
                 autoComplete="current-password"
+                required
+                aria-required="true"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 className={[
