@@ -20,6 +20,7 @@ from app.features.quotes.schemas import (
     ExtractionReviewHiddenDetails,
     ExtractionReviewMetadataV1,
     ExtractionReviewState,
+    ExtractionReviewUnresolvedSegment,
     ExtractionSuggestion,
     HiddenItemState,
     LineItemExtractedV2,
@@ -393,12 +394,12 @@ async def test_patch_extraction_review_metadata_marks_hidden_item_reviewed(
     persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
         hidden_details=ExtractionReviewHiddenDetails(
             unresolved_segments=[
-                {
-                    "id": "unresolved-1",
-                    "raw_text": "Confirm edging scope",
-                    "confidence": "low",
-                    "source": "leftover_classification",
-                }
+                ExtractionReviewUnresolvedSegment(
+                    id="unresolved-1",
+                    raw_text="Confirm edging scope",
+                    confidence="low",
+                    source="leftover_classification",
+                )
             ]
         ),
     ).model_dump(mode="json")
