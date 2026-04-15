@@ -26,12 +26,13 @@ For bug fixes, backend business logic, contract-sensitive behavior, and stateful
 
 ## Verification Tiers (Backend)
 
-- Tier 1 (implementation loop): smallest backend checks proving changed behavior.
+- Tier 1 (implementation loop): smallest backend checks proving changed behavior, plus `make backend-static-verify` before push/PR update for backend code changes.
   - Example: `cd backend && .venv/bin/pytest app/features/<feature>/tests/test_<scope>.py`
   - Example: `cd backend && ruff check app/features/<feature>`
-- Tier 2 (post-review patch): rerun only checks covering patched findings unless scope expands.
+- Tier 2 (post-review patch): rerun only checks covering patched findings unless scope expands, and run `make backend-static-verify` before pushing backend patch commits.
 - Tier 3 (PR/final gate): `make backend-verify` (or `make verify` when cross-surface).
 - Tier 4 (operator-only heavy): live/provider-backed checks run by human operator when explicitly required.
+- Docs-only or non-backend-only changes do not require backend static verification.
 
 ## Agent Runtime Constraints
 
@@ -46,6 +47,7 @@ Integration tests require **PostgreSQL** reachable at `TEST_DATABASE_URL` (see `
 ### Other constraints
 
 - Do not run bare `pytest` from agent sessions; use `cd backend && .venv/bin/pytest ...` for targeted tests.
+- For backend code changes, pair targeted behavior checks with `make backend-static-verify` before push/PR update.
 - Backend pytest uses host-local services in this repo; if backend tests are required, prefer escalated runs over repeated sandbox retries.
 - If sandboxed pytest hangs during startup/collection, suspect sandbox-to-local-service access first.
 - Do not run `make db-verify` or live extraction checks from agent sessions.
