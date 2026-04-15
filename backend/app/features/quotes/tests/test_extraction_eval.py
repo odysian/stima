@@ -6,6 +6,7 @@ manually with ``make extraction-eval`` before prompt/model changes.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,7 +14,7 @@ import anthropic
 import httpx
 import pytest
 
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
 from app.features.quotes.tests.fixtures.extraction_eval_cases import (
     EXTRACTION_EVAL_CASES,
     ExtractionEvalCase,
@@ -71,6 +72,66 @@ def _build_outcomes(case: ExtractionEvalCase) -> list[object]:
     return outcomes
 
 
+def _build_capture_input(case: ExtractionEvalCase) -> PreparedCaptureInput | str:
+    if case.source_type == "text" and case.raw_typed_notes is None and case.raw_transcript is None:
+        return case.transcript
+    if case.source_type == "voice":
+        return PreparedCaptureInput(
+            transcript=case.transcript,
+            source_type="voice",
+            raw_typed_notes=None,
+            raw_transcript=case.raw_transcript or case.transcript,
+        )
+    if case.source_type == "voice+text":
+        return PreparedCaptureInput(
+            transcript=case.transcript,
+            source_type="voice+text",
+            raw_typed_notes=case.raw_typed_notes or case.transcript,
+            raw_transcript=case.raw_transcript or case.transcript,
+        )
+    return PreparedCaptureInput(
+        transcript=case.transcript,
+        source_type="text",
+        raw_typed_notes=case.raw_typed_notes or case.transcript,
+        raw_transcript=None,
+    )
+
+
+def _assert_request_capture_provenance(
+    case: ExtractionEvalCase,
+    *,
+    calls: list[dict[str, object]],
+) -> None:
+    assert calls
+    messages = calls[0]["messages"]
+    assert isinstance(messages, list)
+    assert messages
+    first_message = messages[0]
+    assert isinstance(first_message, dict)
+    content = first_message["content"]
+    assert isinstance(content, str)
+    request_payload = json.loads(content)
+    prepared_capture_input = request_payload["prepared_capture_input"]
+
+    assert prepared_capture_input["source_type"] == case.source_type
+    assert prepared_capture_input["transcript"] == case.transcript
+
+    expected_raw_typed_notes = case.raw_typed_notes
+    expected_raw_transcript = case.raw_transcript
+    if case.source_type == "text":
+        expected_raw_typed_notes = expected_raw_typed_notes or case.transcript
+        expected_raw_transcript = None
+    elif case.source_type == "voice":
+        expected_raw_typed_notes = None
+        expected_raw_transcript = expected_raw_transcript or case.transcript
+    else:
+        expected_raw_typed_notes = expected_raw_typed_notes or case.transcript
+        expected_raw_transcript = expected_raw_transcript or case.transcript
+
+    assert prepared_capture_input["raw_typed_notes"] == expected_raw_typed_notes
+    assert prepared_capture_input["raw_transcript"] == expected_raw_transcript
+
+
 def _assert_extraction_invariants(
     result: ExtractionResult,
     *,
@@ -122,6 +183,20 @@ def _assert_extraction_quality(
         normalized_substring = substring.casefold()
         assert any(normalized_substring in note.casefold() for note in result.confidence_notes)
 
+    if case.expect_pricing_hints:
+        pricing_hints_payload = result.pricing_hints.model_dump(mode="json")
+        for key, value in case.expect_pricing_hints.items():
+            assert pricing_hints_payload[key] == value
+
+    if case.expect_unresolved_segment_sources:
+        assert [segment.source for segment in result.unresolved_segments] == list(
+            case.expect_unresolved_segment_sources
+        )
+
+    if case.expect_customer_notes_source is not None:
+        assert result.customer_notes_suggestion is not None
+        assert result.customer_notes_suggestion.source == case.expect_customer_notes_source
+
     if case.expect_all_line_items_flagged is not None:
         assert result.line_items
         assert all(item.flagged is case.expect_all_line_items_flagged for item in result.line_items)
@@ -152,7 +227,7 @@ async def test_extraction_eval_baseline_invariants_hold_for_primary_fixture() ->
         client=client,
     )
 
-    result = await integration.extract(case.transcript)
+    result = await integration.extract(_build_capture_input(case))
 
     _assert_extraction_invariants(
         result,
@@ -160,6 +235,7 @@ async def test_extraction_eval_baseline_invariants_hold_for_primary_fixture() ->
         expect_total_matches_priced_sum=case.expect_total_matches_priced_sum,
     )
     assert [call["model"] for call in client.messages.calls] == list(case.expected_models)
+    _assert_request_capture_provenance(case, calls=client.messages.calls)
 
     metadata = integration.pop_last_call_metadata()
     assert metadata is not None
@@ -178,7 +254,7 @@ async def test_extraction_eval_invariants(case: ExtractionEvalCase) -> None:
         client=client,
     )
 
-    result = await integration.extract(case.transcript)
+    result = await integration.extract(_build_capture_input(case))
 
     _assert_extraction_invariants(
         result,
@@ -186,6 +262,7 @@ async def test_extraction_eval_invariants(case: ExtractionEvalCase) -> None:
         expect_total_matches_priced_sum=case.expect_total_matches_priced_sum,
     )
     assert [call["model"] for call in client.messages.calls] == list(case.expected_models)
+    _assert_request_capture_provenance(case, calls=client.messages.calls)
 
     metadata = integration.pop_last_call_metadata()
     assert metadata is not None
