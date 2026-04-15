@@ -8,7 +8,7 @@ import pytest
 import sentry_sdk
 
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
@@ -23,8 +23,8 @@ pytestmark = pytest.mark.asyncio
 
 
 class _FailingExtractionIntegration:
-    async def extract(self, notes: str) -> ExtractionResult:
-        del notes
+    async def extract(self, capture_input: PreparedCaptureInput) -> ExtractionResult:
+        del capture_input
         raise ExtractionError("mock extraction failure")
 
 
@@ -48,12 +48,12 @@ class _SuccessfulAudioIntegration:
 
 class _SuccessfulExtractionIntegration:
     def __init__(self) -> None:
-        self.calls: list[str] = []
+        self.calls: list[PreparedCaptureInput] = []
 
-    async def extract(self, notes: str) -> ExtractionResult:
-        self.calls.append(notes)
+    async def extract(self, capture_input: PreparedCaptureInput) -> ExtractionResult:
+        self.calls.append(capture_input)
         return ExtractionResult(
-            transcript=notes,
+            transcript=capture_input.transcript,
             line_items=[],
             confidence_notes=[],
         )
@@ -131,7 +131,12 @@ async def test_extract_combined_allows_audio_and_notes_up_to_extraction_limit() 
     result = await service.extract_combined([_clip()], notes)
 
     expected_transcript = f"{transcript}\n\n{notes}"
-    assert extraction.calls == [expected_transcript]
+    assert len(extraction.calls) == 1
+    prepared_capture_input = extraction.calls[0]
+    assert prepared_capture_input.source_type == "voice+text"
+    assert prepared_capture_input.raw_typed_notes == notes
+    assert prepared_capture_input.raw_transcript == transcript
+    assert prepared_capture_input.transcript == expected_transcript
     assert result.transcript == expected_transcript
     assert len(result.transcript) == EXTRACTION_TRANSCRIPT_MAX_CHARS
 

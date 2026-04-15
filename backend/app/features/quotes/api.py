@@ -301,7 +301,7 @@ async def extract_combined(
         )
 
     try:
-        transcript = await extraction_service.prepare_combined_transcript(
+        prepared_capture_input = await extraction_service.prepare_capture_input(
             clip_inputs,
             notes,
             user_id=user.id,
@@ -325,7 +325,7 @@ async def extract_combined(
             str(job.id),
             _job_id=str(job.id),
             correlation_id=current_correlation_id(),
-            transcript=transcript,
+            prepared_capture_input=prepared_capture_input.model_dump(mode="json"),
             source_type=source_type,
             capture_detail=capture_detail,
             customer_id=str(customer_id) if customer_id is not None else None,
@@ -411,7 +411,7 @@ async def append_extraction(
         )
 
     try:
-        transcript = await extraction_service.prepare_combined_transcript(
+        prepared_capture_input = await extraction_service.prepare_capture_input(
             clip_inputs,
             notes,
             user_id=user.id,
@@ -436,7 +436,7 @@ async def append_extraction(
             str(job.id),
             _job_id=str(job.id),
             correlation_id=current_correlation_id(),
-            transcript=transcript,
+            prepared_capture_input=prepared_capture_input.model_dump(mode="json"),
             source_type=source_type,
             capture_detail=capture_detail,
             append_to_quote=True,

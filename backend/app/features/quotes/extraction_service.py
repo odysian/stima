@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 from uuid import UUID
 
 import sentry_sdk
@@ -15,7 +15,7 @@ from app.features.quotes.extraction_outcomes import (
     log_draft_generation_failed_event,
     should_persist_degraded_retryable_error,
 )
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
@@ -30,7 +30,7 @@ from app.shared.input_limits import (
 class ExtractionIntegrationProtocol(Protocol):
     """Structural protocol for extraction integration dependency."""
 
-    async def extract(self, notes: str) -> ExtractionResult: ...
+    async def extract(self, capture_input: PreparedCaptureInput) -> ExtractionResult: ...
 
 
 class AudioIntegrationProtocol(Protocol):
@@ -70,23 +70,20 @@ class ExtractionService:
 
     async def convert_notes(self, notes: str) -> ExtractionResult:
         """Extract structured line items from freeform notes."""
-        try:
-            return await self._extraction.extract(notes)
-        except ExtractionError as exc:
-            sentry_sdk.capture_exception(exc)
-            raise QuoteServiceError(
-                detail=f"Extraction failed: {exc}",
-                status_code=422,
-            ) from exc
+        prepared_input = PreparedCaptureInput.from_legacy_transcript(
+            transcript=notes,
+            source_type="text",
+        )
+        return await self._extract_prepared_input(prepared_input)
 
-    async def prepare_combined_transcript(
+    async def prepare_capture_input(
         self,
         clips: Sequence[CaptureAudioClip] | None,
         notes: str | None,
         *,
         user_id: UUID | None = None,
-    ) -> str:
-        """Normalize user inputs into one validated transcript for extraction."""
+    ) -> PreparedCaptureInput:
+        """Normalize capture input into structured transcript + provenance."""
         normalized_notes = (notes or "").strip()
         has_clips = bool(clips)
         if not has_clips and not normalized_notes:
@@ -95,25 +92,53 @@ class ExtractionService:
                 status_code=400,
             )
 
-        source_type = (
+        capture_detail = (
             "audio+notes" if has_clips and normalized_notes else "audio" if has_clips else "notes"
         )
-        log_event("quote_started", user_id=user_id, detail=source_type)
+        log_event("quote_started", user_id=user_id, detail=capture_detail)
         if has_clips:
-            log_event("audio_uploaded", user_id=user_id, detail=source_type)
+            log_event("audio_uploaded", user_id=user_id, detail=capture_detail)
 
+        raw_transcript: str | None = None
         combined_text = normalized_notes
         if clips:
-            transcript = await self._transcribe_clips(clips)
-            combined_text = transcript
+            raw_transcript = await self._transcribe_clips(clips)
+            combined_text = raw_transcript
             if normalized_notes:
-                combined_text = f"{transcript}\n\n{normalized_notes}"
+                combined_text = f"{raw_transcript}\n\n{normalized_notes}"
 
         _validate_transcript_length(
             combined_text,
             max_chars=EXTRACTION_TRANSCRIPT_MAX_CHARS,
         )
-        return combined_text
+        source_type: Literal["text", "voice", "voice+text"]
+        if raw_transcript is not None and normalized_notes:
+            source_type = "voice+text"
+        elif raw_transcript is not None:
+            source_type = "voice"
+        else:
+            source_type = "text"
+        return PreparedCaptureInput(
+            transcript=combined_text,
+            source_type=source_type,
+            raw_typed_notes=normalized_notes or None,
+            raw_transcript=raw_transcript,
+        )
+
+    async def prepare_combined_transcript(
+        self,
+        clips: Sequence[CaptureAudioClip] | None,
+        notes: str | None,
+        *,
+        user_id: UUID | None = None,
+    ) -> str:
+        """Return the flattened transcript string for compatibility call sites."""
+        prepared_input = await self.prepare_capture_input(
+            clips,
+            notes,
+            user_id=user_id,
+        )
+        return prepared_input.transcript
 
     async def extract_combined(
         self,
@@ -125,13 +150,13 @@ class ExtractionService:
     ) -> ExtractionResult:
         """Extract quote line items from optional clips plus optional typed notes."""
         try:
-            combined_text = await self.prepare_combined_transcript(
+            prepared_input = await self.prepare_capture_input(
                 clips,
                 notes,
                 user_id=user_id,
             )
             try:
-                extraction = await self.convert_notes(combined_text)
+                extraction = await self._extract_prepared_input(prepared_input)
             except QuoteServiceError as exc:
                 should_persist_degraded = (
                     allow_degraded_persist_on_retryable_failure
@@ -141,7 +166,7 @@ class ExtractionService:
                     )
                 )
                 if should_persist_degraded:
-                    return build_degraded_extraction_result(transcript=combined_text)
+                    return build_degraded_extraction_result(transcript=prepared_input.transcript)
                 raise
         except QuoteServiceError:
             source_type = (
@@ -151,6 +176,19 @@ class ExtractionService:
                 log_draft_generation_failed_event(user_id=user_id, capture_detail=source_type)
             raise
         return extraction
+
+    async def _extract_prepared_input(
+        self,
+        prepared_input: PreparedCaptureInput,
+    ) -> ExtractionResult:
+        try:
+            return await self._extraction.extract(prepared_input)
+        except ExtractionError as exc:
+            sentry_sdk.capture_exception(exc)
+            raise QuoteServiceError(
+                detail=f"Extraction failed: {exc}",
+                status_code=422,
+            ) from exc
 
     async def _transcribe_clips(self, clips: Sequence[CaptureAudioClip]) -> str:
         """Normalize clip uploads and return the resulting transcript."""
