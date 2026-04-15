@@ -15,6 +15,7 @@ from app.features.jobs.repository import JobRepository
 from app.features.quotes.models import Document
 from app.features.quotes.schemas import (
     ExtractionResult,
+    ExtractionReviewHiddenDetails,
     ExtractionReviewMetadataV1,
     LineItemExtractedV2,
     PricingHints,
@@ -175,7 +176,9 @@ async def test_append_extraction_preserves_existing_confidence_notes_when_new_no
     persisted_quote = await db_session.get(Document, quote_id)
     assert persisted_quote is not None
     persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
-        hidden_details={"confidence_notes": ["keep existing confidence note"]},
+        hidden_details=ExtractionReviewHiddenDetails(
+            confidence_notes=["keep existing confidence note"]
+        ),
     ).model_dump(mode="json")
     await db_session.commit()
 
