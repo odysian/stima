@@ -716,13 +716,7 @@ def _segment_capture_input(transcript: str) -> list[CaptureSegment]:
         if len(lines) == 1:
             chunks.append(lines[0])
             continue
-        for line in lines:
-            if _BULLET_PREFIX_PATTERN.match(line):
-                chunks.append(line)
-            elif _HEADING_PATTERN.match(line):
-                chunks.append(line)
-            else:
-                chunks.append(line)
+        chunks.extend(lines)
 
     segments: list[CaptureSegment] = []
     for index, raw_text in enumerate(chunks):

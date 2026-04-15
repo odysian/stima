@@ -138,7 +138,7 @@ class PricingHints(BaseModel):
 class ExtractionSuggestion(BaseModel):
     """Suggestion payload for notes-like content placement."""
 
-    text: str = Field(min_length=1, max_length=DOCUMENT_NOTES_MAX_CHARS)
+    text: str = Field(min_length=1, max_length=LINE_ITEM_DETAILS_MAX_CHARS)
     confidence: PlacementConfidence
     source: UnresolvedSegmentSource
 

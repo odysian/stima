@@ -803,6 +803,82 @@ async def test_extract_emits_trace_events_for_primary_repair_and_result_stages(
     assert ("result", "succeeded") in {(call["stage"], call["outcome"]) for call in trace_calls}
 
 
+async def test_guard_flags_line_items_with_price_in_description() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Premium service $500",
+                                "details": None,
+                                "price": None,
+                            },
+                            {
+                                "description": "Standard service",
+                                "details": None,
+                                "price": 200,
+                            },
+                        ],
+                        "total": None,
+                        "confidence_notes": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].flagged is True
+    assert "price token" in (result.line_items[0].flag_reason or "").lower()
+    assert result.line_items[1].flagged is False
+    assert any("price token" in note.lower() for note in result.confidence_notes)
+
+
+async def test_guard_flags_line_items_with_duplicate_details() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Mulch installation",
+                                "details": "Mulch installation",
+                                "price": 150,
+                            },
+                            {
+                                "description": "Weed removal",
+                                "details": "Spot treatment only",
+                                "price": 75,
+                            },
+                        ],
+                        "total": None,
+                        "confidence_notes": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].flagged is True
+    assert "duplicate" in (result.line_items[0].flag_reason or "").lower()
+    assert result.line_items[1].flagged is False
+    assert any("duplicate" in note.lower() for note in result.confidence_notes)
+
+
 async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> None:
     prepared_capture_input = PreparedCaptureInput(
         transcript="voice transcript text\n\ntyped note text",
