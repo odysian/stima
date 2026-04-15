@@ -426,8 +426,8 @@ class QuoteUpdateRequest(BaseModel):
 class ExtractionReviewStateClearRequest(BaseModel):
     """Request payload for clearing grouped extraction review state flags."""
 
-    notes_pending: bool | None = None
-    pricing_pending: bool | None = None
+    notes_pending: Literal[True] | None = None
+    pricing_pending: Literal[True] | None = None
 
     @model_validator(mode="after")
     def validate_has_target(self) -> ExtractionReviewStateClearRequest:

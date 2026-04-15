@@ -327,13 +327,13 @@ class QuoteMutationService:
             metadata,
             dismiss_hidden_item=data.dismiss_hidden_item,
             review_hidden_item=data.review_hidden_item,
-            clear_notes_pending=bool(
+            clear_notes_pending=(
                 data.clear_review_state is not None
-                and data.clear_review_state.notes_pending is not None
+                and data.clear_review_state.notes_pending is True
             ),
-            clear_pricing_pending=bool(
+            clear_pricing_pending=(
                 data.clear_review_state is not None
-                and data.clear_review_state.pricing_pending is not None
+                and data.clear_review_state.pricing_pending is True
             ),
         )
         if next_metadata.model_dump(mode="json") != metadata.model_dump(mode="json"):

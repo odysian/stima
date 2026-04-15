@@ -226,8 +226,8 @@ export interface ExtractionReviewMetadataUpdateRequest {
   dismiss_hidden_item?: string;
   review_hidden_item?: string;
   clear_review_state?: {
-    notes_pending?: boolean;
-    pricing_pending?: boolean;
+    notes_pending?: true;
+    pricing_pending?: true;
   };
 }
 

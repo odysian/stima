@@ -379,6 +379,51 @@ async def test_patch_extraction_review_metadata_updates_sidecar_only(
     }
 
 
+async def test_patch_extraction_review_metadata_marks_hidden_item_reviewed(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = UUID(quote["id"])
+
+    persisted_quote = await db_session.get(Document, quote_id)
+    assert persisted_quote is not None
+    persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
+        hidden_details=ExtractionReviewHiddenDetails(
+            unresolved_segments=[
+                {
+                    "id": "unresolved-1",
+                    "raw_text": "Confirm edging scope",
+                    "confidence": "low",
+                    "source": "leftover_classification",
+                }
+            ]
+        ),
+    ).model_dump(mode="json")
+    await db_session.commit()
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}/extraction-review-metadata",
+        json={"review_hidden_item": "unresolved-1"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["hidden_detail_state"]["unresolved-1"] == {
+        "reviewed": True,
+        "dismissed": False,
+    }
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert payload["extraction_review_metadata"]["hidden_detail_state"]["unresolved-1"] == {
+        "reviewed": True,
+        "dismissed": False,
+    }
+
+
 async def test_quote_patch_clears_related_append_suggestions_on_real_field_edits(
     client: AsyncClient,
     db_session: AsyncSession,
