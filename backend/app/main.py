@@ -31,6 +31,7 @@ from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
 from app.shared.dependencies import get_idempotency_store
 from app.shared.event_logger import configure_event_logging
+from app.shared.extraction_logger import configure_extraction_logging
 from app.shared.observability import (
     RequestObservabilityMiddleware,
     bind_request_context,
@@ -118,6 +119,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
     init_sentry(dsn=settings.sentry_dsn, environment=settings.environment)
     configure_event_logging(session_factory=get_session_maker())
+    configure_extraction_logging(
+        include_raw_content=settings.extraction_trace_include_raw_content,
+    )
     configure_security_logging()
 
     app = FastAPI(title="Stima API", lifespan=_lifespan)

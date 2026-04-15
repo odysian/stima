@@ -206,6 +206,10 @@ class Settings(BaseSettings):
         default="fallback_default",
         validation_alias="EXTRACTION_FALLBACK_PROMPT_VARIANT",
     )
+    extraction_trace_include_raw_content: bool = Field(
+        default=False,
+        validation_alias="EXTRACTION_TRACE_INCLUDE_RAW_CONTENT",
+    )
     transcription_model: str = Field(
         default="whisper-1",
         validation_alias="TRANSCRIPTION_MODEL",

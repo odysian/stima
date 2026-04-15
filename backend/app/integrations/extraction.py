@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import json
+import logging
 import re
 import secrets
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from anthropic import AsyncAnthropic
 from pydantic import ValidationError
 
 from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
+from app.shared.extraction_logger import log_extraction_trace
 from app.shared.input_limits import (
     CONFIDENCE_NOTE_MAX_CHARS,
     CONFIDENCE_NOTES_MAX_ITEMS,
@@ -107,6 +109,7 @@ _WHITESPACE_PATTERN = re.compile(r"\s+")
 
 _RETRY_BASE_DELAY_SECONDS = 0.25
 _RETRY_MAX_DELAY_SECONDS = 2.0
+_TRACE_EVENT_NAME = "extraction.trace"
 
 
 class ExtractionError(Exception):
@@ -205,10 +208,29 @@ class ExtractionIntegration:
                 )
             except ExtractionError as exc:
                 last_error = exc
+                log_extraction_trace(
+                    _TRACE_EVENT_NAME,
+                    stage=tier.tier,
+                    outcome="failed",
+                    level=logging.WARNING,
+                    extraction_model_id=tier.model_id,
+                    extraction_prompt_variant=tier.prompt_variant,
+                    error_class=type(exc).__name__,
+                    error_message=str(exc),
+                )
                 continue
 
         if last_error is None:  # pragma: no cover - defensive invariant
             raise ExtractionError("Claude request failed")
+        log_extraction_trace(
+            _TRACE_EVENT_NAME,
+            stage="result",
+            outcome="failed",
+            level=logging.ERROR,
+            reason="all_tiers_failed",
+            error_class=type(last_error).__name__,
+            error_message=str(last_error),
+        )
         raise last_error
 
     @property
@@ -246,6 +268,15 @@ class ExtractionIntegration:
         *,
         tier: _ExtractionTierConfig,
     ) -> ExtractionResult:
+        log_extraction_trace(
+            _TRACE_EVENT_NAME,
+            stage=tier.tier,
+            outcome="started",
+            extraction_model_id=tier.model_id,
+            extraction_prompt_variant=tier.prompt_variant,
+            transcript_chars=len(normalized_notes),
+            raw_transcript=normalized_notes,
+        )
         _set_last_call_metadata(
             model_id=tier.model_id,
             token_usage=None,
@@ -276,14 +307,47 @@ class ExtractionIntegration:
         payload.setdefault("transcript", normalized_notes)
         payload.setdefault("line_items", [])
         payload.setdefault("confidence_notes", [])
+        log_extraction_trace(
+            _TRACE_EVENT_NAME,
+            stage=tier.tier,
+            outcome="provider_response",
+            extraction_model_id=response_model_id,
+            extraction_prompt_variant=tier.prompt_variant,
+            token_input_tokens=_token_usage_value(response_token_usage, "input_tokens"),
+            token_output_tokens=_token_usage_value(response_token_usage, "output_tokens"),
+            line_item_count=_list_count(payload.get("line_items")),
+            confidence_note_count=_list_count(payload.get("confidence_notes")),
+            total_present=payload.get("total") is not None if "total" in payload else None,
+            raw_transcript=normalized_notes,
+            raw_tool_payload=payload,
+        )
 
         try:
             validated_result = ExtractionResult.model_validate(payload)
-            return _apply_semantic_guard_rules(validated_result)
+            result = _apply_semantic_guard_rules(validated_result)
+            _log_result_trace(
+                result=result,
+                invocation_tier=tier.tier,
+                model_id=response_model_id,
+                prompt_variant=tier.prompt_variant,
+            )
+            return result
         except ValidationError as exc:
             validation_errors = _compact_validation_errors(exc)
             repair_prompt_variant = (
                 f"{tier.prompt_variant}:{EXTRACTION_PROMPT_VARIANT_REPAIR_SUFFIX}"
+            )
+            log_extraction_trace(
+                _TRACE_EVENT_NAME,
+                stage="repair",
+                outcome="started",
+                level=logging.WARNING,
+                extraction_invocation_tier=tier.tier,
+                extraction_model_id=response_model_id,
+                extraction_prompt_variant=repair_prompt_variant,
+                validation_error_count=len(validation_errors),
+                raw_transcript=normalized_notes,
+                raw_tool_payload=payload,
             )
             try:
                 repair_response = await self._request_with_retry(
@@ -308,6 +372,17 @@ class ExtractionIntegration:
                     repair_outcome="repair_request_failed",
                     repair_validation_error_count=len(validation_errors),
                 )
+                log_extraction_trace(
+                    _TRACE_EVENT_NAME,
+                    stage="repair",
+                    outcome="failed",
+                    level=logging.WARNING,
+                    extraction_invocation_tier=tier.tier,
+                    extraction_model_id=response_model_id,
+                    extraction_prompt_variant=repair_prompt_variant,
+                    validation_error_count=len(validation_errors),
+                    reason="repair_request_failed",
+                )
                 raise
             repair_usage = _extract_token_usage(repair_response)
             repair_model_id = getattr(repair_response, "model", None) or tier.model_id
@@ -327,7 +402,31 @@ class ExtractionIntegration:
                     repair_outcome="repair_invalid",
                     repair_validation_error_count=len(validation_errors),
                 )
-                return _build_validation_repair_failed_result(transcript=normalized_notes)
+                log_extraction_trace(
+                    _TRACE_EVENT_NAME,
+                    stage="repair",
+                    outcome="failed",
+                    level=logging.WARNING,
+                    extraction_invocation_tier=tier.tier,
+                    extraction_model_id=repair_model_id,
+                    extraction_prompt_variant=repair_prompt_variant,
+                    validation_error_count=len(validation_errors),
+                    reason="repair_invalid",
+                    token_input_tokens=_token_usage_value(repair_usage, "input_tokens"),
+                    token_output_tokens=_token_usage_value(repair_usage, "output_tokens"),
+                    raw_transcript=normalized_notes,
+                    raw_tool_payload=repair_payload,
+                )
+                degraded_result = _build_validation_repair_failed_result(
+                    transcript=normalized_notes
+                )
+                _log_result_trace(
+                    result=degraded_result,
+                    invocation_tier=tier.tier,
+                    model_id=repair_model_id,
+                    prompt_variant=repair_prompt_variant,
+                )
+                return degraded_result
             _set_last_call_metadata(
                 model_id=repair_model_id,
                 token_usage=repair_usage,
@@ -337,7 +436,32 @@ class ExtractionIntegration:
                 repair_outcome="repair_succeeded",
                 repair_validation_error_count=len(validation_errors),
             )
-            return _apply_semantic_guard_rules(repaired_result)
+            log_extraction_trace(
+                _TRACE_EVENT_NAME,
+                stage="repair",
+                outcome="succeeded",
+                extraction_invocation_tier=tier.tier,
+                extraction_model_id=repair_model_id,
+                extraction_prompt_variant=repair_prompt_variant,
+                validation_error_count=len(validation_errors),
+                token_input_tokens=_token_usage_value(repair_usage, "input_tokens"),
+                token_output_tokens=_token_usage_value(repair_usage, "output_tokens"),
+                line_item_count=_list_count(repair_payload.get("line_items")),
+                confidence_note_count=_list_count(repair_payload.get("confidence_notes")),
+                total_present=(
+                    repair_payload.get("total") is not None if "total" in repair_payload else None
+                ),
+                raw_transcript=normalized_notes,
+                raw_tool_payload=repair_payload,
+            )
+            result = _apply_semantic_guard_rules(repaired_result)
+            _log_result_trace(
+                result=result,
+                invocation_tier=tier.tier,
+                model_id=repair_model_id,
+                prompt_variant=repair_prompt_variant,
+            )
+            return result
 
     async def _request_with_retry(
         self,
@@ -530,6 +654,43 @@ def _token_usage_int(usage: object, key: str) -> int | None:
     else:
         candidate = getattr(usage, key, None)
     return candidate if isinstance(candidate, int) else None
+
+
+def _token_usage_value(usage: dict[str, int] | None, key: str) -> int | None:
+    if usage is None:
+        return None
+    value = usage.get(key)
+    return value if isinstance(value, int) else None
+
+
+def _list_count(value: object) -> int | None:
+    if isinstance(value, list):
+        return len(value)
+    return None
+
+
+def _log_result_trace(
+    *,
+    result: ExtractionResult,
+    invocation_tier: Literal["primary", "fallback"],
+    model_id: str,
+    prompt_variant: str,
+) -> None:
+    log_extraction_trace(
+        _TRACE_EVENT_NAME,
+        stage="result",
+        outcome="succeeded",
+        extraction_invocation_tier=invocation_tier,
+        extraction_model_id=model_id,
+        extraction_prompt_variant=prompt_variant,
+        extraction_tier=result.extraction_tier,
+        extraction_degraded_reason_code=result.extraction_degraded_reason_code,
+        line_item_count=len(result.line_items),
+        confidence_note_count=len(result.confidence_notes),
+        total_present=result.total is not None,
+        raw_transcript=result.transcript,
+        raw_tool_payload=result.model_dump(mode="json"),
+    )
 
 
 def _build_repair_request(

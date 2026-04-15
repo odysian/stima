@@ -20,6 +20,7 @@ from app.core.database import get_session_maker
 from app.features.jobs.models import JobType
 from app.features.jobs.repository import JobRepository
 from app.shared.dependencies import get_extraction_integration
+from app.shared.extraction_logger import configure_extraction_logging
 from app.shared.observability import (
     bind_worker_correlation,
     configure_security_logging,
@@ -89,6 +90,9 @@ async def on_worker_startup(ctx: dict[str, Any]) -> None:
         raise ValueError("REDIS_URL must be set for worker execution")
 
     configure_security_logging()
+    configure_extraction_logging(
+        include_raw_content=settings.extraction_trace_include_raw_content,
+    )
     await ping_worker_redis(redis_url)
     ctx["worker_runtime"] = WorkerRuntimeSettings(
         session_maker=get_session_maker(),
