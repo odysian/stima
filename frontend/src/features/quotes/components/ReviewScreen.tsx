@@ -10,7 +10,6 @@ import { usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { buildDraftSnapshot, readReviewLocationState, resolveBackTarget } from "@/features/quotes/utils/reviewScreenState";
-import { readQuoteConfidenceNotes, writeQuoteConfidenceNotes } from "@/features/quotes/utils/reviewConfidenceNotes";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
 
@@ -33,6 +32,7 @@ export function DocumentEditScreen(): React.ReactElement {
   const [submitAction, setSubmitAction] = useState<"save" | "continue" | null>(null);
   const [isAssignmentSheetOpen, setIsAssignmentSheetOpen] = useState(false);
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
+  const [showContinueWarning, setShowContinueWarning] = useState(false);
   const [pendingNavigationTarget, setPendingNavigationTarget] = useState<{
     to: string;
     replace?: boolean;
@@ -41,7 +41,6 @@ export function DocumentEditScreen(): React.ReactElement {
   const [snapshotQuoteId, setSnapshotQuoteId] = useState<string | null>(null);
   const [suggestedTaxRate, setSuggestedTaxRate] = useState<number | null>(null);
   const [isAssigningCustomer, setIsAssigningCustomer] = useState(false);
-  const [confidenceNotes, setConfidenceNotes] = useState<string[]>([]);
   const [hasAppliedReseedFromLocation, setHasAppliedReseedFromLocation] = useState(false);
   const [lineItemSheetState, setLineItemSheetState] = useState<ReviewLineItemSheetState | null>(null);
   const isAddVoiceNoteInFlightRef = useRef(false);
@@ -55,7 +54,6 @@ export function DocumentEditScreen(): React.ReactElement {
     }
     return document.customer_id === null;
   }, [document]);
-
   const canReassignCustomer = useMemo(() => {
     if (!document || isInvoiceDocument(document)) {
       return false;
@@ -65,7 +63,6 @@ export function DocumentEditScreen(): React.ReactElement {
     }
     return (document.status === "draft" || document.status === "ready") && !document.linked_invoice;
   }, [document]);
-
   const isTypeSelectorLocked = useMemo(() => {
     if (!document) {
       return true;
@@ -75,24 +72,18 @@ export function DocumentEditScreen(): React.ReactElement {
     }
     return document.status !== "draft" && document.status !== "ready";
   }, [document]);
-
-  const hasVisibleConfidenceNotes = confidenceNotes.length > 0;
-
   const currentSnapshotKey = useMemo(() => {
     if (!draft) {
       return null;
     }
     return JSON.stringify(buildDraftSnapshot(draft));
   }, [draft]);
-
   useEffect(() => {
     if (!id) {
       return;
     }
-    setConfidenceNotes(readQuoteConfidenceNotes(id));
     setHasAppliedReseedFromLocation(false);
   }, [id]);
-
   useEffect(() => {
     if (!id || !locationState.reseedDraft || hasAppliedReseedFromLocation) {
       return;
@@ -220,6 +211,13 @@ export function DocumentEditScreen(): React.ReactElement {
     lineItemsForSubmit,
     lineItemSum,
   } = buildLineItemSubmitState(activeDraft.lineItems);
+  const extractionReviewMetadata = !isInvoiceDocument(activeDocument)
+    ? activeDocument.extraction_review_metadata
+    : undefined;
+  const notesReviewPending = activeDraft.docType === "quote"
+    && Boolean(extractionReviewMetadata?.review_state.notes_pending);
+  const pricingReviewPending = activeDraft.docType === "quote"
+    && Boolean(extractionReviewMetadata?.review_state.pricing_pending);
 
   const isInteractionLocked = submitAction !== null || isAssigningCustomer;
   const lineItemSheetInitialItem = lineItemSheetState
@@ -341,7 +339,6 @@ export function DocumentEditScreen(): React.ReactElement {
     <DocumentEditScreenView
       document={activeDocument}
       activeDraft={activeDraft}
-      documentId={documentId}
       backLabel={backLabel}
       backTarget={backTarget}
       loadError={loadError}
@@ -350,8 +347,11 @@ export function DocumentEditScreen(): React.ReactElement {
       requiresCustomerAssignment={requiresCustomerAssignment}
       canReassignCustomer={canReassignCustomer}
       isInteractionLocked={isInteractionLocked}
-      hasVisibleConfidenceNotes={hasVisibleConfidenceNotes}
-      confidenceNotes={confidenceNotes}
+      notesReviewPending={notesReviewPending}
+      pricingReviewPending={pricingReviewPending}
+      extractionTier={!isInvoiceDocument(activeDocument) ? activeDocument.extraction_tier : null}
+      extractionDegradedReasonCode={!isInvoiceDocument(activeDocument) ? activeDocument.extraction_degraded_reason_code : null}
+      hiddenDetails={extractionReviewMetadata?.hidden_details}
       lineItemSum={lineItemSum}
       suggestedTaxRate={suggestedTaxRate}
       isTypeSelectorLocked={isTypeSelectorLocked}
@@ -360,6 +360,7 @@ export function DocumentEditScreen(): React.ReactElement {
       lineItemSheetInitialItem={lineItemSheetInitialItem}
       toastMessage={toastMessage}
       showLeaveWarning={showLeaveWarning}
+      showContinueWarning={showContinueWarning}
       isSavingDraft={submitAction === "save"}
       isContinuing={submitAction === "continue"}
       onRequestNavigation={requestNavigation}
@@ -388,11 +389,6 @@ export function DocumentEditScreen(): React.ReactElement {
       onAddVoiceNote={() => {
         void handleAddVoiceNote();
       }}
-      onDismissConfidence={(noteIndex) => {
-        const nextNotes = confidenceNotes.filter((_, index) => index !== noteIndex);
-        writeQuoteConfidenceNotes(documentId, nextNotes);
-        setConfidenceNotes(nextNotes);
-      }}
       onTitleChange={(nextTitle) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, title: nextTitle })); }}
       onEditLineItem={(lineItemIndex) => {
         if (isInteractionLocked || !activeDraft.lineItems[lineItemIndex]) {
@@ -413,7 +409,13 @@ export function DocumentEditScreen(): React.ReactElement {
       onDepositAmountChange={(nextDepositAmount) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, depositAmount: nextDepositAmount })); }}
       onNotesChange={(nextNotes) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, notes: nextNotes })); }}
       onSaveDraft={() => { void saveDraft("save"); }}
-      onPrimaryAction={() => { void saveDraft("continue"); }}
+      onPrimaryAction={() => {
+        if (activeDraft.docType === "quote" && (notesReviewPending || pricingReviewPending)) {
+          setShowContinueWarning(true);
+          return;
+        }
+        void saveDraft("continue");
+      }}
       onCloseAssignment={() => setIsAssignmentSheetOpen(false)}
       onAssignCustomer={handleAssignCustomer}
       onCloseLineItemSheet={() => setLineItemSheetState(null)}
@@ -437,6 +439,11 @@ export function DocumentEditScreen(): React.ReactElement {
       onDismissToast={() => setToastMessage(null)}
       onLeaveConfirm={handleLeaveConfirm}
       onLeaveCancel={handleLeaveCancel}
+      onContinueConfirm={() => {
+        setShowContinueWarning(false);
+        void saveDraft("continue");
+      }}
+      onContinueCancel={() => setShowContinueWarning(false)}
     />
   );
 }

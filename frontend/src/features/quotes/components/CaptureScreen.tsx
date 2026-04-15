@@ -16,9 +16,6 @@ import {
   readCaptureLaunchOrigin,
   resolveCaptureLaunchOrigin,
 } from "@/features/quotes/utils/workflowNavigation";
-import {
-  writeQuoteConfidenceNotes,
-} from "@/features/quotes/utils/reviewConfidenceNotes";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail, QuoteSourceType } from "@/features/quotes/types/quote.types";
@@ -114,9 +111,6 @@ export function CaptureScreen(): React.ReactElement {
     quoteDetail: QuoteDetail,
     quoteId: string,
   ): void {
-    const confidenceNotes =
-      quoteDetail.extraction_review_metadata?.hidden_details.confidence_notes ?? [];
-    writeQuoteConfidenceNotes(quoteId, confidenceNotes);
     setDraft({
       quoteId,
       customerId: quoteDetail.customer_id ?? customerId ?? "",
@@ -135,7 +129,6 @@ export function CaptureScreen(): React.ReactElement {
       discountType: quoteDetail.discount_type,
       discountValue: quoteDetail.discount_value,
       depositAmount: quoteDetail.deposit_amount,
-      confidenceNotes,
       notes: quoteDetail.notes ?? "",
       sourceType,
     });
@@ -147,9 +140,6 @@ export function CaptureScreen(): React.ReactElement {
     appendMode: boolean,
   ): Promise<void> {
     const persistedQuote = await quoteService.getQuote(quoteId);
-    const confidenceNotes =
-      persistedQuote.extraction_review_metadata?.hidden_details.confidence_notes ?? [];
-    writeQuoteConfidenceNotes(quoteId, confidenceNotes);
     if (appendMode) {
       return;
     }

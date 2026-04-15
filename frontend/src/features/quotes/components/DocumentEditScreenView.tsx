@@ -4,14 +4,13 @@ import { ReviewFormContent } from "@/features/quotes/components/ReviewFormConten
 import { isInvoiceDocument } from "@/features/quotes/components/documentEditUtils";
 import type { ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { type DocumentEditDraft, type PersistedEditableDocument } from "@/features/quotes/hooks/usePersistedReview";
-import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import type { ExtractionReviewHiddenDetails, ExtractionTier, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
 interface DocumentEditScreenViewProps {
   document: PersistedEditableDocument;
   activeDraft: DocumentEditDraft;
-  documentId: string;
   backLabel: string;
   backTarget: string;
   loadError: string | null;
@@ -20,8 +19,11 @@ interface DocumentEditScreenViewProps {
   requiresCustomerAssignment: boolean;
   canReassignCustomer: boolean;
   isInteractionLocked: boolean;
-  hasVisibleConfidenceNotes: boolean;
-  confidenceNotes: string[];
+  notesReviewPending: boolean;
+  pricingReviewPending: boolean;
+  extractionTier: ExtractionTier | null;
+  extractionDegradedReasonCode: string | null;
+  hiddenDetails?: ExtractionReviewHiddenDetails;
   lineItemSum: number;
   suggestedTaxRate: number | null;
   isTypeSelectorLocked: boolean;
@@ -30,6 +32,7 @@ interface DocumentEditScreenViewProps {
   lineItemSheetInitialItem: LineItemDraftWithFlags;
   toastMessage: string | null;
   showLeaveWarning: boolean;
+  showContinueWarning: boolean;
   isSavingDraft: boolean;
   isContinuing: boolean;
   onRequestNavigation: (target: { to: string; replace?: boolean }) => void;
@@ -37,7 +40,6 @@ interface DocumentEditScreenViewProps {
   onDueDateChange: (nextDueDate: string) => void;
   onOpenAssignment: () => void;
   onAddVoiceNote: () => void;
-  onDismissConfidence: (noteIndex: number) => void;
   onTitleChange: (nextTitle: string) => void;
   onEditLineItem: (lineItemIndex: number) => void;
   onAddLineItem: () => void;
@@ -57,12 +59,13 @@ interface DocumentEditScreenViewProps {
   onDismissToast: () => void;
   onLeaveConfirm: () => void;
   onLeaveCancel: () => void;
+  onContinueConfirm: () => void;
+  onContinueCancel: () => void;
 }
 
 export function DocumentEditScreenView({
   document,
   activeDraft,
-  documentId,
   backLabel,
   backTarget,
   loadError,
@@ -71,8 +74,11 @@ export function DocumentEditScreenView({
   requiresCustomerAssignment,
   canReassignCustomer,
   isInteractionLocked,
-  hasVisibleConfidenceNotes,
-  confidenceNotes,
+  notesReviewPending,
+  pricingReviewPending,
+  extractionTier,
+  extractionDegradedReasonCode,
+  hiddenDetails,
   lineItemSum,
   suggestedTaxRate,
   isTypeSelectorLocked,
@@ -81,6 +87,7 @@ export function DocumentEditScreenView({
   lineItemSheetInitialItem,
   toastMessage,
   showLeaveWarning,
+  showContinueWarning,
   isSavingDraft,
   isContinuing,
   onRequestNavigation,
@@ -88,7 +95,6 @@ export function DocumentEditScreenView({
   onDueDateChange,
   onOpenAssignment,
   onAddVoiceNote,
-  onDismissConfidence,
   onTitleChange,
   onEditLineItem,
   onAddLineItem,
@@ -108,6 +114,8 @@ export function DocumentEditScreenView({
   onDismissToast,
   onLeaveConfirm,
   onLeaveCancel,
+  onContinueConfirm,
+  onContinueCancel,
 }: DocumentEditScreenViewProps): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-28">
@@ -122,7 +130,6 @@ export function DocumentEditScreenView({
       />
 
       <ReviewFormContent
-        id={documentId}
         customerName={isInvoiceDocument(document) ? document.customer.name : document.customer_name}
         draft={activeDraft}
         documentType={activeDraft.docType}
@@ -134,15 +141,17 @@ export function DocumentEditScreenView({
         requiresCustomerAssignment={requiresCustomerAssignment}
         canReassignCustomer={canReassignCustomer}
         isInteractionLocked={isInteractionLocked}
-        hasVisibleConfidenceNotes={hasVisibleConfidenceNotes}
-        confidenceNotes={confidenceNotes}
+        notesReviewPending={notesReviewPending}
+        pricingReviewPending={pricingReviewPending}
+        extractionTier={extractionTier}
+        extractionDegradedReasonCode={extractionDegradedReasonCode}
+        hiddenDetails={hiddenDetails}
         lineItemSum={lineItemSum}
         suggestedTaxRate={suggestedTaxRate}
         onDocumentTypeChange={onDocumentTypeChange}
         onDueDateChange={onDueDateChange}
         onRequestAssignment={onOpenAssignment}
         onAddVoiceNote={onAddVoiceNote}
-        onDismissConfidence={onDismissConfidence}
         onTitleChange={onTitleChange}
         onEditLineItem={onEditLineItem}
         onAddLineItem={onAddLineItem}
@@ -179,6 +188,9 @@ export function DocumentEditScreenView({
         showLeaveWarning={showLeaveWarning}
         onLeaveConfirm={onLeaveConfirm}
         onLeaveCancel={onLeaveCancel}
+        showContinueWarning={showContinueWarning}
+        onContinueConfirm={onContinueConfirm}
+        onContinueCancel={onContinueCancel}
       />
     </main>
   );

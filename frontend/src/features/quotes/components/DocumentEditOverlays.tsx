@@ -20,6 +20,9 @@ interface DocumentEditOverlaysProps {
   showLeaveWarning: boolean;
   onLeaveConfirm: () => void;
   onLeaveCancel: () => void;
+  showContinueWarning: boolean;
+  onContinueConfirm: () => void;
+  onContinueCancel: () => void;
 }
 
 export function DocumentEditOverlays({
@@ -37,6 +40,9 @@ export function DocumentEditOverlays({
   showLeaveWarning,
   onLeaveConfirm,
   onLeaveCancel,
+  showContinueWarning,
+  onContinueConfirm,
+  onContinueCancel,
 }: DocumentEditOverlaysProps): React.ReactElement {
   return (
     <>
@@ -71,6 +77,17 @@ export function DocumentEditOverlays({
           onConfirm={onLeaveConfirm}
           onCancel={onLeaveCancel}
           variant="destructive"
+        />
+      ) : null}
+
+      {showContinueWarning ? (
+        <ConfirmModal
+          title="Review pending extraction markers?"
+          body="Notes and pricing still have pending review markers. Review now, or continue anyway."
+          confirmLabel="Continue anyway"
+          cancelLabel="Review now"
+          onConfirm={onContinueConfirm}
+          onCancel={onContinueCancel}
         />
       ) : null}
     </>
