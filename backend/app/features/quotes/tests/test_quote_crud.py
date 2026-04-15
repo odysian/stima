@@ -81,7 +81,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
             "title": "  Front Bed Refresh  ",
             "transcript": extraction_payload["transcript"],
             "line_items": extraction_payload["line_items"],
-            "total_amount": extraction_payload["total"],
+            "total_amount": extraction_payload["pricing_hints"]["explicit_total"],
             "notes": "Please review within 7 days",
             "source_type": "text",
         },
@@ -487,7 +487,9 @@ async def test_update_quote_replaces_line_items_when_provided(
             "id": payload["line_items"][0]["id"],
             "description": "Premium mulch refresh",
             "details": "6 yards",
-            "price": 180,
+            "price": 180.0,
+            "flagged": False,
+            "flag_reason": None,
             "sort_order": 0,
         }
     ]

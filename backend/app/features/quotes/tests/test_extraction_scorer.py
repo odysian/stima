@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
+from app.features.quotes.schemas import (
+    ExtractionResult,
+    LineItemExtractedV2,
+    PricingHints,
+)
 from app.features.quotes.tests.scoring import extraction_scorer as scorer_module
 from app.features.quotes.tests.scoring.extraction_scorer import (
     CaseScore,
@@ -26,18 +30,20 @@ def _item(
     details: str | None = None,
     flagged: bool = False,
     flag_reason: str | None = None,
-) -> LineItemExtracted:
-    return LineItemExtracted(
+) -> LineItemExtractedV2:
+    return LineItemExtractedV2(
+        raw_text=f"{description} {details or ''}".strip() or description,
         description=description,
         price=price,
         details=details,
         flagged=flagged,
         flag_reason=flag_reason,
+        confidence="medium",
     )
 
 
 def _result(
-    line_items: list[LineItemExtracted],
+    line_items: list[LineItemExtractedV2],
     *,
     total: float | None = None,
     confidence_notes: list[str] | None = None,
@@ -45,7 +51,7 @@ def _result(
     return ExtractionResult(
         transcript="unit test transcript",
         line_items=line_items,
-        total=total,
+        pricing_hints=PricingHints(explicit_total=total),
         confidence_notes=confidence_notes or [],
     )
 

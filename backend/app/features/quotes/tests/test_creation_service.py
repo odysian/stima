@@ -16,7 +16,8 @@ from app.features.quotes.creation.service import (
 from app.features.quotes.models import Document
 from app.features.quotes.schemas import (
     ExtractionResult,
-    LineItemExtracted,
+    LineItemExtractedV2,
+    PricingHints,
     QuoteCreateRequest,
 )
 
@@ -99,13 +100,15 @@ async def test_create_extracted_draft_commit_false_skips_commit() -> None:
     extraction_result = ExtractionResult(
         transcript="mulch the front beds",
         line_items=[
-            LineItemExtracted(
+            LineItemExtractedV2(
+                raw_text="mulch the front beds",
                 description="Brown mulch",
                 details="5 yards",
                 price=120,
+                confidence="medium",
             )
         ],
-        total=120,
+        pricing_hints=PricingHints(explicit_total=120),
         confidence_notes=[],
     )
 

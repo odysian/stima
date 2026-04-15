@@ -414,7 +414,7 @@ class ExtractionIntegration:
         try:
             validated_result_v2 = ExtractionResultV2.model_validate(payload)
             guarded_result_v2 = _apply_semantic_guard_rules(validated_result_v2)
-            result = guarded_result_v2.to_v1_result()
+            result = ExtractionResult.model_validate(guarded_result_v2.model_dump(mode="json"))
             _log_result_trace(
                 result=result,
                 invocation_tier=tier.tier,
@@ -555,7 +555,7 @@ class ExtractionIntegration:
                 raw_tool_payload=repair_payload,
             )
             guarded_result_v2 = _apply_semantic_guard_rules(repaired_result_v2)
-            result = guarded_result_v2.to_v1_result()
+            result = ExtractionResult.model_validate(guarded_result_v2.model_dump(mode="json"))
             _log_result_trace(
                 result=result,
                 invocation_tier=tier.tier,
@@ -915,7 +915,7 @@ def _log_result_trace(
         extraction_degraded_reason_code=result.extraction_degraded_reason_code,
         line_item_count=len(result.line_items),
         confidence_note_count=len(result.confidence_notes),
-        total_present=result.total is not None,
+        total_present=result.pricing_hints.explicit_total is not None,
         raw_transcript=result.transcript,
         raw_tool_payload=result.model_dump(mode="json"),
     )
@@ -956,8 +956,11 @@ def _compact_validation_errors(error: ValidationError) -> list[str]:
 def _build_validation_repair_failed_result(*, transcript: str) -> ExtractionResult:
     return ExtractionResult(
         transcript=transcript,
+        pipeline_version="v2",
         line_items=[],
-        total=None,
+        pricing_hints=PricingHints(),
+        customer_notes_suggestion=None,
+        unresolved_segments=[],
         confidence_notes=[],
         extraction_tier="degraded",
         extraction_degraded_reason_code=EXTRACTION_DEGRADED_REASON_VALIDATION_REPAIR_FAILED,

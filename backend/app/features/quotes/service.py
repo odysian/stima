@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Literal, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 from uuid import UUID
 
 from arq.connections import ArqRedis
@@ -118,6 +118,7 @@ class QuoteRepositoryProtocol(Protocol):
         source_type: str,
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
+        extraction_review_metadata: dict[str, Any] | None = None,
     ) -> Document: ...
 
     async def update(
@@ -157,6 +158,7 @@ class QuoteRepositoryProtocol(Protocol):
         line_items: list[LineItemDraft],
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
+        extraction_review_metadata: dict[str, Any] | None = None,
     ) -> Document: ...
 
     async def delete(self, document_id: UUID) -> None: ...

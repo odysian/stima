@@ -16,7 +16,7 @@ from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, QuoteStatus
-from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
+from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput, PricingHints
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.features.quotes.tests import test_quotes as quotes_test_module
 from app.features.quotes.tests.support.helpers import (
@@ -754,7 +754,7 @@ async def test_convert_notes_rejects_when_concurrency_limit_is_exhausted(
             return ExtractionResult(
                 transcript=notes.transcript,
                 line_items=[],
-                total=None,
+                pricing_hints=PricingHints(),
                 confidence_notes=[],
             )
 

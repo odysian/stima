@@ -38,6 +38,7 @@ from app.features.quotes.extraction_outcomes import (
     log_draft_generation_failed_event,
 )
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
+from app.features.quotes.review_metadata import normalize_extraction_review_metadata
 from app.features.quotes.schemas import (
     ConvertNotesRequest,
     DiscountType,
@@ -548,6 +549,10 @@ async def get_quote(
             job_id=quote.pdf_artifact_job_id,
             job_status=quote.pdf_artifact_job_status,
             terminal_error=quote.pdf_artifact_terminal_error,
+        ),
+        extraction_review_metadata=normalize_extraction_review_metadata(
+            quote.extraction_review_metadata,
+            extraction_degraded_reason_code=quote.extraction_degraded_reason_code,
         ),
     )
 

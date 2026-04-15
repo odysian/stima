@@ -5,7 +5,12 @@ from types import SimpleNamespace
 from typing import TypedDict
 
 from app.features.quotes.repository import QuoteRenderContext
-from app.features.quotes.schemas import ExtractionResult, LineItemExtracted, PreparedCaptureInput
+from app.features.quotes.schemas import (
+    ExtractionResult,
+    LineItemExtractedV2,
+    PreparedCaptureInput,
+    PricingHints,
+)
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.email import EmailConfigurationError, EmailMessage, EmailSendError
 from app.integrations.extraction import ExtractionError
@@ -26,28 +31,32 @@ class _MockExtractionIntegration:
             return ExtractionResult(
                 transcript=normalized_notes,
                 line_items=[
-                    LineItemExtracted(
+                    LineItemExtractedV2(
+                        raw_text="Brown mulch 5 yards 120",
                         description="Brown mulch",
                         details="5 yards",
                         price=120,
                         flagged=True,
                         flag_reason="Unit or price sounds inconsistent with the transcript",
+                        confidence="medium",
                     )
                 ],
-                total=120,
+                pricing_hints=PricingHints(explicit_total=120),
                 confidence_notes=[],
             )
 
         return ExtractionResult(
             transcript=normalized_notes,
             line_items=[
-                LineItemExtracted(
+                LineItemExtractedV2(
+                    raw_text="Brown mulch 5 yards 120",
                     description="Brown mulch",
                     details="5 yards",
                     price=120,
+                    confidence="medium",
                 )
             ],
-            total=120,
+            pricing_hints=PricingHints(explicit_total=120),
             confidence_notes=[],
         )
 

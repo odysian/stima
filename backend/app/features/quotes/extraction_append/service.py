@@ -10,6 +10,10 @@ from uuid import UUID
 from app.features.quotes.errors import QuoteServiceError
 from app.features.quotes.extraction_outcomes import classify_extraction_result
 from app.features.quotes.models import Document, QuoteStatus
+from app.features.quotes.review_metadata import (
+    build_extraction_review_metadata,
+    normalize_extraction_review_metadata,
+)
 from app.features.quotes.schemas import ExtractionResult, LineItemDraft
 from app.shared.pricing import (
     PricingValidationError,
@@ -48,6 +52,7 @@ class QuoteExtractionAppendRepositoryProtocol(Protocol):
         line_items: list[LineItemDraft],
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
+        extraction_review_metadata: dict[str, object] | None = None,
     ) -> Document: ...
 
     async def invalidate_pdf_artifact(self, document: Document) -> str | None: ...
@@ -98,6 +103,8 @@ class QuoteExtractionAppendService:
                 description=item.description,
                 details=item.details,
                 price=item.price,
+                flagged=item.flagged,
+                flag_reason=item.flag_reason,
             )
             for item in extraction_result.line_items
         ]
@@ -107,6 +114,8 @@ class QuoteExtractionAppendService:
                     description=line_item.description,
                     details=line_item.details,
                     price=document_field_float_or_none(line_item.price),
+                    flagged=line_item.flagged,
+                    flag_reason=line_item.flag_reason,
                 )
                 for line_item in quote.line_items
             ],
@@ -139,6 +148,17 @@ class QuoteExtractionAppendService:
             appended_transcript=extraction_result.transcript,
         )
         extraction_metadata = classify_extraction_result(extraction_result)
+        merged_review_metadata = build_extraction_review_metadata(
+            extraction_result,
+            seeded_notes=False,
+            seeded_notes_confidence=None,
+            seeded_notes_source=None,
+            seeded_pricing_fields=set(),
+            existing_metadata=normalize_extraction_review_metadata(
+                quote.extraction_review_metadata,
+                extraction_degraded_reason_code=quote.extraction_degraded_reason_code,
+            ),
+        )
         updated_quote = await self._repository.append_extraction(
             document=quote,
             transcript=next_transcript,
@@ -146,6 +166,7 @@ class QuoteExtractionAppendService:
             line_items=appended_line_items,
             extraction_tier=extraction_metadata.tier,
             extraction_degraded_reason_code=extraction_metadata.degraded_reason_code,
+            extraction_review_metadata=merged_review_metadata.model_dump(mode="json"),
         )
         obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
         if not commit:
