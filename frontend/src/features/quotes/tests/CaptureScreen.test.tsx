@@ -7,7 +7,11 @@ import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { ExtractionResult, JobStatusResponse } from "@/features/quotes/types/quote.types";
+import type {
+  ExtractionResult,
+  JobStatusResponse,
+  QuoteDetail,
+} from "@/features/quotes/types/quote.types";
 import { jobService } from "@/shared/lib/jobService";
 import {
   MAX_AUDIO_CLIPS_PER_REQUEST,
@@ -69,19 +73,96 @@ const mockedJobService = vi.mocked(jobService);
 
 const extractionFixture: ExtractionResult = {
   transcript: "5 yards brown mulch",
+  pipeline_version: "v2",
   line_items: [
     {
+      raw_text: "5 yards brown mulch",
       description: "Brown mulch",
       details: "5 yards",
       price: 120,
       flagged: true,
       flag_reason: "Unit phrasing may be ambiguous",
+      confidence: "medium",
     },
   ],
-  total: 120,
+  pricing_hints: {
+    explicit_total: 120,
+    deposit_amount: null,
+    tax_rate: null,
+    discount_type: null,
+    discount_value: null,
+  },
+  customer_notes_suggestion: null,
+  unresolved_segments: [],
   confidence_notes: [],
   extraction_tier: "primary",
   extraction_degraded_reason_code: null,
+};
+
+const quoteDetailFixture: QuoteDetail = {
+  id: "quote-1",
+  customer_id: "cust-1",
+  extraction_tier: "primary",
+  extraction_degraded_reason_code: null,
+  extraction_review_metadata: {
+    pipeline_version: "v2",
+    review_state: {
+      notes_pending: false,
+      pricing_pending: false,
+    },
+    seeded_fields: {
+      notes: { seeded: false, confidence: null, source: null },
+      pricing: {
+        explicit_total: { seeded: true, source: "explicit_pricing_phrase" },
+        deposit_amount: { seeded: false, source: null },
+        tax_rate: { seeded: false, source: null },
+        discount: { seeded: false, source: null },
+      },
+    },
+    hidden_details: {
+      unresolved_segments: [],
+      append_suggestions: [],
+      confidence_notes: [],
+    },
+    extraction_degraded_reason_code: null,
+  },
+  customer_name: null,
+  customer_email: null,
+  customer_phone: null,
+  doc_number: "Q-001",
+  title: null,
+  status: "draft",
+  source_type: "text",
+  transcript: extractionFixture.transcript,
+  total_amount: 120,
+  tax_rate: null,
+  discount_type: null,
+  discount_value: null,
+  deposit_amount: null,
+  notes: null,
+  shared_at: null,
+  share_token: null,
+  has_active_share: false,
+  linked_invoice: null,
+  pdf_artifact: {
+    status: "missing",
+    job_id: null,
+    download_url: null,
+    terminal_error: null,
+  },
+  line_items: [
+    {
+      id: "line-1",
+      description: "Brown mulch",
+      details: "5 yards",
+      price: 120,
+      flagged: true,
+      flag_reason: "Unit phrasing may be ambiguous",
+      sort_order: 0,
+    },
+  ],
+  created_at: "2026-03-20T00:00:00.000Z",
+  updated_at: "2026-03-20T00:00:00.000Z",
 };
 
 const clipFixture: VoiceClip = {
@@ -160,6 +241,7 @@ beforeEach(() => {
   mockVoiceCapture();
   mockedQuoteService.extract.mockResolvedValue({ type: "sync", quoteId: "quote-1", result: extractionFixture });
   mockedQuoteService.appendExtraction.mockReset();
+  mockedQuoteService.getQuote.mockResolvedValue(quoteDetailFixture);
   mockedQuoteService.createManualDraft.mockResolvedValue({
     id: "quote-manual-1",
     customer_id: "cust-1",
@@ -527,7 +609,18 @@ describe("CaptureScreen", () => {
       quoteId: "quote-1",
       result: {
         ...extractionFixture,
-        confidence_notes: ["New note"],
+        confidence_notes: ["Ignored because hydration now reads persisted sidecar"],
+      },
+    });
+    mockedQuoteService.getQuote.mockResolvedValueOnce({
+      ...quoteDetailFixture,
+      extraction_review_metadata: {
+        ...quoteDetailFixture.extraction_review_metadata!,
+        hidden_details: {
+          unresolved_segments: [],
+          append_suggestions: [],
+          confidence_notes: ["New note"],
+        },
       },
     });
     renderScreen({
@@ -565,6 +658,11 @@ describe("CaptureScreen", () => {
         quote_id: "quote-home",
       }),
     );
+    mockedQuoteService.getQuote.mockResolvedValueOnce({
+      ...quoteDetailFixture,
+      id: "quote-home",
+      customer_id: null,
+    });
     renderScreen({ pathname: "/quotes/capture", customerId: null });
 
     fireEvent.change(screen.getByLabelText(/written description/i), {

@@ -85,17 +85,11 @@ async function submitExtraction(
   }
 
   const persistedExtraction = response.data as PersistedExtractionPayload;
+  const { quote_id: quoteId, ...result } = persistedExtraction;
   return {
     type: "sync",
-    quoteId: persistedExtraction.quote_id,
-    result: {
-      transcript: persistedExtraction.transcript,
-      line_items: persistedExtraction.line_items,
-      total: persistedExtraction.total,
-      confidence_notes: persistedExtraction.confidence_notes,
-      extraction_tier: persistedExtraction.extraction_tier,
-      extraction_degraded_reason_code: persistedExtraction.extraction_degraded_reason_code,
-    },
+    quoteId,
+    result,
   };
 }
 

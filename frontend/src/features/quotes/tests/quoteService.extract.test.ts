@@ -13,6 +13,24 @@ const mockedRequestWithMetadata = vi.mocked(requestWithMetadata);
 const mockedRequest = vi.mocked(request);
 
 describe("quoteService.extract", () => {
+  const extractionPayload = {
+    transcript: "typed note only",
+    pipeline_version: "v2" as const,
+    line_items: [],
+    pricing_hints: {
+      explicit_total: null,
+      deposit_amount: null,
+      tax_rate: null,
+      discount_type: null,
+      discount_value: null,
+    },
+    customer_notes_suggestion: null,
+    unresolved_segments: [],
+    confidence_notes: [],
+    extraction_tier: "primary" as const,
+    extraction_degraded_reason_code: null,
+  };
+
   afterEach(() => {
     mockedRequestWithMetadata.mockReset();
     mockedRequest.mockReset();
@@ -57,10 +75,7 @@ describe("quoteService.extract", () => {
       status: 200,
       data: {
         quote_id: "quote-11",
-        transcript: "typed note only",
-        line_items: [],
-        total: null,
-        confidence_notes: [],
+        ...extractionPayload,
       },
     });
 
@@ -69,12 +84,7 @@ describe("quoteService.extract", () => {
     expect(result).toEqual({
       type: "sync",
       quoteId: "quote-11",
-      result: {
-        transcript: "typed note only",
-        line_items: [],
-        total: null,
-        confidence_notes: [],
-      },
+      result: extractionPayload,
     });
 
     const [, options] = mockedRequestWithMetadata.mock.calls[0] ?? [];
@@ -88,10 +98,8 @@ describe("quoteService.extract", () => {
       status: 200,
       data: {
         quote_id: "quote-22",
+        ...extractionPayload,
         transcript: "clips only",
-        line_items: [],
-        total: null,
-        confidence_notes: [],
       },
     });
 
@@ -112,10 +120,8 @@ describe("quoteService.extract", () => {
       status: 200,
       data: {
         quote_id: "quote-22",
+        ...extractionPayload,
         transcript: "append transcript",
-        line_items: [],
-        total: null,
-        confidence_notes: [],
       },
     });
 
@@ -127,10 +133,8 @@ describe("quoteService.extract", () => {
       type: "sync",
       quoteId: "quote-22",
       result: {
+        ...extractionPayload,
         transcript: "append transcript",
-        line_items: [],
-        total: null,
-        confidence_notes: [],
       },
     });
 

@@ -180,6 +180,8 @@ export function mapQuoteToEditDraft(quote: QuoteDetail): DocumentEditDraft {
       description: item.description,
       details: item.details,
       price: item.price,
+      flagged: item.flagged,
+      flagReason: item.flag_reason,
     })),
     total: breakdown.subtotal ?? quote.total_amount,
     taxRate: quote.tax_rate,

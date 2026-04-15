@@ -61,8 +61,17 @@ async def test_get_job_status_returns_owned_extraction_result(
     assert payload["quote_id"] == str(quote.id)  # nosec B101 - pytest assertion
     assert payload["extraction_result"] == {  # nosec B101 - pytest assertion
         "transcript": "mulch the beds",
+        "pipeline_version": "v2",
         "line_items": [],
-        "total": None,
+        "pricing_hints": {
+            "explicit_total": None,
+            "deposit_amount": None,
+            "tax_rate": None,
+            "discount_type": None,
+            "discount_value": None,
+        },
+        "customer_notes_suggestion": None,
+        "unresolved_segments": [],
         "confidence_notes": [],
         "extraction_tier": "primary",
         "extraction_degraded_reason_code": None,

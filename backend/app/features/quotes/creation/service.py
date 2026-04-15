@@ -11,9 +11,11 @@ from sqlalchemy.exc import IntegrityError
 from app.features.quotes.errors import QuoteServiceError
 from app.features.quotes.extraction_outcomes import classify_extraction_result
 from app.features.quotes.models import Document
+from app.features.quotes.review_metadata import build_extraction_review_metadata
 from app.features.quotes.schemas import (
     ExtractionResult,
     LineItemDraft,
+    PricingFieldName,
     QuoteCreateRequest,
 )
 from app.shared.event_logger import log_event
@@ -46,6 +48,7 @@ class QuoteCreationRepositoryProtocol(Protocol):
         source_type: str,
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
+        extraction_review_metadata: dict[str, object] | None = None,
     ) -> Document: ...
 
     async def commit(self) -> None: ...
@@ -129,6 +132,24 @@ class QuoteCreationService:
             customer_id=customer_id,
         )
         extraction_metadata = classify_extraction_result(extraction_result)
+        seeded_notes = _seeded_notes_from_result(extraction_result)
+        seeded_pricing_fields = _seeded_pricing_fields(extraction_result)
+        extraction_review_metadata = build_extraction_review_metadata(
+            extraction_result,
+            seeded_notes=seeded_notes is not None,
+            seeded_notes_confidence=(
+                extraction_result.customer_notes_suggestion.confidence
+                if extraction_result.customer_notes_suggestion is not None
+                else None
+            ),
+            seeded_notes_source=(
+                extraction_result.customer_notes_suggestion.source
+                if extraction_result.customer_notes_suggestion is not None
+                else None
+            ),
+            seeded_pricing_fields=seeded_pricing_fields,
+            existing_metadata=None,
+        )
         try:
             quote = await self._create_quote_document(
                 user_id=user_id,
@@ -140,18 +161,21 @@ class QuoteCreationService:
                         description=item.description,
                         details=item.details,
                         price=item.price,
+                        flagged=item.flagged,
+                        flag_reason=item.flag_reason,
                     )
                     for item in extraction_result.line_items
                 ],
-                total_amount=extraction_result.total,
-                tax_rate=None,
-                discount_type=None,
-                discount_value=None,
-                deposit_amount=None,
-                notes=None,
+                total_amount=extraction_result.pricing_hints.explicit_total,
+                tax_rate=extraction_result.pricing_hints.tax_rate,
+                discount_type=extraction_result.pricing_hints.discount_type,
+                discount_value=extraction_result.pricing_hints.discount_value,
+                deposit_amount=extraction_result.pricing_hints.deposit_amount,
+                notes=seeded_notes,
                 source_type=source_type,
                 extraction_tier=extraction_metadata.tier,
                 extraction_degraded_reason_code=extraction_metadata.degraded_reason_code,
+                extraction_review_metadata=extraction_review_metadata.model_dump(mode="json"),
             )
         except QuoteServiceError:
             raise
@@ -237,6 +261,7 @@ class QuoteCreationService:
         source_type: Literal["text", "voice"],
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
+        extraction_review_metadata: dict[str, object] | None = None,
     ) -> Document:
         for attempt in range(2):
             try:
@@ -255,6 +280,7 @@ class QuoteCreationService:
                     source_type=source_type,
                     extraction_tier=extraction_tier,
                     extraction_degraded_reason_code=extraction_degraded_reason_code,
+                    extraction_review_metadata=extraction_review_metadata,
                 )
             except IntegrityError as exc:
                 await self._repository.rollback()
@@ -291,3 +317,25 @@ def _validate_document_pricing_for_quote(
         )
     except PricingValidationError as exc:
         raise QuoteServiceError(detail=str(exc), status_code=422) from exc
+
+
+def _seeded_notes_from_result(extraction_result: ExtractionResult) -> str | None:
+    suggestion = extraction_result.customer_notes_suggestion
+    if suggestion is None:
+        return None
+    normalized = suggestion.text.strip()
+    return normalized or None
+
+
+def _seeded_pricing_fields(extraction_result: ExtractionResult) -> set[PricingFieldName]:
+    pricing_hints = extraction_result.pricing_hints
+    seeded: set[PricingFieldName] = set()
+    if pricing_hints.explicit_total is not None:
+        seeded.add("explicit_total")
+    if pricing_hints.deposit_amount is not None:
+        seeded.add("deposit_amount")
+    if pricing_hints.tax_rate is not None:
+        seeded.add("tax_rate")
+    if pricing_hints.discount_type is not None and pricing_hints.discount_value is not None:
+        seeded.add("discount")
+    return seeded

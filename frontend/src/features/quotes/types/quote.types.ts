@@ -5,9 +5,13 @@ export interface LineItemDraft {
   description: string;
   details: string | null;
   price: number | null;
+  flagged?: boolean;
+  flag_reason?: string | null;
 }
 
 export interface LineItemExtracted extends LineItemDraft {
+  raw_text?: string;
+  confidence?: PlacementConfidence;
   flagged?: boolean;
   flag_reason?: string | null;
 }
@@ -17,10 +21,39 @@ export interface LineItemDraftWithFlags extends LineItemDraft {
   flagReason?: string | null;
 }
 
+export type PlacementConfidence = "high" | "medium" | "low";
+export type UnresolvedSegmentSource =
+  | "leftover_classification"
+  | "typed_conflict"
+  | "transcript_conflict";
+
+export interface PricingHints {
+  explicit_total: number | null;
+  deposit_amount: number | null;
+  tax_rate: number | null;
+  discount_type: DiscountType | null;
+  discount_value: number | null;
+}
+
+export interface ExtractionSuggestion {
+  text: string;
+  confidence: PlacementConfidence;
+  source: UnresolvedSegmentSource;
+}
+
+export interface UnresolvedSegment {
+  raw_text: string;
+  confidence: "medium" | "low";
+  source: UnresolvedSegmentSource;
+}
+
 export interface ExtractionResult {
   transcript: string;
+  pipeline_version: "v2";
   line_items: LineItemExtracted[];
-  total: number | null;
+  pricing_hints: PricingHints;
+  customer_notes_suggestion: ExtractionSuggestion | null;
+  unresolved_segments: UnresolvedSegment[];
   confidence_notes: string[];
   extraction_tier: ExtractionTier;
   extraction_degraded_reason_code: string | null;
@@ -65,6 +98,8 @@ export interface LineItem {
   description: string;
   details: string | null;
   price: number | null;
+  flagged?: boolean;
+  flag_reason?: string | null;
   sort_order: number;
 }
 
@@ -121,6 +156,7 @@ export interface QuoteDetail extends Quote {
   has_active_share: boolean;
   extraction_tier: ExtractionTier | null;
   extraction_degraded_reason_code: string | null;
+  extraction_review_metadata?: ExtractionReviewMetadata;
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
@@ -128,6 +164,56 @@ export interface QuoteDetail extends Quote {
   can_reassign_customer?: boolean;
   linked_invoice: LinkedInvoiceSummary | null;
   pdf_artifact: PdfArtifact;
+}
+
+export interface ExtractionReviewState {
+  notes_pending: boolean;
+  pricing_pending: boolean;
+}
+
+export interface NotesSeededFieldMetadata {
+  seeded: boolean;
+  confidence: PlacementConfidence | null;
+  source: "explicit_notes_section" | "derived" | "leftover_classification" | null;
+}
+
+export interface PricingSeededFieldMetadata {
+  seeded: boolean;
+  source: "explicit_pricing_phrase" | null;
+}
+
+export interface ExtractionReviewHiddenDetails {
+  unresolved_segments: Array<{
+    id: string;
+    raw_text: string;
+    confidence: "medium" | "low";
+    source: UnresolvedSegmentSource;
+  }>;
+  append_suggestions: Array<{
+    id: string;
+    kind: "note" | "pricing";
+    raw_text: string;
+    confidence: "medium" | "low";
+    source: "append_capture";
+    pricing_field?: "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
+  }>;
+  confidence_notes: string[];
+}
+
+export interface ExtractionReviewMetadata {
+  pipeline_version: "v2";
+  review_state: ExtractionReviewState;
+  seeded_fields: {
+    notes: NotesSeededFieldMetadata;
+    pricing: {
+      explicit_total: PricingSeededFieldMetadata;
+      deposit_amount: PricingSeededFieldMetadata;
+      tax_rate: PricingSeededFieldMetadata;
+      discount: PricingSeededFieldMetadata;
+    };
+  };
+  hidden_details: ExtractionReviewHiddenDetails;
+  extraction_degraded_reason_code: string | null;
 }
 
 export interface QuoteListItem {

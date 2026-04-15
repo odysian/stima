@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 from uuid import UUID
 
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import ExtractionResult, PricingHints
 from app.integrations.extraction import is_retryable_extraction_error
 from app.shared.event_logger import log_event
 
@@ -55,8 +55,11 @@ def build_degraded_extraction_result(
     """Build a degraded sentinel result that still preserves user transcript work."""
     return ExtractionResult(
         transcript=transcript,
+        pipeline_version="v2",
         line_items=[],
-        total=None,
+        pricing_hints=PricingHints(),
+        customer_notes_suggestion=None,
+        unresolved_segments=[],
         confidence_notes=[],
         extraction_tier=EXTRACTION_TIER_DEGRADED,
         extraction_degraded_reason_code=reason_code,

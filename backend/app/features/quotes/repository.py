@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, tzinfo
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -135,6 +135,7 @@ class QuoteDetailRow:
     transcript: str
     extraction_tier: str | None
     extraction_degraded_reason_code: str | None
+    extraction_review_metadata: dict[str, Any] | None
     total_amount: Decimal | None
     tax_rate: Decimal | None
     discount_type: str | None
@@ -341,6 +342,7 @@ class QuoteRepository:
             transcript=document.transcript,
             extraction_tier=document.extraction_tier,
             extraction_degraded_reason_code=document.extraction_degraded_reason_code,
+            extraction_review_metadata=document.extraction_review_metadata,
             total_amount=document.total_amount,
             tax_rate=document.tax_rate,
             discount_type=document.discount_type,
@@ -619,6 +621,7 @@ class QuoteRepository:
         source_type: str,
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
+        extraction_review_metadata: dict[str, Any] | None = None,
     ) -> Document:
         """Create a quote and optional line items for the owning user."""
         next_sequence = await self.get_next_doc_sequence_for_type(
@@ -636,6 +639,7 @@ class QuoteRepository:
             transcript=transcript,
             extraction_tier=extraction_tier,
             extraction_degraded_reason_code=extraction_degraded_reason_code,
+            extraction_review_metadata=extraction_review_metadata,
             total_amount=_to_decimal(total_amount),
             tax_rate=_to_decimal(tax_rate),
             discount_type=discount_type,
@@ -720,12 +724,15 @@ class QuoteRepository:
         line_items: list[LineItemDraft],
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
+        extraction_review_metadata: dict[str, Any] | None = None,
     ) -> Document:
         """Append extracted line items while preserving existing rows and order."""
         document.transcript = transcript
         document.total_amount = _to_decimal(total_amount)
         document.extraction_tier = extraction_tier
         document.extraction_degraded_reason_code = extraction_degraded_reason_code
+        if extraction_review_metadata is not None:
+            document.extraction_review_metadata = extraction_review_metadata
 
         next_sort_order = len(document.line_items)
         for index, item in enumerate(line_items):
@@ -735,6 +742,8 @@ class QuoteRepository:
                     description=item.description,
                     details=item.details,
                     price=_to_decimal(item.price),
+                    flagged=item.flagged,
+                    flag_reason=item.flag_reason,
                     sort_order=next_sort_order + index,
                 )
             )
@@ -843,6 +852,8 @@ class QuoteRepository:
                     description=item.description,
                     details=item.details,
                     price=_to_decimal(item.price),
+                    flagged=item.flagged,
+                    flag_reason=item.flag_reason,
                     sort_order=index,
                 )
             )

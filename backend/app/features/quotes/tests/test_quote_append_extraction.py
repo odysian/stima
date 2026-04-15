@@ -13,7 +13,13 @@ from app.core.config import get_settings
 from app.features.jobs.models import JobRecord, JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.models import Document
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import (
+    ExtractionResult,
+    ExtractionReviewHiddenDetails,
+    ExtractionReviewMetadataV1,
+    LineItemExtractedV2,
+    PricingHints,
+)
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.features.quotes.tests import test_quotes as quotes_test_module
 from app.features.quotes.tests.support.helpers import (
@@ -131,6 +137,64 @@ async def test_append_extraction_sync_appends_line_items_and_merges_transcript_e
     assert "- first follow-up request" in payload["transcript"]
     assert "- second follow-up request" in payload["transcript"]
     assert "Added later (2):" not in payload["transcript"]
+
+
+async def test_append_extraction_preserves_existing_confidence_notes_when_new_notes_empty(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _extract_without_confidence_notes(self, notes: str) -> ExtractionResult:  # noqa: ANN001
+        del self, notes
+        return ExtractionResult(
+            transcript="append without confidence notes",
+            line_items=[
+                LineItemExtractedV2(
+                    raw_text="Added labor 15",
+                    description="Added labor",
+                    details=None,
+                    price=15,
+                    confidence="medium",
+                )
+            ],
+            pricing_hints=PricingHints(explicit_total=15),
+            confidence_notes=[],
+        )
+
+    monkeypatch.setattr(
+        _MockExtractionIntegration,
+        "extract",
+        _extract_without_confidence_notes,
+    )
+
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = UUID(quote["id"])
+    app.state.arq_pool = None
+
+    persisted_quote = await db_session.get(Document, quote_id)
+    assert persisted_quote is not None
+    persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
+        hidden_details=ExtractionReviewHiddenDetails(
+            confidence_notes=["keep existing confidence note"]
+        ),
+    ).model_dump(mode="json")
+    await db_session.commit()
+
+    append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "append this follow-up"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert append_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert detail_payload["extraction_review_metadata"]["hidden_details"]["confidence_notes"] == [
+        "keep existing confidence note"
+    ]
 
 
 async def test_append_extraction_sync_cleans_obsolete_pdf_artifact_after_commit(

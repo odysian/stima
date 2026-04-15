@@ -44,6 +44,8 @@ export function buildLineItemSubmitState(lineItems: LineItemDraftWithFlags[]): {
       description: lineItem.description,
       details: lineItem.details,
       price: lineItem.price,
+      flagged: lineItem.flagged,
+      flag_reason: lineItem.flagReason ?? null,
     }));
   const lineItemSum = normalizedLineItems.reduce((runningTotal, lineItem) => {
     if (lineItem.price === null) {

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -37,13 +37,12 @@ class LineItemDraft(BaseModel):
     description: str = Field(min_length=1, max_length=LINE_ITEM_DESCRIPTION_MAX_CHARS)
     details: str | None = Field(default=None, max_length=LINE_ITEM_DETAILS_MAX_CHARS)
     price: float | None = None
+    flagged: bool = False
+    flag_reason: str | None = None
 
 
 class LineItemExtracted(LineItemDraft):
     """Extraction-only line item metadata used during review."""
-
-    flagged: bool = False
-    flag_reason: str | None = None
 
 
 class PreparedCaptureInput(BaseModel):
@@ -177,42 +176,165 @@ class ExtractionResultV2(BaseModel):
     extraction_tier: Literal["primary", "degraded"] = "primary"
     extraction_degraded_reason_code: str | None = None
 
-    def to_v1_result(self) -> ExtractionResult:
-        """Project the internal V2 payload onto the existing V1 contract."""
-        return ExtractionResult(
-            transcript=self.transcript,
-            line_items=[
-                LineItemExtracted(
-                    description=item.description,
-                    details=item.details,
-                    price=item.price,
-                    flagged=item.flagged,
-                    flag_reason=item.flag_reason,
-                )
-                for item in self.line_items
-            ],
-            total=self.pricing_hints.explicit_total,
-            confidence_notes=self.confidence_notes,
-            extraction_tier=self.extraction_tier,
-            extraction_degraded_reason_code=self.extraction_degraded_reason_code,
-        )
+
+class ExtractionResult(ExtractionResultV2):
+    """Structured extraction output returned from extraction endpoints.
+
+    Backward compatibility shim:
+    legacy callers/tests may still pass `total`, which maps to
+    `pricing_hints.explicit_total`.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _map_legacy_total_field(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        if "total" in payload:
+            total = payload.pop("total", None)
+            pricing_hints = payload.get("pricing_hints")
+            if not isinstance(pricing_hints, dict):
+                pricing_hints = {}
+            pricing_hints = dict(pricing_hints)
+            pricing_hints.setdefault("explicit_total", total)
+            payload["pricing_hints"] = pricing_hints
+
+        legacy_line_items = payload.get("line_items")
+        if isinstance(legacy_line_items, list):
+            normalized_items: list[dict[str, Any]] = []
+            for candidate in legacy_line_items:
+                item_payload: dict[str, Any] | None = None
+                if isinstance(candidate, dict):
+                    item_payload = dict(candidate)
+                else:
+                    try:
+                        dumped = candidate.model_dump(mode="json")
+                    except AttributeError:
+                        dumped = None
+                    if isinstance(dumped, dict):
+                        item_payload = dict(dumped)
+                if item_payload is None:
+                    continue
+                if not item_payload.get("raw_text"):
+                    item_payload["raw_text"] = (
+                        item_payload.get("details")
+                        or item_payload.get("description")
+                        or "line item"
+                    )
+                item_payload.setdefault("confidence", "medium")
+                normalized_items.append(item_payload)
+            payload["line_items"] = normalized_items
+        return payload
+
+    @property
+    def total(self) -> float | None:
+        """Compatibility accessor for legacy internal callers/tests."""
+        return self.pricing_hints.explicit_total
 
 
-class ExtractionResult(BaseModel):
-    """Structured extraction output returned from convert-notes."""
+PricingFieldName = Literal["explicit_total", "deposit_amount", "tax_rate", "discount"]
 
-    transcript: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
-    line_items: list[LineItemExtracted] = Field(
-        default_factory=list,
-        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
-    )
-    total: float | None = None
+
+class ExtractionReviewState(BaseModel):
+    """Visible grouped extraction review state."""
+
+    notes_pending: bool = False
+    pricing_pending: bool = False
+
+
+class NotesSeededFieldMetadata(BaseModel):
+    """Review metadata for notes field seeding provenance."""
+
+    seeded: bool = False
+    confidence: PlacementConfidence | None = None
+    source: Literal["explicit_notes_section", "derived", "leftover_classification"] | None = None
+
+
+class PricingSeededFieldMetadata(BaseModel):
+    """Review metadata for one pricing field seeding provenance."""
+
+    seeded: bool = False
+    source: Literal["explicit_pricing_phrase"] | None = None
+
+
+class PricingSeededFieldsMetadata(BaseModel):
+    """Grouped pricing field provenance."""
+
+    explicit_total: PricingSeededFieldMetadata = Field(default_factory=PricingSeededFieldMetadata)
+    deposit_amount: PricingSeededFieldMetadata = Field(default_factory=PricingSeededFieldMetadata)
+    tax_rate: PricingSeededFieldMetadata = Field(default_factory=PricingSeededFieldMetadata)
+    discount: PricingSeededFieldMetadata = Field(default_factory=PricingSeededFieldMetadata)
+
+
+class SeededFieldsMetadata(BaseModel):
+    """Grouped seeded-field metadata for V2 extraction hydration."""
+
+    notes: NotesSeededFieldMetadata = Field(default_factory=NotesSeededFieldMetadata)
+    pricing: PricingSeededFieldsMetadata = Field(default_factory=PricingSeededFieldsMetadata)
+
+
+class ExtractionReviewAppendSuggestion(BaseModel):
+    """Hidden append suggestion persisted in sidecar metadata."""
+
+    id: str
+    kind: Literal["note", "pricing"]
+    raw_text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    confidence: Literal["medium", "low"]
+    source: Literal["append_capture"] = "append_capture"
+    pricing_field: PricingFieldName | None = None
+
+
+class ExtractionReviewUnresolvedSegment(BaseModel):
+    """Hidden unresolved segment persisted in sidecar metadata."""
+
+    id: str
+    raw_text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    confidence: Literal["medium", "low"]
+    source: UnresolvedSegmentSource
+
+
+class ExtractionReviewHiddenDetails(BaseModel):
+    """Hidden extraction details shown in Capture Details surfaces."""
+
+    unresolved_segments: list[ExtractionReviewUnresolvedSegment] = Field(default_factory=list)
+    append_suggestions: list[ExtractionReviewAppendSuggestion] = Field(default_factory=list)
     confidence_notes: list[Annotated[str, Field(max_length=CONFIDENCE_NOTE_MAX_CHARS)]] = Field(
         default_factory=list,
         max_length=CONFIDENCE_NOTES_MAX_ITEMS,
     )
-    extraction_tier: Literal["primary", "degraded"] = "primary"
+
+
+class ExtractionReviewMetadataV1(BaseModel):
+    """Sidecar metadata persisted for V2 extraction review behavior."""
+
+    pipeline_version: Literal["v2"] = "v2"
+    review_state: ExtractionReviewState = Field(default_factory=ExtractionReviewState)
+    seeded_fields: SeededFieldsMetadata = Field(default_factory=SeededFieldsMetadata)
+    hidden_details: ExtractionReviewHiddenDetails = Field(
+        default_factory=ExtractionReviewHiddenDetails
+    )
     extraction_degraded_reason_code: str | None = None
+
+    @classmethod
+    def model_validate_with_defaults(
+        cls,
+        value: object | None,
+        *,
+        extraction_degraded_reason_code: str | None = None,
+    ) -> ExtractionReviewMetadataV1:
+        """Deserialize nullable sidecar payloads to a safe default object."""
+        if value is None:
+            return cls(extraction_degraded_reason_code=extraction_degraded_reason_code)
+        metadata = cls.model_validate(value)
+        if (
+            metadata.extraction_degraded_reason_code is None
+            and extraction_degraded_reason_code is not None
+        ):
+            return metadata.model_copy(
+                update={"extraction_degraded_reason_code": extraction_degraded_reason_code}
+            )
+        return metadata
 
 
 class PersistedExtractionResponse(ExtractionResult):
@@ -302,6 +424,8 @@ class LineItemResponse(BaseModel):
     description: str
     details: str | None
     price: float | None
+    flagged: bool = False
+    flag_reason: str | None = None
     sort_order: int
 
 
@@ -395,6 +519,7 @@ class QuoteDetailResponse(QuoteResponse):
     can_reassign_customer: bool
     linked_invoice: LinkedInvoiceResponse | None
     pdf_artifact: PdfArtifactResponse
+    extraction_review_metadata: ExtractionReviewMetadataV1
 
 
 class PublicQuoteResponse(BaseModel):

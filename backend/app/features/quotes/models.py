@@ -8,6 +8,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -90,6 +91,10 @@ class Document(Base):
         sa.String(64),
         nullable=True,
     )
+    extraction_review_metadata: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
     total_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
     tax_rate: Mapped[Decimal | None] = mapped_column(sa.Numeric(5, 4), nullable=True)
     discount_type: Mapped[str | None] = mapped_column(sa.String(7), nullable=True)
@@ -167,6 +172,12 @@ class LineItem(Base):
     description: Mapped[str] = mapped_column(sa.Text, nullable=False)
     details: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     price: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
+    flagged: Mapped[bool] = mapped_column(
+        sa.Boolean,
+        nullable=False,
+        server_default=sa.text("false"),
+    )
+    flag_reason: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True),

@@ -17,12 +17,11 @@ import {
   resolveCaptureLaunchOrigin,
 } from "@/features/quotes/utils/workflowNavigation";
 import {
-  readQuoteConfidenceNotes,
   writeQuoteConfidenceNotes,
 } from "@/features/quotes/utils/reviewConfidenceNotes";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { ExtractionResult, QuoteSourceType } from "@/features/quotes/types/quote.types";
+import type { QuoteDetail, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
@@ -110,46 +109,51 @@ export function CaptureScreen(): React.ReactElement {
     };
   }, []);
 
-  function applyDraft(
+  function applyDraftFromQuoteDetail(
     sourceType: QuoteSourceType,
-    extraction: ExtractionResult,
+    quoteDetail: QuoteDetail,
     quoteId: string,
   ): void {
-    writeQuoteConfidenceNotes(quoteId, extraction.confidence_notes);
+    const confidenceNotes =
+      quoteDetail.extraction_review_metadata?.hidden_details.confidence_notes ?? [];
+    writeQuoteConfidenceNotes(quoteId, confidenceNotes);
     setDraft({
       quoteId,
-      customerId: customerId ?? "",
+      customerId: quoteDetail.customer_id ?? customerId ?? "",
       launchOrigin,
       title: "",
-      transcript: extraction.transcript,
-      lineItems: extraction.line_items.map((lineItem) => ({
+      transcript: quoteDetail.transcript,
+      lineItems: quoteDetail.line_items.map((lineItem) => ({
         description: lineItem.description,
         details: lineItem.details,
         price: lineItem.price,
         flagged: lineItem.flagged,
         flagReason: lineItem.flag_reason,
       })),
-      total: extraction.total,
-      taxRate: null,
-      discountType: null,
-      discountValue: null,
-      depositAmount: null,
-      confidenceNotes: extraction.confidence_notes,
-      notes: "",
+      total: quoteDetail.total_amount,
+      taxRate: quoteDetail.tax_rate,
+      discountType: quoteDetail.discount_type,
+      discountValue: quoteDetail.discount_value,
+      depositAmount: quoteDetail.deposit_amount,
+      confidenceNotes,
+      notes: quoteDetail.notes ?? "",
       sourceType,
     });
   }
 
-  function applyAppendResult(
+  async function hydrateFromPersistedQuote(
     quoteId: string,
-    extraction: ExtractionResult,
-  ): void {
-    const existingNotes = readQuoteConfidenceNotes(quoteId);
-    const nextNotes =
-      extraction.confidence_notes.length > 0
-        ? extraction.confidence_notes
-        : existingNotes;
-    writeQuoteConfidenceNotes(quoteId, nextNotes);
+    sourceType: QuoteSourceType,
+    appendMode: boolean,
+  ): Promise<void> {
+    const persistedQuote = await quoteService.getQuote(quoteId);
+    const confidenceNotes =
+      persistedQuote.extraction_review_metadata?.hidden_details.confidence_notes ?? [];
+    writeQuoteConfidenceNotes(quoteId, confidenceNotes);
+    if (appendMode) {
+      return;
+    }
+    applyDraftFromQuoteDetail(sourceType, persistedQuote, quoteId);
   }
 
   function navigateToReview(quoteId: string): void {
@@ -213,11 +217,7 @@ export function CaptureScreen(): React.ReactElement {
       }
       const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
       if (extraction.type === "sync") {
-        if (isAppendMode) {
-          applyAppendResult(extraction.quoteId, extraction.result);
-        } else {
-          applyDraft(sourceType, extraction.result, extraction.quoteId);
-        }
+        await hydrateFromPersistedQuote(extraction.quoteId, sourceType, isAppendMode);
         navigateToReview(extraction.quoteId);
         return;
       }
@@ -281,11 +281,7 @@ export function CaptureScreen(): React.ReactElement {
             "Extraction completed without a result. Please try again.",
           );
         }
-        if (appendMode) {
-          applyAppendResult(job.quote_id, job.extraction_result);
-        } else {
-          applyDraft(sourceType, job.extraction_result, job.quote_id);
-        }
+        await hydrateFromPersistedQuote(job.quote_id, sourceType, appendMode);
         navigateToReview(job.quote_id);
         return;
       }

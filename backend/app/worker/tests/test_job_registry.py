@@ -11,7 +11,7 @@ from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.models import Document
-from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
+from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput, PricingHints
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.extraction import ExtractionCallMetadata, ExtractionError
 from app.shared import event_logger, observability
@@ -333,7 +333,7 @@ class _SuccessfulExtractionIntegration:
         return ExtractionResult(
             transcript=transcript,
             line_items=[],
-            total=None,
+            pricing_hints=PricingHints(),
             confidence_notes=[],
         )
 
@@ -349,7 +349,7 @@ class _CaptureInputExtractionIntegration:
         return ExtractionResult(
             transcript=transcript,
             line_items=[],
-            total=None,
+            pricing_hints=PricingHints(),
             confidence_notes=[],
         )
 
@@ -374,7 +374,7 @@ class _ValidationRepairFailedExtractionIntegration:
         return ExtractionResult(
             transcript=transcript,
             line_items=[],
-            total=None,
+            pricing_hints=PricingHints(),
             confidence_notes=[],
             extraction_tier="degraded",
             extraction_degraded_reason_code="validation_repair_failed",
