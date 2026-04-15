@@ -96,7 +96,11 @@ def build_extraction_review_metadata(
             for segment in extraction_result.unresolved_segments
         ],
         append_suggestions=list(previous.hidden_details.append_suggestions),
-        confidence_notes=list(extraction_result.confidence_notes),
+        confidence_notes=(
+            list(extraction_result.confidence_notes)
+            if extraction_result.confidence_notes
+            else list(previous.hidden_details.confidence_notes)
+        ),
     )
 
     return ExtractionReviewMetadataV1(

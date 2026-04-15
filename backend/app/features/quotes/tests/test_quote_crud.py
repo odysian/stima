@@ -239,6 +239,7 @@ async def test_create_quote_returns_404_for_nonexistent_customer(
 
 async def test_create_manual_draft_without_customer_persists_empty_draft_and_logs_manual_event(
     client: AsyncClient,
+    db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     emitted_events: list[dict[str, str]] = []
@@ -266,11 +267,24 @@ async def test_create_manual_draft_without_customer_persists_empty_draft_and_log
     assert payload["line_items"] == []
     assert payload["total_amount"] is None
 
+    persisted_quote = await db_session.get(Document, UUID(payload["id"]))
+    assert persisted_quote is not None
+    assert persisted_quote.extraction_review_metadata is None
+
     detail_response = await client.get(f"/api/quotes/{payload['id']}")
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
     assert detail_payload["extraction_tier"] is None
     assert detail_payload["extraction_degraded_reason_code"] is None
+    assert detail_payload["extraction_review_metadata"]["review_state"] == {
+        "notes_pending": False,
+        "pricing_pending": False,
+    }
+    assert detail_payload["extraction_review_metadata"]["hidden_details"] == {
+        "unresolved_segments": [],
+        "append_suggestions": [],
+        "confidence_notes": [],
+    }
 
     quote_event_names = [
         event["event"] for event in emitted_events if event.get("quote_id") == payload["id"]
