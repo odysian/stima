@@ -17,6 +17,11 @@ updates:
     open-pull-requests-limit: 3
     allow:
       - dependency-type: "direct"
+    ignore:
+      - dependency-name: "redis"
+        versions:
+          - "6.x"
+          - "7.x"
     groups:
       backend-patch-minor:
         patterns:
