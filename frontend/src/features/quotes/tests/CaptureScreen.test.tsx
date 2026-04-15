@@ -124,6 +124,7 @@ const quoteDetailFixture: QuoteDetail = {
       append_suggestions: [],
       confidence_notes: [],
     },
+    hidden_detail_state: {},
     extraction_degraded_reason_code: null,
   },
   customer_name: null,
@@ -617,6 +618,7 @@ describe("CaptureScreen", () => {
           append_suggestions: [],
           confidence_notes: ["New note"],
         },
+        hidden_detail_state: {},
       },
     });
     renderScreen({

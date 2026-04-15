@@ -30,6 +30,8 @@ from app.features.quotes.repository import (
 )
 from app.features.quotes.schemas import (
     ExtractionResult,
+    ExtractionReviewMetadataUpdateRequest,
+    ExtractionReviewMetadataV1,
     LineItemDraft,
     QuoteCreateRequest,
     QuoteUpdateRequest,
@@ -145,6 +147,8 @@ class QuoteRepositoryProtocol(Protocol):
         update_notes: bool,
         line_items: list[LineItemDraft] | None,
         replace_line_items: bool,
+        extraction_review_metadata: dict[str, Any] | None = None,
+        update_extraction_review_metadata: bool = False,
     ) -> Document: ...
 
     async def invalidate_pdf_artifact(self, document: Document) -> str | None: ...
@@ -155,10 +159,28 @@ class QuoteRepositoryProtocol(Protocol):
         document: Document,
         transcript: str,
         total_amount: float | None,
+        update_total_amount: bool,
+        notes: str | None,
+        update_notes: bool,
+        tax_rate: float | None,
+        update_tax_rate: bool,
+        discount_type: str | None,
+        update_discount_type: bool,
+        discount_value: float | None,
+        update_discount_value: bool,
+        deposit_amount: float | None,
+        update_deposit_amount: bool,
         line_items: list[LineItemDraft],
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
         extraction_review_metadata: dict[str, Any] | None = None,
+    ) -> Document: ...
+
+    async def update_extraction_review_metadata(
+        self,
+        *,
+        document: Document,
+        extraction_review_metadata: dict[str, Any],
     ) -> Document: ...
 
     async def delete(self, document_id: UUID) -> None: ...
@@ -323,6 +345,19 @@ class QuoteService:
     ) -> Document:
         """Delegate quote patch behavior to the mutation lifecycle slice."""
         return await self._mutation_service.update_quote(
+            user_id=_resolve_user_id(user),
+            quote_id=quote_id,
+            data=data,
+        )
+
+    async def update_extraction_review_metadata(
+        self,
+        user: User,
+        quote_id: UUID,
+        data: ExtractionReviewMetadataUpdateRequest,
+    ) -> ExtractionReviewMetadataV1:
+        """Delegate sidecar-only extraction review metadata updates."""
+        return await self._mutation_service.update_extraction_review_metadata(
             user_id=_resolve_user_id(user),
             quote_id=quote_id,
             data=data,

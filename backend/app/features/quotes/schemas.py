@@ -305,6 +305,13 @@ class ExtractionReviewHiddenDetails(BaseModel):
     )
 
 
+class HiddenItemState(BaseModel):
+    """Lifecycle state persisted for one hidden extraction item."""
+
+    reviewed: bool = False
+    dismissed: bool = False
+
+
 class ExtractionReviewMetadataV1(BaseModel):
     """Sidecar metadata persisted for V2 extraction review behavior."""
 
@@ -314,6 +321,7 @@ class ExtractionReviewMetadataV1(BaseModel):
     hidden_details: ExtractionReviewHiddenDetails = Field(
         default_factory=ExtractionReviewHiddenDetails
     )
+    hidden_detail_state: dict[str, HiddenItemState] = Field(default_factory=dict)
     extraction_degraded_reason_code: str | None = None
 
     @classmethod
@@ -412,6 +420,40 @@ class QuoteUpdateRequest(BaseModel):
             raise ValueError("doc_type cannot be null")
         if "due_date" in self.model_fields_set and self.due_date is None:
             raise ValueError("due_date cannot be null")
+        return self
+
+
+class ExtractionReviewStateClearRequest(BaseModel):
+    """Request payload for clearing grouped extraction review state flags."""
+
+    notes_pending: bool | None = None
+    pricing_pending: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_has_target(self) -> ExtractionReviewStateClearRequest:
+        if self.notes_pending is None and self.pricing_pending is None:
+            raise ValueError("clear_review_state must include notes_pending or pricing_pending")
+        return self
+
+
+class ExtractionReviewMetadataUpdateRequest(BaseModel):
+    """Sidecar-only mutation payload for hidden-item lifecycle and review state."""
+
+    dismiss_hidden_item: str | None = Field(default=None, min_length=1)
+    review_hidden_item: str | None = Field(default=None, min_length=1)
+    clear_review_state: ExtractionReviewStateClearRequest | None = None
+
+    @model_validator(mode="after")
+    def validate_has_mutation(self) -> ExtractionReviewMetadataUpdateRequest:
+        has_action = any(
+            (
+                self.dismiss_hidden_item is not None,
+                self.review_hidden_item is not None,
+                self.clear_review_state is not None,
+            )
+        )
+        if not has_action:
+            raise ValueError("At least one extraction review metadata mutation is required")
         return self
 
 

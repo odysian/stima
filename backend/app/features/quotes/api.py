@@ -43,6 +43,8 @@ from app.features.quotes.schemas import (
     ConvertNotesRequest,
     DiscountType,
     ExtractionResult,
+    ExtractionReviewMetadataUpdateRequest,
+    ExtractionReviewMetadataV1,
     LineItemResponse,
     LinkedInvoiceResponse,
     ManualDraftCreateRequest,
@@ -555,6 +557,28 @@ async def get_quote(
             extraction_degraded_reason_code=quote.extraction_degraded_reason_code,
         ),
     )
+
+
+@router.patch(
+    "/{quote_id}/extraction-review-metadata",
+    response_model=ExtractionReviewMetadataV1,
+    dependencies=[Depends(require_csrf)],
+)
+async def update_extraction_review_metadata(
+    quote_id: UUID,
+    payload: ExtractionReviewMetadataUpdateRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> ExtractionReviewMetadataV1:
+    """Mutate one quote extraction review sidecar payload."""
+    try:
+        return await quote_service.update_extraction_review_metadata(
+            user,
+            quote_id,
+            payload,
+        )
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.patch(

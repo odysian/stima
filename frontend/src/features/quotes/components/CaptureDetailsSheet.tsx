@@ -1,12 +1,16 @@
 import * as Dialog from "@radix-ui/react-dialog";
 
-import type { ExtractionReviewHiddenDetails } from "@/features/quotes/types/quote.types";
+import type { ExtractionReviewHiddenDetails, HiddenItemState } from "@/features/quotes/types/quote.types";
 
 interface CaptureDetailsSheetProps {
   open: boolean;
   onClose: () => void;
   transcript: string;
   hiddenDetails?: ExtractionReviewHiddenDetails;
+  hiddenDetailState?: Record<string, HiddenItemState>;
+  onReviewHiddenItem?: (itemId: string) => Promise<void> | void;
+  onDismissHiddenItem?: (itemId: string) => Promise<void> | void;
+  isMutating?: boolean;
 }
 
 function formatPricingField(
@@ -41,10 +45,20 @@ export function CaptureDetailsSheet({
   onClose,
   transcript,
   hiddenDetails,
+  hiddenDetailState,
+  onReviewHiddenItem,
+  onDismissHiddenItem,
+  isMutating = false,
 }: CaptureDetailsSheetProps): React.ReactElement {
   const appendSuggestions = hiddenDetails?.append_suggestions ?? [];
   const unresolvedSegments = hiddenDetails?.unresolved_segments ?? [];
   const confidenceNotes = hiddenDetails?.confidence_notes ?? [];
+  const visibleAppendSuggestions = appendSuggestions.filter(
+    (suggestion) => !hiddenDetailState?.[suggestion.id]?.dismissed,
+  );
+  const visibleUnresolvedSegments = unresolvedSegments.filter(
+    (segment) => !hiddenDetailState?.[segment.id]?.dismissed,
+  );
 
   return (
     <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
@@ -67,10 +81,11 @@ export function CaptureDetailsSheet({
                 <h3 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                   New Suggestions From Latest Capture
                 </h3>
-                {appendSuggestions.length === 0 ? renderEmptySection("No new suggestions from the latest capture.") : (
+                {visibleAppendSuggestions.length === 0 ? renderEmptySection("No new suggestions from the latest capture.") : (
                   <ul className="space-y-2">
-                    {appendSuggestions.map((suggestion) => {
+                    {visibleAppendSuggestions.map((suggestion) => {
                       const pricingField = formatPricingField(suggestion.pricing_field);
+                      const itemState = hiddenDetailState?.[suggestion.id];
                       return (
                         <li
                           key={suggestion.id}
@@ -81,6 +96,30 @@ export function CaptureDetailsSheet({
                             {pricingField ? ` (${pricingField})` : ""}
                           </p>
                           <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{suggestion.raw_text}</p>
+                          <div className="mt-3 flex items-center gap-2">
+                            {itemState?.reviewed ? (
+                              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-success">
+                                Reviewed
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={isMutating || !onReviewHiddenItem}
+                                onClick={() => { void onReviewHiddenItem?.(suggestion.id); }}
+                              >
+                                Mark reviewed
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={isMutating || !onDismissHiddenItem}
+                              onClick={() => { void onDismissHiddenItem?.(suggestion.id); }}
+                            >
+                              Dismiss
+                            </button>
+                          </div>
                         </li>
                       );
                     })}
@@ -92,19 +131,46 @@ export function CaptureDetailsSheet({
                 <h3 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                   Unresolved Capture Details
                 </h3>
-                {unresolvedSegments.length === 0 ? renderEmptySection("No unresolved capture details.") : (
+                {visibleUnresolvedSegments.length === 0 ? renderEmptySection("No unresolved capture details.") : (
                   <ul className="space-y-2">
-                    {unresolvedSegments.map((segment) => (
-                      <li
-                        key={segment.id}
-                        className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
-                      >
-                        <p className="font-semibold">
-                          {segment.source.replaceAll("_", " ")}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{segment.raw_text}</p>
-                      </li>
-                    ))}
+                    {visibleUnresolvedSegments.map((segment) => {
+                      const itemState = hiddenDetailState?.[segment.id];
+                      return (
+                        <li
+                          key={segment.id}
+                          className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
+                        >
+                          <p className="font-semibold">
+                            {segment.source.replaceAll("_", " ")}
+                          </p>
+                          <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{segment.raw_text}</p>
+                          <div className="mt-3 flex items-center gap-2">
+                            {itemState?.reviewed ? (
+                              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-success">
+                                Reviewed
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={isMutating || !onReviewHiddenItem}
+                                onClick={() => { void onReviewHiddenItem?.(segment.id); }}
+                              >
+                                Mark reviewed
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={isMutating || !onDismissHiddenItem}
+                              onClick={() => { void onDismissHiddenItem?.(segment.id); }}
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </section>

@@ -40,6 +40,7 @@ vi.mock("@/features/quotes/hooks/usePersistedReview", async () => {
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
     updateQuote: vi.fn(),
+    updateExtractionReviewMetadata: vi.fn(),
   },
 }));
 
@@ -101,6 +102,7 @@ function makeQuote(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
         append_suggestions: [],
         confidence_notes: [],
       },
+      hidden_detail_state: {},
       extraction_degraded_reason_code: null,
     },
     shared_at: null,
@@ -242,6 +244,29 @@ beforeEach(() => {
   mockedQuoteService.updateQuote.mockResolvedValue({
     id: "doc-1",
   } as never);
+  mockedQuoteService.updateExtractionReviewMetadata.mockResolvedValue({
+    pipeline_version: "v2",
+    review_state: {
+      notes_pending: false,
+      pricing_pending: false,
+    },
+    seeded_fields: {
+      notes: { seeded: false, confidence: null, source: null },
+      pricing: {
+        explicit_total: { seeded: false, source: null },
+        deposit_amount: { seeded: false, source: null },
+        tax_rate: { seeded: false, source: null },
+        discount: { seeded: false, source: null },
+      },
+    },
+    hidden_details: {
+      unresolved_segments: [],
+      append_suggestions: [],
+      confidence_notes: [],
+    },
+    hidden_detail_state: {},
+    extraction_degraded_reason_code: null,
+  });
   mockedInvoiceService.updateInvoice.mockResolvedValue({
     id: "doc-1",
   } as never);
@@ -470,6 +495,39 @@ describe("DocumentEditScreen", () => {
     expect(section2.compareDocumentPosition(section3)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(section3.compareDocumentPosition(section4)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(screen.getByText("Original capture transcript text.")).toBeInTheDocument();
+  });
+
+  it("persists dismiss actions for hidden items through sidecar metadata patch", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          hidden_details: {
+            append_suggestions: [
+              {
+                id: "append-1",
+                kind: "note",
+                raw_text: "Add gate latch note",
+                confidence: "low",
+                source: "append_capture",
+              },
+            ],
+            unresolved_segments: [],
+            confidence_notes: [],
+          },
+          hidden_detail_state: {},
+        },
+      }),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /capture details/i }));
+    fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateExtractionReviewMetadata).toHaveBeenCalledWith("doc-1", {
+        dismiss_hidden_item: "append-1",
+      });
+    });
   });
 
   it("locks type selector after sharing", async () => {

@@ -5,7 +5,7 @@ import { ReviewCustomerRow } from "@/features/quotes/components/ReviewCustomerRo
 import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewLineItemsSection } from "@/features/quotes/components/ReviewLineItemsSection";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
-import type { ExtractionReviewHiddenDetails, ExtractionTier } from "@/features/quotes/types/quote.types";
+import type { ExtractionReviewHiddenDetails, ExtractionTier, HiddenItemState } from "@/features/quotes/types/quote.types";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   DOCUMENT_NOTES_MAX_CHARS,
@@ -58,8 +58,10 @@ interface ReviewFormContentProps {
   extractionTier: ExtractionTier | null;
   extractionDegradedReasonCode: string | null;
   hiddenDetails?: ExtractionReviewHiddenDetails;
+  hiddenDetailState?: Record<string, HiddenItemState>;
   lineItemSum: number;
   suggestedTaxRate: number | null;
+  isMutatingHiddenItems: boolean;
   onDocumentTypeChange: (nextType: ReviewDocumentType) => void;
   onDueDateChange: (nextDueDate: string) => void;
   onRequestAssignment: () => void;
@@ -73,6 +75,8 @@ interface ReviewFormContentProps {
   onDiscountValueChange: (nextDiscountValue: number | null) => void;
   onDepositAmountChange: (nextDepositAmount: number | null) => void;
   onNotesChange: (nextNotes: string) => void;
+  onReviewHiddenItem: (itemId: string) => Promise<void>;
+  onDismissHiddenItem: (itemId: string) => Promise<void>;
 }
 
 export function ReviewFormContent({
@@ -92,8 +96,10 @@ export function ReviewFormContent({
   extractionTier,
   extractionDegradedReasonCode,
   hiddenDetails,
+  hiddenDetailState,
   lineItemSum,
   suggestedTaxRate,
+  isMutatingHiddenItems,
   onDocumentTypeChange,
   onDueDateChange,
   onRequestAssignment,
@@ -107,16 +113,24 @@ export function ReviewFormContent({
   onDiscountValueChange,
   onDepositAmountChange,
   onNotesChange,
+  onReviewHiddenItem,
+  onDismissHiddenItem,
 }: ReviewFormContentProps): React.ReactElement {
   const [isCaptureDetailsOpen, setIsCaptureDetailsOpen] = useState(false);
   const showDueDateField = documentType === "invoice";
   const showQuoteOnlySections = documentType === "quote";
   const showSevereDegradedMarker = extractionTier === "degraded"
     && draft.lineItems.length === 0;
+  const hasVisibleAppendSuggestions = Boolean(
+    hiddenDetails?.append_suggestions.some((suggestion) => !hiddenDetailState?.[suggestion.id]?.dismissed),
+  );
+  const hasVisibleUnresolvedSegments = Boolean(
+    hiddenDetails?.unresolved_segments.some((segment) => !hiddenDetailState?.[segment.id]?.dismissed),
+  );
   const hasHiddenActionableItems = Boolean(
     hiddenDetails
-      && (hiddenDetails.append_suggestions.length > 0
-        || hiddenDetails.unresolved_segments.length > 0
+      && (hasVisibleAppendSuggestions
+        || hasVisibleUnresolvedSegments
         || hiddenDetails.confidence_notes.length > 0),
   );
 
@@ -294,6 +308,10 @@ export function ReviewFormContent({
           onClose={() => setIsCaptureDetailsOpen(false)}
           transcript={draft.transcript ?? ""}
           hiddenDetails={hiddenDetails}
+          hiddenDetailState={hiddenDetailState}
+          onReviewHiddenItem={onReviewHiddenItem}
+          onDismissHiddenItem={onDismissHiddenItem}
+          isMutating={isMutatingHiddenItems}
         />
       ) : null}
     </form>

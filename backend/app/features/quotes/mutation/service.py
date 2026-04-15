@@ -11,7 +11,17 @@ from sqlalchemy.exc import IntegrityError
 
 from app.features.quotes.errors import QuoteServiceError
 from app.features.quotes.models import Document, QuoteStatus
-from app.features.quotes.schemas import LineItemDraft, QuoteUpdateRequest
+from app.features.quotes.review_metadata import (
+    apply_hidden_detail_lifecycle_updates,
+    clear_append_suggestions_for_manual_edits,
+    normalize_extraction_review_metadata,
+)
+from app.features.quotes.schemas import (
+    ExtractionReviewMetadataUpdateRequest,
+    ExtractionReviewMetadataV1,
+    LineItemDraft,
+    QuoteUpdateRequest,
+)
 from app.shared.event_logger import log_event
 from app.shared.pricing import (
     PricingValidationError,
@@ -71,6 +81,15 @@ class QuoteMutationRepositoryProtocol(Protocol):
         update_notes: bool,
         line_items: list[LineItemDraft] | None,
         replace_line_items: bool,
+        extraction_review_metadata: dict[str, object] | None = None,
+        update_extraction_review_metadata: bool = False,
+    ) -> Document: ...
+
+    async def update_extraction_review_metadata(
+        self,
+        *,
+        document: Document,
+        extraction_review_metadata: dict[str, object],
     ) -> Document: ...
 
     async def invalidate_pdf_artifact(self, document: Document) -> str | None: ...
@@ -185,19 +204,44 @@ class QuoteMutationService:
                 else document_field_float_or_none(quote.deposit_amount)
             ),
         )
+        next_total_amount = document_field_float_or_none(current_pricing.total_amount)
+        next_tax_rate = document_field_float_or_none(current_pricing.tax_rate)
+        next_discount_type = current_pricing.discount_type
+        next_discount_value = document_field_float_or_none(current_pricing.discount_value)
+        next_deposit_amount = document_field_float_or_none(current_pricing.deposit_amount)
+        next_notes = data.notes if "notes" in data.model_fields_set else quote.notes
+        notes_changed = "notes" in data.model_fields_set and _normalized_optional_text(
+            next_notes
+        ) != _normalized_optional_text(quote.notes)
+        pricing_changed = any(
+            (
+                next_total_amount != document_field_float_or_none(quote.total_amount),
+                next_tax_rate != document_field_float_or_none(quote.tax_rate),
+                next_discount_type != quote.discount_type,
+                next_discount_value != document_field_float_or_none(quote.discount_value),
+                next_deposit_amount != document_field_float_or_none(quote.deposit_amount),
+            )
+        )
+        next_extraction_review_metadata, update_extraction_review_metadata = (
+            _resolve_next_extraction_review_metadata_for_update(
+                quote=quote,
+                notes_changed=notes_changed,
+                pricing_changed=pricing_changed,
+            )
+        )
         rendered_fields_changed = (
             _quote_render_inputs_changed(
                 quote=quote,
                 update_fields=data.model_fields_set,
                 next_customer_id=next_customer_id,
                 next_line_items=next_line_items,
-                next_total_amount=document_field_float_or_none(current_pricing.total_amount),
-                next_tax_rate=document_field_float_or_none(current_pricing.tax_rate),
-                next_discount_type=current_pricing.discount_type,
-                next_discount_value=document_field_float_or_none(current_pricing.discount_value),
-                next_deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+                next_total_amount=next_total_amount,
+                next_tax_rate=next_tax_rate,
+                next_discount_type=next_discount_type,
+                next_discount_value=next_discount_value,
+                next_deposit_amount=next_deposit_amount,
                 next_title=data.title if "title" in data.model_fields_set else quote.title,
-                next_notes=data.notes if "notes" in data.model_fields_set else quote.notes,
+                next_notes=next_notes,
             )
             or doc_type_changed
         )
@@ -211,30 +255,33 @@ class QuoteMutationService:
                 update_title="title" in data.model_fields_set,
                 transcript=data.transcript,
                 update_transcript="transcript" in data.model_fields_set,
-                total_amount=document_field_float_or_none(current_pricing.total_amount),
+                total_amount=next_total_amount,
                 update_total_amount="total_amount" in data.model_fields_set
                 or ("line_items" in data.model_fields_set and line_items_define_subtotal)
                 or "discount_type" in data.model_fields_set
                 or "discount_value" in data.model_fields_set
                 or "tax_rate" in data.model_fields_set,
-                tax_rate=document_field_float_or_none(current_pricing.tax_rate),
+                tax_rate=next_tax_rate,
                 update_tax_rate="tax_rate" in data.model_fields_set,
-                discount_type=current_pricing.discount_type,
+                discount_type=next_discount_type,
                 update_discount_type=(
                     "discount_type" in data.model_fields_set
-                    or (
-                        "discount_value" in data.model_fields_set
-                        and current_pricing.discount_type is None
-                    )
+                    or ("discount_value" in data.model_fields_set and next_discount_type is None)
                 ),
-                discount_value=document_field_float_or_none(current_pricing.discount_value),
+                discount_value=next_discount_value,
                 update_discount_value="discount_value" in data.model_fields_set,
-                deposit_amount=document_field_float_or_none(current_pricing.deposit_amount),
+                deposit_amount=next_deposit_amount,
                 update_deposit_amount="deposit_amount" in data.model_fields_set,
                 notes=data.notes,
                 update_notes="notes" in data.model_fields_set,
                 line_items=data.line_items,
                 replace_line_items="line_items" in data.model_fields_set,
+                extraction_review_metadata=(
+                    next_extraction_review_metadata.model_dump(mode="json")
+                    if next_extraction_review_metadata is not None
+                    else None
+                ),
+                update_extraction_review_metadata=update_extraction_review_metadata,
             )
             obsolete_artifact_path = None
             if rendered_fields_changed:
@@ -259,6 +306,46 @@ class QuoteMutationService:
             customer_id=updated_quote.customer_id,
         )
         return await self._repository.refresh(updated_quote)
+
+    async def update_extraction_review_metadata(
+        self,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+        data: ExtractionReviewMetadataUpdateRequest,
+    ) -> ExtractionReviewMetadataV1:
+        """Mutate only extraction review sidecar metadata for one quote."""
+        quote = await self._repository.get_by_id(quote_id, user_id)
+        if quote is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        metadata = normalize_extraction_review_metadata(
+            quote.extraction_review_metadata,
+            extraction_degraded_reason_code=quote.extraction_degraded_reason_code,
+        )
+        next_metadata = apply_hidden_detail_lifecycle_updates(
+            metadata,
+            dismiss_hidden_item=data.dismiss_hidden_item,
+            review_hidden_item=data.review_hidden_item,
+            clear_notes_pending=bool(
+                data.clear_review_state is not None
+                and data.clear_review_state.notes_pending is not None
+            ),
+            clear_pricing_pending=bool(
+                data.clear_review_state is not None
+                and data.clear_review_state.pricing_pending is not None
+            ),
+        )
+        if next_metadata.model_dump(mode="json") != metadata.model_dump(mode="json"):
+            await self._repository.update_extraction_review_metadata(
+                document=quote,
+                extraction_review_metadata=next_metadata.model_dump(mode="json"),
+            )
+            await self._repository.commit()
+        return normalize_extraction_review_metadata(
+            quote.extraction_review_metadata,
+            extraction_degraded_reason_code=quote.extraction_degraded_reason_code,
+        )
 
     async def _apply_doc_type_transition(
         self,
@@ -351,6 +438,36 @@ class QuoteMutationService:
             )
 
         return requested_customer_id
+
+
+def _resolve_next_extraction_review_metadata_for_update(
+    *,
+    quote: Document,
+    notes_changed: bool,
+    pricing_changed: bool,
+) -> tuple[ExtractionReviewMetadataV1 | None, bool]:
+    if not notes_changed and not pricing_changed:
+        return None, False
+
+    metadata = normalize_extraction_review_metadata(
+        getattr(quote, "extraction_review_metadata", None),
+        extraction_degraded_reason_code=getattr(quote, "extraction_degraded_reason_code", None),
+    )
+    cleared_metadata = clear_append_suggestions_for_manual_edits(
+        metadata,
+        notes_changed=notes_changed,
+        pricing_changed=pricing_changed,
+    )
+    if cleared_metadata.model_dump(mode="json") == metadata.model_dump(mode="json"):
+        return None, False
+    return cleared_metadata, True
+
+
+def _normalized_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 def _is_doc_sequence_collision(exc: IntegrityError) -> bool:

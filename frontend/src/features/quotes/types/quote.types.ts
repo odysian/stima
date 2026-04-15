@@ -200,6 +200,11 @@ export interface ExtractionReviewHiddenDetails {
   confidence_notes: string[];
 }
 
+export interface HiddenItemState {
+  reviewed: boolean;
+  dismissed: boolean;
+}
+
 export interface ExtractionReviewMetadata {
   pipeline_version: "v2";
   review_state: ExtractionReviewState;
@@ -213,7 +218,17 @@ export interface ExtractionReviewMetadata {
     };
   };
   hidden_details: ExtractionReviewHiddenDetails;
+  hidden_detail_state: Record<string, HiddenItemState>;
   extraction_degraded_reason_code: string | null;
+}
+
+export interface ExtractionReviewMetadataUpdateRequest {
+  dismiss_hidden_item?: string;
+  review_hidden_item?: string;
+  clear_review_state?: {
+    notes_pending?: boolean;
+    pricing_pending?: boolean;
+  };
 }
 
 export interface QuoteListItem {
