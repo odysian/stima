@@ -399,7 +399,7 @@ async def test_send_quote_email_returns_429_when_duplicate_send_guard_triggers(
 
     assert response.status_code == 429
     assert response.json() == {
-        "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
+        "detail": "This quote was emailed recently. Please wait before resending.",
     }
     assert mock_email_service.messages == []
 
@@ -553,7 +553,7 @@ async def test_send_quote_email_returns_200_when_event_persist_fails_after_send(
     assert first_response.status_code == 200
     assert second_response.status_code == 429
     assert second_response.json() == {
-        "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
+        "detail": "This quote was emailed recently. Please wait before resending.",
     }
     assert len(mock_email_service.messages) == 1
     assert rollback_calls == 1
@@ -610,7 +610,7 @@ async def test_send_quote_email_returns_200_when_event_commit_fails_after_send(
     assert first_response.status_code == 200
     assert second_response.status_code == 429
     assert second_response.json() == {
-        "detail": "This quote was emailed recently. Please wait a few minutes before resending.",
+        "detail": "This quote was emailed recently. Please wait before resending.",
     }
     assert len(mock_email_service.messages) == 1
     assert rollback_calls == 1

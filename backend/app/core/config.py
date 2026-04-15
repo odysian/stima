@@ -132,6 +132,16 @@ class Settings(BaseSettings):
         default="10/day",
         validation_alias="INVOICE_EMAIL_SEND_RATE_LIMIT",
     )
+    quote_email_duplicate_send_window_seconds: int = Field(
+        default=60,
+        ge=1,
+        validation_alias="QUOTE_EMAIL_DUPLICATE_SEND_WINDOW_SECONDS",
+    )
+    invoice_email_duplicate_send_window_seconds: int = Field(
+        default=60,
+        ge=1,
+        validation_alias="INVOICE_EMAIL_DUPLICATE_SEND_WINDOW_SECONDS",
+    )
     extraction_daily_quota: int = Field(
         default=40,
         validation_alias="EXTRACTION_DAILY_QUOTA",

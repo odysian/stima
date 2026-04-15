@@ -79,6 +79,20 @@ def test_extraction_job_reaper_settings_must_be_positive(monkeypatch) -> None:
         get_settings()
 
 
+@pytest.mark.parametrize(
+    "setting_name",
+    [
+        "QUOTE_EMAIL_DUPLICATE_SEND_WINDOW_SECONDS",
+        "INVOICE_EMAIL_DUPLICATE_SEND_WINDOW_SECONDS",
+    ],
+)
+def test_duplicate_send_window_seconds_must_be_positive(monkeypatch, setting_name: str) -> None:
+    monkeypatch.setenv(setting_name, "0")
+
+    with pytest.raises(ValidationError):
+        get_settings()
+
+
 def test_allowed_origins_csv_parses_to_list(monkeypatch) -> None:
     monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:5173, https://app.stima.dev")
 

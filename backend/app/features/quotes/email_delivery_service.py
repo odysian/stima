@@ -13,6 +13,7 @@ from uuid import UUID
 from email_validator import EmailNotValidError, validate_email
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.repository import QuoteEmailContext
@@ -29,7 +30,6 @@ from app.integrations.email import (
 )
 from app.shared.event_logger import log_event
 
-_DUPLICATE_SEND_WINDOW = timedelta(minutes=5)
 _EMAIL_SENT_FALLBACK_TIMESTAMPS: dict[tuple[UUID, UUID], datetime] = {}
 LOGGER = logging.getLogger(__name__)
 
@@ -240,11 +240,13 @@ class QuoteEmailDeliveryService:
         if effective_latest_email_sent_at is None:
             return
 
-        cutoff = datetime.now(UTC) - _DUPLICATE_SEND_WINDOW
+        cutoff = datetime.now(UTC) - timedelta(
+            seconds=get_settings().quote_email_duplicate_send_window_seconds
+        )
         if effective_latest_email_sent_at >= cutoff:
             raise QuoteServiceError(
                 detail=(
-                    "This quote was emailed recently. Please wait a few minutes before resending."
+                    "This quote was emailed recently. Please wait before resending."
                 ),
                 status_code=429,
             )
@@ -293,7 +295,9 @@ def _get_fallback_email_sent_at(context: QuoteEmailContext) -> datetime | None:
     if fallback_email_sent_at is None:
         return None
 
-    cutoff = datetime.now(UTC) - _DUPLICATE_SEND_WINDOW
+    cutoff = datetime.now(UTC) - timedelta(
+        seconds=get_settings().quote_email_duplicate_send_window_seconds
+    )
     if fallback_email_sent_at < cutoff:
         _EMAIL_SENT_FALLBACK_TIMESTAMPS.pop(cache_key, None)
         return None
