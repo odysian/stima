@@ -13,10 +13,16 @@ from app.core.config import get_settings
 from app.features.jobs.models import JobRecord, JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.models import Document
+from app.features.quotes.review_metadata import build_hidden_item_id
 from app.features.quotes.schemas import (
     ExtractionResult,
+    ExtractionReviewAppendSuggestion,
     ExtractionReviewHiddenDetails,
     ExtractionReviewMetadataV1,
+    ExtractionReviewState,
+    ExtractionReviewUnresolvedSegment,
+    ExtractionSuggestion,
+    HiddenItemState,
     LineItemExtractedV2,
     PricingHints,
 )
@@ -139,6 +145,135 @@ async def test_append_extraction_sync_appends_line_items_and_merges_transcript_e
     assert "Added later (2):" not in payload["transcript"]
 
 
+async def test_append_extraction_keeps_populated_notes_and_total_and_records_append_suggestions(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _extract_blocked_append_fields(self, notes: str) -> ExtractionResult:  # noqa: ANN001
+        del self, notes
+        return ExtractionResult(
+            transcript="append blocked fields",
+            line_items=[],
+            pricing_hints=PricingHints(explicit_total=999),
+            customer_notes_suggestion=ExtractionSuggestion(
+                text="Add driveway gate code",
+                confidence="medium",
+                source="leftover_classification",
+            ),
+            confidence_notes=[],
+        )
+
+    monkeypatch.setattr(
+        _MockExtractionIntegration,
+        "extract",
+        _extract_blocked_append_fields,
+    )
+
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+    app.state.arq_pool = None
+
+    append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "append blocked fields"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert append_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert payload["notes"] == "Original note"
+    assert payload["total_amount"] == 55
+    append_suggestions = payload["extraction_review_metadata"]["hidden_details"][
+        "append_suggestions"
+    ]
+    assert append_suggestions == [
+        {
+            "id": append_suggestions[0]["id"],
+            "kind": "note",
+            "raw_text": "Add driveway gate code",
+            "confidence": "medium",
+            "source": "append_capture",
+            "pricing_field": None,
+        },
+        {
+            "id": append_suggestions[1]["id"],
+            "kind": "pricing",
+            "raw_text": "Total 999",
+            "confidence": "medium",
+            "source": "append_capture",
+            "pricing_field": "explicit_total",
+        },
+    ]
+
+
+async def test_append_extraction_resurfaces_previously_dismissed_matching_suggestion(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    suggestion_text = "Add driveway gate code"
+    suggestion_id = build_hidden_item_id("append", "note", "none", suggestion_text)
+
+    async def _extract_blocked_note(self, notes: str) -> ExtractionResult:  # noqa: ANN001
+        del self, notes
+        return ExtractionResult(
+            transcript="append blocked note",
+            line_items=[],
+            pricing_hints=PricingHints(),
+            customer_notes_suggestion=ExtractionSuggestion(
+                text=suggestion_text,
+                confidence="low",
+                source="leftover_classification",
+            ),
+            confidence_notes=[],
+        )
+
+    monkeypatch.setattr(
+        _MockExtractionIntegration,
+        "extract",
+        _extract_blocked_note,
+    )
+
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = UUID(quote["id"])
+    app.state.arq_pool = None
+
+    persisted_quote = await db_session.get(Document, quote_id)
+    assert persisted_quote is not None
+    persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
+        hidden_details=ExtractionReviewHiddenDetails(
+            append_suggestions=[
+                ExtractionReviewAppendSuggestion(
+                    id=suggestion_id,
+                    kind="note",
+                    raw_text=suggestion_text,
+                    confidence="low",
+                )
+            ]
+        ),
+        hidden_detail_state={suggestion_id: HiddenItemState(reviewed=True, dismissed=True)},
+    ).model_dump(mode="json")
+    await db_session.commit()
+
+    append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "append blocked note"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert append_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    hidden_state = detail_response.json()["extraction_review_metadata"]["hidden_detail_state"]
+    assert hidden_state[suggestion_id] == {"reviewed": False, "dismissed": False}
+
+
 async def test_append_extraction_preserves_existing_confidence_notes_when_new_notes_empty(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -195,6 +330,173 @@ async def test_append_extraction_preserves_existing_confidence_notes_when_new_no
     assert detail_payload["extraction_review_metadata"]["hidden_details"]["confidence_notes"] == [
         "keep existing confidence note"
     ]
+
+
+async def test_patch_extraction_review_metadata_updates_sidecar_only(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = UUID(quote["id"])
+
+    persisted_quote = await db_session.get(Document, quote_id)
+    assert persisted_quote is not None
+    persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
+        hidden_details=ExtractionReviewHiddenDetails(
+            append_suggestions=[
+                ExtractionReviewAppendSuggestion(
+                    id="append-note-1",
+                    kind="note",
+                    raw_text="Add mulch color confirmation",
+                    confidence="medium",
+                )
+            ]
+        ),
+    ).model_dump(mode="json")
+    await db_session.commit()
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}/extraction-review-metadata",
+        json={"dismiss_hidden_item": "append-note-1"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["hidden_detail_state"]["append-note-1"] == {
+        "reviewed": False,
+        "dismissed": True,
+    }
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert payload["notes"] == "Original note"
+    assert payload["total_amount"] == 55
+    assert payload["line_items"][0]["description"] == "line item"
+    assert payload["extraction_review_metadata"]["hidden_detail_state"]["append-note-1"] == {
+        "reviewed": False,
+        "dismissed": True,
+    }
+
+
+async def test_patch_extraction_review_metadata_marks_hidden_item_reviewed(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = UUID(quote["id"])
+
+    persisted_quote = await db_session.get(Document, quote_id)
+    assert persisted_quote is not None
+    persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
+        hidden_details=ExtractionReviewHiddenDetails(
+            unresolved_segments=[
+                ExtractionReviewUnresolvedSegment(
+                    id="unresolved-1",
+                    raw_text="Confirm edging scope",
+                    confidence="low",
+                    source="leftover_classification",
+                )
+            ]
+        ),
+    ).model_dump(mode="json")
+    await db_session.commit()
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}/extraction-review-metadata",
+        json={"review_hidden_item": "unresolved-1"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["hidden_detail_state"]["unresolved-1"] == {
+        "reviewed": True,
+        "dismissed": False,
+    }
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert payload["extraction_review_metadata"]["hidden_detail_state"]["unresolved-1"] == {
+        "reviewed": True,
+        "dismissed": False,
+    }
+
+
+async def test_quote_patch_clears_related_append_suggestions_on_real_field_edits(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = UUID(quote["id"])
+
+    persisted_quote = await db_session.get(Document, quote_id)
+    assert persisted_quote is not None
+    persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
+        review_state=ExtractionReviewState(
+            notes_pending=True,
+            pricing_pending=True,
+        ),
+        hidden_details=ExtractionReviewHiddenDetails(
+            unresolved_segments=[],
+            append_suggestions=[
+                ExtractionReviewAppendSuggestion(
+                    id="append-note-1",
+                    kind="note",
+                    raw_text="Add customer gate code",
+                    confidence="medium",
+                ),
+                ExtractionReviewAppendSuggestion(
+                    id="append-pricing-1",
+                    kind="pricing",
+                    raw_text="Total 120",
+                    confidence="medium",
+                    pricing_field="explicit_total",
+                ),
+            ],
+            confidence_notes=[],
+        ),
+    ).model_dump(mode="json")
+    await db_session.commit()
+
+    note_update_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"notes": "Updated customer notes"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert note_update_response.status_code == 200
+
+    first_detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert first_detail_response.status_code == 200
+    first_metadata = first_detail_response.json()["extraction_review_metadata"]
+    assert first_metadata["review_state"] == {"notes_pending": False, "pricing_pending": True}
+    assert first_metadata["hidden_details"]["append_suggestions"] == [
+        {
+            "id": "append-pricing-1",
+            "kind": "pricing",
+            "raw_text": "Total 120",
+            "confidence": "medium",
+            "source": "append_capture",
+            "pricing_field": "explicit_total",
+        }
+    ]
+
+    pricing_update_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"total_amount": 88},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert pricing_update_response.status_code == 200
+
+    second_detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert second_detail_response.status_code == 200
+    second_metadata = second_detail_response.json()["extraction_review_metadata"]
+    assert second_metadata["review_state"] == {"notes_pending": False, "pricing_pending": False}
+    assert second_metadata["hidden_details"]["append_suggestions"] == []
 
 
 async def test_append_extraction_sync_cleans_obsolete_pdf_artifact_after_commit(

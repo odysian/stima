@@ -1,6 +1,8 @@
 import type { Invoice } from "@/features/invoices/types/invoice.types";
 import type {
   ExtractionResult,
+  ExtractionReviewMetadata,
+  ExtractionReviewMetadataUpdateRequest,
   JobStatusResponse,
   Quote,
   QuoteDetail,
@@ -134,6 +136,19 @@ function updateQuote(id: string, data: QuoteUpdateRequest): Promise<Quote> {
   });
 }
 
+function updateExtractionReviewMetadata(
+  id: string,
+  data: ExtractionReviewMetadataUpdateRequest,
+): Promise<ExtractionReviewMetadata> {
+  return request<ExtractionReviewMetadata>(
+    `/api/quotes/${id}/extraction-review-metadata`,
+    {
+      method: "PATCH",
+      body: data,
+    },
+  );
+}
+
 function deleteQuote(id: string): Promise<void> {
   // 204 No Content responses parse as null before we normalize back to void.
   return request<null>(`/api/quotes/${id}`, {
@@ -197,6 +212,7 @@ export const quoteService = {
   listQuotes,
   getQuote,
   updateQuote,
+  updateExtractionReviewMetadata,
   deleteQuote,
   generatePdf,
   shareQuote,

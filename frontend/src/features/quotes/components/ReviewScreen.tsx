@@ -4,6 +4,7 @@ import { useBeforeUnload, useLocation, useNavigate, useParams } from "react-rout
 import { profileService } from "@/features/profile/services/profileService";
 import { DocumentEditScreenView } from "@/features/quotes/components/DocumentEditScreenView";
 import { buildDefaultInvoiceDueDate, buildDocumentSnapshotKey, buildSaveValidationMessage, isInvoiceDocument, persistDocumentDraft } from "@/features/quotes/components/documentEditUtils";
+import { useHiddenDetailLifecycle } from "@/features/quotes/hooks/useHiddenDetailLifecycle";
 import { applyLineItemSheetDelete, applyLineItemSheetSave, resolveLineItemSheetInitialItem, type ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { buildLineItemSubmitState, EMPTY_LINE_ITEM } from "@/features/quotes/components/reviewScreenUtils";
 import { usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
@@ -78,6 +79,17 @@ export function DocumentEditScreen(): React.ReactElement {
     }
     return JSON.stringify(buildDraftSnapshot(draft));
   }, [draft]);
+  const documentId = id ?? "";
+  const {
+    isMutatingHiddenItems,
+    reviewHiddenItem,
+    dismissHiddenItem,
+  } = useHiddenDetailLifecycle({
+    canMutate: Boolean(document && !isInvoiceDocument(document)),
+    documentId,
+    refreshDocument: async () => refreshDocument(),
+    setSaveError,
+  });
   useEffect(() => {
     if (!id) {
       return;
@@ -88,13 +100,11 @@ export function DocumentEditScreen(): React.ReactElement {
     if (!id || !locationState.reseedDraft || hasAppliedReseedFromLocation) {
       return;
     }
-
     setHasAppliedReseedFromLocation(true);
     void refreshDocument({ reseedDraft: true }).catch(() => {
       // Existing load/save error messaging covers failed refreshes.
     });
   }, [hasAppliedReseedFromLocation, id, locationState.reseedDraft, refreshDocument]);
-
   useEffect(() => {
     if (!document || !draft || !currentSnapshotKey) {
       return;
@@ -133,24 +143,19 @@ export function DocumentEditScreen(): React.ReactElement {
     if (!hasUnsavedChanges) {
       return;
     }
-
     event.preventDefault();
     event.returnValue = "";
   });
-
   function requestNavigation(target: { to: string; replace?: boolean }): void {
     if (!hasUnsavedChanges) {
       navigate(target.to, { replace: target.replace });
       return;
     }
-
     setPendingNavigationTarget(target);
     setShowLeaveWarning(true);
   }
-
   function handleLeaveConfirm(): void {
     setShowLeaveWarning(false);
-
     if (pendingNavigationTarget) {
       const nextTarget = pendingNavigationTarget;
       setPendingNavigationTarget(null);
@@ -163,7 +168,6 @@ export function DocumentEditScreen(): React.ReactElement {
     setShowLeaveWarning(false);
     setPendingNavigationTarget(null);
   }
-
   if (!id) {
     return (
       <main className="min-h-screen bg-background px-4 pt-20">
@@ -172,7 +176,6 @@ export function DocumentEditScreen(): React.ReactElement {
     );
   }
 
-  const documentId = id;
   const activeDocumentType = draft?.docType ?? (document && isInvoiceDocument(document) ? "invoice" : "quote");
   const shouldUseQuoteListBackTarget = locationState.origin === "preview" && requiresCustomerAssignment;
   const invoiceBackTarget = `/invoices/${documentId}`;
@@ -185,7 +188,6 @@ export function DocumentEditScreen(): React.ReactElement {
     : (shouldUseQuoteListBackTarget
       ? "Back to quotes"
       : (locationState.origin === "preview" ? "Back to preview" : "Back to quotes"));
-
   if (isLoadingDocument || !draft) {
     return (
       <main className="min-h-screen bg-background px-4 pt-20">
@@ -205,7 +207,6 @@ export function DocumentEditScreen(): React.ReactElement {
   }
   const activeDocument = document;
   const activeDraft = draft;
-
   const {
     hasInvalidLineItems,
     lineItemsForSubmit,
@@ -214,6 +215,7 @@ export function DocumentEditScreen(): React.ReactElement {
   const extractionReviewMetadata = !isInvoiceDocument(activeDocument)
     ? activeDocument.extraction_review_metadata
     : undefined;
+  const hiddenDetailState = extractionReviewMetadata?.hidden_detail_state;
   const notesReviewPending = activeDraft.docType === "quote"
     && Boolean(extractionReviewMetadata?.review_state.notes_pending);
   const pricingReviewPending = activeDraft.docType === "quote"
@@ -223,12 +225,10 @@ export function DocumentEditScreen(): React.ReactElement {
   const lineItemSheetInitialItem = lineItemSheetState
     ? resolveLineItemSheetInitialItem(activeDraft, lineItemSheetState, EMPTY_LINE_ITEM)
     : EMPTY_LINE_ITEM;
-
   async function tryAutoSaveDraft(): Promise<void> {
     if (activeDraft.docType !== "quote") {
       return;
     }
-
     const validationMessage = buildSaveValidationMessage({
       draft: activeDraft,
       lineItemsForSubmit,
@@ -237,7 +237,6 @@ export function DocumentEditScreen(): React.ReactElement {
     if (validationMessage) {
       return;
     }
-
     try {
       await persistDocumentDraft({
         document: activeDocument,
@@ -254,9 +253,7 @@ export function DocumentEditScreen(): React.ReactElement {
     if (isAddVoiceNoteInFlightRef.current) {
       return;
     }
-
     isAddVoiceNoteInFlightRef.current = true;
-
     try {
       await tryAutoSaveDraft();
       navigate(`/quotes/${documentId}/review/append-capture`, {
@@ -270,7 +267,6 @@ export function DocumentEditScreen(): React.ReactElement {
   async function saveDraft(nextAction: "save" | "continue"): Promise<void> {
     setSaveError(null);
     setToastMessage(null);
-
     const validationMessage = buildSaveValidationMessage({
       draft: activeDraft,
       lineItemsForSubmit,
@@ -280,9 +276,7 @@ export function DocumentEditScreen(): React.ReactElement {
       setSaveError(validationMessage ?? "Unable to save quote.");
       return;
     }
-
     setSubmitAction(nextAction);
-
     try {
       await persistDocumentDraft({
         document: activeDocument,
@@ -303,11 +297,9 @@ export function DocumentEditScreen(): React.ReactElement {
           navigate(`/invoices/${documentId}`, { replace: true });
           return;
         }
-
         navigate(`/quotes/${documentId}/preview`, { replace: true });
         return;
       }
-
       setToastMessage("Draft saved.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save quote";
@@ -321,9 +313,7 @@ export function DocumentEditScreen(): React.ReactElement {
     if (isInvoiceDocument(activeDocument)) {
       return;
     }
-
     setIsAssigningCustomer(true);
-
     try {
       await quoteService.updateQuote(documentId, { customer_id: customerId });
       await refreshDocument();
@@ -334,7 +324,6 @@ export function DocumentEditScreen(): React.ReactElement {
       setIsAssigningCustomer(false);
     }
   }
-
   return (
     <DocumentEditScreenView
       document={activeDocument}
@@ -352,8 +341,10 @@ export function DocumentEditScreen(): React.ReactElement {
       extractionTier={!isInvoiceDocument(activeDocument) ? activeDocument.extraction_tier : null}
       extractionDegradedReasonCode={!isInvoiceDocument(activeDocument) ? activeDocument.extraction_degraded_reason_code : null}
       hiddenDetails={extractionReviewMetadata?.hidden_details}
+      hiddenDetailState={hiddenDetailState}
       lineItemSum={lineItemSum}
       suggestedTaxRate={suggestedTaxRate}
+      isMutatingHiddenItems={isMutatingHiddenItems}
       isTypeSelectorLocked={isTypeSelectorLocked}
       isAssignmentSheetOpen={isAssignmentSheetOpen}
       lineItemSheetState={lineItemSheetState}
@@ -408,6 +399,8 @@ export function DocumentEditScreen(): React.ReactElement {
       onDiscountValueChange={(nextDiscountValue) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, discountValue: nextDiscountValue })); }}
       onDepositAmountChange={(nextDepositAmount) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, depositAmount: nextDepositAmount })); }}
       onNotesChange={(nextNotes) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, notes: nextNotes })); }}
+      onReviewHiddenItem={reviewHiddenItem}
+      onDismissHiddenItem={dismissHiddenItem}
       onSaveDraft={() => { void saveDraft("save"); }}
       onPrimaryAction={() => {
         if (activeDraft.docType === "quote" && (notesReviewPending || pricingReviewPending)) {

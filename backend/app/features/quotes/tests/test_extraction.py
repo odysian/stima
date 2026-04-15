@@ -12,6 +12,7 @@ import httpx
 import pytest
 
 import app.integrations.extraction as extraction_module
+from app.features.quotes.review_metadata import build_hidden_item_id
 from app.features.quotes.schemas import PreparedCaptureInput
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
 from app.integrations.extraction import (
@@ -678,6 +679,15 @@ async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
     assert "flag_reason" not in line_item_schema["required"]
     assert "raw_text" in line_item_schema["required"]
     assert "confidence" in line_item_schema["required"]
+
+
+async def test_hidden_item_id_is_deterministic_and_distinguishes_content() -> None:
+    first = build_hidden_item_id("append", "note", "none", "Gate code 1942")
+    second = build_hidden_item_id(" append ", "NOTE", "none", " gate code 1942 ")
+    different = build_hidden_item_id("append", "note", "none", "Gate code 7788")
+
+    assert first == second
+    assert first != different
 
 
 @pytest.mark.parametrize("fixture_name", sorted(TRANSCRIPTS))

@@ -686,6 +686,8 @@ class QuoteRepository:
         update_notes: bool,
         line_items: list[LineItemDraft] | None,
         replace_line_items: bool,
+        extraction_review_metadata: dict[str, Any] | None = None,
+        update_extraction_review_metadata: bool = False,
     ) -> Document:
         """Apply partial quote updates and optional full line-item replacement."""
         if update_customer_id:
@@ -706,6 +708,8 @@ class QuoteRepository:
             document.deposit_amount = _to_decimal(deposit_amount)
         if update_notes:
             document.notes = notes
+        if update_extraction_review_metadata:
+            document.extraction_review_metadata = extraction_review_metadata
 
         if replace_line_items and line_items is not None:
             await self._replace_line_items(document.id, line_items)
@@ -721,6 +725,17 @@ class QuoteRepository:
         document: Document,
         transcript: str,
         total_amount: float | None,
+        update_total_amount: bool,
+        notes: str | None,
+        update_notes: bool,
+        tax_rate: float | None,
+        update_tax_rate: bool,
+        discount_type: str | None,
+        update_discount_type: bool,
+        discount_value: float | None,
+        update_discount_value: bool,
+        deposit_amount: float | None,
+        update_deposit_amount: bool,
         line_items: list[LineItemDraft],
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
@@ -728,7 +743,18 @@ class QuoteRepository:
     ) -> Document:
         """Append extracted line items while preserving existing rows and order."""
         document.transcript = transcript
-        document.total_amount = _to_decimal(total_amount)
+        if update_total_amount:
+            document.total_amount = _to_decimal(total_amount)
+        if update_notes:
+            document.notes = notes
+        if update_tax_rate:
+            document.tax_rate = _to_decimal(tax_rate)
+        if update_discount_type:
+            document.discount_type = discount_type
+        if update_discount_value:
+            document.discount_value = _to_decimal(discount_value)
+        if update_deposit_amount:
+            document.deposit_amount = _to_decimal(deposit_amount)
         document.extraction_tier = extraction_tier
         document.extraction_degraded_reason_code = extraction_degraded_reason_code
         if extraction_review_metadata is not None:
@@ -751,6 +777,18 @@ class QuoteRepository:
         await self._session.flush()
         await self._session.refresh(document)
         await self._session.refresh(document, attribute_names=["line_items"])
+        return document
+
+    async def update_extraction_review_metadata(
+        self,
+        *,
+        document: Document,
+        extraction_review_metadata: dict[str, Any],
+    ) -> Document:
+        """Persist one sidecar-only extraction review metadata mutation."""
+        document.extraction_review_metadata = extraction_review_metadata
+        await self._session.flush()
+        await self._session.refresh(document)
         return document
 
     async def has_linked_invoice(

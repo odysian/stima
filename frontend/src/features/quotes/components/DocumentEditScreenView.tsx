@@ -4,7 +4,7 @@ import { ReviewFormContent } from "@/features/quotes/components/ReviewFormConten
 import { isInvoiceDocument } from "@/features/quotes/components/documentEditUtils";
 import type { ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { type DocumentEditDraft, type PersistedEditableDocument } from "@/features/quotes/hooks/usePersistedReview";
-import type { ExtractionReviewHiddenDetails, ExtractionTier, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import type { ExtractionReviewHiddenDetails, ExtractionTier, HiddenItemState, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
@@ -24,8 +24,10 @@ interface DocumentEditScreenViewProps {
   extractionTier: ExtractionTier | null;
   extractionDegradedReasonCode: string | null;
   hiddenDetails?: ExtractionReviewHiddenDetails;
+  hiddenDetailState?: Record<string, HiddenItemState>;
   lineItemSum: number;
   suggestedTaxRate: number | null;
+  isMutatingHiddenItems: boolean;
   isTypeSelectorLocked: boolean;
   isAssignmentSheetOpen: boolean;
   lineItemSheetState: ReviewLineItemSheetState | null;
@@ -49,6 +51,8 @@ interface DocumentEditScreenViewProps {
   onDiscountValueChange: (nextDiscountValue: number | null) => void;
   onDepositAmountChange: (nextDepositAmount: number | null) => void;
   onNotesChange: (nextNotes: string) => void;
+  onReviewHiddenItem: (itemId: string) => Promise<void>;
+  onDismissHiddenItem: (itemId: string) => Promise<void>;
   onSaveDraft: () => void;
   onPrimaryAction: () => void;
   onCloseAssignment: () => void;
@@ -79,8 +83,10 @@ export function DocumentEditScreenView({
   extractionTier,
   extractionDegradedReasonCode,
   hiddenDetails,
+  hiddenDetailState,
   lineItemSum,
   suggestedTaxRate,
+  isMutatingHiddenItems,
   isTypeSelectorLocked,
   isAssignmentSheetOpen,
   lineItemSheetState,
@@ -104,6 +110,8 @@ export function DocumentEditScreenView({
   onDiscountValueChange,
   onDepositAmountChange,
   onNotesChange,
+  onReviewHiddenItem,
+  onDismissHiddenItem,
   onSaveDraft,
   onPrimaryAction,
   onCloseAssignment,
@@ -146,8 +154,10 @@ export function DocumentEditScreenView({
         extractionTier={extractionTier}
         extractionDegradedReasonCode={extractionDegradedReasonCode}
         hiddenDetails={hiddenDetails}
+        hiddenDetailState={hiddenDetailState}
         lineItemSum={lineItemSum}
         suggestedTaxRate={suggestedTaxRate}
+        isMutatingHiddenItems={isMutatingHiddenItems}
         onDocumentTypeChange={onDocumentTypeChange}
         onDueDateChange={onDueDateChange}
         onRequestAssignment={onOpenAssignment}
@@ -161,6 +171,8 @@ export function DocumentEditScreenView({
         onDiscountValueChange={onDiscountValueChange}
         onDepositAmountChange={onDepositAmountChange}
         onNotesChange={onNotesChange}
+        onReviewHiddenItem={onReviewHiddenItem}
+        onDismissHiddenItem={onDismissHiddenItem}
       />
 
       <ReviewActionFooter
