@@ -599,17 +599,13 @@ describe("CaptureScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/documents/quote-manual-home/edit");
   });
 
-  it("submits append extraction from review, requests draft reseed, and replaces prior confidence notes", async () => {
-    window.localStorage.setItem(
-      "stima_review_confidence_notes:quote-1",
-      JSON.stringify(["Existing note"]),
-    );
+  it("submits append extraction from review and requests draft reseed without local confidence-note writes", async () => {
     mockedQuoteService.appendExtraction.mockResolvedValueOnce({
       type: "sync",
       quoteId: "quote-1",
       result: {
         ...extractionFixture,
-        confidence_notes: ["Ignored because hydration now reads persisted sidecar"],
+        confidence_notes: ["Backend output remains available for metadata, but review state is sidecar-driven."],
       },
     });
     mockedQuoteService.getQuote.mockResolvedValueOnce({
@@ -644,9 +640,7 @@ describe("CaptureScreen", () => {
       state: { reseedDraft: true },
     });
     expect(setDraftMock).not.toHaveBeenCalled();
-    expect(
-      window.localStorage.getItem("stima_review_confidence_notes:quote-1"),
-    ).toBe(JSON.stringify(["New note"]));
+    expect(window.localStorage.getItem("stima_review_confidence_notes:quote-1")).toBeNull();
   });
 
   it("submits home capture without customer context and routes when polling returns quote_id", async () => {

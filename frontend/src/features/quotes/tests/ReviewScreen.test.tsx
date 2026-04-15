@@ -81,6 +81,28 @@ function makeQuote(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     discount_value: null,
     deposit_amount: null,
     notes: "Thanks for your business",
+    extraction_review_metadata: {
+      pipeline_version: "v2",
+      review_state: {
+        notes_pending: false,
+        pricing_pending: false,
+      },
+      seeded_fields: {
+        notes: { seeded: false, confidence: null, source: null },
+        pricing: {
+          explicit_total: { seeded: false, source: null },
+          deposit_amount: { seeded: false, source: null },
+          tax_rate: { seeded: false, source: null },
+          discount: { seeded: false, source: null },
+        },
+      },
+      hidden_details: {
+        unresolved_segments: [],
+        append_suggestions: [],
+        confidence_notes: [],
+      },
+      extraction_degraded_reason_code: null,
+    },
     shared_at: null,
     share_token: null,
     has_active_share: false,
@@ -256,19 +278,198 @@ describe("DocumentEditScreen", () => {
     expect(screen.queryByRole("button", { name: /continue to preview/i })).not.toBeInTheDocument();
   });
 
-  it("keeps AI confidence notes visible after switching to invoice type", async () => {
-    window.localStorage.setItem(
-      "stima_review_confidence_notes:doc-1",
-      JSON.stringify(["Price for item 2 was not mentioned — verify before sending."]),
-    );
+  it("shows grouped review markers from sidecar review_state", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          review_state: {
+            notes_pending: true,
+            pricing_pending: true,
+          },
+        },
+      }),
+    });
 
-    renderScreen();
+    expect(await screen.findByText("Pricing Pending Review")).toBeInTheDocument();
+    expect(screen.getByText("Notes Pending Review")).toBeInTheDocument();
+  });
 
-    expect(await screen.findByText(/price for item 2 was not mentioned/i)).toBeInTheDocument();
+  it("shows the high-severity review marker when extraction is degraded with no line items", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_tier: "degraded",
+        extraction_degraded_reason_code: null,
+        line_items: [],
+      }),
+    });
 
-    fireEvent.click(screen.getByRole("radio", { name: /invoice/i }));
+    expect(await screen.findByText("Review Required")).toBeInTheDocument();
+    expect(screen.getByText("No line items were found from this capture. Review capture details before continuing.")).toBeInTheDocument();
+  });
 
-    expect(screen.getByText(/price for item 2 was not mentioned/i)).toBeInTheDocument();
+  it("shows the degraded-specific high-severity marker copy when a degraded reason code is present", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_tier: "degraded",
+        extraction_degraded_reason_code: "no_line_items_from_substantial_capture",
+        line_items: [],
+      }),
+    });
+
+    expect(await screen.findByText("Review Required")).toBeInTheDocument();
+    expect(screen.getByText("Extraction degraded and no line items were found. Review capture details before continuing.")).toBeInTheDocument();
+  });
+
+  it("gates Continue with a review modal only when visible review markers remain", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          review_state: {
+            notes_pending: true,
+            pricing_pending: false,
+          },
+        },
+      }),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
+
+    expect(screen.getByRole("dialog", { name: /review pending extraction markers/i })).toBeInTheDocument();
+    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Review now" }));
+    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue anyway" }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
+        doc_type: "quote",
+      }));
+    });
+  });
+
+  it("does not gate Continue when only hidden Capture Details items exist", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          review_state: {
+            notes_pending: false,
+            pricing_pending: false,
+          },
+          hidden_details: {
+            unresolved_segments: [
+              {
+                id: "unresolved-1",
+                raw_text: "maybe add edging",
+                confidence: "low",
+                source: "leftover_classification",
+              },
+            ],
+            append_suggestions: [],
+            confidence_notes: [],
+          },
+        },
+      }),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
+
+    expect(screen.queryByRole("dialog", { name: /review pending extraction markers/i })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
+        doc_type: "quote",
+      }));
+    });
+  });
+
+  it("does not show the capture-details alert icon for transcript-only details", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          hidden_details: {
+            unresolved_segments: [],
+            append_suggestions: [],
+            confidence_notes: [],
+          },
+        },
+      }),
+    });
+    expect(await screen.findByRole("button", { name: /capture details/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Capture details need review")).not.toBeInTheDocument();
+  });
+
+  it("shows the capture-details alert icon when hidden actionable items exist", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          hidden_details: {
+            unresolved_segments: [],
+            append_suggestions: [
+              {
+                id: "append-1",
+                kind: "note",
+                raw_text: "Add gate latch note",
+                confidence: "low",
+                source: "append_capture",
+              },
+            ],
+            confidence_notes: [],
+          },
+        },
+      }),
+    });
+    expect(await screen.findByLabelText("Capture details need review")).toBeInTheDocument();
+  });
+
+  it("renders Capture Details sections in the required order", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          hidden_details: {
+            append_suggestions: [
+              {
+                id: "append-1",
+                kind: "pricing",
+                raw_text: "discount 25",
+                confidence: "low",
+                source: "append_capture",
+                pricing_field: "discount",
+              },
+            ],
+            unresolved_segments: [
+              {
+                id: "unresolved-1",
+                raw_text: "trim rose bed maybe",
+                confidence: "low",
+                source: "typed_conflict",
+              },
+            ],
+            confidence_notes: ["Check driveway edging scope."],
+          },
+        },
+        transcript: "Original capture transcript text.",
+      }),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /capture details/i }));
+
+    const section1 = await screen.findByText("New Suggestions From Latest Capture");
+    const section2 = screen.getByText("Unresolved Capture Details");
+    const section3 = screen.getByText("AI Review Notes");
+    const section4 = screen.getByText("Transcript");
+
+    expect(section1.compareDocumentPosition(section2)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(section2.compareDocumentPosition(section3)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(section3.compareDocumentPosition(section4)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getByText("Original capture transcript text.")).toBeInTheDocument();
   });
 
   it("locks type selector after sharing", async () => {

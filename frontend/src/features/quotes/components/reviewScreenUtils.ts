@@ -72,7 +72,6 @@ export function mapExtractedLineItems(extraction: ExtractionResult): LineItemDra
 }
 
 export function getReviewMessages(draft: QuoteDraft): string[] {
-  const flaggedReasonSet = new Set<string>();
   const flaggedMessages = draft.lineItems.flatMap((lineItem, index) => {
     if (!lineItem.flagged) {
       return [];
@@ -80,14 +79,10 @@ export function getReviewMessages(draft: QuoteDraft): string[] {
 
     const lineItemLabel = lineItem.description.trim() || `Line item ${index + 1}`;
     const reason = lineItem.flagReason?.trim() || "Needs manual review before generating the quote.";
-    flaggedReasonSet.add(reason.toLowerCase());
     return [`${lineItemLabel}: ${reason}`];
   });
-  const confidenceMessages = draft.confidenceNotes
-    .map((note) => note.trim())
-    .filter((note) => note.length > 0 && !flaggedReasonSet.has(note.toLowerCase()));
 
-  return [...new Set([...confidenceMessages, ...flaggedMessages])];
+  return [...new Set(flaggedMessages)];
 }
 
 export function getWarningMessages(

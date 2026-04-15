@@ -17,7 +17,6 @@ export interface QuoteDraft {
   discountType: DiscountType | null;
   discountValue: number | null;
   depositAmount: number | null;
-  confidenceNotes: string[];
   notes: string;
   sourceType: QuoteSourceType;
 }
@@ -59,7 +58,6 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
       discountType,
       discountValue,
       depositAmount,
-      confidenceNotes,
       notes,
       sourceType,
     } = parsed;
@@ -71,7 +69,6 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
       (title !== undefined && typeof title !== "string") ||
       typeof transcript !== "string" ||
       !Array.isArray(lineItems) ||
-      !Array.isArray(confidenceNotes) ||
       typeof notes !== "string"
     ) {
       return null;
@@ -113,9 +110,6 @@ function parseStoredDraft(raw: string | null): QuoteDraft | null {
       discountType: discountType === "fixed" || discountType === "percent" ? discountType : null,
       discountValue: typeof discountValue === "number" ? discountValue : null,
       depositAmount: typeof depositAmount === "number" ? depositAmount : null,
-      confidenceNotes: confidenceNotes.filter(
-        (entry): entry is string => typeof entry === "string",
-      ),
       notes,
       sourceType: parsedSourceType,
     };

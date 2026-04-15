@@ -1,17 +1,36 @@
 import { useState } from "react";
 
+import { CaptureDetailsSheet } from "@/features/quotes/components/CaptureDetailsSheet";
 import { ReviewCustomerRow } from "@/features/quotes/components/ReviewCustomerRow";
 import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewLineItemsSection } from "@/features/quotes/components/ReviewLineItemsSection";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
-import { AIConfidenceBanner } from "@/shared/components/AIConfidenceBanner";
+import type { ExtractionReviewHiddenDetails, ExtractionTier } from "@/features/quotes/types/quote.types";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   DOCUMENT_NOTES_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
 
+interface ReviewPendingMarkerProps {
+  title: string;
+  message: string;
+}
+
+function ReviewPendingMarker({ title, message }: ReviewPendingMarkerProps): React.ReactElement {
+  return (
+    <section className="ghost-shadow rounded-lg border-l-4 border-warning-accent bg-warning-container p-4">
+      <div className="flex items-start gap-3">
+        <span className="material-symbols-outlined text-warning">error</span>
+        <div>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-wider text-warning">{title}</p>
+          <p className="text-sm font-medium leading-snug text-warning">{message}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 interface ReviewFormContentProps {
-  id: string;
   customerName: string | null;
   draft: {
     title: string;
@@ -34,15 +53,17 @@ interface ReviewFormContentProps {
   requiresCustomerAssignment: boolean;
   canReassignCustomer: boolean;
   isInteractionLocked: boolean;
-  hasVisibleConfidenceNotes: boolean;
-  confidenceNotes: string[];
+  notesReviewPending: boolean;
+  pricingReviewPending: boolean;
+  extractionTier: ExtractionTier | null;
+  extractionDegradedReasonCode: string | null;
+  hiddenDetails?: ExtractionReviewHiddenDetails;
   lineItemSum: number;
   suggestedTaxRate: number | null;
   onDocumentTypeChange: (nextType: ReviewDocumentType) => void;
   onDueDateChange: (nextDueDate: string) => void;
   onRequestAssignment: () => void;
   onAddVoiceNote: () => void;
-  onDismissConfidence: (noteIndex: number) => void;
   onTitleChange: (nextTitle: string) => void;
   onEditLineItem: (lineItemIndex: number) => void;
   onAddLineItem: () => void;
@@ -55,7 +76,6 @@ interface ReviewFormContentProps {
 }
 
 export function ReviewFormContent({
-  id,
   customerName,
   draft,
   documentType,
@@ -67,15 +87,17 @@ export function ReviewFormContent({
   requiresCustomerAssignment,
   canReassignCustomer,
   isInteractionLocked,
-  hasVisibleConfidenceNotes,
-  confidenceNotes,
+  notesReviewPending,
+  pricingReviewPending,
+  extractionTier,
+  extractionDegradedReasonCode,
+  hiddenDetails,
   lineItemSum,
   suggestedTaxRate,
   onDocumentTypeChange,
   onDueDateChange,
   onRequestAssignment,
   onAddVoiceNote,
-  onDismissConfidence,
   onTitleChange,
   onEditLineItem,
   onAddLineItem,
@@ -86,9 +108,17 @@ export function ReviewFormContent({
   onDepositAmountChange,
   onNotesChange,
 }: ReviewFormContentProps): React.ReactElement {
-  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+  const [isCaptureDetailsOpen, setIsCaptureDetailsOpen] = useState(false);
   const showDueDateField = documentType === "invoice";
   const showQuoteOnlySections = documentType === "quote";
+  const showSevereDegradedMarker = extractionTier === "degraded"
+    && draft.lineItems.length === 0;
+  const hasHiddenActionableItems = Boolean(
+    hiddenDetails
+      && (hiddenDetails.append_suggestions.length > 0
+        || hiddenDetails.unresolved_segments.length > 0
+        || hiddenDetails.confidence_notes.length > 0),
+  );
 
   return (
     <form
@@ -108,6 +138,15 @@ export function ReviewFormContent({
 
       {saveError ? (
         <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
+      ) : null}
+
+      {showSevereDegradedMarker ? (
+        <ReviewPendingMarker
+          title="Review Required"
+          message={extractionDegradedReasonCode
+            ? "Extraction degraded and no line items were found. Review capture details before continuing."
+            : "No line items were found from this capture. Review capture details before continuing."}
+        />
       ) : null}
 
       <section className="space-y-2">
@@ -167,37 +206,42 @@ export function ReviewFormContent({
         <section className="space-y-2">
           <button
             type="button"
-            aria-expanded={isTranscriptExpanded}
-            aria-controls="quote-review-transcript-panel"
-            className="inline-flex cursor-pointer items-center gap-1.5 py-1 text-left text-[0.6875rem] font-bold uppercase tracking-widest text-outline transition-colors hover:text-on-surface-variant"
-            onClick={() => setIsTranscriptExpanded((current) => !current)}
+            className="inline-flex w-full cursor-pointer items-center justify-between rounded-lg border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-colors hover:bg-surface-container-lowest"
+            onClick={() => setIsCaptureDetailsOpen(true)}
           >
-            <span>Transcript Notes</span>
-            <span className="material-symbols-outlined text-[1rem] leading-none text-outline">
-              {isTranscriptExpanded ? "expand_more" : "chevron_right"}
-            </span>
-          </button>
-          {isTranscriptExpanded ? (
-            <div
-              id="quote-review-transcript-panel"
-              className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm leading-6 text-on-surface whitespace-pre-wrap"
-            >
-              {draft.transcript?.trim().length ? draft.transcript : "No transcript notes captured."}
+            <div>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Capture Details</p>
+              <p className="text-sm text-on-surface-variant">
+                Suggestions, unresolved details, AI review notes, and transcript.
+              </p>
             </div>
-          ) : null}
+            <div className="inline-flex items-center gap-1.5">
+              {hasHiddenActionableItems ? (
+                <span
+                  aria-label="Capture details need review"
+                  className="material-symbols-outlined text-[1.125rem] leading-none text-warning"
+                >
+                  error
+                </span>
+              ) : null}
+              <span className="material-symbols-outlined text-[1rem] leading-none text-outline">chevron_right</span>
+            </div>
+          </button>
         </section>
       ) : null}
 
-      {hasVisibleConfidenceNotes ? (
-        <div className="space-y-2">
-          {confidenceNotes.map((note, index) => (
-            <AIConfidenceBanner
-              key={`review-confidence-note-${id}-${index}`}
-              message={note}
-              onDismiss={() => onDismissConfidence(index)}
-            />
-          ))}
-        </div>
+      {pricingReviewPending ? (
+        <ReviewPendingMarker
+          title="Pricing Pending Review"
+          message="Pricing fields were seeded from capture details. Review totals, tax, discount, and deposit."
+        />
+      ) : null}
+
+      {notesReviewPending ? (
+        <ReviewPendingMarker
+          title="Notes Pending Review"
+          message="Notes were seeded from capture details. Review and adjust before continuing."
+        />
       ) : null}
 
       <ReviewLineItemsSection
@@ -243,6 +287,15 @@ export function ReviewFormContent({
           placeholder="Any notes to include for the customer."
         />
       </section>
+
+      {showQuoteOnlySections ? (
+        <CaptureDetailsSheet
+          open={isCaptureDetailsOpen}
+          onClose={() => setIsCaptureDetailsOpen(false)}
+          transcript={draft.transcript ?? ""}
+          hiddenDetails={hiddenDetails}
+        />
+      ) : null}
     </form>
   );
 }

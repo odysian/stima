@@ -24,7 +24,6 @@ const draftFixture: QuoteDraft = {
   discountType: null,
   discountValue: null,
   depositAmount: null,
-  confidenceNotes: [],
   notes: "Thanks for your business",
   sourceType: "text",
 };
@@ -149,7 +148,6 @@ describe("useQuoteDraft", () => {
       transcript: draftFixture.transcript,
       lineItems: [{ description: "Brown mulch", details: "5 yards", price: 120 }],
       total: draftFixture.total,
-      confidenceNotes: draftFixture.confidenceNotes,
       notes: draftFixture.notes,
       sourceType: draftFixture.sourceType,
     };
