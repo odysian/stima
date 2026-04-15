@@ -16,7 +16,7 @@ from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, QuoteStatus
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.features.quotes.tests import test_quotes as quotes_test_module
 from app.features.quotes.tests.support.helpers import (
@@ -279,7 +279,12 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
             "kwargs": {
                 "_job_id": str(jobs[0].id),
                 "correlation_id": response_correlation_id,
-                "transcript": "mulch the front beds",
+                "prepared_capture_input": {
+                    "transcript": "mulch the front beds",
+                    "source_type": "text",
+                    "raw_typed_notes": "mulch the front beds",
+                    "raw_transcript": None,
+                },
                 "source_type": "text",
                 "capture_detail": "notes",
                 "customer_id": None,
@@ -743,11 +748,11 @@ async def test_convert_notes_rejects_when_concurrency_limit_is_exhausted(
             self.started = asyncio.Event()
             self.release = asyncio.Event()
 
-        async def extract(self, notes: str) -> ExtractionResult:
+        async def extract(self, notes: PreparedCaptureInput) -> ExtractionResult:
             self.started.set()
             await self.release.wait()
             return ExtractionResult(
-                transcript=notes,
+                transcript=notes.transcript,
                 line_items=[],
                 total=None,
                 confidence_notes=[],

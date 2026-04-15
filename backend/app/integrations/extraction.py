@@ -15,7 +15,15 @@ import anthropic
 from anthropic import AsyncAnthropic
 from pydantic import ValidationError
 
-from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
+from app.features.quotes.schemas import (
+    CaptureSegment,
+    CaptureSegmentHints,
+    ExtractionResult,
+    ExtractionResultV2,
+    LineItemExtractedV2,
+    PreparedCaptureInput,
+    PricingHints,
+)
 from app.shared.extraction_logger import log_extraction_trace
 from app.shared.input_limits import (
     CONFIDENCE_NOTE_MAX_CHARS,
@@ -33,12 +41,17 @@ EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "transcript": {"type": "string", "maxLength": EXTRACTION_TRANSCRIPT_MAX_CHARS},
+        "pipeline_version": {"type": "string", "enum": ["v2"]},
         "line_items": {
             "type": "array",
             "maxItems": DOCUMENT_LINE_ITEMS_MAX_ITEMS,
             "items": {
                 "type": "object",
                 "properties": {
+                    "raw_text": {
+                        "type": "string",
+                        "maxLength": EXTRACTION_TRANSCRIPT_MAX_CHARS,
+                    },
                     "description": {
                         "type": "string",
                         "maxLength": LINE_ITEM_DESCRIPTION_MAX_CHARS,
@@ -50,12 +63,66 @@ EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
                     "price": {"type": ["number", "null"]},
                     "flagged": {"type": "boolean"},
                     "flag_reason": {"type": ["string", "null"]},
+                    "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
                 },
-                "required": ["description"],
+                "required": ["raw_text", "description", "confidence"],
                 "additionalProperties": False,
             },
         },
-        "total": {"type": ["number", "null"]},
+        "pricing_hints": {
+            "type": "object",
+            "properties": {
+                "explicit_total": {"type": ["number", "null"]},
+                "deposit_amount": {"type": ["number", "null"]},
+                "tax_rate": {"type": ["number", "null"]},
+                "discount_type": {"type": ["string", "null"], "enum": ["fixed", "percent", None]},
+                "discount_value": {"type": ["number", "null"]},
+            },
+            "additionalProperties": False,
+        },
+        "customer_notes_suggestion": {
+            "type": ["object", "null"],
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "maxLength": LINE_ITEM_DETAILS_MAX_CHARS,
+                },
+                "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                "source": {
+                    "type": "string",
+                    "enum": [
+                        "leftover_classification",
+                        "typed_conflict",
+                        "transcript_conflict",
+                    ],
+                },
+            },
+            "required": ["text", "confidence", "source"],
+            "additionalProperties": False,
+        },
+        "unresolved_segments": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "raw_text": {
+                        "type": "string",
+                        "maxLength": EXTRACTION_TRANSCRIPT_MAX_CHARS,
+                    },
+                    "confidence": {"type": "string", "enum": ["medium", "low"]},
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "leftover_classification",
+                            "typed_conflict",
+                            "transcript_conflict",
+                        ],
+                    },
+                },
+                "required": ["raw_text", "confidence", "source"],
+                "additionalProperties": False,
+            },
+        },
         "confidence_notes": {
             "type": "array",
             "maxItems": CONFIDENCE_NOTES_MAX_ITEMS,
@@ -65,13 +132,23 @@ EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
             },
         },
     },
-    "required": ["transcript", "line_items", "confidence_notes"],
+    "required": [
+        "transcript",
+        "pipeline_version",
+        "line_items",
+        "pricing_hints",
+        "customer_notes_suggestion",
+        "unresolved_segments",
+        "confidence_notes",
+    ],
     "additionalProperties": False,
 }
 
 EXTRACTION_SYSTEM_PROMPT = (
-    "Extract quote line items and totals from contractor notes. "
-    "Do not invent pricing. Use null for missing prices and totals. "
+    "Extract quote line items, pricing hints, and unresolved capture details from structured "
+    "capture input. "
+    "Do not invent pricing. Use null for missing values and keep confidence_notes sparse "
+    "and operator-relevant. "
     "Set line-item flagged=true only for strong review signals: likely audio mishears, "
     "clearly implausible single-item prices, or critically ambiguous quantity/unit phrasing. "
     "When flagged=true, include a short flag_reason. Keep flagged false otherwise. "
@@ -99,13 +176,18 @@ _SEMANTIC_NOTE_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT = (
     "No line items were extracted from a substantial transcript; manual review is required."
 )
 _SEMANTIC_NOTE_TOTAL_WITHOUT_PRICED_ITEMS = (
-    "Total was extracted without any priced line items; review pricing details."
+    "Explicit total was extracted without any priced line items; review pricing details."
 )
 _SEMANTIC_NOTE_DUPLICATE_LINE_ITEMS = (
     "Duplicate extracted line items were detected and flagged for review."
 )
 _SEMANTIC_FLAG_REASON_DUPLICATE_LINE_ITEM = "Possible duplicate line item from extraction output"
 _WHITESPACE_PATTERN = re.compile(r"\s+")
+_BLANK_LINE_SPLIT_PATTERN = re.compile(r"\n\s*\n+")
+_BULLET_PREFIX_PATTERN = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+_HEADING_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9 /\-]{0,40}:\s*$")
+_NOTES_HEADING_PATTERN = re.compile(r"^\s*notes?\s*:\s*$", re.IGNORECASE)
+_PRICE_PATTERN = re.compile(r"\$?\s*(\d+(?:\.\d{1,2})?)")
 
 _RETRY_BASE_DELAY_SECONDS = 0.25
 _RETRY_MAX_DELAY_SECONDS = 2.0
@@ -171,11 +253,9 @@ class ExtractionIntegration:
         )
         self._client = client
 
-    async def extract(self, notes: str) -> ExtractionResult:
-        """Call Claude structured output and validate the response contract."""
-        normalized_notes = notes.strip()
-        if not normalized_notes:
-            raise ExtractionError("notes cannot be empty")
+    async def extract(self, capture_input: PreparedCaptureInput | str) -> ExtractionResult:
+        """Call Claude structured output and validate the V2 contract."""
+        prepared_input = _coerce_prepared_capture_input(capture_input)
         _set_last_call_metadata(
             model_id=self._primary_model,
             token_usage=None,
@@ -203,7 +283,7 @@ class ExtractionIntegration:
             try:
                 return await self._extract_for_tier(
                     typed_client,
-                    normalized_notes,
+                    prepared_input,
                     tier=tier,
                 )
             except ExtractionError as exc:
@@ -264,18 +344,19 @@ class ExtractionIntegration:
     async def _extract_for_tier(
         self,
         typed_client: Any,
-        normalized_notes: str,
+        prepared_input: PreparedCaptureInput,
         *,
         tier: _ExtractionTierConfig,
     ) -> ExtractionResult:
+        request_content = _build_extraction_request(prepared_input)
         log_extraction_trace(
             _TRACE_EVENT_NAME,
             stage=tier.tier,
             outcome="started",
             extraction_model_id=tier.model_id,
             extraction_prompt_variant=tier.prompt_variant,
-            transcript_chars=len(normalized_notes),
-            raw_transcript=normalized_notes,
+            transcript_chars=len(prepared_input.transcript),
+            raw_transcript=prepared_input.transcript,
         )
         _set_last_call_metadata(
             model_id=tier.model_id,
@@ -286,7 +367,7 @@ class ExtractionIntegration:
 
         response = await self._request_with_retry(
             typed_client,
-            normalized_notes,
+            request_content,
             model_id=tier.model_id,
             invocation_tier=tier.tier,
             prompt_variant=tier.prompt_variant,
@@ -304,9 +385,14 @@ class ExtractionIntegration:
         )
 
         payload = _extract_tool_payload(response)
-        payload.setdefault("transcript", normalized_notes)
+        payload.setdefault("transcript", prepared_input.transcript)
+        payload.setdefault("pipeline_version", "v2")
         payload.setdefault("line_items", [])
+        payload.setdefault("pricing_hints", {})
+        payload.setdefault("customer_notes_suggestion", None)
+        payload.setdefault("unresolved_segments", [])
         payload.setdefault("confidence_notes", [])
+        payload["line_items"] = _normalize_line_item_payloads(payload.get("line_items"))
         log_extraction_trace(
             _TRACE_EVENT_NAME,
             stage=tier.tier,
@@ -317,14 +403,18 @@ class ExtractionIntegration:
             token_output_tokens=_token_usage_value(response_token_usage, "output_tokens"),
             line_item_count=_list_count(payload.get("line_items")),
             confidence_note_count=_list_count(payload.get("confidence_notes")),
-            total_present=payload.get("total") is not None if "total" in payload else None,
-            raw_transcript=normalized_notes,
+            total_present=(
+                _pricing_hints_payload(payload.get("pricing_hints")).get("explicit_total")
+                is not None
+            ),
+            raw_transcript=prepared_input.transcript,
             raw_tool_payload=payload,
         )
 
         try:
-            validated_result = ExtractionResult.model_validate(payload)
-            result = _apply_semantic_guard_rules(validated_result)
+            validated_result_v2 = ExtractionResultV2.model_validate(payload)
+            guarded_result_v2 = _apply_semantic_guard_rules(validated_result_v2)
+            result = guarded_result_v2.to_v1_result()
             _log_result_trace(
                 result=result,
                 invocation_tier=tier.tier,
@@ -346,14 +436,14 @@ class ExtractionIntegration:
                 extraction_model_id=response_model_id,
                 extraction_prompt_variant=repair_prompt_variant,
                 validation_error_count=len(validation_errors),
-                raw_transcript=normalized_notes,
+                raw_transcript=prepared_input.transcript,
                 raw_tool_payload=payload,
             )
             try:
                 repair_response = await self._request_with_retry(
                     typed_client,
                     _build_repair_request(
-                        notes=normalized_notes,
+                        notes=request_content,
                         invalid_payload=payload,
                         validation_errors=validation_errors,
                     ),
@@ -387,11 +477,18 @@ class ExtractionIntegration:
             repair_usage = _extract_token_usage(repair_response)
             repair_model_id = getattr(repair_response, "model", None) or tier.model_id
             repair_payload = _extract_tool_payload(repair_response)
-            repair_payload.setdefault("transcript", normalized_notes)
+            repair_payload.setdefault("transcript", prepared_input.transcript)
+            repair_payload.setdefault("pipeline_version", "v2")
             repair_payload.setdefault("line_items", [])
+            repair_payload.setdefault("pricing_hints", {})
+            repair_payload.setdefault("customer_notes_suggestion", None)
+            repair_payload.setdefault("unresolved_segments", [])
             repair_payload.setdefault("confidence_notes", [])
+            repair_payload["line_items"] = _normalize_line_item_payloads(
+                repair_payload.get("line_items")
+            )
             try:
-                repaired_result = ExtractionResult.model_validate(repair_payload)
+                repaired_result_v2 = ExtractionResultV2.model_validate(repair_payload)
             except ValidationError:
                 _set_last_call_metadata(
                     model_id=repair_model_id,
@@ -414,11 +511,11 @@ class ExtractionIntegration:
                     reason="repair_invalid",
                     token_input_tokens=_token_usage_value(repair_usage, "input_tokens"),
                     token_output_tokens=_token_usage_value(repair_usage, "output_tokens"),
-                    raw_transcript=normalized_notes,
+                    raw_transcript=prepared_input.transcript,
                     raw_tool_payload=repair_payload,
                 )
                 degraded_result = _build_validation_repair_failed_result(
-                    transcript=normalized_notes
+                    transcript=prepared_input.transcript
                 )
                 _log_result_trace(
                     result=degraded_result,
@@ -449,12 +546,16 @@ class ExtractionIntegration:
                 line_item_count=_list_count(repair_payload.get("line_items")),
                 confidence_note_count=_list_count(repair_payload.get("confidence_notes")),
                 total_present=(
-                    repair_payload.get("total") is not None if "total" in repair_payload else None
+                    _pricing_hints_payload(repair_payload.get("pricing_hints")).get(
+                        "explicit_total"
+                    )
+                    is not None
                 ),
-                raw_transcript=normalized_notes,
+                raw_transcript=prepared_input.transcript,
                 raw_tool_payload=repair_payload,
             )
-            result = _apply_semantic_guard_rules(repaired_result)
+            guarded_result_v2 = _apply_semantic_guard_rules(repaired_result_v2)
+            result = guarded_result_v2.to_v1_result()
             _log_result_trace(
                 result=result,
                 invocation_tier=tier.tier,
@@ -491,8 +592,8 @@ class ExtractionIntegration:
                         {
                             "name": EXTRACTION_TOOL_NAME,
                             "description": (
-                                "Extract quote line items, optional per-item pricing, "
-                                "optional total, and confidence notes."
+                                "Extract quote line items, pricing hints, unresolved segments, "
+                                "optional customer-notes suggestion, and sparse confidence notes."
                             ),
                             "input_schema": EXTRACTION_TOOL_SCHEMA,
                         }
@@ -565,6 +666,139 @@ def _extract_tool_payload(response: object) -> dict[str, Any]:
             return dict(tool_input)
 
     raise ExtractionError("Claude response missing structured tool output")
+
+
+def _coerce_prepared_capture_input(
+    capture_input: PreparedCaptureInput | str,
+) -> PreparedCaptureInput:
+    if isinstance(capture_input, PreparedCaptureInput):
+        return capture_input
+    normalized_text = capture_input.strip()
+    if not normalized_text:
+        raise ExtractionError("notes cannot be empty")
+    return PreparedCaptureInput.from_legacy_transcript(
+        transcript=normalized_text,
+        source_type="text",
+    )
+
+
+def _build_extraction_request(prepared_input: PreparedCaptureInput) -> str:
+    segments = _segment_capture_input(prepared_input.transcript)
+    request_payload = {
+        "prepared_capture_input": prepared_input.model_dump(mode="json"),
+        "capture_segments": [segment.model_dump(mode="json") for segment in segments],
+        "instructions": {
+            "line_item_description_rule": (
+                "Use short customer-facing labels; move remainder to details."
+            ),
+            "pricing_rule": (
+                "Do not invent pricing. Use pricing_hints for explicit pricing directives only."
+            ),
+            "confidence_notes_rule": "Only include sparse, operator-relevant review notes.",
+        },
+    }
+    return json.dumps(request_payload, ensure_ascii=True, separators=(",", ":"))
+
+
+def _segment_capture_input(transcript: str) -> list[CaptureSegment]:
+    stripped = transcript.strip()
+    if not stripped:
+        return []
+
+    chunks: list[str] = []
+    for block in _BLANK_LINE_SPLIT_PATTERN.split(stripped):
+        block_text = block.strip()
+        if not block_text:
+            continue
+        lines = [line.strip() for line in block_text.splitlines() if line.strip()]
+        if not lines:
+            continue
+        if len(lines) == 1:
+            chunks.append(lines[0])
+            continue
+        for line in lines:
+            if _BULLET_PREFIX_PATTERN.match(line):
+                chunks.append(line)
+            elif _HEADING_PATTERN.match(line):
+                chunks.append(line)
+            else:
+                chunks.append(line)
+
+    segments: list[CaptureSegment] = []
+    for index, raw_text in enumerate(chunks):
+        normalized_text = _normalize_segment_text(raw_text)
+        hints = _build_segment_hints(raw_text=raw_text, normalized_text=normalized_text)
+        segments.append(
+            CaptureSegment(
+                index=index,
+                raw_text=raw_text,
+                normalized_text=normalized_text,
+                hints=hints,
+            )
+        )
+    return segments
+
+
+def _normalize_segment_text(text: str) -> str:
+    normalized = _WHITESPACE_PATTERN.sub(" ", text.strip())
+    normalized = re.sub(r"\bw/\b", "with", normalized, flags=re.IGNORECASE)
+    normalized = normalized.replace("+", " and ")
+    return _WHITESPACE_PATTERN.sub(" ", normalized).strip()
+
+
+def _build_segment_hints(*, raw_text: str, normalized_text: str) -> CaptureSegmentHints:
+    explicit_price_match = _PRICE_PATTERN.search(raw_text)
+    price_value = (
+        _parse_price_value(explicit_price_match.group(1)) if explicit_price_match else None
+    )
+    looks_like_heading = _HEADING_PATTERN.match(raw_text) is not None
+    looks_like_notes_heading = _NOTES_HEADING_PATTERN.match(raw_text) is not None
+    looks_like_line_item = _BULLET_PREFIX_PATTERN.match(raw_text) is not None or (
+        price_value is not None and not looks_like_heading
+    )
+    return CaptureSegmentHints(
+        has_explicit_price=price_value is not None,
+        price_value=price_value,
+        looks_like_heading=looks_like_heading,
+        looks_like_notes_heading=looks_like_notes_heading,
+        looks_like_line_item=looks_like_line_item,
+    )
+
+
+def _parse_price_value(candidate: str) -> float | None:
+    try:
+        return float(candidate)
+    except ValueError:
+        return None
+
+
+def _normalize_line_item_payloads(value: object) -> object:
+    if not isinstance(value, list):
+        return value
+
+    normalized_items: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        normalized_item = dict(item)
+        description = normalized_item.get("description")
+        normalized_item.setdefault(
+            "raw_text",
+            (
+                description
+                if isinstance(description, str) and description.strip()
+                else "Unspecified item"
+            ),
+        )
+        normalized_item.setdefault("confidence", "medium")
+        normalized_items.append(normalized_item)
+    return normalized_items
+
+
+def _pricing_hints_payload(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return PricingHints().model_dump(mode="json")
 
 
 def _is_retryable_provider_error(exc: Exception) -> bool:
@@ -736,12 +970,12 @@ def _build_validation_repair_failed_result(*, transcript: str) -> ExtractionResu
     )
 
 
-def _apply_semantic_guard_rules(result: ExtractionResult) -> ExtractionResult:
+def _apply_semantic_guard_rules(result: ExtractionResultV2) -> ExtractionResultV2:
     """Apply incident-informed semantic checks after schema validation succeeds.
 
     Rule outcomes are intentionally constrained:
     - Empty line items + substantial transcript -> degraded (allowlisted structural failure).
-    - Total without priced line items -> warning note only (tier remains primary).
+    - Explicit total without priced line items -> warning note only (tier remains primary).
     - Duplicate extracted line items -> line-level flags + warning note only.
     """
 
@@ -761,6 +995,8 @@ def _apply_semantic_guard_rules(result: ExtractionResult) -> ExtractionResult:
     if _should_warn_for_total_without_priced_items(result):
         _append_semantic_note(confidence_notes, _SEMANTIC_NOTE_TOTAL_WITHOUT_PRICED_ITEMS)
 
+    line_items = _flag_line_items_with_price_in_description(line_items, confidence_notes)
+    line_items = _flag_line_items_with_duplicate_details(line_items, confidence_notes)
     line_items = _apply_duplicate_line_item_flags(line_items, confidence_notes)
 
     return result.model_copy(
@@ -774,7 +1010,7 @@ def _apply_semantic_guard_rules(result: ExtractionResult) -> ExtractionResult:
 
 
 def _should_degrade_for_empty_line_items_with_substantial_transcript(
-    result: ExtractionResult,
+    result: ExtractionResultV2,
 ) -> bool:
     if result.extraction_tier == "degraded" or result.line_items:
         return False
@@ -784,18 +1020,18 @@ def _should_degrade_for_empty_line_items_with_substantial_transcript(
     return len(normalized_transcript.split()) >= _SEMANTIC_EMPTY_LINE_ITEMS_MIN_WORDS
 
 
-def _should_warn_for_total_without_priced_items(result: ExtractionResult) -> bool:
+def _should_warn_for_total_without_priced_items(result: ExtractionResultV2) -> bool:
     return (
-        result.total is not None
+        result.pricing_hints.explicit_total is not None
         and bool(result.line_items)
         and not any(item.price is not None for item in result.line_items)
     )
 
 
 def _apply_duplicate_line_item_flags(
-    line_items: list[LineItemExtracted],
+    line_items: list[LineItemExtractedV2],
     confidence_notes: list[str],
-) -> list[LineItemExtracted]:
+) -> list[LineItemExtractedV2]:
     duplicate_groups: dict[tuple[str, float | None], list[int]] = {}
     for index, item in enumerate(line_items):
         normalized_description = _normalize_line_item_description(item.description)
@@ -823,6 +1059,62 @@ def _apply_duplicate_line_item_flags(
     return updated_items
 
 
+def _flag_line_items_with_price_in_description(
+    line_items: list[LineItemExtractedV2],
+    confidence_notes: list[str],
+) -> list[LineItemExtractedV2]:
+    flagged_indexes = [
+        index for index, item in enumerate(line_items) if _contains_price_token(item.description)
+    ]
+    if not flagged_indexes:
+        return line_items
+
+    _append_semantic_note(
+        confidence_notes,
+        "Line-item descriptions should not include price tokens; review flagged items.",
+    )
+    updated_items = list(line_items)
+    for index in flagged_indexes:
+        current = updated_items[index]
+        updated_items[index] = current.model_copy(
+            update={
+                "flagged": True,
+                "flag_reason": current.flag_reason or "Description includes price tokens",
+            }
+        )
+    return updated_items
+
+
+def _flag_line_items_with_duplicate_details(
+    line_items: list[LineItemExtractedV2],
+    confidence_notes: list[str],
+) -> list[LineItemExtractedV2]:
+    flagged_indexes = [
+        index
+        for index, item in enumerate(line_items)
+        if item.details is not None
+        and _normalize_line_item_description(item.details)
+        == _normalize_line_item_description(item.description)
+    ]
+    if not flagged_indexes:
+        return line_items
+
+    _append_semantic_note(
+        confidence_notes,
+        "Some line-item details duplicate the description; review flagged items.",
+    )
+    updated_items = list(line_items)
+    for index in flagged_indexes:
+        current = updated_items[index]
+        updated_items[index] = current.model_copy(
+            update={
+                "flagged": True,
+                "flag_reason": current.flag_reason or "Details duplicate description",
+            }
+        )
+    return updated_items
+
+
 def _normalize_line_item_description(value: str) -> str:
     collapsed_whitespace = _WHITESPACE_PATTERN.sub(" ", value.strip())
     return collapsed_whitespace.casefold()
@@ -834,3 +1126,7 @@ def _append_semantic_note(confidence_notes: list[str], note: str) -> None:
     if len(confidence_notes) >= CONFIDENCE_NOTES_MAX_ITEMS:
         return
     confidence_notes.append(note)
+
+
+def _contains_price_token(text: str) -> bool:
+    return _PRICE_PATTERN.search(text) is not None

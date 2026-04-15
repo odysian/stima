@@ -12,6 +12,7 @@ from typing import Any, Literal, cast
 from uuid import UUID
 
 from arq.worker import Retry, func
+from pydantic import ValidationError
 
 from app.core.config import get_settings
 from app.features.invoices.email_delivery_service import InvoiceEmailDeliveryService
@@ -26,7 +27,7 @@ from app.features.quotes.extraction_outcomes import (
     should_persist_degraded_retryable_error,
 )
 from app.features.quotes.repository import QuoteEmailContext, QuoteRepository
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.email import EmailService
 from app.integrations.extraction import (
@@ -81,14 +82,20 @@ async def extraction_job(
     job_id: str,
     *,
     correlation_id: str | None = None,
-    transcript: str,
+    transcript: str | None = None,
+    prepared_capture_input: dict[str, Any] | PreparedCaptureInput | None = None,
     source_type: str = "text",
     capture_detail: str | None = None,
     customer_id: str | None = None,
     append_to_quote: bool = False,
 ) -> None:
-    """Run durable quote extraction against the transcript prepared by the API."""
+    """Run durable quote extraction against prepared capture input."""
     parsed_job_id = UUID(job_id)
+    resolved_capture_input = _resolve_prepared_capture_input(
+        transcript=transcript,
+        prepared_capture_input=prepared_capture_input,
+        source_type=source_type,
+    )
     resolved_capture_detail = _resolve_worker_capture_detail(
         source_type=source_type,
         capture_detail=capture_detail,
@@ -100,7 +107,11 @@ async def extraction_job(
             job_type=JobType.EXTRACTION,
             job_name=EXTRACTION_JOB_NAME,
             correlation_id=correlation_id,
-            handler=lambda: _extract_quote_data(ctx, transcript, job_id=parsed_job_id),
+            handler=lambda: _extract_quote_data(
+                ctx,
+                resolved_capture_input,
+                job_id=parsed_job_id,
+            ),
             on_success=lambda runtime, result: _store_extraction_result(
                 runtime,
                 job_id=parsed_job_id,
@@ -226,7 +237,7 @@ async def _deliver_email(ctx: dict[str, Any], *, job_id: UUID) -> None:
 
 async def _extract_quote_data(
     ctx: dict[str, Any],
-    transcript: str,
+    prepared_capture_input: PreparedCaptureInput,
     *,
     job_id: UUID,
 ) -> ExtractionResult:
@@ -245,7 +256,7 @@ async def _extract_quote_data(
     )
 
     try:
-        result = await extraction_integration.extract(transcript)
+        result = await extraction_integration.extract(prepared_capture_input)
     except ExtractionError as exc:
         metadata = _pop_extraction_call_metadata(extraction_integration)
         resolved_last_model_id = _resolve_last_model_id(
@@ -277,13 +288,13 @@ async def _extract_quote_data(
                 metadata.repair_validation_error_count if metadata is not None else None
             ),
             error_class=_compact_error_class(exc),
-            transcript_sha256=_transcript_sha256(transcript),
+            transcript_sha256=_transcript_sha256(prepared_capture_input.transcript),
         )
         if should_persist_degraded_retryable_error(
             exc,
             is_final_attempt=is_final_attempt,
         ):
-            return build_degraded_extraction_result(transcript=transcript)
+            return build_degraded_extraction_result(transcript=prepared_capture_input.transcript)
         if is_retryable:
             raise RetryableJobError(str(exc)) from exc
         raise
@@ -314,7 +325,7 @@ async def _extract_quote_data(
             extraction_degraded_reason_code=result.extraction_degraded_reason_code,
             repair_validation_error_count=metadata.repair_validation_error_count,
             token_usage=metadata.token_usage,
-            transcript_sha256=_transcript_sha256(transcript),
+            transcript_sha256=_transcript_sha256(prepared_capture_input.transcript),
         )
     return result
 
@@ -496,6 +507,32 @@ def _resolve_worker_capture_detail(*, source_type: str, capture_detail: str | No
     if source_type == "voice":
         return "audio"
     return "notes"
+
+
+def _resolve_prepared_capture_input(
+    *,
+    transcript: str | None,
+    prepared_capture_input: dict[str, Any] | PreparedCaptureInput | None,
+    source_type: str,
+) -> PreparedCaptureInput:
+    if isinstance(prepared_capture_input, PreparedCaptureInput):
+        return prepared_capture_input
+    if isinstance(prepared_capture_input, dict):
+        try:
+            return PreparedCaptureInput.model_validate(prepared_capture_input)
+        except ValidationError as exc:
+            raise NonRetryableJobError("Extraction job prepared_capture_input is invalid") from exc
+
+    normalized_transcript = (transcript or "").strip()
+    if not normalized_transcript:
+        raise NonRetryableJobError(
+            "Extraction job requires transcript or prepared_capture_input payload"
+        )
+    prepared_source_type: Literal["text", "voice"] = "voice" if source_type == "voice" else "text"
+    return PreparedCaptureInput.from_legacy_transcript(
+        transcript=normalized_transcript,
+        source_type=prepared_source_type,
+    )
 
 
 async def _store_extraction_result(

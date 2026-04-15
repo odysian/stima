@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -11,6 +12,7 @@ import httpx
 import pytest
 
 import app.integrations.extraction as extraction_module
+from app.features.quotes.schemas import PreparedCaptureInput
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
 from app.integrations.extraction import (
     EXTRACTION_TOOL_SCHEMA,
@@ -113,7 +115,7 @@ async def test_extract_preserves_total_only_payload() -> None:
                                 "price": None,
                             }
                         ],
-                        "total": 2100,
+                        "pricing_hints": {"explicit_total": 2100},
                         "confidence_notes": [],
                     },
                 }
@@ -237,7 +239,7 @@ async def test_extract_attempts_one_repair_then_accepts_valid_repaired_payload()
                                     "price": 125,
                                 }
                             ],
-                            "total": 125,
+                            "pricing_hints": {"explicit_total": 125},
                             "confidence_notes": [],
                         },
                     }
@@ -611,7 +613,7 @@ async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> Non
                                 "price": None,
                             }
                         ],
-                        "total": 2100,
+                        "pricing_hints": {"explicit_total": 2100},
                         "confidence_notes": [],
                     },
                 }
@@ -625,7 +627,7 @@ async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> Non
     assert result.extraction_tier == "primary"
     assert result.extraction_degraded_reason_code is None
     assert any(
-        "Total was extracted without any priced line items" in note
+        "Explicit total was extracted without any priced line items" in note
         for note in result.confidence_notes
     )
 
@@ -674,6 +676,8 @@ async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
     assert line_item_schema["properties"]["flag_reason"] == {"type": ["string", "null"]}
     assert "flagged" not in line_item_schema["required"]
     assert "flag_reason" not in line_item_schema["required"]
+    assert "raw_text" in line_item_schema["required"]
+    assert "confidence" in line_item_schema["required"]
 
 
 @pytest.mark.parametrize("fixture_name", sorted(TRANSCRIPTS))
@@ -686,7 +690,17 @@ async def test_extract_exercises_all_transcript_fixtures(fixture_name: str) -> N
         assert messages
         last_message = messages[-1]
         assert isinstance(last_message, dict)
-        assert last_message["content"] == transcript
+        content = last_message["content"]
+        assert isinstance(content, str)
+        request_payload = json.loads(content)
+        prepared_capture_input = request_payload["prepared_capture_input"]
+        assert prepared_capture_input["transcript"] == transcript
+        assert prepared_capture_input["source_type"] == "text"
+        assert prepared_capture_input["raw_typed_notes"] == transcript
+        assert prepared_capture_input["raw_transcript"] is None
+        capture_segments = request_payload["capture_segments"]
+        assert capture_segments
+        assert capture_segments[0]["raw_text"]
         return _FakeResponse(
             content=[
                 {
@@ -767,7 +781,7 @@ async def test_extract_emits_trace_events_for_primary_repair_and_result_stages(
                                     "price": 125,
                                 }
                             ],
-                            "total": 125,
+                            "pricing_hints": {"explicit_total": 125},
                             "confidence_notes": [],
                         },
                     }
@@ -787,3 +801,50 @@ async def test_extract_emits_trace_events_for_primary_repair_and_result_stages(
     assert ("repair", "started") in {(call["stage"], call["outcome"]) for call in trace_calls}
     assert ("repair", "succeeded") in {(call["stage"], call["outcome"]) for call in trace_calls}
     assert ("result", "succeeded") in {(call["stage"], call["outcome"]) for call in trace_calls}
+
+
+async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> None:
+    prepared_capture_input = PreparedCaptureInput(
+        transcript="voice transcript text\n\ntyped note text",
+        source_type="voice+text",
+        raw_typed_notes="typed note text",
+        raw_transcript="voice transcript text",
+    )
+    captured_messages: list[str] = []
+
+    def _factory(kwargs: dict[str, object]) -> _FakeResponse:
+        messages = kwargs["messages"]
+        assert isinstance(messages, list)
+        assert messages
+        first_message = messages[0]
+        assert isinstance(first_message, dict)
+        content = first_message["content"]
+        assert isinstance(content, str)
+        captured_messages.append(content)
+        return _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": prepared_capture_input.transcript,
+                        "line_items": [],
+                        "confidence_notes": [],
+                    },
+                }
+            ]
+        )
+
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="test-model",
+        client=_FakeClient(_factory),
+    )
+
+    result = await integration.extract(prepared_capture_input)
+
+    assert result.transcript == prepared_capture_input.transcript
+    assert captured_messages
+    request_payload = json.loads(captured_messages[0])
+    assert request_payload["prepared_capture_input"]["source_type"] == "voice+text"
+    assert request_payload["prepared_capture_input"]["raw_typed_notes"] == "typed note text"
+    assert request_payload["prepared_capture_input"]["raw_transcript"] == "voice transcript text"

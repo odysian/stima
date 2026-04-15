@@ -208,7 +208,12 @@ async def test_append_extraction_enqueues_async_job_for_owned_quote(
             "kwargs": {
                 "_job_id": str(jobs[0].id),
                 "correlation_id": response_correlation_id,
-                "transcript": "append this",
+                "prepared_capture_input": {
+                    "transcript": "append this",
+                    "source_type": "text",
+                    "raw_typed_notes": "append this",
+                    "raw_transcript": None,
+                },
                 "source_type": "text",
                 "capture_detail": "notes",
                 "append_to_quote": True,

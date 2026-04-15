@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.features.auth.models import User
 from app.features.auth.service import CSRF_COOKIE_NAME
 from app.features.quotes.models import Document, QuoteStatus
+from app.features.quotes.schemas import PreparedCaptureInput
 from app.worker.job_registry import extraction_job, pdf_job
 from app.worker.runtime import (
     DEFAULT_MAX_TRIES,
@@ -236,6 +237,7 @@ async def _run_extraction_job(
     customer_id: str | None = None,
     append_to_quote: bool = False,
     transcript: str = "mulch the front beds",
+    prepared_capture_input: PreparedCaptureInput | dict[str, object] | None = None,
     job_try: int = 1,
     extraction_integration: object | None = None,
     correlation_id: str | None = None,
@@ -262,6 +264,7 @@ async def _run_extraction_job(
         job_id,
         correlation_id=correlation_id,
         transcript=transcript,
+        prepared_capture_input=prepared_capture_input,
         source_type=source_type,
         capture_detail=capture_detail,
         customer_id=customer_id,

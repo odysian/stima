@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from typing import TypedDict
 
 from app.features.quotes.repository import QuoteRenderContext
-from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
+from app.features.quotes.schemas import ExtractionResult, LineItemExtracted, PreparedCaptureInput
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.email import EmailConfigurationError, EmailMessage, EmailSendError
 from app.integrations.extraction import ExtractionError
@@ -15,11 +15,11 @@ from app.shared.idempotency import IdempotencyBeginResult
 
 
 class _MockExtractionIntegration:
-    async def extract(self, notes: str) -> ExtractionResult:
-        if "malformed" in notes.lower():
+    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
+        normalized_notes = _capture_transcript(notes)
+        if "malformed" in normalized_notes.lower():
             raise ExtractionError("mock malformed extraction payload")
 
-        normalized_notes = notes.strip()
         if "needs-review" in normalized_notes.lower() or normalized_notes.startswith(
             "transcript from stitched"
         ):
@@ -50,6 +50,12 @@ class _MockExtractionIntegration:
             total=120,
             confidence_notes=[],
         )
+
+
+def _capture_transcript(notes: PreparedCaptureInput | str) -> str:
+    if isinstance(notes, PreparedCaptureInput):
+        return notes.transcript.strip()
+    return notes.strip()
 
 
 class _MockPdfIntegration:
@@ -172,6 +178,6 @@ class _RetryableProviderError(Exception):
 
 
 class _RetryableFailureExtractionIntegration:
-    async def extract(self, notes: str) -> ExtractionResult:
+    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
         del notes
         raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)

@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.shared.input_limits import (
+    AUDIO_TRANSCRIPT_MAX_CHARS,
     CONFIDENCE_NOTE_MAX_CHARS,
     CONFIDENCE_NOTES_MAX_ITEMS,
     DOCUMENT_LINE_ITEMS_MAX_ITEMS,
@@ -43,6 +44,158 @@ class LineItemExtracted(LineItemDraft):
 
     flagged: bool = False
     flag_reason: str | None = None
+
+
+class PreparedCaptureInput(BaseModel):
+    """Structured capture input preserving typed vs voice provenance."""
+
+    transcript: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    source_type: Literal["text", "voice", "voice+text"]
+    raw_typed_notes: str | None = Field(default=None, max_length=NOTE_INPUT_MAX_CHARS)
+    raw_transcript: str | None = Field(default=None, max_length=AUDIO_TRANSCRIPT_MAX_CHARS)
+
+    @classmethod
+    def from_legacy_transcript(
+        cls,
+        *,
+        transcript: str,
+        source_type: Literal["text", "voice"] = "text",
+    ) -> PreparedCaptureInput:
+        """Build structured input from legacy single-string payloads."""
+        normalized_transcript = transcript.strip()
+        if source_type == "voice":
+            return cls(
+                transcript=normalized_transcript,
+                source_type="voice",
+                raw_typed_notes=None,
+                raw_transcript=normalized_transcript,
+            )
+        return cls(
+            transcript=normalized_transcript,
+            source_type="text",
+            raw_typed_notes=normalized_transcript,
+            raw_transcript=None,
+        )
+
+    @model_validator(mode="after")
+    def validate_source_provenance(self) -> PreparedCaptureInput:
+        """Ensure source-specific provenance fields stay coherent."""
+        if self.source_type == "text":
+            if self.raw_typed_notes is None:
+                raise ValueError("raw_typed_notes is required for text source_type")
+            if self.raw_transcript is not None:
+                raise ValueError("raw_transcript must be null for text source_type")
+        elif self.source_type == "voice":
+            if self.raw_transcript is None:
+                raise ValueError("raw_transcript is required for voice source_type")
+            if self.raw_typed_notes is not None:
+                raise ValueError("raw_typed_notes must be null for voice source_type")
+        else:
+            if self.raw_typed_notes is None or self.raw_transcript is None:
+                raise ValueError(
+                    "raw_typed_notes and raw_transcript are required for voice+text source_type"
+                )
+        return self
+
+
+class CaptureSegmentHints(BaseModel):
+    """Deterministic segmentation hints for model-side placement."""
+
+    has_explicit_price: bool
+    price_value: float | None
+    looks_like_heading: bool
+    looks_like_notes_heading: bool
+    looks_like_line_item: bool
+
+
+class CaptureSegment(BaseModel):
+    """One normalized segment generated from capture transcript text."""
+
+    index: int = Field(ge=0)
+    raw_text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    normalized_text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    hints: CaptureSegmentHints
+
+
+PlacementConfidence = Literal["high", "medium", "low"]
+UnresolvedSegmentSource = Literal[
+    "leftover_classification",
+    "typed_conflict",
+    "transcript_conflict",
+]
+
+
+class PricingHints(BaseModel):
+    """Structured pricing suggestions returned by V2 extraction."""
+
+    explicit_total: float | None = None
+    deposit_amount: float | None = None
+    tax_rate: float | None = None
+    discount_type: DiscountType | None = None
+    discount_value: float | None = None
+
+
+class ExtractionSuggestion(BaseModel):
+    """Suggestion payload for notes-like content placement."""
+
+    text: str = Field(min_length=1, max_length=DOCUMENT_NOTES_MAX_CHARS)
+    confidence: PlacementConfidence
+    source: UnresolvedSegmentSource
+
+
+class UnresolvedSegment(BaseModel):
+    """Minimal unresolved capture segment surfaced for downstream handling."""
+
+    raw_text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    confidence: Literal["medium", "low"]
+    source: UnresolvedSegmentSource
+
+
+class LineItemExtractedV2(LineItemExtracted):
+    """V2 extraction line-item contract with placement metadata."""
+
+    raw_text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    confidence: PlacementConfidence = "medium"
+
+
+class ExtractionResultV2(BaseModel):
+    """Internal V2 extraction contract used by integration/guards."""
+
+    transcript: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    pipeline_version: Literal["v2"] = "v2"
+    line_items: list[LineItemExtractedV2] = Field(
+        default_factory=list,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
+    pricing_hints: PricingHints = Field(default_factory=PricingHints)
+    customer_notes_suggestion: ExtractionSuggestion | None = None
+    unresolved_segments: list[UnresolvedSegment] = Field(default_factory=list)
+    confidence_notes: list[Annotated[str, Field(max_length=CONFIDENCE_NOTE_MAX_CHARS)]] = Field(
+        default_factory=list,
+        max_length=CONFIDENCE_NOTES_MAX_ITEMS,
+    )
+    extraction_tier: Literal["primary", "degraded"] = "primary"
+    extraction_degraded_reason_code: str | None = None
+
+    def to_v1_result(self) -> ExtractionResult:
+        """Project the internal V2 payload onto the existing V1 contract."""
+        return ExtractionResult(
+            transcript=self.transcript,
+            line_items=[
+                LineItemExtracted(
+                    description=item.description,
+                    details=item.details,
+                    price=item.price,
+                    flagged=item.flagged,
+                    flag_reason=item.flag_reason,
+                )
+                for item in self.line_items
+            ],
+            total=self.pricing_hints.explicit_total,
+            confidence_notes=self.confidence_notes,
+            extraction_tier=self.extraction_tier,
+            extraction_degraded_reason_code=self.extraction_degraded_reason_code,
+        )
 
 
 class ExtractionResult(BaseModel):
