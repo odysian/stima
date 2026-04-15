@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -495,6 +495,9 @@ describe("DocumentEditScreen", () => {
     expect(section2.compareDocumentPosition(section3)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(section3.compareDocumentPosition(section4)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(screen.getByText("Original capture transcript text.")).toBeInTheDocument();
+    const transcriptSection = section4.closest("section");
+    expect(transcriptSection).not.toBeNull();
+    expect(within(transcriptSection as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
   it("persists dismiss actions for hidden items through sidecar metadata patch", async () => {
