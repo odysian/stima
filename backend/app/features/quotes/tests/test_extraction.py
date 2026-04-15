@@ -10,6 +10,7 @@ import anthropic
 import httpx
 import pytest
 
+import app.integrations.extraction as extraction_module
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
 from app.integrations.extraction import (
     EXTRACTION_TOOL_SCHEMA,
@@ -713,3 +714,76 @@ async def test_extract_exercises_all_transcript_fixtures(fixture_name: str) -> N
 
     assert result.transcript == transcript
     assert result.line_items[0].description.startswith("Extracted from")
+
+
+async def test_extract_emits_trace_events_for_primary_repair_and_result_stages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    trace_calls: list[dict[str, object]] = []
+
+    def _capture_trace(
+        event: str,
+        *,
+        stage: str,
+        outcome: str,
+        **fields: object,
+    ) -> None:
+        trace_calls.append(
+            {
+                "event": event,
+                "stage": stage,
+                "outcome": outcome,
+                **fields,
+            }
+        )
+
+    monkeypatch.setattr(extraction_module, "log_extraction_trace", _capture_trace)
+    client = _SequencedClient(
+        [
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": "invalid-shape",
+                            "total": 435,
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+            _FakeResponse(
+                content=[
+                    {
+                        "type": "tool_use",
+                        "input": {
+                            "transcript": transcript,
+                            "line_items": [
+                                {
+                                    "description": "Trim shrubs",
+                                    "details": "Front beds",
+                                    "price": 125,
+                                }
+                            ],
+                            "total": 125,
+                            "confidence_notes": [],
+                        },
+                    }
+                ]
+            ),
+        ]
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.total == 125
+    assert ("primary", "started") in {(call["stage"], call["outcome"]) for call in trace_calls}
+    assert ("primary", "provider_response") in {
+        (call["stage"], call["outcome"]) for call in trace_calls
+    }
+    assert ("repair", "started") in {(call["stage"], call["outcome"]) for call in trace_calls}
+    assert ("repair", "succeeded") in {(call["stage"], call["outcome"]) for call in trace_calls}
+    assert ("result", "succeeded") in {(call["stage"], call["outcome"]) for call in trace_calls}
