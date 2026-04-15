@@ -295,6 +295,32 @@ describe("DocumentEditScreen", () => {
     expect(screen.getByText("Notes Pending Review")).toBeInTheDocument();
   });
 
+  it("shows the high-severity review marker when extraction is degraded with no line items", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_tier: "degraded",
+        extraction_degraded_reason_code: null,
+        line_items: [],
+      }),
+    });
+
+    expect(await screen.findByText("Review Required")).toBeInTheDocument();
+    expect(screen.getByText("No line items were found from this capture. Review capture details before continuing.")).toBeInTheDocument();
+  });
+
+  it("shows the degraded-specific high-severity marker copy when a degraded reason code is present", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_tier: "degraded",
+        extraction_degraded_reason_code: "no_line_items_from_substantial_capture",
+        line_items: [],
+      }),
+    });
+
+    expect(await screen.findByText("Review Required")).toBeInTheDocument();
+    expect(screen.getByText("Extraction degraded and no line items were found. Review capture details before continuing.")).toBeInTheDocument();
+  });
+
   it("gates Continue with a review modal only when visible review markers remain", async () => {
     renderScreen({
       document: makeQuote({
