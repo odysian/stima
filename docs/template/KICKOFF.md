@@ -16,6 +16,7 @@ Use these prompts to start work on already-scoped tasks without reloading unnece
 - Use the short reviewer kickoff by default.
 - After `ACTIONABLE`, patch listed findings only unless scope expands.
 - Verification follows tiers from `docs/workflow/VERIFY.md`.
+- For backend code changes, run the targeted behavior check plus `make backend-static-verify` before push/PR update.
 
 ## When To Load Which Asset
 
@@ -42,7 +43,7 @@ Then execute the full Task flow end-to-end:
    - default: create/switch to `task-<id>-<slug>`
    - `execution=parallel`: run `scripts/worktree-init.sh <task-id> [slug]`, use returned `WORKTREE_READY` path only, and verify `backend/.venv` / `frontend/node_modules` symlinks before verification.
 3. Implement minimally and preserve contracts unless issue scope says otherwise.
-4. Run relevant verification by tier.
+4. Run relevant verification by tier (for backend code changes, include targeted behavior checks plus `make backend-static-verify` before push/PR update).
 5. Open PR with `Closes #<task-id>`.
 6. Return the short reviewer kickoff from section 3a.
 7. After review verdict:
@@ -53,6 +54,8 @@ Then execute the full Task flow end-to-end:
 ### Backend integration pytest in agent/sandbox environments
 
 Before running Tier 1 `cd backend && .venv/bin/pytest ...` or Tier 3 `make backend-verify` from an **agent**: integration tests need **PostgreSQL** at `TEST_DATABASE_URL` (see `backend/conftest.py`). **Sandboxed** agent shells often cannot reach `localhost:5432` → **all tests error (`E`) during setup**, not real assertion failures. **Run outside sandbox** (network to localhost) or have the **human** run the command and paste output — do not burn retries in a blocked environment. Canonical detail: `docs/workflow/VERIFY.md` and `backend/AGENTS.md`.
+
+For backend code changes, run `make backend-static-verify` before push/PR update in addition to any targeted behavior checks; docs-only or non-backend-only changes do not need backend static verification.
 
 Behavior Matrix (required for stateful/cross-layer tasks):
 - states/statuses and allowed actions
@@ -79,7 +82,7 @@ Inputs:
 Deliver:
 1. Patch listed findings only.
 2. Keep Task issue authoritative.
-3. Rerun targeted verification unless scope expanded.
+3. Rerun targeted verification unless scope expanded; for backend code patches also run `make backend-static-verify` before push/PR update.
 4. Return concise patch summary + targeted verification + follow-up (if any).
 ```
 

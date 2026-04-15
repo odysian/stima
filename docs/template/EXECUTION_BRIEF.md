@@ -51,6 +51,8 @@ Capture commands by tier so reruns stay proportional:
 - Tier 3 (PR/final gate): `<canonical broad verify command for touched surface>`
 - Tier 4 (operator-only heavy, when needed): `<manual/live check>`
 
+For backend code changes, include `make backend-static-verify` before push/PR update alongside the targeted behavior check. Docs-only or non-backend-only changes do not require backend static verification.
+
 ## Open Product Decisions / Blockers
 
 - `<Decision the implementation should not silently lock in>`

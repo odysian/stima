@@ -8,10 +8,11 @@ Run the relevant checks before claiming completion.
 
 ### Verification Tiers
 
-- Tier 1 (implementation loop): run the smallest checks that prove changed behavior.
-- Tier 2 (post-review patch): rerun only checks needed for patched findings unless scope expands.
+- Tier 1 (implementation loop): run the smallest checks that prove changed behavior. For backend code changes, run the targeted backend behavior check plus `make backend-static-verify` before push/PR update.
+- Tier 2 (post-review patch): rerun only checks needed for patched findings unless scope expands. For backend code patches, keep the targeted rerun and also run `make backend-static-verify` before pushing follow-up commits.
 - Tier 3 (PR/final gate): run canonical broad verify targets for affected surfaces (`make backend-verify`, `make frontend-verify`, `make verify` as applicable).
 - Tier 4 (operator-only heavy): live/provider/manual or unusually expensive checks only when explicitly required.
+- Docs-only or non-backend-only changes do not require backend static verification.
 
 ### Agent execution: backend tests vs sandboxes
 
@@ -21,7 +22,7 @@ This applies to **network-isolated agent runs** (Cursor sandbox, VS Code / Copil
 
 **Do:**
 
-- Use `cd backend && .venv/bin/pytest ...` for targeted runs or `make backend-verify` for Tier 3 — never bare `pytest` (wrong interpreter / deps).
+- Use `cd backend && .venv/bin/pytest ...` for targeted backend behavior runs, pair backend code changes with `make backend-static-verify` before push, and reserve `make backend-verify` for Tier 3 broad gates — never bare `pytest` (wrong interpreter / deps).
 - When running from an **agent**, assume sandbox **until proven otherwise**. If you see all-`E` or hang at startup/collection, **stop** and either escalate to a **non-sandboxed** run with **localhost network**, or ask the **human** to run the exact command and paste the traceback.
 - Confirm failures with `-x --tb=short` once before declaring product bugs.
 
@@ -82,4 +83,3 @@ cd backend && alembic upgrade head
 - Frontend: type-check + tests + lint + production build.
 - No-contract refactors: include parity lock results in final verification summary.
 - Template maintenance: unresolved-token guard passes (`./scripts/check-unresolved-template-tokens.sh`).
-
