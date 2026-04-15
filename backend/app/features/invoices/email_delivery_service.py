@@ -237,9 +237,7 @@ class InvoiceEmailDeliveryService:
         )
         if effective_latest_email_sent_at >= cutoff:
             raise QuoteServiceError(
-                detail=(
-                    "This invoice was emailed recently. Please wait before resending."
-                ),
+                detail=("This invoice was emailed recently. Please wait before resending."),
                 status_code=429,
             )
 

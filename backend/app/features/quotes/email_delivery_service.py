@@ -245,9 +245,7 @@ class QuoteEmailDeliveryService:
         )
         if effective_latest_email_sent_at >= cutoff:
             raise QuoteServiceError(
-                detail=(
-                    "This quote was emailed recently. Please wait before resending."
-                ),
+                detail=("This quote was emailed recently. Please wait before resending."),
                 status_code=429,
             )
 
