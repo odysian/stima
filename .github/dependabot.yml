@@ -19,9 +19,8 @@ updates:
       - dependency-type: "direct"
     ignore:
       - dependency-name: "redis"
-        versions:
-          - "6.x"
-          - "7.x"
+        update-types:
+          - "version-update:semver-major"
     groups:
       backend-patch-minor:
         patterns:
