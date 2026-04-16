@@ -50,7 +50,7 @@ def _print_report_card(name: str, result: ExtractionResult) -> None:
 
 @pytest.mark.live
 async def test_live_clean_with_total() -> None:
-    result = await _build_integration().extract(TRANSCRIPTS["clean_with_total"])
+    result = await _build_integration().extract(TRANSCRIPTS["clean_with_total"], mode="initial")
     _print_report_card("clean_with_total", result)
 
     assert result.total == pytest.approx(435)
@@ -62,7 +62,7 @@ async def test_live_clean_with_total() -> None:
 
 @pytest.mark.live
 async def test_live_clean_no_prices() -> None:
-    result = await _build_integration().extract(TRANSCRIPTS["clean_no_prices"])
+    result = await _build_integration().extract(TRANSCRIPTS["clean_no_prices"], mode="initial")
     _print_report_card("clean_no_prices", result)
 
     assert result.total is None
@@ -72,7 +72,7 @@ async def test_live_clean_no_prices() -> None:
 
 @pytest.mark.live
 async def test_live_total_only() -> None:
-    result = await _build_integration().extract(TRANSCRIPTS["total_only"])
+    result = await _build_integration().extract(TRANSCRIPTS["total_only"], mode="initial")
     _print_report_card("total_only", result)
 
     assert result.total == pytest.approx(2100)
@@ -82,7 +82,7 @@ async def test_live_total_only() -> None:
 
 @pytest.mark.live
 async def test_live_partial_ambiguous() -> None:
-    result = await _build_integration().extract(TRANSCRIPTS["partial_ambiguous"])
+    result = await _build_integration().extract(TRANSCRIPTS["partial_ambiguous"], mode="initial")
     _print_report_card("partial_ambiguous", result)
 
     assert result.line_items
@@ -94,7 +94,10 @@ async def test_live_partial_ambiguous() -> None:
 
 @pytest.mark.live
 async def test_live_noisy_with_hesitation() -> None:
-    result = await _build_integration().extract(TRANSCRIPTS["noisy_with_hesitation"])
+    result = await _build_integration().extract(
+        TRANSCRIPTS["noisy_with_hesitation"],
+        mode="initial",
+    )
     _print_report_card("noisy_with_hesitation", result)
 
     assert result.total is None
@@ -105,7 +108,7 @@ async def test_live_noisy_with_hesitation() -> None:
 
 @pytest.mark.live
 async def test_live_no_pricing_at_all() -> None:
-    result = await _build_integration().extract(TRANSCRIPTS["no_pricing_at_all"])
+    result = await _build_integration().extract(TRANSCRIPTS["no_pricing_at_all"], mode="initial")
     _print_report_card("no_pricing_at_all", result)
 
     assert result.total is None
@@ -130,7 +133,7 @@ async def test_live_fallback_tier_probe_uses_fallback_model_after_primary_exhaus
     )
 
     transcript = TRANSCRIPTS["fallback_tier_probe"]
-    result = await integration.extract(transcript)
+    result = await integration.extract(transcript, mode="initial")
     metadata = integration.pop_last_call_metadata()
 
     _print_report_card("fallback_tier_probe", result)

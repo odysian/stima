@@ -227,7 +227,7 @@ async def test_extraction_eval_baseline_invariants_hold_for_primary_fixture() ->
         client=client,
     )
 
-    result = await integration.extract(_build_capture_input(case))
+    result = await integration.extract(_build_capture_input(case), mode="initial")
 
     _assert_extraction_invariants(
         result,
@@ -254,7 +254,7 @@ async def test_extraction_eval_invariants(case: ExtractionEvalCase) -> None:
         client=client,
     )
 
-    result = await integration.extract(_build_capture_input(case))
+    result = await integration.extract(_build_capture_input(case), mode="initial")
 
     _assert_extraction_invariants(
         result,
@@ -279,4 +279,4 @@ async def test_empty_transcript_raises_extraction_error() -> None:
     )
 
     with pytest.raises(ExtractionError, match="notes cannot be empty"):
-        await integration.extract("")
+        await integration.extract("", mode="initial")
