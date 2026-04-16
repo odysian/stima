@@ -23,7 +23,9 @@ from app.features.quotes.schemas import (
     ExtractionResult,
     ExtractionReviewAppendSuggestion,
     LineItemDraft,
+    LineItemExtractedV2,
     PricingFieldName,
+    UnresolvedSegment,
 )
 from app.shared.pricing import (
     PricingValidationError,
@@ -46,6 +48,13 @@ _APPENDABLE_QUOTE_STATUSES = frozenset(
 _APPEND_UNAVAILABLE_DETAIL = "This quote can no longer be edited."
 _APPEND_TRANSCRIPT_SEPARATOR_PATTERN = re.compile(r"(?:^|\n\n)Added later(?: \(\d+\))?:\n")
 _APPEND_TRANSCRIPT_BULLET_PREFIXES = ("- ", "* ")
+_APPEND_CORRECTION_PATTERN = re.compile(
+    r"\b("
+    r"replace|replacing|replacement|remove|removed|removal|delete|deleted|"
+    r"correct|correction|instead|not\s+this|should\s+be"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def _resolve_line_item_price_status_for_append(line_item: LineItem) -> LineItemPriceStatus:
@@ -61,6 +70,7 @@ class QuoteExtractionAppendRepositoryProtocol(Protocol):
     """Repository behavior required by extraction append lifecycle orchestration."""
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
+    async def get_by_id_for_update(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
 
     async def append_extraction(
         self,
@@ -109,9 +119,13 @@ class QuoteExtractionAppendService:
         *,
         user_id: UUID,
         quote_id: UUID,
+        for_update: bool = False,
     ) -> Document:
         """Return one owned quote that can accept append extraction updates."""
-        quote = await self._repository.get_by_id(quote_id, user_id)
+        if for_update:
+            quote = await self._repository.get_by_id_for_update(quote_id, user_id)
+        else:
+            quote = await self._repository.get_by_id(quote_id, user_id)
         if quote is None:
             raise QuoteServiceError(detail="Not found", status_code=404)
         if quote.status not in _APPENDABLE_QUOTE_STATUSES:
@@ -127,32 +141,52 @@ class QuoteExtractionAppendService:
         commit: bool = True,
     ) -> tuple[Document, ExtractionResult]:
         """Append extraction output and commit cleanup only when `commit=True`."""
-        quote = await self.ensure_quote_appendable(user_id=user_id, quote_id=quote_id)
-        append_suggestions = _resolve_append_suggestions(
+        quote = await self.ensure_quote_appendable(
+            user_id=user_id,
+            quote_id=quote_id,
+            for_update=True,
+        )
+        normalized_extraction_result = _normalize_append_extraction_result_for_application(
             quote=quote,
             extraction_result=extraction_result,
+        )
+        append_suggestions = _resolve_append_suggestions(
+            quote=quote,
+            extraction_result=normalized_extraction_result,
         )
         (
             next_notes,
             update_notes,
-        ) = _resolve_next_notes_for_append(quote=quote, extraction_result=extraction_result)
+        ) = _resolve_next_notes_for_append(
+            quote=quote,
+            extraction_result=normalized_extraction_result,
+        )
         (
             next_discount_type,
             next_discount_value,
             update_discount_type,
             update_discount_value,
             seeded_discount,
-        ) = _resolve_discount_for_append(quote=quote, extraction_result=extraction_result)
+        ) = _resolve_discount_for_append(
+            quote=quote,
+            extraction_result=normalized_extraction_result,
+        )
         (
             next_tax_rate,
             update_tax_rate,
             seeded_tax_rate,
-        ) = _resolve_tax_rate_for_append(quote=quote, extraction_result=extraction_result)
+        ) = _resolve_tax_rate_for_append(
+            quote=quote,
+            extraction_result=normalized_extraction_result,
+        )
         (
             next_deposit_amount,
             update_deposit_amount,
             seeded_deposit_amount,
-        ) = _resolve_deposit_amount_for_append(quote=quote, extraction_result=extraction_result)
+        ) = _resolve_deposit_amount_for_append(
+            quote=quote,
+            extraction_result=normalized_extraction_result,
+        )
         appended_line_items = [
             LineItemDraft(
                 description=item.description,
@@ -167,7 +201,7 @@ class QuoteExtractionAppendService:
                 flagged=item.flagged,
                 flag_reason=item.flag_reason,
             )
-            for item in extraction_result.line_items
+            for item in normalized_extraction_result.line_items
         ]
         merged_line_items = [
             *[
@@ -196,7 +230,7 @@ class QuoteExtractionAppendService:
         )
         next_total_input = _resolve_total_amount_for_append(
             quote=quote,
-            extraction_result=extraction_result,
+            extraction_result=normalized_extraction_result,
             line_items_define_subtotal=line_items_define_subtotal,
             derived_line_item_subtotal=derived_line_item_subtotal,
             current_subtotal=current_subtotal,
@@ -230,25 +264,25 @@ class QuoteExtractionAppendService:
         if seeded_deposit_amount and validated_deposit_amount is not None:
             seeded_pricing_fields.add("deposit_amount")
         if (
-            extraction_result.pricing_hints.explicit_total is not None
+            normalized_extraction_result.pricing_hints.explicit_total is not None
             and quote.total_amount is None
             and not line_items_define_subtotal
             and validated_total_amount is not None
         ):
             seeded_pricing_fields.add("explicit_total")
 
-        extraction_metadata = classify_extraction_result(extraction_result)
+        extraction_metadata = classify_extraction_result(normalized_extraction_result)
         merged_review_metadata = build_extraction_review_metadata(
-            extraction_result,
+            normalized_extraction_result,
             seeded_notes=update_notes,
             seeded_notes_confidence=(
-                extraction_result.customer_notes_suggestion.confidence
-                if extraction_result.customer_notes_suggestion is not None
+                normalized_extraction_result.customer_notes_suggestion.confidence
+                if normalized_extraction_result.customer_notes_suggestion is not None
                 else None
             ),
             seeded_notes_source=(
-                extraction_result.customer_notes_suggestion.source
-                if extraction_result.customer_notes_suggestion is not None
+                normalized_extraction_result.customer_notes_suggestion.source
+                if normalized_extraction_result.customer_notes_suggestion is not None
                 else None
             ),
             seeded_pricing_fields=seeded_pricing_fields,
@@ -293,11 +327,11 @@ class QuoteExtractionAppendService:
         )
         obsolete_artifact_path = await self._repository.invalidate_pdf_artifact(updated_quote)
         if not commit:
-            return updated_quote, extraction_result
+            return updated_quote, normalized_extraction_result
 
         await self._repository.commit()
         await self._delete_obsolete_artifact(obsolete_artifact_path)
-        return await self._repository.refresh(updated_quote), extraction_result
+        return await self._repository.refresh(updated_quote), normalized_extraction_result
 
 
 def _validate_document_pricing_for_append(
@@ -375,6 +409,150 @@ def _extract_append_entries(transcript: str) -> list[str]:
     return entries
 
 
+def _normalize_append_extraction_result_for_application(
+    *,
+    quote: Document,
+    extraction_result: ExtractionResult,
+) -> ExtractionResult:
+    additive_line_items, corrective_line_item_unresolved = _partition_append_line_item_candidates(
+        extraction_result.line_items
+    )
+    additive_line_items = _drop_materially_duplicate_line_items(
+        existing_line_items=quote.line_items,
+        candidate_line_items=additive_line_items,
+    )
+
+    notes_suggestion = extraction_result.customer_notes_suggestion
+    corrective_notes_unresolved: list[UnresolvedSegment] = []
+    if notes_suggestion is not None and _looks_like_corrective_content(notes_suggestion.text):
+        normalized_text = notes_suggestion.text.strip()
+        if normalized_text:
+            corrective_notes_unresolved.append(
+                UnresolvedSegment(
+                    raw_text=normalized_text,
+                    confidence="medium",
+                    source="transcript_conflict",
+                )
+            )
+        notes_suggestion = None
+
+    unresolved_segments = _merge_unresolved_segments(
+        extraction_result.unresolved_segments,
+        corrective_line_item_unresolved,
+        corrective_notes_unresolved,
+    )
+    return extraction_result.model_copy(
+        update={
+            "line_items": additive_line_items,
+            "customer_notes_suggestion": notes_suggestion,
+            "unresolved_segments": unresolved_segments,
+        }
+    )
+
+
+def _partition_append_line_item_candidates(
+    line_items: Sequence[LineItemExtractedV2],
+) -> tuple[list[LineItemExtractedV2], list[UnresolvedSegment]]:
+    additive_items: list[LineItemExtractedV2] = []
+    unresolved_items: list[UnresolvedSegment] = []
+    for item in line_items:
+        if not _looks_like_corrective_line_item(item):
+            additive_items.append(item)
+            continue
+        text = _line_item_text_for_unresolved(item)
+        if not text:
+            continue
+        unresolved_items.append(
+            UnresolvedSegment(
+                raw_text=text,
+                confidence="medium",
+                source="transcript_conflict",
+            )
+        )
+    return additive_items, unresolved_items
+
+
+def _looks_like_corrective_line_item(item: LineItemExtractedV2) -> bool:
+    return _looks_like_corrective_content(_line_item_text_for_unresolved(item))
+
+
+def _line_item_text_for_unresolved(item: LineItemExtractedV2) -> str:
+    details = (item.details or "").strip()
+    description = item.description.strip()
+    if details:
+        return f"{description} - {details}"
+    return description
+
+
+def _looks_like_corrective_content(text: str) -> bool:
+    return _APPEND_CORRECTION_PATTERN.search(text.strip()) is not None
+
+
+def _drop_materially_duplicate_line_items(
+    *,
+    existing_line_items: Sequence[LineItem],
+    candidate_line_items: Sequence[LineItemExtractedV2],
+) -> list[LineItemExtractedV2]:
+    seen_signatures = {
+        _line_item_material_signature(
+            description=line_item.description,
+            details=line_item.details,
+            price=document_field_float_or_none(line_item.price),
+            price_status=_resolve_line_item_price_status_for_append(line_item),
+        )
+        for line_item in existing_line_items
+    }
+
+    filtered: list[LineItemExtractedV2] = []
+    for item in candidate_line_items:
+        signature = _line_item_material_signature(
+            description=item.description,
+            details=item.details,
+            price=item.price,
+            price_status=resolve_line_item_price_status_with_fallback(
+                price=item.price,
+                price_status=item.price_status,
+                description=item.description,
+                details=item.details,
+            ),
+        )
+        if signature in seen_signatures:
+            continue
+        seen_signatures.add(signature)
+        filtered.append(item)
+    return filtered
+
+
+def _line_item_material_signature(
+    *,
+    description: str,
+    details: str | None,
+    price: float | None,
+    price_status: LineItemPriceStatus,
+) -> tuple[str, str, float | None, LineItemPriceStatus]:
+    return (
+        _normalize_material_text(description),
+        _normalize_material_text(details),
+        _normalize_material_number(price),
+        price_status,
+    )
+
+
+def _merge_unresolved_segments(
+    *segment_groups: Sequence[UnresolvedSegment],
+) -> list[UnresolvedSegment]:
+    merged: list[UnresolvedSegment] = []
+    seen: set[tuple[str, str]] = set()
+    for group in segment_groups:
+        for segment in group:
+            key = (segment.source, _normalize_material_text(segment.raw_text))
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(segment)
+    return merged
+
+
 def _resolve_append_suggestions(
     *,
     quote: Document,
@@ -384,7 +562,7 @@ def _resolve_append_suggestions(
     notes_suggestion = extraction_result.customer_notes_suggestion
     if notes_suggestion is not None and _is_populated_text(quote.notes):
         normalized_text = notes_suggestion.text.strip()
-        if normalized_text:
+        if normalized_text and not _is_materially_same_text(normalized_text, quote.notes):
             append_suggestions.append(
                 build_append_suggestion(
                     kind="note",
@@ -394,21 +572,37 @@ def _resolve_append_suggestions(
             )
 
     pricing_hints = extraction_result.pricing_hints
-    if pricing_hints.explicit_total is not None and quote.total_amount is not None:
+    current_total = document_field_float_or_none(quote.total_amount)
+    current_deposit = document_field_float_or_none(quote.deposit_amount)
+    current_tax_rate = document_field_float_or_none(quote.tax_rate)
+    current_discount_value = document_field_float_or_none(quote.discount_value)
+    if (
+        pricing_hints.explicit_total is not None
+        and quote.total_amount is not None
+        and not _is_materially_same_number(pricing_hints.explicit_total, current_total)
+    ):
         append_suggestions.append(
             _build_pricing_append_suggestion(
                 pricing_field="explicit_total",
                 value=pricing_hints.explicit_total,
             )
         )
-    if pricing_hints.deposit_amount is not None and quote.deposit_amount is not None:
+    if (
+        pricing_hints.deposit_amount is not None
+        and quote.deposit_amount is not None
+        and not _is_materially_same_number(pricing_hints.deposit_amount, current_deposit)
+    ):
         append_suggestions.append(
             _build_pricing_append_suggestion(
                 pricing_field="deposit_amount",
                 value=pricing_hints.deposit_amount,
             )
         )
-    if pricing_hints.tax_rate is not None and quote.tax_rate is not None:
+    if (
+        pricing_hints.tax_rate is not None
+        and quote.tax_rate is not None
+        and not _is_materially_same_number(pricing_hints.tax_rate, current_tax_rate)
+    ):
         append_suggestions.append(
             _build_pricing_append_suggestion(
                 pricing_field="tax_rate",
@@ -420,7 +614,14 @@ def _resolve_append_suggestions(
         and pricing_hints.discount_value is not None
         and _is_discount_populated(
             discount_type=quote.discount_type,
-            discount_value=document_field_float_or_none(quote.discount_value),
+            discount_value=current_discount_value,
+        )
+        and (
+            pricing_hints.discount_type != quote.discount_type
+            or not _is_materially_same_number(
+                pricing_hints.discount_value,
+                current_discount_value,
+            )
         )
     ):
         append_suggestions.append(
@@ -544,6 +745,30 @@ def _build_pricing_append_suggestion(
         confidence="medium",
         pricing_field=pricing_field,
     )
+
+
+def _is_materially_same_text(candidate: str, existing: str | None) -> bool:
+    if existing is None:
+        return False
+    return _normalize_material_text(candidate) == _normalize_material_text(existing)
+
+
+def _normalize_material_text(value: str | None) -> str:
+    if value is None:
+        return ""
+    return re.sub(r"\s+", " ", value.strip()).casefold()
+
+
+def _is_materially_same_number(candidate: float, existing: float | None) -> bool:
+    if existing is None:
+        return False
+    return _normalize_material_number(candidate) == _normalize_material_number(existing)
+
+
+def _normalize_material_number(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(float(value), 2)
 
 
 def _normalize_append_confidence(
