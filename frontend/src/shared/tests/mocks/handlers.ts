@@ -212,7 +212,6 @@ export const handlers = [
           },
         ],
         total: 120,
-        confidence_notes: [],
       },
       { status: 200 },
     );
@@ -296,7 +295,6 @@ export const handlers = [
           },
         ],
         total: 120,
-        confidence_notes: [],
       },
       { status: 200 },
     );
@@ -320,7 +318,6 @@ export const handlers = [
             },
           ],
           total: 165,
-          confidence_notes: ["Confirm cleanup scope before sending"],
         },
         { status: 200 },
       );
@@ -347,7 +344,6 @@ export const handlers = [
             },
           ],
           total: 120,
-          confidence_notes: [],
         },
         quote_id: "quote-1",
         created_at: "2026-03-20T00:00:00.000Z",

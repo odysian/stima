@@ -172,7 +172,6 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     assert payload["quote_id"]
     assert payload["transcript"] == "add 10 percent travel surcharge"
     assert payload["line_items"]
-    assert payload["confidence_notes"] == []
 
 
 async def test_extract_combined_sync_passes_initial_mode_to_extraction_integration(
@@ -623,7 +622,6 @@ async def test_extract_combined_clips_and_notes_success(client: AsyncClient) -> 
         "transcript from stitched-1\n\nadd 10 percent travel surcharge"
     )
     assert payload["line_items"]
-    assert payload["confidence_notes"] == []
 
 
 async def test_extract_combined_requires_clip_or_notes(client: AsyncClient) -> None:
@@ -802,7 +800,6 @@ async def test_convert_notes_rejects_when_concurrency_limit_is_exhausted(
                 transcript=notes.transcript,
                 line_items=[],
                 pricing_hints=PricingHints(),
-                confidence_notes=[],
             )
 
     blocking_integration = _BlockingExtractionIntegration()

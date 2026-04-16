@@ -59,7 +59,6 @@ from app.features.quotes.schemas import (
     QuoteListItemResponse,
     QuoteResponse,
     QuoteUpdateRequest,
-    project_extraction_result_for_public_response,
 )
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.audio import infer_audio_format
@@ -168,7 +167,7 @@ async def convert_notes(
     async with extraction_capacity_guard(user.id):
         try:
             extraction = await extraction_service.convert_notes(payload.notes)
-            return project_extraction_result_for_public_response(extraction)
+            return extraction
         except QuoteServiceError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -301,10 +300,9 @@ async def extract_combined(
             capture_detail=capture_detail,
             extraction_result=extraction,
         )
-        projected_extraction = project_extraction_result_for_public_response(extraction)
         return PersistedExtractionResponse(
             quote_id=quote.id,
-            **projected_extraction.model_dump(),
+            **extraction.model_dump(),
         )
 
     try:
@@ -414,10 +412,9 @@ async def append_extraction(
             customer_id=updated_quote.customer_id,
             detail=capture_detail,
         )
-        projected_extraction = project_extraction_result_for_public_response(merged_extraction)
         return PersistedExtractionResponse(
             quote_id=updated_quote.id,
-            **projected_extraction.model_dump(),
+            **merged_extraction.model_dump(),
         )
 
     try:

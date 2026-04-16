@@ -72,7 +72,6 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert extraction_payload["transcript"]
     assert isinstance(extraction_payload["line_items"], list)
     assert extraction_payload["line_items"][0]["price"] == 120
-    assert extraction_payload["confidence_notes"] == []
 
     create_response_1 = await client.post(
         "/api/quotes",
@@ -446,9 +445,6 @@ async def test_create_manual_draft_without_customer_persists_empty_draft_and_log
     }
     assert detail_payload["extraction_review_metadata"]["hidden_details"] == {
         "items": [],
-        "unresolved_segments": [],
-        "append_suggestions": [],
-        "confidence_notes": [],
     }
 
     quote_event_names = [

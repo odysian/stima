@@ -58,7 +58,6 @@ export interface ExtractionResult {
   pricing_hints: PricingHints;
   customer_notes_suggestion: ExtractionSuggestion | null;
   unresolved_segments: UnresolvedSegment[];
-  confidence_notes: string[];
   extraction_tier: ExtractionTier;
   extraction_degraded_reason_code: string | null;
 }
@@ -188,32 +187,16 @@ export interface PricingSeededFieldMetadata {
 }
 
 export interface ExtractionReviewHiddenDetails {
-  items?: Array<{
+  items: Array<{
     id: string;
-    kind: "append_suggestion" | "unresolved_segment" | "confidence_note";
+    kind: "append_suggestion" | "unresolved_segment";
     field?: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
     reason?: string | null;
     text: string;
   }>;
-  unresolved_segments: Array<{
-    id: string;
-    raw_text: string;
-    confidence: "medium" | "low";
-    source: UnresolvedSegmentSource;
-  }>;
-  append_suggestions: Array<{
-    id: string;
-    kind: "note" | "pricing";
-    raw_text: string;
-    confidence: "medium" | "low";
-    source: "append_capture";
-    pricing_field?: "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
-  }>;
-  confidence_notes: string[];
 }
 
 export interface HiddenItemState {
-  reviewed: boolean;
   dismissed: boolean;
 }
 
@@ -236,7 +219,6 @@ export interface ExtractionReviewMetadata {
 
 export interface ExtractionReviewMetadataUpdateRequest {
   dismiss_hidden_item?: string;
-  review_hidden_item?: string;
   clear_review_state?: {
     notes_pending?: true;
     pricing_pending?: true;

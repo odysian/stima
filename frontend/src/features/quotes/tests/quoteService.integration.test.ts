@@ -37,7 +37,6 @@ describe("quoteService integration (MSW)", () => {
             },
           ],
           total: 120,
-          confidence_notes: [],
         });
       }),
     );
@@ -57,7 +56,6 @@ describe("quoteService integration (MSW)", () => {
         },
       ],
       total: 120,
-      confidence_notes: [],
     });
   });
 
@@ -113,7 +111,6 @@ describe("quoteService integration (MSW)", () => {
             transcript: "Mulch and edging",
             line_items: [],
             total: null,
-            confidence_notes: [],
           },
           { status: 200 },
         )),
@@ -128,7 +125,6 @@ describe("quoteService integration (MSW)", () => {
         transcript: "Mulch and edging",
         line_items: [],
         total: null,
-        confidence_notes: [],
       },
     });
   });
@@ -443,7 +439,6 @@ describe("quoteService integration (MSW)", () => {
           transcript: "combined transcript",
           line_items: [],
           total: null,
-          confidence_notes: [],
         });
       }),
     );
@@ -466,7 +461,6 @@ describe("quoteService integration (MSW)", () => {
         transcript: "combined transcript",
         line_items: [],
         total: null,
-        confidence_notes: [],
       },
     });
   });
@@ -483,7 +477,6 @@ describe("quoteService integration (MSW)", () => {
           transcript: capturedCsrfHeader ? "notes only transcript" : "missing csrf",
           line_items: [],
           total: null,
-          confidence_notes: [],
         });
       }),
     );
@@ -497,7 +490,6 @@ describe("quoteService integration (MSW)", () => {
         transcript: "notes only transcript",
         line_items: [],
         total: null,
-        confidence_notes: [],
       },
     });
   });
@@ -514,7 +506,6 @@ describe("quoteService integration (MSW)", () => {
           transcript: capturedCsrfHeader ? "clips only transcript" : "missing csrf",
           line_items: [],
           total: null,
-          confidence_notes: [],
         });
       }),
     );
@@ -530,7 +521,6 @@ describe("quoteService integration (MSW)", () => {
         transcript: "clips only transcript",
         line_items: [],
         total: null,
-        confidence_notes: [],
       },
     });
   });

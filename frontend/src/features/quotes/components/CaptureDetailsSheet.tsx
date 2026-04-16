@@ -33,7 +33,7 @@ function formatPricingField(
 }
 
 function buildActionableLabel(item: {
-  kind: "append_suggestion" | "unresolved_segment" | "confidence_note";
+  kind: "append_suggestion" | "unresolved_segment";
   field: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
   reason: string | null;
 }): string {
@@ -46,7 +46,7 @@ function buildActionableLabel(item: {
   if (item.kind === "unresolved_segment") {
     return (item.reason ?? "leftover_classification").replaceAll("_", " ");
   }
-  return "Capture note";
+  return "Capture detail";
 }
 
 export function CaptureDetailsSheet({

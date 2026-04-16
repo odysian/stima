@@ -45,7 +45,7 @@ def _print_report_card(name: str, result: ExtractionResult) -> None:
     print(f"[{name}]")
     print(f"  items: {items}")
     print(f"  total: {total}")
-    print(f"  confidence: {result.confidence_notes}")
+    print(f"  confidence: {result.unresolved_segments}")
 
 
 @pytest.mark.live
@@ -89,7 +89,7 @@ async def test_live_partial_ambiguous() -> None:
     prices = [item.price for item in result.line_items]
     assert any(price is not None for price in prices)
     assert any(price is None for price in prices)
-    assert result.confidence_notes
+    assert result.unresolved_segments
 
 
 @pytest.mark.live
@@ -114,7 +114,7 @@ async def test_live_no_pricing_at_all() -> None:
     assert result.total is None
     assert result.line_items
     assert all(item.price is None for item in result.line_items)
-    assert result.confidence_notes
+    assert result.unresolved_segments
 
 
 @pytest.mark.live

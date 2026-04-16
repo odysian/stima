@@ -45,9 +45,7 @@ async def test_get_job_status_returns_owned_extraction_result(
     await repository.set_extraction_success(
         record.id,
         quote_id=quote.id,
-        result_json=(
-            '{"transcript":"mulch the beds","line_items":[],"total":null,"confidence_notes":[]}'
-        ),
+        result_json=('{"transcript":"mulch the beds","line_items":[],"total":null}'),
     )
     await db_session.commit()
 
@@ -72,7 +70,6 @@ async def test_get_job_status_returns_owned_extraction_result(
         },
         "customer_notes_suggestion": None,
         "unresolved_segments": [],
-        "confidence_notes": [],
         "extraction_tier": "primary",
         "extraction_degraded_reason_code": None,
     }

@@ -65,7 +65,6 @@ class _SuccessfulExtractionIntegration:
         return ExtractionResult(
             transcript=capture_input.transcript,
             line_items=[],
-            confidence_notes=[],
         )
 
 

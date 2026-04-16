@@ -155,7 +155,6 @@ def _assert_extraction_invariants(
 ) -> None:
     assert result.transcript == transcript
     assert len(result.line_items) <= DOCUMENT_LINE_ITEMS_MAX_ITEMS
-    assert result.confidence_notes == []
     assert all(item.description.strip() for item in result.line_items)
     if result.extraction_tier == "degraded":
         assert result.extraction_degraded_reason_code is not None

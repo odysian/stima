@@ -111,7 +111,6 @@ async def test_create_extracted_draft_commit_false_skips_commit() -> None:
             )
         ],
         pricing_hints=PricingHints(explicit_total=120),
-        confidence_notes=[],
     )
 
     quote = await service.create_extracted_draft(
@@ -153,7 +152,6 @@ async def test_create_extracted_draft_prefers_line_item_subtotal_over_conflictin
             ),
         ],
         pricing_hints=PricingHints(explicit_total=140),
-        confidence_notes=[],
     )
 
     quote = await service.create_extracted_draft(

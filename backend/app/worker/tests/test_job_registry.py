@@ -476,7 +476,6 @@ class _SuccessfulExtractionIntegration:
             transcript=transcript,
             line_items=[],
             pricing_hints=PricingHints(),
-            confidence_notes=[],
         )
 
 
@@ -501,7 +500,6 @@ class _SuccessfulSeededLineItemExtractionIntegration:
                 )
             ],
             pricing_hints=PricingHints(explicit_total=100),
-            confidence_notes=[],
         )
 
 
@@ -524,7 +522,6 @@ class _CaptureInputExtractionIntegration:
             transcript=transcript,
             line_items=[],
             pricing_hints=PricingHints(),
-            confidence_notes=[],
         )
 
 
@@ -546,7 +543,6 @@ class _AppendCandidateExtractionIntegration:
                 confidence="medium",
                 source="leftover_classification",
             ),
-            confidence_notes=[],
         )
 
 
@@ -582,7 +578,6 @@ class _ValidationRepairFailedExtractionIntegration:
             transcript=transcript,
             line_items=[],
             pricing_hints=PricingHints(),
-            confidence_notes=[],
             extraction_tier="degraded",
             extraction_degraded_reason_code="validation_repair_failed",
         )

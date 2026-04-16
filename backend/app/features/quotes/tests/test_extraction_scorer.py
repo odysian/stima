@@ -46,13 +46,11 @@ def _result(
     line_items: list[LineItemExtractedV2],
     *,
     total: float | None = None,
-    confidence_notes: list[str] | None = None,
 ) -> ExtractionResult:
     return ExtractionResult(
         transcript="unit test transcript",
         line_items=line_items,
         pricing_hints=PricingHints(explicit_total=total),
-        confidence_notes=confidence_notes or [],
     )
 
 

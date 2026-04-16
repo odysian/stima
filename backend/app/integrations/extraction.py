@@ -998,7 +998,6 @@ def _build_extraction_result_from_candidate(
             else None
         ),
         unresolved_segments=unresolved_segments,
-        confidence_notes=[],
     )
     return _apply_semantic_guard_rules(result)
 
@@ -1042,7 +1041,6 @@ def _build_extraction_result_from_append_candidate(
             else None
         ),
         unresolved_segments=unresolved_segments,
-        confidence_notes=[],
     )
     return _apply_semantic_guard_rules(result)
 
@@ -1211,7 +1209,6 @@ def _log_result_trace(
         line_item_count=len(result.line_items),
         flagged_line_item_count=sum(1 for item in result.line_items if item.flagged),
         unresolved_segment_count=len(result.unresolved_segments),
-        confidence_note_count=len(result.confidence_notes),
         total_present=result.pricing_hints.explicit_total is not None,
         raw_transcript=result.transcript,
         raw_tool_payload=result.model_dump(mode="json"),
@@ -1258,7 +1255,6 @@ def _build_validation_repair_failed_result(*, transcript: str) -> ExtractionResu
         pricing_hints=PricingHints(),
         customer_notes_suggestion=None,
         unresolved_segments=[],
-        confidence_notes=[],
         extraction_tier="degraded",
         extraction_degraded_reason_code=EXTRACTION_DEGRADED_REASON_VALIDATION_REPAIR_FAILED,
     )
@@ -1297,7 +1293,6 @@ def _apply_semantic_guard_rules(result: ExtractionResult) -> ExtractionResult:
         update={
             "line_items": line_items,
             "unresolved_segments": unresolved_segments,
-            "confidence_notes": [],
             "extraction_tier": extraction_tier,
             "extraction_degraded_reason_code": degraded_reason_code,
         }
