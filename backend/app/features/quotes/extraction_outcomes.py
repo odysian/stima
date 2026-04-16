@@ -55,7 +55,7 @@ def build_degraded_extraction_result(
     """Build a degraded sentinel result that still preserves user transcript work."""
     return ExtractionResult(
         transcript=transcript,
-        pipeline_version="v2",
+        pipeline_version="v2.5",
         line_items=[],
         pricing_hints=PricingHints(),
         customer_notes_suggestion=None,

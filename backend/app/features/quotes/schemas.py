@@ -135,6 +135,32 @@ class PricingHints(BaseModel):
     discount_value: float | None = None
 
 
+class PricingCandidates(PricingHints):
+    """Initial 2.5 provider pricing candidates before backend application."""
+
+
+UnresolvedItemReason = Literal["ambiguous_scope", "possible_conflict", "unplaced_content"]
+
+
+class UnresolvedItem(BaseModel):
+    """Initial 2.5 provider unresolved content candidate."""
+
+    text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    reason: UnresolvedItemReason
+
+
+class InitialExtractionCandidate(BaseModel):
+    """Initial 2.5 provider candidate payload prior to backend stamping/adapters."""
+
+    line_items: list[LineItemExtracted] = Field(
+        default_factory=list,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
+    notes_candidate: str | None = Field(default=None, max_length=LINE_ITEM_DETAILS_MAX_CHARS)
+    pricing_candidates: PricingCandidates = Field(default_factory=PricingCandidates)
+    unresolved_items: list[UnresolvedItem] = Field(default_factory=list)
+
+
 class ExtractionSuggestion(BaseModel):
     """Suggestion payload for notes-like content placement."""
 
@@ -162,7 +188,7 @@ class ExtractionResultV2(BaseModel):
     """Internal V2 extraction contract used by integration/guards."""
 
     transcript: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
-    pipeline_version: Literal["v2"] = "v2"
+    pipeline_version: Literal["v2", "v2.5"] = "v2"
     line_items: list[LineItemExtractedV2] = Field(
         default_factory=list,
         max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
@@ -316,7 +342,7 @@ class HiddenItemState(BaseModel):
 class ExtractionReviewMetadataV1(BaseModel):
     """Sidecar metadata persisted for V2 extraction review behavior."""
 
-    pipeline_version: Literal["v2"] = "v2"
+    pipeline_version: Literal["v2", "v2.5"] = "v2"
     review_state: ExtractionReviewState = Field(default_factory=ExtractionReviewState)
     seeded_fields: SeededFieldsMetadata = Field(default_factory=SeededFieldsMetadata)
     hidden_details: ExtractionReviewHiddenDetails = Field(
@@ -456,6 +482,13 @@ class ExtractionReviewMetadataUpdateRequest(BaseModel):
         if not has_action:
             raise ValueError("At least one extraction review metadata mutation is required")
         return self
+
+
+def project_extraction_result_for_public_response(result: ExtractionResult) -> ExtractionResult:
+    """Project internal extraction payloads to the transitional public legacy contract."""
+    if result.pipeline_version == "v2":
+        return result
+    return result.model_copy(update={"pipeline_version": "v2"})
 
 
 class LineItemResponse(BaseModel):
