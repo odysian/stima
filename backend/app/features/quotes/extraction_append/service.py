@@ -9,7 +9,11 @@ from uuid import UUID
 
 from app.features.quotes.errors import QuoteServiceError
 from app.features.quotes.extraction_outcomes import classify_extraction_result
-from app.features.quotes.models import Document, QuoteStatus
+from app.features.quotes.models import Document, LineItem, QuoteStatus
+from app.features.quotes.price_status import (
+    LineItemPriceStatus,
+    resolve_line_item_price_status_with_fallback,
+)
 from app.features.quotes.review_metadata import (
     build_append_suggestion,
     build_extraction_review_metadata,
@@ -42,6 +46,15 @@ _APPENDABLE_QUOTE_STATUSES = frozenset(
 _APPEND_UNAVAILABLE_DETAIL = "This quote can no longer be edited."
 _APPEND_TRANSCRIPT_SEPARATOR_PATTERN = re.compile(r"(?:^|\n\n)Added later(?: \(\d+\))?:\n")
 _APPEND_TRANSCRIPT_BULLET_PREFIXES = ("- ", "* ")
+
+
+def _resolve_line_item_price_status_for_append(line_item: LineItem) -> LineItemPriceStatus:
+    return resolve_line_item_price_status_with_fallback(
+        price=line_item.price,
+        price_status=line_item.price_status,
+        description=line_item.description,
+        details=line_item.details,
+    )
 
 
 class QuoteExtractionAppendRepositoryProtocol(Protocol):
@@ -145,6 +158,12 @@ class QuoteExtractionAppendService:
                 description=item.description,
                 details=item.details,
                 price=item.price,
+                price_status=resolve_line_item_price_status_with_fallback(
+                    price=item.price,
+                    price_status=item.price_status,
+                    description=item.description,
+                    details=item.details,
+                ),
                 flagged=item.flagged,
                 flag_reason=item.flag_reason,
             )
@@ -156,6 +175,7 @@ class QuoteExtractionAppendService:
                     description=line_item.description,
                     details=line_item.details,
                     price=document_field_float_or_none(line_item.price),
+                    price_status=_resolve_line_item_price_status_for_append(line_item),
                     flagged=line_item.flagged,
                     flag_reason=line_item.flag_reason,
                 )

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   LINE_ITEM_DESCRIPTION_MAX_CHARS,
@@ -50,6 +51,14 @@ export function LineItemEditSheet({
   const [priceInput, setPriceInput] = useState(
     initialLineItem.price == null ? "" : initialLineItem.price.toString(),
   );
+  const [isIncluded, setIsIncluded] = useState(
+    resolvePriceStatus({
+      price: initialLineItem.price,
+      priceStatus: initialLineItem.priceStatus,
+      description: initialLineItem.description,
+      details: initialLineItem.details,
+    }) === "included",
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const title = mode === "edit" ? "Edit Line Item" : "Add Line Item";
 
@@ -67,11 +76,15 @@ export function LineItemEditSheet({
     }
 
     setFormError(null);
+    const resolvedPriceStatus = parsedPrice.value !== null
+      ? "priced"
+      : (isIncluded ? "included" : "unknown");
     onSave({
       ...initialLineItem,
       description: trimmedDescription,
       details: details.trim().length > 0 ? details.trim() : null,
-      price: parsedPrice.value,
+      price: resolvedPriceStatus === "priced" ? parsedPrice.value : null,
+      priceStatus: resolvedPriceStatus,
     });
   }
 
@@ -145,9 +158,30 @@ export function LineItemEditSheet({
                   inputMode="decimal"
                   placeholder="$ 0.00"
                   value={priceInput}
-                  onChange={(event) => setPriceInput(event.target.value)}
+                  disabled={isIncluded}
+                  onChange={(event) => {
+                    setPriceInput(event.target.value);
+                    if (event.target.value.trim().length > 0) {
+                      setIsIncluded(false);
+                    }
+                  }}
                   className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
+                <label className="mt-2 inline-flex items-center gap-2 text-sm text-on-surface-variant">
+                  <input
+                    id="line-item-sheet-included"
+                    type="checkbox"
+                    checked={isIncluded}
+                    onChange={(event) => {
+                      const nextIncluded = event.target.checked;
+                      setIsIncluded(nextIncluded);
+                      if (nextIncluded) {
+                        setPriceInput("");
+                      }
+                    }}
+                  />
+                  Included / no-charge item
+                </label>
               </section>
             </div>
 

@@ -34,6 +34,20 @@ describe("LineItemCard", () => {
     expect(screen.getByText("REVIEW")).toBeInTheDocument();
   });
 
+  it("renders included rows with Included label", () => {
+    render(
+      <LineItemCard
+        description="Cleanup labor"
+        details="No separate charge"
+        price={null}
+        priceStatus="included"
+        onClick={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Included")).toBeInTheDocument();
+  });
+
   it("fires onClick when card is clicked", () => {
     const onClickMock = vi.fn();
     render(

@@ -40,6 +40,7 @@ function isValidLineItemDraft(value: unknown): value is LineItemDraftWithFlags {
     description,
     details,
     price,
+    priceStatus,
     flagged,
     flagReason,
   } = value;
@@ -48,6 +49,7 @@ function isValidLineItemDraft(value: unknown): value is LineItemDraftWithFlags {
     typeof description === "string"
     && (details === null || details === undefined || typeof details === "string")
     && (price === null || price === undefined || typeof price === "number")
+    && (priceStatus === undefined || priceStatus === "priced" || priceStatus === "included" || priceStatus === "unknown")
     && (flagged === undefined || typeof flagged === "boolean")
     && (flagReason === undefined || flagReason === null || typeof flagReason === "string")
   );
@@ -180,6 +182,7 @@ export function mapQuoteToEditDraft(quote: QuoteDetail): DocumentEditDraft {
       description: item.description,
       details: item.details,
       price: item.price,
+      priceStatus: item.price_status,
       flagged: item.flagged,
       flagReason: item.flag_reason,
     })),
@@ -215,6 +218,7 @@ export function mapInvoiceToEditDraft(invoice: InvoiceDetail): DocumentEditDraft
       description: item.description,
       details: item.details,
       price: item.price,
+      priceStatus: item.price_status ?? (item.price !== null ? "priced" : "unknown"),
     })),
     total: breakdown.subtotal ?? invoice.total_amount,
     taxRate: invoice.tax_rate,

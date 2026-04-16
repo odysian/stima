@@ -6,6 +6,7 @@ import {
   publicService,
 } from "@/features/public/services/publicService";
 import type { PublicDocument } from "@/features/public/types/public.types";
+import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
@@ -277,28 +278,38 @@ export function PublicQuotePage(): React.ReactElement {
                 </span>
               </div>
               <ul className="mt-4 space-y-3">
-                {documentData.line_items.map((item, index) => (
-                  <li
-                    key={`${index}-${item.description}-${item.details ?? "none"}`}
-                    className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="font-semibold break-words [overflow-wrap:anywhere]">
-                          {item.description}
-                        </p>
-                        {item.details ? (
-                          <p className="mt-1 text-sm text-on-surface-variant break-words [overflow-wrap:anywhere]">
-                            {item.details}
+                {documentData.line_items.map((item, index) => {
+                  const resolvedPriceStatus = resolvePriceStatus({
+                    price: item.price,
+                    priceStatus: item.price_status,
+                    description: item.description,
+                    details: item.details,
+                  });
+                  return (
+                    <li
+                      key={`${index}-${item.description}-${item.details ?? "none"}`}
+                      className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="font-semibold break-words [overflow-wrap:anywhere]">
+                            {item.description}
                           </p>
-                        ) : null}
+                          {item.details ? (
+                            <p className="mt-1 text-sm text-on-surface-variant break-words [overflow-wrap:anywhere]">
+                              {item.details}
+                            </p>
+                          ) : null}
+                        </div>
+                        <p className={`shrink-0 text-sm font-semibold ${resolvedPriceStatus === "included" ? "text-success" : ""}`}>
+                          {resolvedPriceStatus === "priced" && item.price !== null
+                            ? formatCurrency(item.price)
+                            : (resolvedPriceStatus === "included" ? "Included" : "TBD")}
+                        </p>
                       </div>
-                      <p className="shrink-0 text-sm font-semibold">
-                        {item.price !== null ? formatCurrency(item.price) : "TBD"}
-                      </p>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             </section>
 

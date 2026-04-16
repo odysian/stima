@@ -56,6 +56,48 @@ _override_extraction_service_dependency = quotes_test_module._override_extractio
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
 
 
+async def test_extraction_review_metadata_parses_legacy_grouped_hidden_details() -> None:
+    metadata = ExtractionReviewMetadataV1.model_validate(
+        {
+            "pipeline_version": "v2",
+            "hidden_details": {
+                "append_suggestions": [
+                    {
+                        "id": "append-note-1",
+                        "kind": "note",
+                        "raw_text": "Add gate note",
+                        "confidence": "medium",
+                        "source": "append_capture",
+                        "pricing_field": None,
+                    }
+                ],
+                "unresolved_segments": [
+                    {
+                        "id": "unresolved-1",
+                        "raw_text": "Clarify edging scope",
+                        "confidence": "low",
+                        "source": "leftover_classification",
+                    }
+                ],
+                "confidence_notes": ["Legacy confidence note"],
+            },
+            "hidden_detail_state": {
+                "append-note-1": {"reviewed": False, "dismissed": True},
+            },
+        }
+    )
+
+    assert [item["kind"] for item in metadata.hidden_details.model_dump(mode="json")["items"]] == [
+        "append_suggestion",
+        "unresolved_segment",
+        "confidence_note",
+    ]
+    assert metadata.hidden_details.items[0].field == "notes"
+    assert metadata.hidden_details.items[0].text == "Add gate note"
+    assert metadata.hidden_details.items[1].reason == "leftover_classification"
+    assert metadata.hidden_details.items[2].text == "Legacy confidence note"
+
+
 async def test_append_extraction_sync_retryable_failure_uses_degraded_append_semantics(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -319,8 +361,15 @@ async def test_append_extraction_resurfaces_previously_dismissed_matching_sugges
 
     detail_response = await client.get(f"/api/quotes/{quote_id}")
     assert detail_response.status_code == 200
-    hidden_state = detail_response.json()["extraction_review_metadata"]["hidden_detail_state"]
-    assert hidden_state[suggestion_id] == {"reviewed": False, "dismissed": False}
+    metadata_payload = detail_response.json()["extraction_review_metadata"]
+    hidden_state = metadata_payload["hidden_detail_state"]
+    next_item = next(
+        item
+        for item in metadata_payload["hidden_details"]["items"]
+        if item["kind"] == "append_suggestion" and item["text"] == suggestion_text
+    )
+    assert next_item["id"] != suggestion_id
+    assert hidden_state[next_item["id"]] == {"reviewed": False, "dismissed": False}
 
 
 async def test_append_extraction_preserves_existing_confidence_notes_when_new_notes_empty(

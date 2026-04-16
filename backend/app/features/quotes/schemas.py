@@ -8,6 +8,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.features.quotes.price_status import (
+    LineItemPriceStatus,
+    resolve_line_item_price_status,
+    resolve_line_item_price_status_with_fallback,
+)
 from app.shared.input_limits import (
     AUDIO_TRANSCRIPT_MAX_CHARS,
     CONFIDENCE_NOTE_MAX_CHARS,
@@ -31,14 +36,70 @@ def _normalize_optional_title(value: object) -> object:
     return trimmed or None
 
 
+def _normalize_line_item_price_status_payload(value: object) -> object:
+    if not isinstance(value, dict):
+        return value
+    payload = dict(value)
+    payload["price_status"] = resolve_line_item_price_status(
+        price=payload.get("price"),
+        price_status=(
+            payload.get("price_status") if isinstance(payload.get("price_status"), str) else None
+        ),
+        description=(
+            payload.get("description") if isinstance(payload.get("description"), str) else None
+        ),
+        details=payload.get("details") if isinstance(payload.get("details"), str) else None,
+    )
+    return payload
+
+
+def _normalize_line_item_price_status_for_response(value: object) -> object:
+    payload: dict[str, Any] | None = None
+    if isinstance(value, dict):
+        payload = dict(value)
+    else:
+        fields = (
+            "id",
+            "description",
+            "details",
+            "price",
+            "price_status",
+            "flagged",
+            "flag_reason",
+            "sort_order",
+        )
+        extracted = {field: getattr(value, field) for field in fields if hasattr(value, field)}
+        if extracted:
+            payload = extracted
+    if payload is None:
+        return value
+
+    payload["price_status"] = resolve_line_item_price_status_with_fallback(
+        price=payload.get("price"),
+        price_status=(
+            payload.get("price_status") if isinstance(payload.get("price_status"), str) else None
+        ),
+        description=(
+            payload.get("description") if isinstance(payload.get("description"), str) else None
+        ),
+        details=payload.get("details") if isinstance(payload.get("details"), str) else None,
+    )
+    return payload
+
+
 class LineItemDraft(BaseModel):
     """Editable line item payload used for quote creation and updates."""
 
     description: str = Field(min_length=1, max_length=LINE_ITEM_DESCRIPTION_MAX_CHARS)
     details: str | None = Field(default=None, max_length=LINE_ITEM_DETAILS_MAX_CHARS)
     price: float | None = None
+    price_status: LineItemPriceStatus | None = None
     flagged: bool = False
     flag_reason: str | None = None
+
+    _normalize_price_status = model_validator(mode="before")(
+        _normalize_line_item_price_status_payload
+    )
 
 
 class LineItemExtracted(LineItemDraft):
@@ -321,15 +382,168 @@ class ExtractionReviewUnresolvedSegment(BaseModel):
     source: UnresolvedSegmentSource
 
 
+ActionableItemKind = Literal["append_suggestion", "unresolved_segment", "confidence_note"]
+ActionableItemField = Literal["notes", "explicit_total", "deposit_amount", "tax_rate", "discount"]
+
+
+def _coerce_pricing_field(field: str | None) -> PricingFieldName | None:
+    if field == "explicit_total":
+        return "explicit_total"
+    if field == "deposit_amount":
+        return "deposit_amount"
+    if field == "tax_rate":
+        return "tax_rate"
+    if field == "discount":
+        return "discount"
+    return None
+
+
+def _coerce_unresolved_segment_source(reason: str | None) -> UnresolvedSegmentSource:
+    if reason == "leftover_classification":
+        return "leftover_classification"
+    if reason == "typed_conflict":
+        return "typed_conflict"
+    if reason == "transcript_conflict":
+        return "transcript_conflict"
+    return "leftover_classification"
+
+
+class ExtractionReviewActionableItem(BaseModel):
+    """Unified actionable hidden item persisted in extraction sidecar metadata."""
+
+    id: str = Field(min_length=1)
+    kind: ActionableItemKind
+    field: ActionableItemField | None = None
+    reason: str | None = Field(default=None, max_length=64)
+    confidence: Literal["medium", "low"] | None = None
+    text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+
+
 class ExtractionReviewHiddenDetails(BaseModel):
     """Hidden extraction details shown in Capture Details surfaces."""
 
+    items: list[ExtractionReviewActionableItem] = Field(default_factory=list)
     unresolved_segments: list[ExtractionReviewUnresolvedSegment] = Field(default_factory=list)
     append_suggestions: list[ExtractionReviewAppendSuggestion] = Field(default_factory=list)
     confidence_notes: list[Annotated[str, Field(max_length=CONFIDENCE_NOTE_MAX_CHARS)]] = Field(
         default_factory=list,
         max_length=CONFIDENCE_NOTES_MAX_ITEMS,
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_shapes(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        if isinstance(payload.get("items"), list):
+            return payload
+
+        items: list[dict[str, Any]] = []
+        for suggestion_candidate in payload.get("append_suggestions", []):
+            suggestion: dict[str, Any] | None
+            if isinstance(suggestion_candidate, dict):
+                suggestion = suggestion_candidate
+            else:
+                model_dump = getattr(suggestion_candidate, "model_dump", None)
+                suggestion = model_dump(mode="json") if callable(model_dump) else None
+            if not isinstance(suggestion, dict):
+                continue
+            raw_text = suggestion.get("raw_text")
+            if not isinstance(raw_text, str) or not raw_text.strip():
+                continue
+            suggestion_pricing_field = suggestion.get("pricing_field")
+            field = _coerce_pricing_field(
+                suggestion_pricing_field if isinstance(suggestion_pricing_field, str) else None
+            )
+            items.append(
+                {
+                    "id": str(suggestion.get("id", "")),
+                    "kind": "append_suggestion",
+                    "field": "notes" if field is None else field,
+                    "reason": suggestion.get("source"),
+                    "confidence": suggestion.get("confidence"),
+                    "text": raw_text,
+                }
+            )
+
+        for segment_candidate in payload.get("unresolved_segments", []):
+            segment: dict[str, Any] | None
+            if isinstance(segment_candidate, dict):
+                segment = segment_candidate
+            else:
+                model_dump = getattr(segment_candidate, "model_dump", None)
+                segment = model_dump(mode="json") if callable(model_dump) else None
+            if not isinstance(segment, dict):
+                continue
+            raw_text = segment.get("raw_text")
+            if not isinstance(raw_text, str) or not raw_text.strip():
+                continue
+            items.append(
+                {
+                    "id": str(segment.get("id", "")),
+                    "kind": "unresolved_segment",
+                    "field": None,
+                    "reason": segment.get("source"),
+                    "confidence": segment.get("confidence"),
+                    "text": raw_text,
+                }
+            )
+
+        for index, note in enumerate(payload.get("confidence_notes", [])):
+            if not isinstance(note, str) or not note.strip():
+                continue
+            note_id = f"legacy-confidence-{index}"
+            items.append(
+                {
+                    "id": note_id,
+                    "kind": "confidence_note",
+                    "field": None,
+                    "reason": "legacy_confidence_note",
+                    "confidence": None,
+                    "text": note,
+                }
+            )
+
+        payload["items"] = items
+        return payload
+
+    @model_validator(mode="after")
+    def sync_legacy_views(self) -> ExtractionReviewHiddenDetails:
+        unresolved_segments: list[ExtractionReviewUnresolvedSegment] = []
+        append_suggestions: list[ExtractionReviewAppendSuggestion] = []
+        confidence_notes: list[str] = []
+        for item in self.items:
+            if item.kind == "unresolved_segment":
+                unresolved_source = _coerce_unresolved_segment_source(item.reason)
+                unresolved_segments.append(
+                    ExtractionReviewUnresolvedSegment(
+                        id=item.id,
+                        raw_text=item.text,
+                        confidence=item.confidence or "medium",
+                        source=unresolved_source,
+                    )
+                )
+                continue
+            if item.kind == "append_suggestion":
+                pricing_field = _coerce_pricing_field(item.field)
+                append_suggestions.append(
+                    ExtractionReviewAppendSuggestion(
+                        id=item.id,
+                        kind=("note" if pricing_field is None else "pricing"),
+                        raw_text=item.text,
+                        confidence=item.confidence or "medium",
+                        source="append_capture",
+                        pricing_field=pricing_field,
+                    )
+                )
+                continue
+            confidence_notes.append(item.text)
+
+        self.unresolved_segments = unresolved_segments
+        self.append_suggestions = append_suggestions
+        self.confidence_notes = confidence_notes
+        return self
 
 
 class HiddenItemState(BaseModel):
@@ -350,6 +564,23 @@ class ExtractionReviewMetadataV1(BaseModel):
     )
     hidden_detail_state: dict[str, HiddenItemState] = Field(default_factory=dict)
     extraction_degraded_reason_code: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_metadata_shape(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        hidden_details = payload.get("hidden_details")
+        hidden_payload = dict(hidden_details) if isinstance(hidden_details, dict) else {}
+        for key in ("append_suggestions", "unresolved_segments", "confidence_notes", "items"):
+            if key in payload and key not in hidden_payload:
+                hidden_payload[key] = payload[key]
+        if hidden_payload:
+            payload["hidden_details"] = hidden_payload
+        if "hidden_item_state" in payload and "hidden_detail_state" not in payload:
+            payload["hidden_detail_state"] = payload["hidden_item_state"]
+        return payload
 
     @classmethod
     def model_validate_with_defaults(
@@ -500,9 +731,14 @@ class LineItemResponse(BaseModel):
     description: str
     details: str | None
     price: float | None
+    price_status: LineItemPriceStatus
     flagged: bool = False
     flag_reason: str | None = None
     sort_order: int
+
+    _normalize_price_status = model_validator(mode="before")(
+        _normalize_line_item_price_status_for_response
+    )
 
 
 class PublicLineItemResponse(BaseModel):
@@ -513,6 +749,11 @@ class PublicLineItemResponse(BaseModel):
     description: str
     details: str | None
     price: float | None
+    price_status: LineItemPriceStatus
+
+    _normalize_price_status = model_validator(mode="before")(
+        _normalize_line_item_price_status_for_response
+    )
 
 
 class QuoteListItemResponse(BaseModel):

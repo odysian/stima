@@ -13,6 +13,14 @@ interface CaptureDetailsSheetProps {
   isMutating?: boolean;
 }
 
+interface ResolvedHiddenItem {
+  id: string;
+  kind: "append_suggestion" | "unresolved_segment" | "confidence_note";
+  field: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
+  reason: string | null;
+  text: string;
+}
+
 function formatPricingField(
   pricingField: "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null | undefined,
 ): string | null {
@@ -40,6 +48,44 @@ function renderEmptySection(message: string): React.ReactElement {
   );
 }
 
+function resolveHiddenItems(hiddenDetails?: ExtractionReviewHiddenDetails): ResolvedHiddenItem[] {
+  if (!hiddenDetails) {
+    return [];
+  }
+  if (Array.isArray(hiddenDetails.items) && hiddenDetails.items.length > 0) {
+    return hiddenDetails.items.map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      field: item.field ?? null,
+      reason: item.reason ?? null,
+      text: item.text,
+    }));
+  }
+
+  const fromSuggestions: ResolvedHiddenItem[] = hiddenDetails.append_suggestions.map((suggestion) => ({
+    id: suggestion.id,
+    kind: "append_suggestion",
+    field: suggestion.pricing_field ?? "notes",
+    reason: suggestion.source,
+    text: suggestion.raw_text,
+  }));
+  const fromUnresolved: ResolvedHiddenItem[] = hiddenDetails.unresolved_segments.map((segment) => ({
+    id: segment.id,
+    kind: "unresolved_segment",
+    field: null,
+    reason: segment.source,
+    text: segment.raw_text,
+  }));
+  const fromConfidence: ResolvedHiddenItem[] = hiddenDetails.confidence_notes.map((note, index) => ({
+    id: `legacy-confidence-${index}`,
+    kind: "confidence_note",
+    field: null,
+    reason: "legacy_confidence_note",
+    text: note,
+  }));
+  return [...fromSuggestions, ...fromUnresolved, ...fromConfidence];
+}
+
 export function CaptureDetailsSheet({
   open,
   onClose,
@@ -50,14 +96,15 @@ export function CaptureDetailsSheet({
   onDismissHiddenItem,
   isMutating = false,
 }: CaptureDetailsSheetProps): React.ReactElement {
-  const appendSuggestions = hiddenDetails?.append_suggestions ?? [];
-  const unresolvedSegments = hiddenDetails?.unresolved_segments ?? [];
-  const confidenceNotes = hiddenDetails?.confidence_notes ?? [];
-  const visibleAppendSuggestions = appendSuggestions.filter(
-    (suggestion) => !hiddenDetailState?.[suggestion.id]?.dismissed,
+  const hiddenItems = resolveHiddenItems(hiddenDetails);
+  const visibleAppendSuggestions = hiddenItems.filter(
+    (item) => item.kind === "append_suggestion" && !hiddenDetailState?.[item.id]?.dismissed,
   );
-  const visibleUnresolvedSegments = unresolvedSegments.filter(
-    (segment) => !hiddenDetailState?.[segment.id]?.dismissed,
+  const visibleUnresolvedSegments = hiddenItems.filter(
+    (item) => item.kind === "unresolved_segment" && !hiddenDetailState?.[item.id]?.dismissed,
+  );
+  const visibleConfidenceNotes = hiddenItems.filter(
+    (item) => item.kind === "confidence_note" && !hiddenDetailState?.[item.id]?.dismissed,
   );
 
   return (
@@ -84,7 +131,9 @@ export function CaptureDetailsSheet({
                 {visibleAppendSuggestions.length === 0 ? renderEmptySection("No new suggestions from the latest capture.") : (
                   <ul className="space-y-2">
                     {visibleAppendSuggestions.map((suggestion) => {
-                      const pricingField = formatPricingField(suggestion.pricing_field);
+                      const pricingField = formatPricingField(
+                        suggestion.field === "notes" ? null : suggestion.field,
+                      );
                       const itemState = hiddenDetailState?.[suggestion.id];
                       return (
                         <li
@@ -92,10 +141,10 @@ export function CaptureDetailsSheet({
                           className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
                         >
                           <p className="font-semibold">
-                            {suggestion.kind === "pricing" ? "Pricing suggestion" : "Notes suggestion"}
+                            {suggestion.field === "notes" ? "Notes suggestion" : "Pricing suggestion"}
                             {pricingField ? ` (${pricingField})` : ""}
                           </p>
-                          <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{suggestion.raw_text}</p>
+                          <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{suggestion.text}</p>
                           <div className="mt-3 flex items-center gap-2">
                             {itemState?.reviewed ? (
                               <span className="rounded-full bg-success/10 px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-success">
@@ -141,9 +190,9 @@ export function CaptureDetailsSheet({
                           className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
                         >
                           <p className="font-semibold">
-                            {segment.source.replaceAll("_", " ")}
+                            {(segment.reason ?? "leftover_classification").replaceAll("_", " ")}
                           </p>
-                          <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{segment.raw_text}</p>
+                          <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{segment.text}</p>
                           <div className="mt-3 flex items-center gap-2">
                             {itemState?.reviewed ? (
                               <span className="rounded-full bg-success/10 px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-success">
@@ -179,14 +228,14 @@ export function CaptureDetailsSheet({
                 <h3 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
                   AI Review Notes
                 </h3>
-                {confidenceNotes.length === 0 ? renderEmptySection("No AI review notes.") : (
+                {visibleConfidenceNotes.length === 0 ? renderEmptySection("No AI review notes.") : (
                   <ul className="space-y-2">
-                    {confidenceNotes.map((note, index) => (
+                    {visibleConfidenceNotes.map((note) => (
                       <li
-                        key={`${note}-${index}`}
+                        key={note.id}
                         className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface whitespace-pre-wrap"
                       >
-                        {note}
+                        {note.text}
                       </li>
                     ))}
                   </ul>

@@ -29,7 +29,12 @@ export function buildDraftSnapshot(
     docType?: "quote" | "invoice";
     title: string;
     transcript?: string;
-    lineItems: { description: string; details: string | null; price: number | null }[];
+    lineItems: {
+      description: string;
+      details: string | null;
+      price: number | null;
+      priceStatus?: "priced" | "included" | "unknown";
+    }[];
     total: number | null;
     taxRate: number | null;
     discountType: "fixed" | "percent" | null;
@@ -50,6 +55,7 @@ export function buildDraftSnapshot(
       description: lineItem.description,
       details: lineItem.details,
       price: lineItem.price,
+      price_status: lineItem.priceStatus,
     }));
 
   return {
