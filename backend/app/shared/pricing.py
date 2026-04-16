@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
@@ -13,6 +14,10 @@ _ZERO = Decimal("0")
 _ONE = Decimal("1")
 _HUNDRED = Decimal("100")
 _MONEY_QUANTIZER = Decimal("0.01")
+_INCLUDED_NO_CHARGE_PATTERN = re.compile(
+    r"\b(included|no[\s-]?charge|n/?c|complimentary|at no cost)\b",
+    flags=re.IGNORECASE,
+)
 
 
 class PricingValidationError(Exception):
@@ -292,18 +297,8 @@ def derive_document_subtotal_from_line_items(
     line_items: Sequence[object] | None,
 ) -> tuple[bool, float | None]:
     """Return whether priced line items fully define a subtotal and that float value."""
-    substantive_items = [
-        line_item for line_item in (line_items or ()) if document_line_item_has_content(line_item)
-    ]
-    if not substantive_items:
-        return True, None
-    if any(getattr(line_item, "price", None) is None for line_item in substantive_items):
-        return False, None
-
-    line_item_sum = calculate_line_item_sum(
-        [to_decimal(getattr(line_item, "price", None)) for line_item in substantive_items]
-    )
-    return True, document_field_float_or_none(line_item_sum)
+    defines_subtotal, line_item_subtotal = _derive_line_item_subtotal_decimal(line_items)
+    return defines_subtotal, document_field_float_or_none(line_item_subtotal)
 
 
 def resolve_document_subtotal_for_edit(
@@ -316,9 +311,7 @@ def resolve_document_subtotal_for_edit(
     line_items: Sequence[object] | None,
 ) -> float | None:
     """Reverse-calculate subtotal from persisted totals for PATCH merge logic."""
-    line_item_sum = calculate_line_item_sum(
-        [to_decimal(getattr(line_item, "price", None)) for line_item in (line_items or ())]
-    )
+    _, line_item_sum = _derive_line_item_subtotal_decimal(line_items)
     breakdown = calculate_breakdown_from_persisted(
         PricingInput(
             total_amount=document_field_decimal_or_none(total_amount),
@@ -342,9 +335,7 @@ def validate_document_pricing_input(
     deposit_amount: float | None,
 ) -> PricingInput:
     """Validate API pricing fields; raises PricingValidationError on contract violations."""
-    line_item_sum = calculate_line_item_sum(
-        [to_decimal(getattr(line_item, "price", None)) for line_item in (line_items or ())]
-    )
+    _, line_item_sum = _derive_line_item_subtotal_decimal(line_items)
     pricing, _ = validate_and_calculate_from_input(
         subtotal_input=to_decimal(total_amount),
         line_item_sum=line_item_sum,
@@ -378,6 +369,72 @@ def _resolve_subtotal_from_persisted(
         percent_multiplier = _ONE - (percent_discount / _HUNDRED)
         return _quantize_money(total_amount / (tax_multiplier * percent_multiplier))
     return _quantize_money(total_amount / tax_multiplier)
+
+
+def amounts_materially_differ(
+    candidate: float | Decimal | None,
+    baseline: float | Decimal | None,
+) -> bool:
+    """Return true when two monetary values differ by more than one cent."""
+    if candidate is None or baseline is None:
+        return False
+    return abs(_to_money_decimal(candidate) - _to_money_decimal(baseline)) > _MONEY_QUANTIZER
+
+
+def _derive_line_item_subtotal_decimal(
+    line_items: Sequence[object] | None,
+) -> tuple[bool, Decimal | None]:
+    substantive_items = [
+        line_item for line_item in (line_items or ()) if document_line_item_has_content(line_item)
+    ]
+    if not substantive_items:
+        return True, None
+
+    priced_values: list[Decimal] = []
+    for line_item in substantive_items:
+        status = _resolve_line_item_price_status_for_pricing(line_item)
+        if status == "unknown":
+            return False, None
+        if status == "priced":
+            price = to_decimal(getattr(line_item, "price", None))
+            if price is None:
+                return False, None
+            priced_values.append(price)
+
+    if not priced_values:
+        return True, None
+    return True, _quantize_money(sum(priced_values, start=_ZERO))
+
+
+def _resolve_line_item_price_status_for_pricing(
+    line_item: object,
+) -> Literal["priced", "included", "unknown"]:
+    price = getattr(line_item, "price", None)
+    has_price = price is not None
+    raw_status = getattr(line_item, "price_status", None)
+    if isinstance(raw_status, str):
+        normalized = raw_status.strip().casefold()
+        if normalized == "priced":
+            return "priced" if has_price else "unknown"
+        if normalized == "included":
+            return "included" if not has_price else "priced"
+        if normalized == "unknown":
+            return "unknown" if not has_price else "priced"
+
+    if has_price:
+        return "priced"
+    description = getattr(line_item, "description", None)
+    details = getattr(line_item, "details", None)
+    if _has_included_no_charge_language(description, details):
+        return "included"
+    return "unknown"
+
+
+def _has_included_no_charge_language(*parts: object) -> bool:
+    for part in parts:
+        if isinstance(part, str) and _INCLUDED_NO_CHARGE_PATTERN.search(part):
+            return True
+    return False
 
 
 def _validate_discount_fields(
@@ -438,3 +495,8 @@ def _normalize_optional_amount(value: Decimal | None) -> Decimal | None:
 
 def _quantize_money(value: Decimal) -> Decimal:
     return value.quantize(_MONEY_QUANTIZER, rounding=ROUND_HALF_UP)
+
+
+def _to_money_decimal(value: float | Decimal) -> Decimal:
+    decimal_value = value if isinstance(value, Decimal) else Decimal(str(value))
+    return _quantize_money(decimal_value)

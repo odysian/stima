@@ -36,6 +36,7 @@ class _CreationRepository:
         self.create_calls = 0
         self.rollback_calls = 0
         self.commit_calls = 0
+        self.last_create_kwargs: dict[str, object] | None = None
 
     async def customer_exists_for_user(self, *, user_id: UUID, customer_id: UUID) -> bool:
         del user_id
@@ -44,6 +45,7 @@ class _CreationRepository:
 
     async def create(self, **kwargs):  # noqa: ANN003, ANN201
         self.create_calls += 1
+        self.last_create_kwargs = kwargs
         if self._sequence_collision_on_first_create and self.create_calls == 1:
             raise IntegrityError(
                 statement="INSERT INTO documents (...) VALUES (...)",
@@ -123,3 +125,52 @@ async def test_create_extracted_draft_commit_false_skips_commit() -> None:
     assert quote.id is not None  # nosec B101 - pytest assertion
     assert repository.create_calls == 1  # nosec B101 - pytest assertion
     assert repository.commit_calls == 0  # nosec B101 - pytest assertion
+
+
+async def test_create_extracted_draft_prefers_line_item_subtotal_over_conflicting_total() -> None:
+    repository = _CreationRepository()
+    service = QuoteCreationService(
+        repository=cast(QuoteCreationRepositoryProtocol, repository),
+    )
+    extraction_result = ExtractionResult(
+        transcript="Mulch 120 and cleanup included, total 140",
+        line_items=[
+            LineItemExtractedV2(
+                raw_text="Mulch 120",
+                description="Mulch",
+                details="5 yards",
+                price=120,
+                price_status="priced",
+                confidence="medium",
+            ),
+            LineItemExtractedV2(
+                raw_text="Cleanup included",
+                description="Cleanup",
+                details="Included / no charge",
+                price=None,
+                price_status="included",
+                confidence="medium",
+            ),
+        ],
+        pricing_hints=PricingHints(explicit_total=140),
+        confidence_notes=[],
+    )
+
+    quote = await service.create_extracted_draft(
+        user_id=uuid4(),
+        customer_id=None,
+        extraction_result=extraction_result,
+        source_type="text",
+        commit=False,
+    )
+
+    assert quote.id is not None  # nosec B101 - pytest assertion
+    assert repository.last_create_kwargs is not None  # nosec B101 - pytest assertion
+    assert repository.last_create_kwargs["total_amount"] == 120.0  # nosec B101 - pytest assertion
+    review_metadata = repository.last_create_kwargs["extraction_review_metadata"]
+    assert isinstance(review_metadata, dict)  # nosec B101 - pytest assertion
+    hidden_items = review_metadata["hidden_details"]["items"]  # type: ignore[index]
+    assert any(
+        item["kind"] == "unresolved_segment" and "total 140" in item["text"].lower()
+        for item in hidden_items
+    )  # nosec B101 - pytest assertion

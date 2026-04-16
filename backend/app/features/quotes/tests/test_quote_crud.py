@@ -283,6 +283,80 @@ async def test_quote_detail_normalizes_pre_v25_rows_with_null_price_status(
     ]
 
 
+async def test_create_quote_uses_priced_and_included_rows_as_subtotal_authority(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "Mulch and cleanup included",
+            "line_items": [
+                {
+                    "description": "Mulch",
+                    "details": "5 yards",
+                    "price": 120,
+                    "price_status": "priced",
+                },
+                {
+                    "description": "Cleanup",
+                    "details": "Included / no charge",
+                    "price": None,
+                    "price_status": "included",
+                },
+            ],
+            "total_amount": None,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["total_amount"] == 120
+
+
+async def test_create_quote_with_unknown_price_rows_leaves_total_empty_without_explicit_total(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "Mulch and edging TBD",
+            "line_items": [
+                {
+                    "description": "Mulch",
+                    "details": "5 yards",
+                    "price": 120,
+                    "price_status": "priced",
+                },
+                {
+                    "description": "Edging",
+                    "details": "Need to confirm price onsite",
+                    "price": None,
+                    "price_status": "unknown",
+                },
+            ],
+            "total_amount": None,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["total_amount"] is None
+
+
 async def test_get_quote_returns_404_for_nonexistent_id(client: AsyncClient) -> None:
     await _register_and_login(client, _credentials())
 
