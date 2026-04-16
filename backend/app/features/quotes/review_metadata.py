@@ -5,14 +5,15 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from hashlib import sha256
 from typing import Literal, cast
+from uuid import uuid4
 
 from app.features.quotes.schemas import (
     ExtractionResult,
+    ExtractionReviewActionableItem,
     ExtractionReviewAppendSuggestion,
     ExtractionReviewHiddenDetails,
     ExtractionReviewMetadataV1,
     ExtractionReviewState,
-    ExtractionReviewUnresolvedSegment,
     HiddenItemState,
     NotesSeededFieldMetadata,
     PlacementConfidence,
@@ -84,28 +85,14 @@ def build_extraction_review_metadata(
         ),
     )
 
-    unresolved_segments = _dedupe_unresolved_segments(extraction_result)
-    merged_append_suggestions, incoming_append_ids = _merge_append_suggestions(
-        previous_suggestions=previous.hidden_details.append_suggestions,
-        incoming_suggestions=append_suggestions or [],
+    next_actionable_items = _build_actionable_items(
+        extraction_result=extraction_result,
+        previous_items=previous.hidden_details.items,
+        previous_state=previous.hidden_detail_state,
+        append_suggestions=append_suggestions or [],
     )
-    hidden_details = ExtractionReviewHiddenDetails(
-        unresolved_segments=unresolved_segments,
-        append_suggestions=merged_append_suggestions,
-        confidence_notes=(
-            list(extraction_result.confidence_notes)
-            if extraction_result.confidence_notes
-            else list(previous.hidden_details.confidence_notes)
-        ),
-    )
-    current_hidden_item_ids = {
-        *[item.id for item in unresolved_segments],
-        *[item.id for item in merged_append_suggestions],
-    }
-    resurfaced_hidden_item_ids = {
-        *[item.id for item in unresolved_segments],
-        *incoming_append_ids,
-    }
+    hidden_details = ExtractionReviewHiddenDetails(items=next_actionable_items)
+    current_hidden_item_ids = {item.id for item in next_actionable_items}
 
     return ExtractionReviewMetadataV1(
         pipeline_version=extraction_result.pipeline_version,
@@ -125,7 +112,6 @@ def build_extraction_review_metadata(
         hidden_detail_state=_build_hidden_detail_state(
             previous_state=previous.hidden_detail_state,
             current_item_ids=current_hidden_item_ids,
-            resurfaced_item_ids=resurfaced_hidden_item_ids,
         ),
         extraction_degraded_reason_code=extraction_result.extraction_degraded_reason_code,
     )
@@ -171,11 +157,18 @@ def clear_append_suggestions_for_manual_edits(
     if not notes_changed and not pricing_changed:
         return metadata
 
-    filtered_append_suggestions = [
+    filtered_items = [
         item
-        for item in metadata.hidden_details.append_suggestions
+        for item in metadata.hidden_details.items
         if not (
-            (notes_changed and item.kind == "note") or (pricing_changed and item.kind == "pricing")
+            item.kind == "append_suggestion"
+            and (
+                (notes_changed and item.field == "notes")
+                or (
+                    pricing_changed
+                    and item.field in {"explicit_total", "deposit_amount", "tax_rate", "discount"}
+                )
+            )
         )
     ]
     updated_review_state = metadata.review_state.model_copy(
@@ -186,9 +179,7 @@ def clear_append_suggestions_for_manual_edits(
             ),
         }
     )
-    updated_hidden_details = metadata.hidden_details.model_copy(
-        update={"append_suggestions": filtered_append_suggestions}
-    )
+    updated_hidden_details = ExtractionReviewHiddenDetails(items=filtered_items)
     return metadata.model_copy(
         update={
             "review_state": updated_review_state,
@@ -275,16 +266,10 @@ def _build_hidden_detail_state(
     *,
     previous_state: Mapping[str, HiddenItemState],
     current_item_ids: set[str],
-    resurfaced_item_ids: set[str],
 ) -> dict[str, HiddenItemState]:
-    merged: dict[str, HiddenItemState] = {
-        item_id: state.model_copy(deep=True) for item_id, state in previous_state.items()
-    }
+    merged: dict[str, HiddenItemState] = {}
     for item_id in current_item_ids:
-        previous = merged.get(item_id, HiddenItemState())
-        if item_id in resurfaced_item_ids:
-            merged[item_id] = HiddenItemState()
-            continue
+        previous = previous_state.get(item_id, HiddenItemState())
         merged[item_id] = HiddenItemState(
             reviewed=previous.reviewed,
             dismissed=previous.dismissed,
@@ -292,38 +277,110 @@ def _build_hidden_detail_state(
     return merged
 
 
-def _dedupe_unresolved_segments(
+def _build_actionable_items(
+    *,
     extraction_result: ExtractionResult,
-) -> list[ExtractionReviewUnresolvedSegment]:
-    deduped: dict[str, ExtractionReviewUnresolvedSegment] = {}
+    previous_items: Sequence[ExtractionReviewActionableItem],
+    previous_state: Mapping[str, HiddenItemState],
+    append_suggestions: Sequence[ExtractionReviewAppendSuggestion],
+) -> list[ExtractionReviewActionableItem]:
+    previous_by_signature: dict[str, ExtractionReviewActionableItem] = {
+        _actionable_signature(item): item for item in previous_items
+    }
+    deduped: dict[str, ExtractionReviewActionableItem] = {}
+
     for segment in extraction_result.unresolved_segments:
-        hidden_id = build_hidden_item_id(
-            "unresolved",
-            segment.source,
-            segment.confidence,
-            segment.raw_text,
-        )
-        if hidden_id in deduped:
-            continue
-        deduped[hidden_id] = ExtractionReviewUnresolvedSegment(
-            id=hidden_id,
-            raw_text=segment.raw_text,
+        candidate = ExtractionReviewActionableItem(
+            id="pending",
+            kind="unresolved_segment",
+            field=None,
+            reason=segment.source,
             confidence=segment.confidence,
-            source=segment.source,
+            text=segment.raw_text,
         )
+        signature = _actionable_signature(candidate)
+        previous = previous_by_signature.get(signature)
+        previous_item_state = previous_state.get(previous.id) if previous is not None else None
+        deduped[signature] = candidate.model_copy(
+            update={
+                "id": (
+                    previous.id
+                    if previous is not None
+                    and (previous_item_state is None or not previous_item_state.dismissed)
+                    else _build_new_occurrence_id()
+                )
+            }
+        )
+
+    for suggestion in append_suggestions:
+        field: PricingFieldName | Literal["notes"]
+        if suggestion.pricing_field is None:
+            field = "notes"
+        else:
+            field = suggestion.pricing_field
+        candidate = ExtractionReviewActionableItem(
+            id="pending",
+            kind="append_suggestion",
+            field=field,
+            reason=suggestion.source,
+            confidence=suggestion.confidence,
+            text=suggestion.raw_text,
+        )
+        signature = _actionable_signature(candidate)
+        previous = previous_by_signature.get(signature)
+        previous_item_state = previous_state.get(previous.id) if previous is not None else None
+        deduped[signature] = candidate.model_copy(
+            update={
+                "id": (
+                    previous.id
+                    if previous is not None
+                    and (previous_item_state is None or not previous_item_state.dismissed)
+                    else _build_new_occurrence_id()
+                )
+            }
+        )
+
+    confidence_notes = (
+        list(extraction_result.confidence_notes)
+        if extraction_result.confidence_notes
+        else [item.text for item in previous_items if item.kind == "confidence_note"]
+    )
+    for note in confidence_notes:
+        candidate = ExtractionReviewActionableItem(
+            id="pending",
+            kind="confidence_note",
+            field=None,
+            reason="confidence_note",
+            confidence=None,
+            text=note,
+        )
+        signature = _actionable_signature(candidate)
+        previous = previous_by_signature.get(signature)
+        previous_item_state = previous_state.get(previous.id) if previous is not None else None
+        deduped[signature] = candidate.model_copy(
+            update={
+                "id": (
+                    previous.id
+                    if previous is not None
+                    and (previous_item_state is None or not previous_item_state.dismissed)
+                    else _build_new_occurrence_id()
+                )
+            }
+        )
+
     return list(deduped.values())
 
 
-def _merge_append_suggestions(
-    *,
-    previous_suggestions: Sequence[ExtractionReviewAppendSuggestion],
-    incoming_suggestions: Sequence[ExtractionReviewAppendSuggestion],
-) -> tuple[list[ExtractionReviewAppendSuggestion], set[str]]:
-    merged: dict[str, ExtractionReviewAppendSuggestion] = {
-        item.id: item for item in previous_suggestions
-    }
-    incoming_ids: set[str] = set()
-    for item in incoming_suggestions:
-        merged[item.id] = item
-        incoming_ids.add(item.id)
-    return list(merged.values()), incoming_ids
+def _actionable_signature(item: ExtractionReviewActionableItem) -> str:
+    return "|".join(
+        (
+            item.kind,
+            item.field or "",
+            item.reason or "",
+            item.text.strip().casefold(),
+        )
+    )
+
+
+def _build_new_occurrence_id() -> str:
+    return f"occ:{uuid4().hex[:16]}"

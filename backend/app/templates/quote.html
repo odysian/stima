@@ -484,8 +484,10 @@
             <td class="price-col">
               {% if line_item.price is not none %}
               ${{ "{:,.2f}".format(line_item.price) }}
+              {% elif line_item.price_status == "included" %}
+              Included
               {% else %}
-              &mdash;
+              TBD
               {% endif %}
             </td>
           </tr>

@@ -10,6 +10,7 @@ function makeLineItem(overrides: Partial<LineItemDraftWithFlags> = {}): LineItem
     description: "Brown mulch",
     details: "5 yards",
     price: 120,
+    priceStatus: "priced",
     flagged: true,
     flagReason: "Needs review",
     ...overrides,
@@ -97,6 +98,33 @@ describe("LineItemEditSheet", () => {
       description: "Premium mulch",
       details: "6 yards",
       price: null,
+      priceStatus: "unknown",
+      flagged: true,
+      flagReason: "Needs review",
+    });
+  });
+
+  it("saves included/no-charge rows with included price status", () => {
+    const onSave = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem()}
+        onClose={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText(/included \/ no-charge item/i));
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(onSave).toHaveBeenCalledWith({
+      description: "Brown mulch",
+      details: "5 yards",
+      price: null,
+      priceStatus: "included",
       flagged: true,
       flagReason: "Needs review",
     });

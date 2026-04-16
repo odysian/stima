@@ -5,6 +5,7 @@ import type {
   LineItemDraftWithFlags,
 } from "@/features/quotes/types/quote.types";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
+import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 
 export const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   description: "",
@@ -14,10 +15,17 @@ export const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
 
 export function normalizeLineItem(item: LineItemDraftWithFlags): LineItemDraftWithFlags {
   const normalizedDetails = item.details?.trim() ?? "";
+  const details = normalizedDetails.length > 0 ? normalizedDetails : null;
   return {
     description: item.description.trim(),
-    details: normalizedDetails.length > 0 ? normalizedDetails : null,
+    details,
     price: item.price,
+    priceStatus: resolvePriceStatus({
+      price: item.price,
+      priceStatus: item.priceStatus,
+      description: item.description,
+      details,
+    }),
     flagged: item.flagged,
     flagReason: item.flagReason,
   };
@@ -44,6 +52,7 @@ export function buildLineItemSubmitState(lineItems: LineItemDraftWithFlags[]): {
       description: lineItem.description,
       details: lineItem.details,
       price: lineItem.price,
+      price_status: lineItem.priceStatus,
       flagged: lineItem.flagged,
       flag_reason: lineItem.flagReason ?? null,
     }));
@@ -66,6 +75,7 @@ export function mapExtractedLineItems(extraction: ExtractionResult): LineItemDra
     description: lineItem.description,
     details: lineItem.details,
     price: lineItem.price,
+    priceStatus: lineItem.price_status,
     flagged: lineItem.flagged,
     flagReason: lineItem.flag_reason,
   }));

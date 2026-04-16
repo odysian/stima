@@ -1,6 +1,7 @@
 import { formatCurrency } from "@/shared/lib/formatters";
 
 import type { LineItem } from "@/features/quotes/types/quote.types";
+import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 
 interface QuoteLineItemsSectionProps {
   lineItems: LineItem[];
@@ -20,26 +21,36 @@ export function QuoteLineItemsSection({
         </span>
       </div>
       <ul className="space-y-2">
-        {lineItems.map((item) => (
-          <li
-            key={item.id}
-            className="ghost-shadow flex items-start justify-between rounded-lg bg-surface-container-lowest p-3"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-on-surface break-words [overflow-wrap:anywhere]">
-                {item.description}
-              </p>
-              {item.details ? (
-                <p className="mt-1 text-sm text-on-surface-variant break-words [overflow-wrap:anywhere]">
-                  {item.details}
+        {lineItems.map((item) => {
+          const resolvedPriceStatus = resolvePriceStatus({
+            price: item.price,
+            priceStatus: item.price_status,
+            description: item.description,
+            details: item.details,
+          });
+          return (
+            <li
+              key={item.id}
+              className="ghost-shadow flex items-start justify-between rounded-lg bg-surface-container-lowest p-3"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-on-surface break-words [overflow-wrap:anywhere]">
+                  {item.description}
                 </p>
-              ) : null}
-            </div>
-            <p className="ml-4 shrink-0 font-bold text-on-surface">
-              {item.price !== null ? formatCurrency(item.price) : "TBD"}
-            </p>
-          </li>
-        ))}
+                {item.details ? (
+                  <p className="mt-1 text-sm text-on-surface-variant break-words [overflow-wrap:anywhere]">
+                    {item.details}
+                  </p>
+                ) : null}
+              </div>
+              <p className={`ml-4 shrink-0 font-bold ${resolvedPriceStatus === "included" ? "text-success" : "text-on-surface"}`}>
+                {resolvedPriceStatus === "priced" && item.price !== null
+                  ? formatCurrency(item.price)
+                  : (resolvedPriceStatus === "included" ? "Included" : "TBD")}
+              </p>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

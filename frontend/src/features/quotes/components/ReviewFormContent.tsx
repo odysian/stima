@@ -30,12 +30,35 @@ function ReviewPendingMarker({ title, message }: ReviewPendingMarkerProps): Reac
   );
 }
 
+function resolveHiddenActionableItems(hiddenDetails?: ExtractionReviewHiddenDetails): Array<{ id: string }> {
+  if (!hiddenDetails) {
+    return [];
+  }
+  if (Array.isArray(hiddenDetails.items) && hiddenDetails.items.length > 0) {
+    return hiddenDetails.items;
+  }
+
+  const legacyItems = [
+    ...hiddenDetails.append_suggestions.map((item) => ({ id: item.id })),
+    ...hiddenDetails.unresolved_segments.map((item) => ({ id: item.id })),
+    ...hiddenDetails.confidence_notes.map((_, index) => ({ id: `legacy-confidence-${index}` })),
+  ];
+  return legacyItems;
+}
+
 interface ReviewFormContentProps {
   customerName: string | null;
   draft: {
     title: string;
     transcript?: string;
-    lineItems: Array<{ description: string; details: string | null; price: number | null; flagged?: boolean; flagReason?: string | null }>;
+    lineItems: Array<{
+      description: string;
+      details: string | null;
+      price: number | null;
+      priceStatus?: "priced" | "included" | "unknown";
+      flagged?: boolean;
+      flagReason?: string | null;
+    }>;
     total: number | null;
     taxRate: number | null;
     discountType: "fixed" | "percent" | null;
@@ -121,18 +144,8 @@ export function ReviewFormContent({
   const showQuoteOnlySections = documentType === "quote";
   const showSevereDegradedMarker = extractionTier === "degraded"
     && draft.lineItems.length === 0;
-  const hasVisibleAppendSuggestions = Boolean(
-    hiddenDetails?.append_suggestions.some((suggestion) => !hiddenDetailState?.[suggestion.id]?.dismissed),
-  );
-  const hasVisibleUnresolvedSegments = Boolean(
-    hiddenDetails?.unresolved_segments.some((segment) => !hiddenDetailState?.[segment.id]?.dismissed),
-  );
-  const hasHiddenActionableItems = Boolean(
-    hiddenDetails
-      && (hasVisibleAppendSuggestions
-        || hasVisibleUnresolvedSegments
-        || hiddenDetails.confidence_notes.length > 0),
-  );
+  const hasHiddenActionableItems = resolveHiddenActionableItems(hiddenDetails)
+    .some((item) => !hiddenDetailState?.[item.id]?.dismissed);
 
   return (
     <form

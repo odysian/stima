@@ -21,8 +21,8 @@ describe("reviewScreenState", () => {
     });
 
     expect(snapshot.lineItems).toEqual([
-      { description: "", details: "Has details", price: null },
-      { description: "", details: null, price: 25 },
+      { description: "", details: "Has details", price: null, price_status: "unknown" },
+      { description: "", details: null, price: 25, price_status: "priced" },
     ]);
   });
 });

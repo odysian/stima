@@ -18,6 +18,10 @@ from app.features.customers.models import Customer
 from app.features.event_logs.models import EventLog
 from app.features.jobs.models import JobRecord, JobStatus
 from app.features.quotes.models import Document, LineItem, QuoteStatus
+from app.features.quotes.price_status import (
+    LineItemPriceStatus,
+    resolve_line_item_price_status,
+)
 from app.features.quotes.schemas import LineItemDraft
 from app.shared.pricing import (
     DiscountType,
@@ -61,6 +65,7 @@ class QuoteRenderLineItem:
     description: str
     details: str | None
     price: Decimal | None
+    price_status: LineItemPriceStatus
 
 
 @dataclass(slots=True)
@@ -768,6 +773,7 @@ class QuoteRepository:
                     description=item.description,
                     details=item.details,
                     price=_to_decimal(item.price),
+                    price_status=item.price_status,
                     flagged=item.flagged,
                     flag_reason=item.flag_reason,
                     sort_order=next_sort_order + index,
@@ -890,6 +896,7 @@ class QuoteRepository:
                     description=item.description,
                     details=item.details,
                     price=_to_decimal(item.price),
+                    price_status=item.price_status,
                     flagged=item.flagged,
                     flag_reason=item.flag_reason,
                     sort_order=index,
@@ -958,6 +965,7 @@ def _build_render_context(
                 description=line_item.description,
                 details=line_item.details,
                 price=line_item.price,
+                price_status=_resolve_line_item_price_status_for_render(line_item),
             )
             for line_item in document.line_items
         ],
@@ -976,6 +984,18 @@ def _format_quote_date(value: datetime, timezone: str | None) -> str:
             resolved_tz = UTC
 
     return value.astimezone(resolved_tz).strftime("%b %d, %Y")
+
+
+def _resolve_line_item_price_status_for_render(line_item: LineItem) -> LineItemPriceStatus:
+    try:
+        return resolve_line_item_price_status(
+            price=line_item.price,
+            price_status=line_item.price_status,
+            description=line_item.description,
+            details=line_item.details,
+        )
+    except ValueError:
+        return "priced" if line_item.price is not None else "unknown"
 
 
 def _can_reassign_customer(*, status: str, has_linked_invoice: bool) -> bool:
