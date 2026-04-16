@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.features.quotes.price_status import (
     LineItemPriceStatus,
     resolve_line_item_price_status,
+    resolve_line_item_price_status_with_fallback,
 )
 from app.shared.input_limits import (
     AUDIO_TRANSCRIPT_MAX_CHARS,
@@ -73,21 +74,16 @@ def _normalize_line_item_price_status_for_response(value: object) -> object:
     if payload is None:
         return value
 
-    try:
-        payload["price_status"] = resolve_line_item_price_status(
-            price=payload.get("price"),
-            price_status=(
-                payload.get("price_status")
-                if isinstance(payload.get("price_status"), str)
-                else None
-            ),
-            description=(
-                payload.get("description") if isinstance(payload.get("description"), str) else None
-            ),
-            details=payload.get("details") if isinstance(payload.get("details"), str) else None,
-        )
-    except ValueError:
-        payload["price_status"] = "priced" if payload.get("price") is not None else "unknown"
+    payload["price_status"] = resolve_line_item_price_status_with_fallback(
+        price=payload.get("price"),
+        price_status=(
+            payload.get("price_status") if isinstance(payload.get("price_status"), str) else None
+        ),
+        description=(
+            payload.get("description") if isinstance(payload.get("description"), str) else None
+        ),
+        details=payload.get("details") if isinstance(payload.get("details"), str) else None,
+    )
     return payload
 
 

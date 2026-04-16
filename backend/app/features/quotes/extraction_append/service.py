@@ -12,7 +12,7 @@ from app.features.quotes.extraction_outcomes import classify_extraction_result
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.price_status import (
     LineItemPriceStatus,
-    resolve_line_item_price_status,
+    resolve_line_item_price_status_with_fallback,
 )
 from app.features.quotes.review_metadata import (
     build_append_suggestion,
@@ -49,15 +49,12 @@ _APPEND_TRANSCRIPT_BULLET_PREFIXES = ("- ", "* ")
 
 
 def _resolve_line_item_price_status_for_append(line_item: LineItem) -> LineItemPriceStatus:
-    try:
-        return resolve_line_item_price_status(
-            price=line_item.price,
-            price_status=line_item.price_status,
-            description=line_item.description,
-            details=line_item.details,
-        )
-    except ValueError:
-        return "priced" if line_item.price is not None else "unknown"
+    return resolve_line_item_price_status_with_fallback(
+        price=line_item.price,
+        price_status=line_item.price_status,
+        description=line_item.description,
+        details=line_item.details,
+    )
 
 
 class QuoteExtractionAppendRepositoryProtocol(Protocol):
@@ -161,7 +158,12 @@ class QuoteExtractionAppendService:
                 description=item.description,
                 details=item.details,
                 price=item.price,
-                price_status=item.price_status,
+                price_status=resolve_line_item_price_status_with_fallback(
+                    price=item.price,
+                    price_status=item.price_status,
+                    description=item.description,
+                    details=item.details,
+                ),
                 flagged=item.flagged,
                 flag_reason=item.flag_reason,
             )

@@ -54,3 +54,27 @@ def resolve_line_item_price_status(
     if has_included_no_charge_language(description, details):
         return "included"
     return "unknown"
+
+
+def resolve_line_item_price_status_with_fallback(
+    *,
+    price: float | Decimal | None,
+    price_status: str | None,
+    description: str | None,
+    details: str | None,
+) -> LineItemPriceStatus:
+    """Resolve price status and gracefully recover from malformed status payloads."""
+    try:
+        return resolve_line_item_price_status(
+            price=price,
+            price_status=price_status,
+            description=description,
+            details=details,
+        )
+    except ValueError:
+        return resolve_line_item_price_status(
+            price=price,
+            price_status=None,
+            description=description,
+            details=details,
+        )

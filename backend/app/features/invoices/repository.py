@@ -25,7 +25,7 @@ from app.features.jobs.models import JobRecord, JobStatus
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.price_status import (
     LineItemPriceStatus,
-    resolve_line_item_price_status,
+    resolve_line_item_price_status_with_fallback,
 )
 from app.features.quotes.repository import QuoteRenderContext, QuoteRenderLineItem
 from app.features.quotes.schemas import LineItemDraft
@@ -821,12 +821,9 @@ def _format_document_date(value: date | None, timezone: str | None) -> str | Non
 
 
 def _resolve_line_item_price_status_for_render(line_item: LineItem) -> LineItemPriceStatus:
-    try:
-        return resolve_line_item_price_status(
-            price=line_item.price,
-            price_status=line_item.price_status,
-            description=line_item.description,
-            details=line_item.details,
-        )
-    except ValueError:
-        return "priced" if line_item.price is not None else "unknown"
+    return resolve_line_item_price_status_with_fallback(
+        price=line_item.price,
+        price_status=line_item.price_status,
+        description=line_item.description,
+        details=line_item.details,
+    )
