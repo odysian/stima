@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Literal, Protocol
 from uuid import UUID
 
@@ -17,10 +18,13 @@ from app.features.quotes.schemas import (
     LineItemDraft,
     PricingFieldName,
     QuoteCreateRequest,
+    UnresolvedSegment,
 )
 from app.shared.event_logger import log_event
 from app.shared.pricing import (
     PricingValidationError,
+    amounts_materially_differ,
+    derive_document_subtotal_from_line_items,
     document_field_float_or_none,
     validate_document_pricing_input,
 )
@@ -133,9 +137,40 @@ class QuoteCreationService:
         )
         extraction_metadata = classify_extraction_result(extraction_result)
         seeded_notes = _seeded_notes_from_result(extraction_result)
-        seeded_pricing_fields = _seeded_pricing_fields(extraction_result)
+        extracted_line_items = [
+            LineItemDraft(
+                description=item.description,
+                details=item.details,
+                price=item.price,
+                price_status=item.price_status,
+                flagged=item.flagged,
+                flag_reason=item.flag_reason,
+            )
+            for item in extraction_result.line_items
+        ]
+        pricing_application = _resolve_initial_pricing_application(
+            extraction_result=extraction_result,
+            line_items=extracted_line_items,
+        )
+        validated_pricing = _validate_document_pricing_for_quote(
+            total_amount=pricing_application.total_amount,
+            line_items=extracted_line_items,
+            discount_type=pricing_application.discount_type,
+            discount_value=pricing_application.discount_value,
+            tax_rate=pricing_application.tax_rate,
+            deposit_amount=pricing_application.deposit_amount,
+        )
+        seeded_pricing_fields = _seeded_pricing_fields(
+            extraction_result=extraction_result,
+            validated_pricing=validated_pricing,
+            seeded_explicit_total=pricing_application.seeded_explicit_total,
+        )
+        metadata_extraction_result = _apply_initial_pricing_hidden_item(
+            extraction_result=extraction_result,
+            hidden_explicit_total_text=pricing_application.hidden_explicit_total_text,
+        )
         extraction_review_metadata = build_extraction_review_metadata(
-            extraction_result,
+            metadata_extraction_result,
             seeded_notes=seeded_notes is not None,
             seeded_notes_confidence=(
                 extraction_result.customer_notes_suggestion.confidence
@@ -156,22 +191,12 @@ class QuoteCreationService:
                 customer_id=customer_id,
                 title=None,
                 transcript=extraction_result.transcript,
-                line_items=[
-                    LineItemDraft(
-                        description=item.description,
-                        details=item.details,
-                        price=item.price,
-                        price_status=item.price_status,
-                        flagged=item.flagged,
-                        flag_reason=item.flag_reason,
-                    )
-                    for item in extraction_result.line_items
-                ],
-                total_amount=extraction_result.pricing_hints.explicit_total,
-                tax_rate=extraction_result.pricing_hints.tax_rate,
-                discount_type=extraction_result.pricing_hints.discount_type,
-                discount_value=extraction_result.pricing_hints.discount_value,
-                deposit_amount=extraction_result.pricing_hints.deposit_amount,
+                line_items=extracted_line_items,
+                total_amount=document_field_float_or_none(validated_pricing.total_amount),
+                tax_rate=document_field_float_or_none(validated_pricing.tax_rate),
+                discount_type=validated_pricing.discount_type,
+                discount_value=document_field_float_or_none(validated_pricing.discount_value),
+                deposit_amount=document_field_float_or_none(validated_pricing.deposit_amount),
                 notes=seeded_notes,
                 source_type=source_type,
                 extraction_tier=extraction_metadata.tier,
@@ -328,15 +353,138 @@ def _seeded_notes_from_result(extraction_result: ExtractionResult) -> str | None
     return normalized or None
 
 
-def _seeded_pricing_fields(extraction_result: ExtractionResult) -> set[PricingFieldName]:
+@dataclass(frozen=True, slots=True)
+class _InitialPricingApplication:
+    total_amount: float | None
+    tax_rate: float | None
+    discount_type: str | None
+    discount_value: float | None
+    deposit_amount: float | None
+    seeded_explicit_total: bool
+    hidden_explicit_total_text: str | None
+
+
+def _resolve_initial_pricing_application(
+    *,
+    extraction_result: ExtractionResult,
+    line_items: list[LineItemDraft],
+) -> _InitialPricingApplication:
     pricing_hints = extraction_result.pricing_hints
+    line_items_define_subtotal, derived_line_item_subtotal = (
+        derive_document_subtotal_from_line_items(line_items)
+    )
+    has_reliable_priced_line_sum = (
+        line_items_define_subtotal and derived_line_item_subtotal is not None
+    )
+    has_valid_discount_candidate = (
+        pricing_hints.discount_type is not None and pricing_hints.discount_value is not None
+    )
+    has_tax_or_discount_candidate = (
+        pricing_hints.tax_rate is not None or has_valid_discount_candidate
+    )
+
+    seeded_explicit_total = False
+    hidden_explicit_total_text: str | None = None
+    total_amount: float | None
+
+    if has_reliable_priced_line_sum:
+        total_amount = derived_line_item_subtotal
+        if pricing_hints.explicit_total is not None and amounts_materially_differ(
+            pricing_hints.explicit_total, derived_line_item_subtotal
+        ):
+            hidden_explicit_total_text = (
+                f"Total {pricing_hints.explicit_total:g} conflicts with visible line-item subtotal "
+                f"{derived_line_item_subtotal:g}."
+            )
+    elif pricing_hints.explicit_total is not None and not has_tax_or_discount_candidate:
+        total_amount = pricing_hints.explicit_total
+        seeded_explicit_total = True
+    else:
+        total_amount = None
+        if pricing_hints.explicit_total is not None and has_tax_or_discount_candidate:
+            hidden_explicit_total_text = (
+                f"Total {pricing_hints.explicit_total:g} needs review because tax or discount was "
+                "also captured."
+            )
+
+    # Optional pricing fields require a subtotal authority source.
+    if total_amount is None:
+        return _InitialPricingApplication(
+            total_amount=None,
+            tax_rate=None,
+            discount_type=None,
+            discount_value=None,
+            deposit_amount=None,
+            seeded_explicit_total=seeded_explicit_total,
+            hidden_explicit_total_text=hidden_explicit_total_text,
+        )
+
+    return _InitialPricingApplication(
+        total_amount=total_amount,
+        tax_rate=pricing_hints.tax_rate,
+        discount_type=pricing_hints.discount_type if has_valid_discount_candidate else None,
+        discount_value=pricing_hints.discount_value if has_valid_discount_candidate else None,
+        deposit_amount=pricing_hints.deposit_amount,
+        seeded_explicit_total=seeded_explicit_total,
+        hidden_explicit_total_text=hidden_explicit_total_text,
+    )
+
+
+def _apply_initial_pricing_hidden_item(
+    *,
+    extraction_result: ExtractionResult,
+    hidden_explicit_total_text: str | None,
+) -> ExtractionResult:
+    if hidden_explicit_total_text is None:
+        return extraction_result
+    return extraction_result.model_copy(
+        update={
+            "unresolved_segments": [
+                *extraction_result.unresolved_segments,
+                UnresolvedSegment(
+                    raw_text=hidden_explicit_total_text,
+                    confidence="medium",
+                    source="transcript_conflict",
+                ),
+            ]
+        }
+    )
+
+
+def _seeded_pricing_fields(
+    *,
+    extraction_result: ExtractionResult,
+    validated_pricing: object,
+    seeded_explicit_total: bool,
+) -> set[PricingFieldName]:
+    pricing_hints = extraction_result.pricing_hints
+    normalized_total_amount = document_field_float_or_none(
+        getattr(validated_pricing, "total_amount", None)
+    )
+    normalized_tax_rate = document_field_float_or_none(getattr(validated_pricing, "tax_rate", None))
+    normalized_discount_type = getattr(validated_pricing, "discount_type", None)
+    normalized_discount_value = document_field_float_or_none(
+        getattr(validated_pricing, "discount_value", None)
+    )
+    normalized_deposit_amount = document_field_float_or_none(
+        getattr(validated_pricing, "deposit_amount", None)
+    )
     seeded: set[PricingFieldName] = set()
-    if pricing_hints.explicit_total is not None:
+    if (
+        seeded_explicit_total
+        and pricing_hints.explicit_total is not None
+        and normalized_total_amount is not None
+    ):
         seeded.add("explicit_total")
-    if pricing_hints.deposit_amount is not None:
+    if pricing_hints.deposit_amount is not None and normalized_deposit_amount is not None:
         seeded.add("deposit_amount")
-    if pricing_hints.tax_rate is not None:
+    if pricing_hints.tax_rate is not None and normalized_tax_rate is not None:
         seeded.add("tax_rate")
-    if pricing_hints.discount_type is not None and pricing_hints.discount_value is not None:
+    if (
+        pricing_hints.discount_type is not None
+        and pricing_hints.discount_value is not None
+        and normalized_discount_type is not None
+        and normalized_discount_value is not None
+    ):
         seeded.add("discount")
     return seeded

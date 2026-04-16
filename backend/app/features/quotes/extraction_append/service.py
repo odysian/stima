@@ -29,6 +29,7 @@ from app.features.quotes.schemas import (
 )
 from app.shared.pricing import (
     PricingValidationError,
+    amounts_materially_differ,
     derive_document_subtotal_from_line_items,
     document_field_float_or_none,
     resolve_document_subtotal_for_edit,
@@ -220,6 +221,9 @@ class QuoteExtractionAppendService:
         line_items_define_subtotal, derived_line_item_subtotal = (
             derive_document_subtotal_from_line_items(merged_line_items)
         )
+        has_reliable_priced_line_sum = (
+            line_items_define_subtotal and derived_line_item_subtotal is not None
+        )
         current_subtotal = resolve_document_subtotal_for_edit(
             total_amount=quote.total_amount,
             discount_type=next_discount_type,
@@ -233,8 +237,33 @@ class QuoteExtractionAppendService:
             extraction_result=normalized_extraction_result,
             line_items_define_subtotal=line_items_define_subtotal,
             derived_line_item_subtotal=derived_line_item_subtotal,
+            seeded_tax_rate=seeded_tax_rate,
+            seeded_discount=seeded_discount,
             current_subtotal=current_subtotal,
         )
+        explicit_total_append_suggestion = _resolve_explicit_total_append_suggestion(
+            quote=quote,
+            extraction_result=normalized_extraction_result,
+            has_reliable_priced_line_sum=has_reliable_priced_line_sum,
+            derived_line_item_subtotal=derived_line_item_subtotal,
+            seeded_tax_rate=seeded_tax_rate,
+            seeded_discount=seeded_discount,
+        )
+        if explicit_total_append_suggestion is not None:
+            append_suggestions.append(explicit_total_append_suggestion)
+        if next_total_input is None:
+            # Optional pricing cannot be newly seeded without a subtotal authority source.
+            next_discount_type = quote.discount_type
+            next_discount_value = document_field_float_or_none(quote.discount_value)
+            update_discount_type = False
+            update_discount_value = False
+            seeded_discount = False
+            next_tax_rate = document_field_float_or_none(quote.tax_rate)
+            update_tax_rate = False
+            seeded_tax_rate = False
+            next_deposit_amount = document_field_float_or_none(quote.deposit_amount)
+            update_deposit_amount = False
+            seeded_deposit_amount = False
         validated_pricing = _validate_document_pricing_for_append(
             total_amount=next_total_input,
             line_items=merged_line_items,
@@ -266,7 +295,9 @@ class QuoteExtractionAppendService:
         if (
             normalized_extraction_result.pricing_hints.explicit_total is not None
             and quote.total_amount is None
-            and not line_items_define_subtotal
+            and not has_reliable_priced_line_sum
+            and not seeded_tax_rate
+            and not seeded_discount
             and validated_total_amount is not None
         ):
             seeded_pricing_fields.add("explicit_total")
@@ -707,13 +738,58 @@ def _resolve_total_amount_for_append(
     extraction_result: ExtractionResult,
     line_items_define_subtotal: bool,
     derived_line_item_subtotal: float | None,
+    seeded_tax_rate: bool,
+    seeded_discount: bool,
     current_subtotal: float | None,
 ) -> float | None:
-    if line_items_define_subtotal:
+    has_reliable_priced_line_sum = (
+        line_items_define_subtotal and derived_line_item_subtotal is not None
+    )
+    if has_reliable_priced_line_sum:
         return derived_line_item_subtotal
-    if quote.total_amount is None and extraction_result.pricing_hints.explicit_total is not None:
+    if (
+        quote.total_amount is None
+        and extraction_result.pricing_hints.explicit_total is not None
+        and not seeded_tax_rate
+        and not seeded_discount
+    ):
         return extraction_result.pricing_hints.explicit_total
     return current_subtotal
+
+
+def _resolve_explicit_total_append_suggestion(
+    *,
+    quote: Document,
+    extraction_result: ExtractionResult,
+    has_reliable_priced_line_sum: bool,
+    derived_line_item_subtotal: float | None,
+    seeded_tax_rate: bool,
+    seeded_discount: bool,
+) -> ExtractionReviewAppendSuggestion | None:
+    explicit_total = extraction_result.pricing_hints.explicit_total
+    if explicit_total is None:
+        return None
+
+    if (
+        has_reliable_priced_line_sum
+        and derived_line_item_subtotal is not None
+        and amounts_materially_differ(explicit_total, derived_line_item_subtotal)
+    ):
+        return _build_pricing_append_suggestion(
+            pricing_field="explicit_total",
+            value=explicit_total,
+        )
+
+    if (
+        not has_reliable_priced_line_sum
+        and quote.total_amount is None
+        and (seeded_tax_rate or seeded_discount)
+    ):
+        return _build_pricing_append_suggestion(
+            pricing_field="explicit_total",
+            value=explicit_total,
+        )
+    return None
 
 
 def _is_populated_text(value: str | None) -> bool:
@@ -762,7 +838,7 @@ def _normalize_material_text(value: str | None) -> str:
 def _is_materially_same_number(candidate: float, existing: float | None) -> bool:
     if existing is None:
         return False
-    return _normalize_material_number(candidate) == _normalize_material_number(existing)
+    return not amounts_materially_differ(candidate, existing)
 
 
 def _normalize_material_number(value: float | None) -> float | None:

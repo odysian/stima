@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from app.shared.pricing import (
     PricingInput,
     PricingValidationError,
     calculate_breakdown_from_persisted,
+    derive_document_subtotal_from_line_items,
     validate_and_calculate_from_input,
 )
 
@@ -57,3 +59,103 @@ def test_calculate_breakdown_from_persisted_recovers_percent_discount_subtotal()
     assert breakdown.tax_amount == Decimal("16.00")
     assert breakdown.total_amount == Decimal("176.00")
     assert breakdown.balance_due == Decimal("126.00")
+
+
+def test_derive_document_subtotal_from_line_items_priced_and_included_rows() -> None:
+    defines_subtotal, subtotal = derive_document_subtotal_from_line_items(
+        [
+            _line_item("Mulch", price=120.0, price_status="priced"),
+            _line_item(
+                "Cleanup",
+                details="Included / no charge",
+                price=None,
+                price_status="included",
+            ),
+        ]
+    )
+
+    assert defines_subtotal is True
+    assert subtotal == 120.0
+
+
+def test_derive_document_subtotal_from_line_items_priced_and_unknown_rows() -> None:
+    defines_subtotal, subtotal = derive_document_subtotal_from_line_items(
+        [
+            _line_item("Mulch", price=120.0, price_status="priced"),
+            _line_item(
+                "Edging",
+                details="Need price confirmation",
+                price=None,
+                price_status="unknown",
+            ),
+        ]
+    )
+
+    assert defines_subtotal is False
+    assert subtotal is None
+
+
+def test_derive_document_subtotal_from_line_items_all_included_rows() -> None:
+    defines_subtotal, subtotal = derive_document_subtotal_from_line_items(
+        [
+            _line_item(
+                "Cleanup",
+                details="Included / no charge",
+                price=None,
+                price_status="included",
+            ),
+            _line_item(
+                "Debris hauling",
+                details="Complimentary",
+                price=None,
+                price_status="included",
+            ),
+        ]
+    )
+
+    assert defines_subtotal is True
+    assert subtotal is None
+
+
+def test_derive_document_subtotal_from_line_items_all_unknown_rows() -> None:
+    defines_subtotal, subtotal = derive_document_subtotal_from_line_items(
+        [
+            _line_item(
+                "Cleanup",
+                details="Need to confirm scope",
+                price=None,
+                price_status="unknown",
+            ),
+            _line_item(
+                "Edging",
+                details="Estimate pending",
+                price=None,
+                price_status="unknown",
+            ),
+        ]
+    )
+
+    assert defines_subtotal is False
+    assert subtotal is None
+
+
+def test_derive_document_subtotal_from_line_items_empty_rows() -> None:
+    defines_subtotal, subtotal = derive_document_subtotal_from_line_items([])
+
+    assert defines_subtotal is True
+    assert subtotal is None
+
+
+def _line_item(
+    description: str,
+    *,
+    details: str | None = None,
+    price: float | None,
+    price_status: str | None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        description=description,
+        details=details,
+        price=price,
+        price_status=price_status,
+    )

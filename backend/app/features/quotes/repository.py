@@ -27,7 +27,7 @@ from app.shared.pricing import (
     DiscountType,
     PricingInput,
     calculate_breakdown_from_persisted,
-    calculate_line_item_sum,
+    derive_document_subtotal_from_line_items,
 )
 
 _PUBLIC_QUOTE_STATUSES = (
@@ -938,9 +938,7 @@ def _build_render_context(
             tax_rate=document.tax_rate,
             deposit_amount=document.deposit_amount,
         ),
-        line_item_sum=calculate_line_item_sum(
-            [line_item.price for line_item in document.line_items]
-        ),
+        line_item_sum=_to_decimal(derive_document_subtotal_from_line_items(document.line_items)[1]),
     )
     return QuoteRenderContext(
         quote_id=document.id,

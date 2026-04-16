@@ -372,6 +372,85 @@ async def test_append_extraction_withholds_populated_notes_and_deposit_but_seeds
     ]
 
 
+async def test_append_extraction_withholds_ambiguous_explicit_total_when_tax_candidate_present(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _extract_ambiguous_total(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:  # noqa: ANN001
+        del self, notes, mode
+        return ExtractionResult(
+            transcript="append ambiguous explicit total",
+            line_items=[],
+            pricing_hints=PricingHints(
+                explicit_total=200,
+                tax_rate=0.0825,
+            ),
+            confidence_notes=[],
+        )
+
+    monkeypatch.setattr(
+        _MockExtractionIntegration,
+        "extract",
+        _extract_ambiguous_total,
+    )
+
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    create_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "Unknown pricing scope",
+            "line_items": [
+                {
+                    "description": "Cleanup",
+                    "details": "Need to confirm price onsite",
+                    "price": None,
+                    "price_status": "unknown",
+                }
+            ],
+            "total_amount": None,
+            "notes": None,
+            "source_type": "text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    quote_id = create_response.json()["id"]
+    app.state.arq_pool = None
+
+    append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "append ambiguous explicit total"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert append_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert payload["total_amount"] is None
+    assert payload["tax_rate"] is None
+    append_suggestions = payload["extraction_review_metadata"]["hidden_details"][
+        "append_suggestions"
+    ]
+    assert append_suggestions == [
+        {
+            "id": append_suggestions[0]["id"],
+            "kind": "pricing",
+            "raw_text": "Total 200",
+            "confidence": "medium",
+            "source": "append_capture",
+            "pricing_field": "explicit_total",
+        }
+    ]
+
+
 async def test_append_extraction_resurfaces_previously_dismissed_matching_suggestion(
     client: AsyncClient,
     db_session: AsyncSession,

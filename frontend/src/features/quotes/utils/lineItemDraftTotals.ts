@@ -1,4 +1,5 @@
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 import { resolveLineItemSum } from "@/shared/lib/pricing";
 
 interface DraftLineItemTotalsState {
@@ -10,31 +11,46 @@ export function syncDraftTotalWithLineItems(
   currentState: DraftLineItemTotalsState,
   nextLineItems: LineItemDraftWithFlags[],
 ): number | null {
-  const currentDerivedSubtotal = resolveFullyPricedLineItemSum(currentState.lineItems);
-  if (currentDerivedSubtotal !== currentState.total) {
+  const currentDerivedSubtotal = resolveLineItemAuthoritativeSubtotal(currentState.lineItems);
+  if (currentState.total !== null && !currentDerivedSubtotal.definesSubtotal) {
+    return currentState.total;
+  }
+  if (!isSameMoneyValue(currentDerivedSubtotal.subtotal, currentState.total)) {
     return currentState.total;
   }
 
-  const nextDerivedSubtotal = resolveFullyPricedLineItemSum(nextLineItems);
-  if (nextDerivedSubtotal === null) {
-    return hasSubstantiveLineItems(nextLineItems) ? currentState.total : null;
+  const nextDerivedSubtotal = resolveLineItemAuthoritativeSubtotal(nextLineItems);
+  if (!nextDerivedSubtotal.definesSubtotal) {
+    return currentState.total;
   }
-  return nextDerivedSubtotal;
+  return nextDerivedSubtotal.subtotal;
 }
 
-function resolveFullyPricedLineItemSum(lineItems: LineItemDraftWithFlags[]): number | null {
+function resolveLineItemAuthoritativeSubtotal(lineItems: LineItemDraftWithFlags[]): {
+  definesSubtotal: boolean;
+  subtotal: number | null;
+} {
   const substantiveLineItems = lineItems.filter(hasLineItemContent);
   if (substantiveLineItems.length === 0) {
-    return null;
+    return { definesSubtotal: true, subtotal: null };
   }
-  if (substantiveLineItems.some((lineItem) => lineItem.price === null)) {
-    return null;
-  }
-  return resolveLineItemSum(substantiveLineItems.map((lineItem) => lineItem.price));
-}
 
-function hasSubstantiveLineItems(lineItems: LineItemDraftWithFlags[]): boolean {
-  return lineItems.some(hasLineItemContent);
+  const pricedValues: number[] = [];
+  for (const lineItem of substantiveLineItems) {
+    const priceStatus = resolvePriceStatus({
+      price: lineItem.price,
+      priceStatus: lineItem.priceStatus,
+      description: lineItem.description,
+      details: lineItem.details,
+    });
+    if (priceStatus === "unknown") {
+      return { definesSubtotal: false, subtotal: null };
+    }
+    if (priceStatus === "priced" && lineItem.price !== null) {
+      pricedValues.push(lineItem.price);
+    }
+  }
+  return { definesSubtotal: true, subtotal: resolveLineItemSum(pricedValues) };
 }
 
 function hasLineItemContent(lineItem: LineItemDraftWithFlags): boolean {
@@ -43,4 +59,11 @@ function hasLineItemContent(lineItem: LineItemDraftWithFlags): boolean {
     || (lineItem.details?.trim().length ?? 0) > 0
     || lineItem.price !== null
   );
+}
+
+function isSameMoneyValue(left: number | null, right: number | null): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+  return Math.round(left * 100) === Math.round(right * 100);
 }
