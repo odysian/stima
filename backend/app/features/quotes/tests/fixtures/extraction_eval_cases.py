@@ -5,12 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from app.features.quotes.schemas import ExtractionMode
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
 
-_SEMANTIC_EMPTY_LINE_ITEMS_BELOW_TRANSCRIPT = (
-    "Clean gutters flush drains sweep roof patch fascia trim shrubs edge beds "
-    "check lights and confirm work schedule."
-)
 _SEMANTIC_EMPTY_LINE_ITEMS_ABOVE_TRANSCRIPT = (
     "Clean gutters flush drains sweep roof patch fascia trim shrubs edge beds "
     "check lights and confirm full work schedule tomorrow morning."
@@ -39,6 +36,16 @@ _APPEND_CAPTURE_TRANSCRIPT = (
     "Added later:\n"
     "- include driveway edging for 95"
 )
+_APPEND_CORRECTIVE_TRANSCRIPT = (
+    "Added later: actually remove driveway edging from the previous draft and keep only lights."
+)
+_APPEND_INCLUDED_SCOPE_TRANSCRIPT = "Added later: debris disposal is included at no extra charge."
+_APPEND_CONCURRENT_TRANSCRIPT = (
+    "Added later batch two: add hedge trim for 120 while another append is processing."
+)
+_APPEND_ASYNC_USER_EDIT_RACE_TRANSCRIPT = (
+    "Added later: gate code 1942 and tax is 7 percent for this follow-up scope."
+)
 _EXPLICIT_PRICING_RULE_TRANSCRIPT = (
     "Patio and drainage scope: seal patio for 260 and clear drainage line for 180. "
     "Pricing notes: deposit 150, tax 6.5 percent, discount 10 percent, total 459.95."
@@ -60,6 +67,7 @@ class ExtractionEvalCase:
     """Declarative extraction eval fixture used by manual property checks."""
 
     name: str
+    extraction_mode: ExtractionMode
     transcript: str
     provider_events: tuple[dict[str, Any], ...]
     expected_models: tuple[str, ...]
@@ -72,7 +80,7 @@ class ExtractionEvalCase:
     expect_degraded_reason_code: str | None = None
     expect_line_item_count_min: int | None = None
     expect_line_item_count_max: int | None = None
-    expect_confidence_note_substrings: tuple[str, ...] = ()
+    expect_line_item_price_statuses: tuple[Literal["priced", "included", "unknown"], ...] = ()
     expect_pricing_hints: dict[str, float | str | None] | None = None
     expect_unresolved_segment_sources: tuple[_UNRESOLVED_SEGMENT_SOURCE, ...] = ()
     expect_customer_notes_source: _UNRESOLVED_SEGMENT_SOURCE | None = None
@@ -94,13 +102,13 @@ class ExtractionEvalCase:
 
 EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
     ExtractionEvalCase(
-        name="baseline_primary_contract_invariants",
+        name="baseline_initial_happy_path",
+        extraction_mode="initial",
         transcript=TRANSCRIPTS["clean_with_total"],
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": TRANSCRIPTS["clean_with_total"],
                     "line_items": [
                         {
                             "description": "Rear garage floodlights",
@@ -113,8 +121,9 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 75,
                         },
                     ],
-                    "total": 435,
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 435},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -126,10 +135,13 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_line_item_count_max=2,
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Baseline primary extraction invariants remain stable.",
+        human_notes=(
+            "Baseline initial extraction keeps visible math aligned with visible line items."
+        ),
     ),
     ExtractionEvalCase(
         name="fallback_tier_after_primary_rate_limit",
+        extraction_mode="initial",
         transcript=TRANSCRIPTS["fallback_tier_probe"],
         provider_events=(
             {
@@ -138,7 +150,6 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": TRANSCRIPTS["fallback_tier_probe"],
                     "line_items": [
                         {
                             "description": "Replace porch lights",
@@ -151,10 +162,9 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 45,
                         },
                     ],
-                    "total": 165,
-                    "confidence_notes": [
-                        "Primary model unavailable; fallback tier produced extraction output."
-                    ],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 165},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -164,19 +174,18 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_extraction_tier="primary",
         expect_line_item_count_min=2,
         expect_line_item_count_max=2,
-        expect_confidence_note_substrings=("fallback tier produced extraction output",),
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Fallback invocation should remain quote-facing primary when usable.",
+        human_notes="Fallback invocation remains primary-tier output when payload validates.",
     ),
     ExtractionEvalCase(
-        name="typed_landscaping_capture_with_explicit_total",
+        name="typed_only_capture_with_explicit_total",
+        extraction_mode="initial",
         transcript=_TYPED_LANDSCAPING_TRANSCRIPT,
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": _TYPED_LANDSCAPING_TRANSCRIPT,
                     "line_items": [
                         {
                             "description": "Brown mulch",
@@ -194,10 +203,9 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 60,
                         },
                     ],
-                    "pricing_hints": {
-                        "explicit_total": 365,
-                    },
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 365},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -210,16 +218,16 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_pricing_hints={"explicit_total": 365},
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Typed-only landscaping capture should preserve explicit quantity math.",
+        human_notes="Typed-only capture remains a deterministic initial-mode baseline.",
     ),
     ExtractionEvalCase(
-        name="voice_only_landscaping_capture_spoken_equivalent",
+        name="voice_only_capture_equivalent",
+        extraction_mode="initial",
         transcript=_VOICE_EQUIVALENT_TRANSCRIPT,
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": _VOICE_EQUIVALENT_TRANSCRIPT,
                     "line_items": [
                         {
                             "description": "Brown mulch",
@@ -237,8 +245,9 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 60,
                         },
                     ],
-                    "pricing_hints": {"explicit_total": 365},
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 365},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -253,16 +262,16 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_pricing_hints={"explicit_total": 365},
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Voice-only equivalent should retain the same pricing structure.",
+        human_notes="Voice-only capture mirrors typed math and contract shape.",
     ),
     ExtractionEvalCase(
-        name="mixed_voice_text_capture_with_typed_vs_transcript_conflict",
+        name="mixed_voice_text_conflict_initial",
+        extraction_mode="initial",
         transcript=_MIXED_VOICE_TEXT_TRANSCRIPT,
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": _MIXED_VOICE_TEXT_TRANSCRIPT,
                     "line_items": [
                         {
                             "description": "Brown mulch",
@@ -280,30 +289,17 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 60,
                         },
                     ],
-                    "pricing_hints": {"explicit_total": 365},
-                    "customer_notes_suggestion": {
-                        "text": (
-                            "Typed follow-up conflicts with transcript scope; "
-                            "confirm edging details."
-                        ),
-                        "confidence": "low",
-                        "source": "typed_conflict",
-                    },
-                    "unresolved_segments": [
+                    "notes_candidate": "Typed follow-up conflicts with transcript scope.",
+                    "pricing_candidates": {"explicit_total": 365},
+                    "unresolved_items": [
                         {
-                            "raw_text": "Typed follow-up says skip edging on one side.",
-                            "confidence": "low",
-                            "source": "typed_conflict",
+                            "text": "Typed follow-up says skip edging on one side.",
+                            "reason": "possible_conflict",
                         },
                         {
-                            "raw_text": "Transcript includes edging for full front beds.",
-                            "confidence": "medium",
-                            "source": "transcript_conflict",
+                            "text": "Transcript includes edging for full front beds.",
+                            "reason": "possible_conflict",
                         },
-                    ],
-                    "confidence_notes": [
-                        "Typed and transcript conflict on edging scope; "
-                        "operator confirmation required."
                     ],
                 },
             },
@@ -317,40 +313,33 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_extraction_tier="primary",
         expect_line_item_count_min=3,
         expect_line_item_count_max=3,
-        expect_confidence_note_substrings=("conflict on edging scope",),
         expect_pricing_hints={"explicit_total": 365},
-        expect_unresolved_segment_sources=("typed_conflict", "transcript_conflict"),
-        expect_customer_notes_source="typed_conflict",
+        expect_unresolved_segment_sources=("transcript_conflict", "transcript_conflict"),
+        expect_customer_notes_source="leftover_classification",
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
         human_notes=(
-            "Mixed capture should retain provenance and preserve typed/transcript conflicts."
+            "Mixed capture keeps source provenance and conflict details without confidence notes."
         ),
     ),
     ExtractionEvalCase(
-        name="append_capture_follow_up_transcript_sample",
+        name="append_additive_visible_scope",
+        extraction_mode="append",
         transcript=_APPEND_CAPTURE_TRANSCRIPT,
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": _APPEND_CAPTURE_TRANSCRIPT,
-                    "line_items": [
-                        {
-                            "description": "Floodlights",
-                            "details": "2 units",
-                            "price": 360,
-                        },
+                    "new_line_items": [
                         {
                             "description": "Driveway edging",
                             "details": None,
                             "price": 95,
-                        },
+                        }
                     ],
-                    "pricing_hints": {"explicit_total": 455},
-                    "confidence_notes": [
-                        "Append capture added a new line item after the initial transcript."
-                    ],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 95},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -358,22 +347,87 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expected_invocation_tier="primary",
         expect_total_matches_priced_sum=True,
         expect_extraction_tier="primary",
-        expect_line_item_count_min=2,
-        expect_line_item_count_max=2,
-        expect_confidence_note_substrings=("append capture added",),
-        expect_pricing_hints={"explicit_total": 455},
+        expect_line_item_count_min=1,
+        expect_line_item_count_max=1,
+        expect_pricing_hints={"explicit_total": 95},
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Append-style transcript section should remain deterministic in eval fixtures.",
+        human_notes="Append mode returns additive scope only using append schema.",
     ),
     ExtractionEvalCase(
-        name="explicit_pricing_rule_fields_with_deposit_tax_discount",
+        name="append_corrective_language_routes_to_unresolved",
+        extraction_mode="append",
+        transcript=_APPEND_CORRECTIVE_TRANSCRIPT,
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "new_line_items": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {},
+                    "unresolved_items": [
+                        {
+                            "text": "Remove driveway edging from prior draft",
+                            "reason": "correction",
+                        }
+                    ],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=False,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=0,
+        expect_line_item_count_max=0,
+        expect_unresolved_segment_sources=("transcript_conflict",),
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes=(
+            "Corrective append content must route to unresolved items, not visible rewrites."
+        ),
+    ),
+    ExtractionEvalCase(
+        name="append_included_scope_price_status",
+        extraction_mode="append",
+        transcript=_APPEND_INCLUDED_SCOPE_TRANSCRIPT,
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "new_line_items": [
+                        {
+                            "description": "Debris disposal",
+                            "details": "Included with cleanup",
+                            "price": None,
+                            "price_status": "included",
+                        }
+                    ],
+                    "notes_candidate": None,
+                    "pricing_candidates": {},
+                    "unresolved_items": [],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=False,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=1,
+        expect_line_item_count_max=1,
+        expect_line_item_price_statuses=("included",),
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes="Included append scope should preserve included/price-null semantics.",
+    ),
+    ExtractionEvalCase(
+        name="initial_pricing_fields_with_deposit_tax_discount",
+        extraction_mode="initial",
         transcript=_EXPLICIT_PRICING_RULE_TRANSCRIPT,
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": _EXPLICIT_PRICING_RULE_TRANSCRIPT,
                     "line_items": [
                         {
                             "description": "Patio sealing",
@@ -386,16 +440,15 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 180,
                         },
                     ],
-                    "pricing_hints": {
+                    "notes_candidate": None,
+                    "pricing_candidates": {
                         "explicit_total": 459.95,
                         "deposit_amount": 150,
                         "tax_rate": 6.5,
                         "discount_type": "percent",
                         "discount_value": 10,
                     },
-                    "confidence_notes": [
-                        "Total includes tax and discount adjustments; line-item sum may differ."
-                    ],
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -414,16 +467,65 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         },
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Pricing hints should retain explicit total/deposit/tax/discount fields.",
+        human_notes=(
+            "Initial mode preserves explicit pricing candidates for downstream fill-empty logic."
+        ),
+    ),
+    ExtractionEvalCase(
+        name="initial_conflicting_total_with_unknown_price_status",
+        extraction_mode="initial",
+        transcript=(
+            "Paint fence and replace gate latch. Pricing is unclear per line item but customer "
+            "says "
+            "total should be 225."
+        ),
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "line_items": [
+                        {
+                            "description": "Paint fence",
+                            "details": None,
+                            "price": None,
+                            "price_status": "unknown",
+                        },
+                        {
+                            "description": "Replace gate latch",
+                            "details": None,
+                            "price": None,
+                            "price_status": "unknown",
+                        },
+                    ],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 225},
+                    "unresolved_items": [],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=False,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=2,
+        expect_line_item_count_max=2,
+        expect_line_item_price_statuses=("unknown", "unknown"),
+        expect_pricing_hints={"explicit_total": 225},
+        expect_unresolved_segment_sources=("leftover_classification",),
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes=(
+            "Conflicting totals with unknown item pricing should create unresolved review guidance."
+        ),
     ),
     ExtractionEvalCase(
         name="typed_vs_transcript_conflict_with_unresolved_segments",
+        extraction_mode="initial",
         transcript=_TYPED_TRANSCRIPT_CONFLICT_TRANSCRIPT,
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": _TYPED_TRANSCRIPT_CONFLICT_TRANSCRIPT,
                     "line_items": [
                         {
                             "description": "Patio sealing",
@@ -436,25 +538,20 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 180,
                         },
                     ],
-                    "pricing_hints": {"explicit_total": 440},
-                    "customer_notes_suggestion": {
-                        "text": "Customer may want to waive drainage cleanout if budget is tight.",
-                        "confidence": "low",
-                        "source": "typed_conflict",
-                    },
-                    "unresolved_segments": [
+                    "notes_candidate": (
+                        "Customer may want to waive drainage cleanout if budget is tight."
+                    ),
+                    "pricing_candidates": {"explicit_total": 440},
+                    "unresolved_items": [
                         {
-                            "raw_text": "Typed note says skip drainage if budget is tight.",
-                            "confidence": "low",
-                            "source": "typed_conflict",
+                            "text": "Typed note says skip drainage if budget is tight.",
+                            "reason": "possible_conflict",
                         },
                         {
-                            "raw_text": "Transcript still includes drainage line cleanout.",
-                            "confidence": "medium",
-                            "source": "transcript_conflict",
+                            "text": "Transcript still includes drainage line cleanout.",
+                            "reason": "possible_conflict",
                         },
                     ],
-                    "confidence_notes": ["Typed and transcript inputs conflict on drainage scope."],
                 },
             },
         ),
@@ -464,31 +561,30 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_extraction_tier="primary",
         expect_line_item_count_min=2,
         expect_line_item_count_max=2,
-        expect_confidence_note_substrings=("conflict on drainage scope",),
         expect_pricing_hints={"explicit_total": 440},
-        expect_unresolved_segment_sources=("typed_conflict", "transcript_conflict"),
-        expect_customer_notes_source="typed_conflict",
+        expect_unresolved_segment_sources=("transcript_conflict", "transcript_conflict"),
+        expect_customer_notes_source="leftover_classification",
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Typed-vs-transcript conflict should survive as unresolved sidecar details.",
+        human_notes="Conflict details remain actionable via unresolved segments in 2.5.",
     ),
     ExtractionEvalCase(
         name="repair_succeeds_after_one_invalid_payload",
+        extraction_mode="initial",
         transcript=TRANSCRIPTS["clean_with_total"],
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": TRANSCRIPTS["clean_with_total"],
                     "line_items": "invalid-shape",
-                    "total": 435,
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 435},
+                    "unresolved_items": [],
                 },
             },
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": TRANSCRIPTS["clean_with_total"],
                     "line_items": [
                         {
                             "description": "Trim shrubs",
@@ -496,8 +592,9 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 125,
                         }
                     ],
-                    "total": 125,
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 125},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -514,24 +611,25 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
     ),
     ExtractionEvalCase(
         name="repair_still_invalid_degrades_with_reason_code",
+        extraction_mode="initial",
         transcript=TRANSCRIPTS["clean_with_total"],
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": TRANSCRIPTS["clean_with_total"],
                     "line_items": "invalid-shape",
-                    "total": 435,
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 435},
+                    "unresolved_items": [],
                 },
             },
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": TRANSCRIPTS["clean_with_total"],
                     "line_items": "still-invalid",
-                    "total": 435,
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 435},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -548,40 +646,17 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         human_notes="Invalid repair payload should degrade with validation repair failure.",
     ),
     ExtractionEvalCase(
-        name="semantic_empty_items_below_threshold_stays_primary",
-        transcript=_SEMANTIC_EMPTY_LINE_ITEMS_BELOW_TRANSCRIPT,
-        provider_events=(
-            {
-                "type": "tool_use",
-                "input": {
-                    "transcript": _SEMANTIC_EMPTY_LINE_ITEMS_BELOW_TRANSCRIPT,
-                    "line_items": [],
-                    "total": None,
-                    "confidence_notes": [],
-                },
-            },
-        ),
-        expected_models=("primary-model",),
-        expected_invocation_tier="primary",
-        expect_total_matches_priced_sum=False,
-        expect_extraction_tier="primary",
-        expect_line_item_count_min=0,
-        expect_line_item_count_max=0,
-        expect_repair_attempted=False,
-        expect_repair_outcome="not_attempted",
-        human_notes="Boundary probe just below transcript-char threshold.",
-    ),
-    ExtractionEvalCase(
-        name="semantic_empty_items_at_or_above_threshold_degrades",
+        name="degraded_extraction_for_substantial_empty_payload",
+        extraction_mode="initial",
         transcript=_SEMANTIC_EMPTY_LINE_ITEMS_ABOVE_TRANSCRIPT,
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": _SEMANTIC_EMPTY_LINE_ITEMS_ABOVE_TRANSCRIPT,
                     "line_items": [],
-                    "total": None,
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -592,66 +667,21 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_degraded_reason_code="semantic_empty_line_items_substantial_transcript",
         expect_line_item_count_min=0,
         expect_line_item_count_max=0,
-        expect_confidence_note_substrings=(
-            "No line items were extracted from a substantial transcript",
-        ),
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Boundary probe at/above semantic transcript + word thresholds.",
+        human_notes=(
+            "Substantial transcripts with empty extraction degrade without "
+            "confidence-note fallback."
+        ),
     ),
     ExtractionEvalCase(
-        name="total_mismatch_transcript",
-        transcript=(
-            "Paint fence for 150 and replace gate latch for 100. Customer says total should be 225."
-        ),
+        name="duplicate_line_items_are_flagged",
+        extraction_mode="initial",
+        transcript="Clean gutters for 150, also clean the gutters on the back for 150.",
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": (
-                        "Paint fence for 150 and replace gate latch for 100. "
-                        "Customer says total should be 225."
-                    ),
-                    "line_items": [
-                        {
-                            "description": "Paint fence",
-                            "details": None,
-                            "price": 150,
-                        },
-                        {
-                            "description": "Replace gate latch",
-                            "details": None,
-                            "price": 100,
-                        },
-                    ],
-                    "total": 225,
-                    "confidence_notes": [
-                        "Stated total does not match line item sum; review total before sending."
-                    ],
-                },
-            },
-        ),
-        expected_models=("primary-model",),
-        expected_invocation_tier="primary",
-        expect_total_matches_priced_sum=True,
-        expect_extraction_tier="primary",
-        expect_line_item_count_min=2,
-        expect_line_item_count_max=2,
-        expect_confidence_note_substrings=("does not match line item sum",),
-        expect_repair_attempted=False,
-        expect_repair_outcome="not_attempted",
-        human_notes="Total mismatch should recalculate or provide explicit mismatch guidance.",
-    ),
-    ExtractionEvalCase(
-        name="duplicate_line_items_in_transcript",
-        transcript=("Clean gutters for 150, also clean the gutters on the back for 150."),
-        provider_events=(
-            {
-                "type": "tool_use",
-                "input": {
-                    "transcript": (
-                        "Clean gutters for 150, also clean the gutters on the back for 150."
-                    ),
                     "line_items": [
                         {
                             "description": "Clean gutters",
@@ -664,8 +694,9 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "price": 150,
                         },
                     ],
-                    "total": 300,
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"explicit_total": 300},
+                    "unresolved_items": [],
                 },
             },
         ),
@@ -679,36 +710,71 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_flag_reason_substrings=("duplicate",),
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Duplicate post-validation semantic flagging should mark both entries.",
+        human_notes="Duplicate semantic guard should remain visible through line-item flags.",
     ),
     ExtractionEvalCase(
-        name="very_short_transcript",
-        transcript="Mow lawn 50",
+        name="append_concurrent_followups_candidate_shape",
+        extraction_mode="append",
+        transcript=_APPEND_CONCURRENT_TRANSCRIPT,
         provider_events=(
             {
                 "type": "tool_use",
                 "input": {
-                    "transcript": "Mow lawn 50",
-                    "line_items": [
+                    "new_line_items": [
                         {
-                            "description": "Mow lawn",
+                            "description": "Hedge trim follow-up",
                             "details": None,
-                            "price": 50,
+                            "price": 120,
                         }
                     ],
-                    "total": 50,
-                    "confidence_notes": [],
+                    "notes_candidate": None,
+                    "pricing_candidates": {"deposit_amount": 60},
+                    "unresolved_items": [],
                 },
             },
         ),
         expected_models=("primary-model",),
         expected_invocation_tier="primary",
-        expect_total_matches_priced_sum=True,
+        expect_total_matches_priced_sum=False,
         expect_extraction_tier="primary",
         expect_line_item_count_min=1,
         expect_line_item_count_max=1,
+        expect_pricing_hints={"deposit_amount": 60},
         expect_repair_attempted=False,
         expect_repair_outcome="not_attempted",
-        human_notes="Very short transcripts should not trip empty-items semantic degradation.",
+        human_notes=(
+            "Concurrent append manual plan: run two appends back-to-back and verify additive "
+            "application against latest persisted state."
+        ),
+    ),
+    ExtractionEvalCase(
+        name="append_async_user_edit_race_candidate_shape",
+        extraction_mode="append",
+        transcript=_APPEND_ASYNC_USER_EDIT_RACE_TRANSCRIPT,
+        provider_events=(
+            {
+                "type": "tool_use",
+                "input": {
+                    "new_line_items": [],
+                    "notes_candidate": "Gate code 1942",
+                    "pricing_candidates": {"tax_rate": 7.0},
+                    "unresolved_items": [],
+                },
+            },
+        ),
+        expected_models=("primary-model",),
+        expected_invocation_tier="primary",
+        expect_total_matches_priced_sum=False,
+        expect_extraction_tier="primary",
+        expect_line_item_count_min=0,
+        expect_line_item_count_max=0,
+        expect_pricing_hints={"tax_rate": 7.0},
+        expect_customer_notes_source="leftover_classification",
+        expect_repair_attempted=False,
+        expect_repair_outcome="not_attempted",
+        human_notes=(
+            "Async user-edit race manual plan: if operator fills notes/pricing before async apply, "
+            "candidate should become withheld instead of overwriting visible fields."
+        ),
     ),
 )

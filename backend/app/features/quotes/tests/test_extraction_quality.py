@@ -72,7 +72,7 @@ async def test_extraction_quality_suite() -> None:
     scores = []
 
     for case in selected_cases:
-        result = await integration.extract(case.transcript, mode="initial")
+        result = await integration.extract(case.transcript, mode=case.extraction_mode)
         metadata = integration.pop_last_call_metadata()
 
         line_item_count = len(result.line_items)

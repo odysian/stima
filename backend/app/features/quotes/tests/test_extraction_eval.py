@@ -20,12 +20,13 @@ from app.features.quotes.tests.fixtures.extraction_eval_cases import (
     ExtractionEvalCase,
 )
 from app.integrations.extraction import (
+    APPEND_EXTRACTION_TOOL_SCHEMA,
+    EXTRACTION_TOOL_SCHEMA,
     ExtractionCallMetadata,
     ExtractionError,
     ExtractionIntegration,
 )
 from app.shared.input_limits import (
-    CONFIDENCE_NOTES_MAX_ITEMS,
     DOCUMENT_LINE_ITEMS_MAX_ITEMS,
 )
 
@@ -111,10 +112,24 @@ def _assert_request_capture_provenance(
     content = first_message["content"]
     assert isinstance(content, str)
     request_payload = json.loads(content)
+    assert request_payload["extraction_mode"] == case.extraction_mode
     prepared_capture_input = request_payload["prepared_capture_input"]
 
     assert prepared_capture_input["source_type"] == case.source_type
     assert prepared_capture_input["transcript"] == case.transcript
+
+    tools = calls[0]["tools"]
+    assert isinstance(tools, list)
+    assert tools
+    first_tool = tools[0]
+    assert isinstance(first_tool, dict)
+    input_schema = first_tool["input_schema"]
+    expected_schema = (
+        APPEND_EXTRACTION_TOOL_SCHEMA
+        if case.extraction_mode == "append"
+        else EXTRACTION_TOOL_SCHEMA
+    )
+    assert input_schema == expected_schema
 
     expected_raw_typed_notes = case.raw_typed_notes
     expected_raw_transcript = case.raw_transcript
@@ -140,7 +155,7 @@ def _assert_extraction_invariants(
 ) -> None:
     assert result.transcript == transcript
     assert len(result.line_items) <= DOCUMENT_LINE_ITEMS_MAX_ITEMS
-    assert len(result.confidence_notes) <= CONFIDENCE_NOTES_MAX_ITEMS
+    assert result.confidence_notes == []
     assert all(item.description.strip() for item in result.line_items)
     if result.extraction_tier == "degraded":
         assert result.extraction_degraded_reason_code is not None
@@ -151,14 +166,7 @@ def _assert_extraction_invariants(
         priced_items = [item.price for item in result.line_items if item.price is not None]
         assert priced_items
         priced_sum = sum(priced_items)
-        if priced_sum != pytest.approx(result.total):
-            assert any(
-                any(
-                    token in note.casefold()
-                    for token in ("mismatch", "does not match", "doesn't match", "line item sum")
-                )
-                for note in result.confidence_notes
-            )
+        assert priced_sum == pytest.approx(result.total)
 
 
 def _assert_extraction_quality(
@@ -179,14 +187,16 @@ def _assert_extraction_quality(
     if case.expect_line_item_count_max is not None:
         assert line_item_count <= case.expect_line_item_count_max
 
-    for substring in case.expect_confidence_note_substrings:
-        normalized_substring = substring.casefold()
-        assert any(normalized_substring in note.casefold() for note in result.confidence_notes)
-
     if case.expect_pricing_hints:
         pricing_hints_payload = result.pricing_hints.model_dump(mode="json")
         for key, value in case.expect_pricing_hints.items():
             assert pricing_hints_payload[key] == value
+
+    if case.expect_line_item_price_statuses:
+        assert (
+            tuple(item.price_status for item in result.line_items)
+            == case.expect_line_item_price_statuses
+        )
 
     if case.expect_unresolved_segment_sources:
         assert [segment.source for segment in result.unresolved_segments] == list(
@@ -227,7 +237,7 @@ async def test_extraction_eval_baseline_invariants_hold_for_primary_fixture() ->
         client=client,
     )
 
-    result = await integration.extract(_build_capture_input(case), mode="initial")
+    result = await integration.extract(_build_capture_input(case), mode=case.extraction_mode)
 
     _assert_extraction_invariants(
         result,
@@ -254,7 +264,7 @@ async def test_extraction_eval_invariants(case: ExtractionEvalCase) -> None:
         client=client,
     )
 
-    result = await integration.extract(_build_capture_input(case), mode="initial")
+    result = await integration.extract(_build_capture_input(case), mode=case.extraction_mode)
 
     _assert_extraction_invariants(
         result,

@@ -64,6 +64,7 @@ _Q15_LANDSCAPE_JARGON = (
 QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ExtractionQualityCase(
         name="Q01_multi_item_exact_prices",
+        extraction_mode="initial",
         transcript=TRANSCRIPTS["clean_with_total"],
         expected_line_items=(
             ExpectedLineItem(description="Rear garage floodlights", price=360),
@@ -76,6 +77,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q02_multi_item_no_prices",
+        extraction_mode="initial",
         transcript=TRANSCRIPTS["clean_no_prices"],
         expected_line_items=(
             ExpectedLineItem(description="Trim shrubs", price=None),
@@ -91,6 +93,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q03_single_item_job",
+        extraction_mode="initial",
         transcript=_Q03_SINGLE_ITEM_JOB,
         expected_line_items=(ExpectedLineItem(description="Power wash driveway", price=400),),
         expected_total=400,
@@ -100,6 +103,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q04_quantities_in_description",
+        extraction_mode="initial",
         transcript=_Q04_QUANTITY_MATH,
         expected_line_items=(
             ExpectedLineItem(description="Brown mulch", details="5 yards", price=225),
@@ -112,6 +116,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q05_mixed_services_materials",
+        extraction_mode="initial",
         transcript=_Q05_MIXED_SERVICES_AND_MATERIALS,
         expected_line_items=(
             ExpectedLineItem(description="Driveway section repair", price=800),
@@ -125,6 +130,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q06_mid_sentence_correction",
+        extraction_mode="initial",
         transcript=_Q06_MID_SENTENCE_CORRECTION,
         expected_line_items=(
             ExpectedLineItem(description="Power wash deck", price=275),
@@ -138,6 +144,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q07_item_described_in_two_parts",
+        extraction_mode="initial",
         transcript=_Q07_ITEM_DESCRIBED_IN_PARTS,
         expected_line_items=(
             ExpectedLineItem(
@@ -152,6 +159,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q08_verbose_with_filler_words",
+        extraction_mode="initial",
         transcript=_Q08_VERBOSE_WITH_FILLER,
         expected_line_items=(
             ExpectedLineItem(description="Brown mulch", price=120),
@@ -165,6 +173,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q09_total_only_transcript",
+        extraction_mode="initial",
         transcript=TRANSCRIPTS["total_only"],
         expected_line_items=(
             ExpectedLineItem(
@@ -183,6 +192,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q10_tax_and_discount_language",
+        extraction_mode="initial",
         transcript=_Q10_TAX_AND_DISCOUNT,
         expected_line_items=(
             ExpectedLineItem(
@@ -193,13 +203,14 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
         ),
         expected_total=None,
         expect_total=False,
-        confidence_note_substrings=("discount", "tax"),
+        expected_pricing_fields=("tax_rate", "discount_type", "discount_value"),
         category="tax_discount",
         difficulty="medium",
         human_notes="Discount and tax should appear as confidence notes, not line-item math.",
     ),
     ExtractionQualityCase(
         name="Q11_very_short_transcript",
+        extraction_mode="initial",
         transcript=_Q11_VERY_SHORT,
         expected_line_items=(ExpectedLineItem(description="Mow lawn", price=50),),
         expected_total=50,
@@ -209,6 +220,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q12_extended_multi_item_transcript",
+        extraction_mode="initial",
         transcript=_Q12_EXTENDED_MULTI_ITEM,
         expected_line_items=(
             ExpectedLineItem(
@@ -240,6 +252,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q13_duplicate_detection",
+        extraction_mode="initial",
         transcript=_Q13_DUPLICATE_DETECTION,
         expected_line_items=(
             ExpectedLineItem(
@@ -263,6 +276,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q14_item_split_across_sentences",
+        extraction_mode="initial",
         transcript=_Q14_IMPLICIT_SPLIT,
         expected_line_items=(
             ExpectedLineItem(description="Sod installation", price=1000, price_tolerance_pct=0.15),
@@ -278,6 +292,7 @@ QUALITY_CASES: tuple[ExtractionQualityCase, ...] = (
     ),
     ExtractionQualityCase(
         name="Q15_landscape_jargon_future_followup",
+        extraction_mode="initial",
         transcript=_Q15_LANDSCAPE_JARGON,
         expected_line_items=(
             ExpectedLineItem(description="Dethatch aerate overseed lawn", price=250),

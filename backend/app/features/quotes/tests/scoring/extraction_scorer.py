@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 from math import isclose
 from typing import Any, Literal
 
-from app.features.quotes.schemas import ExtractionResult, LineItemExtracted
+from app.features.quotes.schemas import ExtractionMode, ExtractionResult, LineItemExtracted
 from app.integrations.extraction import ExtractionCallMetadata
 
 _DESCRIPTION_MATCH_THRESHOLD = 0.4
@@ -34,6 +34,7 @@ class ExtractionQualityCase:
     """Ground truth case for extraction quality measurement."""
 
     name: str
+    extraction_mode: ExtractionMode
     transcript: str
     expected_line_items: tuple[ExpectedLineItem, ...]
     expected_total: float | None = None
@@ -42,7 +43,29 @@ class ExtractionQualityCase:
     expected_line_item_count_max: int | None = None
     expect_prices: bool = True
     expect_total: bool = True
-    confidence_note_substrings: tuple[str, ...] = ()
+    expected_pricing_fields: tuple[
+        Literal[
+            "explicit_total",
+            "deposit_amount",
+            "tax_rate",
+            "discount_type",
+            "discount_value",
+        ],
+        ...,
+    ] = ()
+    expected_unresolved_sources: tuple[
+        Literal["leftover_classification", "typed_conflict", "transcript_conflict"], ...
+    ] = ()
+    expected_append_outcome: (
+        Literal[
+            "adds_visible_scope",
+            "withholds_correction",
+            "included_scope",
+            "fills_pricing_fields",
+            "no_visible_change",
+        ]
+        | None
+    ) = None
     category: str = "general"
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     cost_tier: Literal["standard", "high"] = "standard"
@@ -70,7 +93,10 @@ class CaseScore:
     difficulty: str
     item_scores: tuple[ItemMatchResult, ...]
     total_score: float
-    confidence_note_score: float | None
+    flag_accuracy: float
+    unresolved_score: float
+    pricing_behavior_score: float
+    append_outcome_score: float | None
     precision: float
     recall: float
     extras_count: int
@@ -255,18 +281,94 @@ def _score_total(
     return 0.0
 
 
-def _score_confidence_notes(expected: Sequence[str], actual_notes: Sequence[str]) -> float | None:
-    if not expected:
+def _score_flags(result: ExtractionResult, item_scores: Sequence[ItemMatchResult]) -> float:
+    expected_flag_scores = [
+        float(score.flag_score)
+        for score in item_scores
+        if score.expected.expected_flagged and score.flag_score is not None
+    ]
+    if expected_flag_scores:
+        return _average(expected_flag_scores, default=1.0)
+    return 1.0 if not any(item.flagged for item in result.line_items) else 0.5
+
+
+def _score_unresolved_items(
+    expected_sources: Sequence[str], actual_sources: Sequence[str]
+) -> float:
+    if not expected_sources:
+        return 1.0 if not actual_sources else 0.5
+
+    remaining_actual = list(actual_sources)
+    matched = 0
+    for source in expected_sources:
+        if source in remaining_actual:
+            matched += 1
+            remaining_actual.remove(source)
+
+    recall = matched / len(expected_sources)
+    precision = matched / max(len(actual_sources), 1)
+    return (recall + precision) / 2.0
+
+
+def _score_pricing_behavior(case: ExtractionQualityCase, result: ExtractionResult) -> float:
+    status_scores: list[float] = []
+    for item in result.line_items:
+        if item.price is None:
+            status_scores.append(1.0 if item.price_status in {"included", "unknown"} else 0.0)
+        else:
+            status_scores.append(1.0 if item.price_status == "priced" else 0.0)
+
+    pricing_hints_payload = result.pricing_hints.model_dump(mode="json")
+    expected_pricing_scores: list[float] = []
+    for field in case.expected_pricing_fields:
+        expected_pricing_scores.append(1.0 if pricing_hints_payload.get(field) is not None else 0.0)
+
+    priced_values = [item.price for item in result.line_items if item.price is not None]
+    total_alignment_score = 1.0
+    if priced_values and result.total is not None:
+        total_alignment_score = (
+            1.0 if isclose(sum(priced_values), result.total, abs_tol=0.01) else 0.0
+        )
+
+    dimensions: list[float] = []
+    if status_scores:
+        dimensions.append(_average(status_scores, default=1.0))
+    if expected_pricing_scores:
+        dimensions.append(_average(expected_pricing_scores, default=1.0))
+    dimensions.append(total_alignment_score)
+    return _average(dimensions, default=1.0)
+
+
+def _score_append_outcome(case: ExtractionQualityCase, result: ExtractionResult) -> float | None:
+    if case.extraction_mode != "append":
         return None
 
-    folded_notes = [note.casefold() for note in actual_notes]
-    found_count = 0
-    for fragment in expected:
-        folded_fragment = fragment.casefold()
-        if any(folded_fragment in note for note in folded_notes):
-            found_count += 1
+    expected = case.expected_append_outcome
+    if expected is None:
+        return 1.0
 
-    return found_count / len(expected)
+    has_visible_items = bool(result.line_items)
+    has_transcript_conflict = any(
+        segment.source == "transcript_conflict" for segment in result.unresolved_segments
+    )
+    has_included_scope = any(
+        item.price is None and item.price_status == "included" for item in result.line_items
+    )
+    has_pricing_fields = any(
+        value is not None for value in result.pricing_hints.model_dump(mode="json").values()
+    )
+
+    if expected == "adds_visible_scope":
+        return 1.0 if has_visible_items else 0.0
+    if expected == "withholds_correction":
+        return 1.0 if (not has_visible_items and has_transcript_conflict) else 0.0
+    if expected == "included_scope":
+        return 1.0 if has_included_scope else 0.0
+    if expected == "fills_pricing_fields":
+        return 1.0 if has_pricing_fields else 0.0
+    if expected == "no_visible_change":
+        return 1.0 if not has_visible_items else 0.0
+    return 1.0
 
 
 def _description_recall(item_scores: Sequence[ItemMatchResult]) -> float:
@@ -320,19 +422,30 @@ def score_case(
     details_accuracy = _details_accuracy(item_scores)
     total_score = _score_total(case.expected_total, result.total, case.expected_total_tolerance_pct)
     extras_penalty = min(extras_count / max(len(case.expected_line_items), 1), 1.0)
-
-    overall = _clamp(
-        (0.40 * description_recall)
-        + (0.25 * price_accuracy)
-        + (0.15 * total_score)
-        + (0.10 * details_accuracy)
-        + (0.10 * (1.0 - extras_penalty))
+    flag_accuracy = _score_flags(result, item_scores)
+    unresolved_score = _score_unresolved_items(
+        case.expected_unresolved_sources,
+        [segment.source for segment in result.unresolved_segments],
     )
+    pricing_behavior_score = _score_pricing_behavior(case, result)
+    append_outcome_score = _score_append_outcome(case, result)
 
-    confidence_note_score = _score_confidence_notes(
-        case.confidence_note_substrings,
-        result.confidence_notes,
-    )
+    weighted_dimensions: list[tuple[float, float]] = [
+        (description_recall, 0.30),
+        (price_accuracy, 0.18),
+        (total_score, 0.12),
+        (details_accuracy, 0.08),
+        (1.0 - extras_penalty, 0.10),
+        (flag_accuracy, 0.08),
+        (unresolved_score, 0.07),
+        (pricing_behavior_score, 0.07),
+    ]
+    if append_outcome_score is not None:
+        weighted_dimensions.append((append_outcome_score, 0.08))
+
+    weighted_total = sum(score * weight for score, weight in weighted_dimensions)
+    weight_sum = sum(weight for _, weight in weighted_dimensions)
+    overall = _clamp(weighted_total / weight_sum if weight_sum else 0.0)
 
     return CaseScore(
         name=case.name,
@@ -340,7 +453,10 @@ def score_case(
         difficulty=case.difficulty,
         item_scores=item_scores,
         total_score=total_score,
-        confidence_note_score=confidence_note_score,
+        flag_accuracy=flag_accuracy,
+        unresolved_score=unresolved_score,
+        pricing_behavior_score=pricing_behavior_score,
+        append_outcome_score=append_outcome_score,
         precision=precision,
         recall=recall,
         extras_count=extras_count,
@@ -408,8 +524,14 @@ def format_report(cases: Sequence[ExtractionQualityCase], scores: Sequence[CaseS
             f"{description_recall:.2f}  Price: {price_accuracy:.2f}  "
             f"Details: {details_label}  Total: {score.total_score:.2f}"
         )
-        if score.confidence_note_score is not None:
-            lines.append(f"  Confidence notes: {score.confidence_note_score:.2f}")
+        lines.append(
+            "  Flags: "
+            f"{score.flag_accuracy:.2f}  "
+            f"Unresolved: {score.unresolved_score:.2f}  "
+            f"Pricing behavior: {score.pricing_behavior_score:.2f}"
+        )
+        if score.append_outcome_score is not None:
+            lines.append(f"  Append outcome: {score.append_outcome_score:.2f}")
         lines.append(f"  Overall: {score.overall:.2f}")
 
     summary = aggregate_scores(scores)
