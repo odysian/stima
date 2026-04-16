@@ -165,7 +165,7 @@ async def test_extract_handles_ambiguous_partial_input_without_raising() -> None
 
     assert result.line_items
     assert result.line_items[0].description == "Power wash deck"
-    assert "ambiguous" in result.confidence_notes[0].lower()
+    assert result.confidence_notes == []
 
 
 async def test_extract_returns_degraded_result_when_repair_is_still_invalid() -> None:
@@ -565,6 +565,37 @@ async def test_extract_defaults_flag_fields_when_omitted() -> None:
     assert result.line_items[0].flag_reason is None
 
 
+async def test_extract_stamps_backend_owned_transcript_and_pipeline_version() -> None:
+    transcript = TRANSCRIPTS["clean_with_total"]
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "line_items": [
+                            {
+                                "description": "Spread mulch",
+                                "details": "5 yards",
+                                "price": 350,
+                            }
+                        ],
+                        "notes_candidate": None,
+                        "pricing_candidates": {"explicit_total": 350},
+                        "unresolved_items": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.transcript == transcript
+    assert result.pipeline_version == "v2.5"
+
+
 async def test_extract_degrades_when_substantial_transcript_has_no_line_items() -> None:
     transcript = (
         "Customer asked for gutter cleaning, downspout flush, roof debris sweep, driveway edge "
@@ -595,7 +626,7 @@ async def test_extract_degrades_when_substantial_transcript_has_no_line_items() 
         result.extraction_degraded_reason_code
         == SEMANTIC_DEGRADED_REASON_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT
     )
-    assert any("No line items were extracted" in note for note in result.confidence_notes)
+    assert result.confidence_notes == []
 
 
 async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> None:
@@ -627,9 +658,10 @@ async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> Non
 
     assert result.extraction_tier == "primary"
     assert result.extraction_degraded_reason_code is None
+    assert result.confidence_notes == []
     assert any(
-        "Explicit total was extracted without any priced line items" in note
-        for note in result.confidence_notes
+        "explicit total was extracted without priced line items" in segment.raw_text.lower()
+        for segment in result.unresolved_segments
     )
 
 
@@ -668,7 +700,7 @@ async def test_extract_flags_duplicate_line_items_with_warning_note() -> None:
     assert result.extraction_tier == "primary"
     assert all(item.flagged is True for item in result.line_items)
     assert all(item.flag_reason for item in result.line_items)
-    assert any("Duplicate extracted line items" in note for note in result.confidence_notes)
+    assert result.confidence_notes == []
 
 
 async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
@@ -677,8 +709,16 @@ async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
     assert line_item_schema["properties"]["flag_reason"] == {"type": ["string", "null"]}
     assert "flagged" not in line_item_schema["required"]
     assert "flag_reason" not in line_item_schema["required"]
-    assert "raw_text" in line_item_schema["required"]
-    assert "confidence" in line_item_schema["required"]
+    assert "raw_text" not in line_item_schema["properties"]
+    assert "confidence" not in line_item_schema["properties"]
+
+    required_fields = set(EXTRACTION_TOOL_SCHEMA["required"])
+    assert "notes_candidate" in required_fields
+    assert "pricing_candidates" in required_fields
+    assert "unresolved_items" in required_fields
+    assert "transcript" not in required_fields
+    assert "pipeline_version" not in required_fields
+    assert "confidence_notes" not in required_fields
 
 
 async def test_hidden_item_id_is_deterministic_and_distinguishes_content() -> None:
@@ -848,7 +888,7 @@ async def test_guard_flags_line_items_with_price_in_description() -> None:
     assert result.line_items[0].flagged is True
     assert "price token" in (result.line_items[0].flag_reason or "").lower()
     assert result.line_items[1].flagged is False
-    assert any("price token" in note.lower() for note in result.confidence_notes)
+    assert result.confidence_notes == []
 
 
 async def test_guard_flags_line_items_with_duplicate_details() -> None:
@@ -886,7 +926,7 @@ async def test_guard_flags_line_items_with_duplicate_details() -> None:
     assert result.line_items[0].flagged is True
     assert "duplicate" in (result.line_items[0].flag_reason or "").lower()
     assert result.line_items[1].flagged is False
-    assert any("duplicate" in note.lower() for note in result.confidence_notes)
+    assert result.confidence_notes == []
 
 
 async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> None:

@@ -8,7 +8,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from app.features.jobs.models import JobRecord, JobStatus, JobType
-from app.features.quotes.schemas import ExtractionResult
+from app.features.quotes.schemas import (
+    ExtractionResult,
+    project_extraction_result_for_public_response,
+)
 
 
 class JobRecordResponse(BaseModel):
@@ -40,5 +43,7 @@ def job_record_to_response(record: JobRecord) -> JobRecordResponse:
         "quote_id": record.document_id if record.status == JobStatus.SUCCESS else None
     }
     if record.status == JobStatus.SUCCESS and record.result_json is not None:
-        updates["extraction_result"] = ExtractionResult.model_validate_json(record.result_json)
+        updates["extraction_result"] = project_extraction_result_for_public_response(
+            ExtractionResult.model_validate_json(record.result_json)
+        )
     return response.model_copy(update=updates)
