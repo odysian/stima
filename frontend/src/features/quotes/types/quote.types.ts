@@ -13,8 +13,6 @@ export interface LineItemDraft {
 }
 
 export interface LineItemExtracted extends LineItemDraft {
-  raw_text?: string;
-  confidence?: PlacementConfidence;
   flagged?: boolean;
   flag_reason?: string | null;
 }
@@ -45,19 +43,11 @@ export interface ExtractionSuggestion {
   source: UnresolvedSegmentSource;
 }
 
-export interface UnresolvedSegment {
-  raw_text: string;
-  confidence: "medium" | "low";
-  source: UnresolvedSegmentSource;
-}
-
 export interface ExtractionResult {
   transcript: string;
-  pipeline_version: "v2" | "v2.5";
   line_items: LineItemExtracted[];
   pricing_hints: PricingHints;
   customer_notes_suggestion: ExtractionSuggestion | null;
-  unresolved_segments: UnresolvedSegment[];
   extraction_tier: ExtractionTier;
   extraction_degraded_reason_code: string | null;
 }

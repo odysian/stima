@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.quotes.schemas import (
+    ExtractionResponse,
     ExtractionResult,
 )
 
@@ -26,7 +27,7 @@ class JobRecordResponse(BaseModel):
     status: JobStatus
     attempts: int
     terminal_error: str | None
-    extraction_result: ExtractionResult | None = None
+    extraction_result: ExtractionResponse | None = None
     quote_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
@@ -38,9 +39,11 @@ def job_record_to_response(record: JobRecord) -> JobRecordResponse:
     if record.job_type != JobType.EXTRACTION:
         return response
 
-    updates: dict[str, UUID | ExtractionResult | None] = {
+    updates: dict[str, UUID | ExtractionResponse | None] = {
         "quote_id": record.document_id if record.status == JobStatus.SUCCESS else None
     }
     if record.status == JobStatus.SUCCESS and record.result_json is not None:
-        updates["extraction_result"] = ExtractionResult.model_validate_json(record.result_json)
+        updates["extraction_result"] = ExtractionResponse.from_internal_result(
+            ExtractionResult.model_validate_json(record.result_json)
+        )
     return response.model_copy(update=updates)
