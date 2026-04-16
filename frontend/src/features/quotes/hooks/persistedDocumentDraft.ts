@@ -218,7 +218,7 @@ export function mapInvoiceToEditDraft(invoice: InvoiceDetail): DocumentEditDraft
       description: item.description,
       details: item.details,
       price: item.price,
-      priceStatus: item.price !== null ? "priced" : "unknown",
+      priceStatus: item.price_status ?? (item.price !== null ? "priced" : "unknown"),
     })),
     total: breakdown.subtotal ?? invoice.total_amount,
     taxRate: invoice.tax_rate,

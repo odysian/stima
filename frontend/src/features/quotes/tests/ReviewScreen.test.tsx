@@ -281,6 +281,24 @@ afterEach(() => {
 });
 
 describe("DocumentEditScreen", () => {
+  it("preserves included invoice line-item status when hydrating edit draft", () => {
+    const invoice = makeInvoice({
+      line_items: [
+        {
+          id: "line-included",
+          description: "Permit fee",
+          details: "Included in project scope",
+          price: null,
+          price_status: "included",
+          sort_order: 0,
+        },
+      ],
+    });
+
+    const draft = mapInvoiceToEditDraft(invoice);
+    expect(draft.lineItems[0]?.priceStatus).toBe("included");
+  });
+
   it("disables invoice type when no customer is selected", async () => {
     renderScreen({
       document: makeQuote({
