@@ -54,10 +54,14 @@ _LINE_ITEM_SCHEMA: dict[str, Any] = {
             "maxLength": LINE_ITEM_DETAILS_MAX_CHARS,
         },
         "price": {"type": ["number", "null"]},
+        "price_status": {
+            "type": "string",
+            "enum": ["priced", "included", "unknown"],
+        },
         "flagged": {"type": "boolean"},
         "flag_reason": {"type": ["string", "null"]},
     },
-    "required": ["description"],
+    "required": ["description", "price_status"],
     "additionalProperties": False,
 }
 
@@ -168,6 +172,9 @@ EXTRACTION_SYSTEM_PROMPT = (
     "Extract quote line items, pricing candidates, and unresolved capture details from structured "
     "capture input. "
     "Do not invent pricing. Use null for missing values. "
+    "Every line item must include price_status: use priced when price is numeric, included when "
+    "scope is explicitly included/no separate charge, and unknown when customer-visible scope has "
+    "no reliable separate price. "
     "Set line-item flagged=true only for strong review signals: likely audio mishears, "
     "clearly implausible single-item prices, or critically ambiguous quantity/unit phrasing. "
     "When flagged=true, include a short flag_reason. Keep flagged false otherwise. "
@@ -182,6 +189,9 @@ APPEND_EXTRACTION_SYSTEM_PROMPT = (
     "Use notes_candidate and pricing_candidates only for additive candidates that could fill empty "
     "visible fields. "
     "Do not invent pricing. Use null for missing values. "
+    "Every new_line_item must include price_status: use priced when price is numeric, included "
+    "when scope is explicitly included/no separate charge, and unknown when customer-visible scope "
+    "has no reliable separate price. "
     "Return only structured tool output."
 )
 
@@ -778,6 +788,10 @@ def _build_extraction_request(
                 "Return only additive new_line_items. Do not rewrite, remove, or replace "
                 "existing visible quote scope."
             ),
+            "price_status_rule": (
+                "For every new_line_item set price_status: priced requires numeric price; "
+                "included and unknown require price=null."
+            ),
             "notes_candidate_rule": (
                 "Use notes_candidate only for additive context that can fill an empty notes field."
             ),
@@ -794,6 +808,10 @@ def _build_extraction_request(
         mode_instructions = {
             "line_item_description_rule": (
                 "Use short customer-facing labels; move remainder to details."
+            ),
+            "price_status_rule": (
+                "For every line_item set price_status: priced requires numeric price; "
+                "included and unknown require price=null."
             ),
             "pricing_rule": (
                 "Do not invent pricing. "
@@ -980,6 +998,7 @@ def _build_extraction_result_from_candidate(
                 description=line_item.description,
                 details=line_item.details,
                 price=line_item.price,
+                price_status=line_item.price_status,
                 flagged=line_item.flagged,
                 flag_reason=line_item.flag_reason,
             )
@@ -1023,6 +1042,7 @@ def _build_extraction_result_from_append_candidate(
                 description=line_item.description,
                 details=line_item.details,
                 price=line_item.price,
+                price_status=line_item.price_status,
                 flagged=line_item.flagged,
                 flag_reason=line_item.flag_reason,
             )

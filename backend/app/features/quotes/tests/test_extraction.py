@@ -78,11 +78,13 @@ async def test_extract_keeps_null_prices_without_zero_fill() -> None:
                                 "description": "Trim shrubs",
                                 "details": "Front and side",
                                 "price": None,
+                                "price_status": "unknown",
                             },
                             {
                                 "description": "Bag leaves",
                                 "details": None,
                                 "price": None,
+                                "price_status": "unknown",
                             },
                         ],
                         "total": None,
@@ -114,6 +116,7 @@ async def test_extract_preserves_total_only_payload() -> None:
                                 "description": "Driveway repair and reseal",
                                 "details": None,
                                 "price": None,
+                                "price_status": "unknown",
                             }
                         ],
                         "pricing_hints": {"explicit_total": 2100},
@@ -144,11 +147,13 @@ async def test_extract_handles_ambiguous_partial_input_without_raising() -> None
                                 "description": "Power wash deck",
                                 "details": None,
                                 "price": 225,
+                                "price_status": "priced",
                             },
                             {
                                 "description": "Power wash siding",
                                 "details": "Normal rate not provided",
                                 "price": None,
+                                "price_status": "unknown",
                             },
                         ],
                         "total": None,
@@ -163,6 +168,82 @@ async def test_extract_handles_ambiguous_partial_input_without_raising() -> None
 
     assert result.line_items
     assert result.line_items[0].description == "Power wash deck"
+
+
+async def test_extract_preserves_price_status_from_initial_candidate() -> None:
+    transcript = TRANSCRIPTS["clean_no_prices"]
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "line_items": [
+                            {
+                                "description": "Cleanup labor",
+                                "details": "No separate charge",
+                                "price": None,
+                                "price_status": "included",
+                            },
+                            {
+                                "description": "Gutter downspout extension",
+                                "details": "Need onsite measurement",
+                                "price": None,
+                                "price_status": "unknown",
+                            },
+                        ],
+                        "notes_candidate": None,
+                        "pricing_candidates": {},
+                        "unresolved_items": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript, mode="initial")
+
+    assert [item.price_status for item in result.line_items] == ["included", "unknown"]
+    assert all(item.price is None for item in result.line_items)
+
+
+async def test_extract_preserves_price_status_from_append_candidate() -> None:
+    transcript = "Added later: cleanup is included and the extension price is unknown"
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "new_line_items": [
+                            {
+                                "description": "Cleanup labor",
+                                "details": "No separate charge",
+                                "price": None,
+                                "price_status": "included",
+                            },
+                            {
+                                "description": "Gutter downspout extension",
+                                "details": "Need onsite measurement",
+                                "price": None,
+                                "price_status": "unknown",
+                            },
+                        ],
+                        "notes_candidate": None,
+                        "pricing_candidates": {},
+                        "unresolved_items": [],
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript, mode="append")
+
+    assert [item.price_status for item in result.line_items] == ["included", "unknown"]
+    assert all(item.price is None for item in result.line_items)
 
 
 async def test_extract_returns_degraded_result_when_repair_is_still_invalid() -> None:
@@ -232,6 +313,7 @@ async def test_extract_attempts_one_repair_then_accepts_valid_repaired_payload()
                                     "description": "Trim shrubs",
                                     "details": "Front beds",
                                     "price": 125,
+                                    "price_status": "priced",
                                 }
                             ],
                             "pricing_hints": {"explicit_total": 125},
@@ -501,6 +583,7 @@ async def test_extract_accepts_flagged_line_items_with_reason() -> None:
                                 "description": "Siding wash",
                                 "details": "1 side wall",
                                 "price": 9000,
+                                "price_status": "priced",
                                 "flagged": True,
                                 "flag_reason": (
                                     "Price seems implausibly high for a single side wall"
@@ -535,6 +618,7 @@ async def test_extract_defaults_flag_fields_when_omitted() -> None:
                                 "description": "Spread mulch",
                                 "details": "5 yards",
                                 "price": 350,
+                                "price_status": "priced",
                             }
                         ],
                         "total": 350,
@@ -564,6 +648,7 @@ async def test_extract_stamps_backend_owned_transcript_and_pipeline_version() ->
                                 "description": "Spread mulch",
                                 "details": "5 yards",
                                 "price": 350,
+                                "price_status": "priced",
                             }
                         ],
                         "notes_candidate": None,
@@ -627,6 +712,7 @@ async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> Non
                                 "description": "Driveway repair and reseal",
                                 "details": None,
                                 "price": None,
+                                "price_status": "unknown",
                             }
                         ],
                         "pricing_hints": {"explicit_total": 2100},
@@ -661,11 +747,13 @@ async def test_extract_flags_duplicate_line_items_with_warning_note() -> None:
                                 "description": "Brown mulch",
                                 "details": "Front beds",
                                 "price": 120,
+                                "price_status": "priced",
                             },
                             {
                                 "description": "brown   mulch",
                                 "details": "Walkway beds",
                                 "price": 120,
+                                "price_status": "priced",
                             },
                         ],
                         "total": 240,
@@ -685,8 +773,13 @@ async def test_extract_flags_duplicate_line_items_with_warning_note() -> None:
 
 async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
     line_item_schema = EXTRACTION_TOOL_SCHEMA["properties"]["line_items"]["items"]
+    assert line_item_schema["properties"]["price_status"] == {
+        "type": "string",
+        "enum": ["priced", "included", "unknown"],
+    }
     assert line_item_schema["properties"]["flagged"] == {"type": "boolean"}
     assert line_item_schema["properties"]["flag_reason"] == {"type": ["string", "null"]}
+    assert "price_status" in line_item_schema["required"]
     assert "flagged" not in line_item_schema["required"]
     assert "flag_reason" not in line_item_schema["required"]
     assert "raw_text" not in line_item_schema["properties"]
@@ -752,8 +845,13 @@ async def test_append_mode_uses_append_contract_and_routes_correction_to_unresol
 
 async def test_append_tool_schema_uses_new_line_items_contract() -> None:
     line_item_schema = APPEND_EXTRACTION_TOOL_SCHEMA["properties"]["new_line_items"]["items"]
+    assert line_item_schema["properties"]["price_status"] == {
+        "type": "string",
+        "enum": ["priced", "included", "unknown"],
+    }
     assert line_item_schema["properties"]["flagged"] == {"type": "boolean"}
     assert line_item_schema["properties"]["flag_reason"] == {"type": ["string", "null"]}
+    assert "price_status" in line_item_schema["required"]
     assert "flagged" not in line_item_schema["required"]
     assert "flag_reason" not in line_item_schema["required"]
     assert "line_items" not in APPEND_EXTRACTION_TOOL_SCHEMA["properties"]
@@ -807,6 +905,7 @@ async def test_extract_exercises_all_transcript_fixtures(fixture_name: str) -> N
                                 "description": f"Extracted from {fixture_name}",
                                 "details": None,
                                 "price": None,
+                                "price_status": "unknown",
                             }
                         ],
                         "total": None,
@@ -872,6 +971,7 @@ async def test_extract_emits_trace_events_for_primary_repair_and_result_stages(
                                     "description": "Trim shrubs",
                                     "details": "Front beds",
                                     "price": 125,
+                                    "price_status": "priced",
                                 }
                             ],
                             "pricing_hints": {"explicit_total": 125},
@@ -909,11 +1009,13 @@ async def test_guard_flags_line_items_with_price_in_description() -> None:
                                 "description": "Premium service $500",
                                 "details": None,
                                 "price": None,
+                                "price_status": "unknown",
                             },
                             {
                                 "description": "Standard service",
                                 "details": None,
                                 "price": 200,
+                                "price_status": "priced",
                             },
                         ],
                         "total": None,
@@ -945,11 +1047,13 @@ async def test_guard_flags_line_items_with_duplicate_details() -> None:
                                 "description": "Mulch installation",
                                 "details": "Mulch installation",
                                 "price": 150,
+                                "price_status": "priced",
                             },
                             {
                                 "description": "Weed removal",
                                 "details": "Spot treatment only",
                                 "price": 75,
+                                "price_status": "priced",
                             },
                         ],
                         "total": None,
