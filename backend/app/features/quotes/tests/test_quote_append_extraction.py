@@ -483,6 +483,80 @@ async def test_append_extraction_withholds_ambiguous_explicit_total_when_tax_can
     ]
 
 
+async def test_append_extraction_included_scope_keeps_single_conflicting_total_suggestion(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _extract_included_scope_with_conflicting_total(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:  # noqa: ANN001
+        del self, notes, mode
+        return ExtractionResult(
+            transcript="append included scope conflicting total",
+            line_items=[
+                LineItemExtractedV2(
+                    raw_text="Cleanup labor included",
+                    description="Cleanup labor",
+                    details="Included / no charge",
+                    price=None,
+                    price_status="included",
+                    confidence="medium",
+                )
+            ],
+            pricing_hints=PricingHints(explicit_total=500),
+        )
+
+    monkeypatch.setattr(
+        _MockExtractionIntegration,
+        "extract",
+        _extract_included_scope_with_conflicting_total,
+    )
+
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+    app.state.arq_pool = None
+
+    first_append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "append included scope conflicting total"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "append included scope conflicting total"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_append_response.status_code == 200
+    assert second_append_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert payload["total_amount"] == 55
+    included_rows = [
+        item for item in payload["line_items"] if item["description"] == "Cleanup labor"
+    ]
+    assert len(included_rows) == 1
+    assert all(
+        item["price"] is None and item["price_status"] == "included" for item in included_rows
+    )
+
+    explicit_total_suggestions = [
+        item
+        for item in payload["extraction_review_metadata"]["hidden_details"]["items"]
+        if item["kind"] == "append_suggestion"
+        and item["field"] == "explicit_total"
+        and item["text"] == "Total 500"
+    ]
+    assert len(explicit_total_suggestions) == 1
+
+
 async def test_append_extraction_resurfaces_previously_dismissed_matching_suggestion(
     client: AsyncClient,
     db_session: AsyncSession,

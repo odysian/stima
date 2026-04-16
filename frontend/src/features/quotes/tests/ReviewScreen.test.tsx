@@ -708,7 +708,7 @@ describe("DocumentEditScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/invoices/doc-1", { replace: true });
   });
 
-  it("keeps total_amount null when saving unknown-price quotes without pricing edits", async () => {
+  it("keeps total_amount null and preserves null-price statuses when saving without pricing edits", async () => {
     renderScreen({
       document: makeQuote({
         total_amount: null,
@@ -722,12 +722,20 @@ describe("DocumentEditScreen", () => {
             sort_order: 0,
           },
           {
+            id: "line-included",
+            description: "Cleanup",
+            details: "Included / no charge",
+            price: null,
+            price_status: "included",
+            sort_order: 1,
+          },
+          {
             id: "line-unknown",
             description: "Edging",
             details: "Need to confirm exact material cost",
             price: null,
             price_status: "unknown",
-            sort_order: 1,
+            sort_order: 2,
           },
         ],
       }),
@@ -738,6 +746,18 @@ describe("DocumentEditScreen", () => {
     await waitFor(() => {
       expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
         total_amount: null,
+        line_items: expect.arrayContaining([
+          expect.objectContaining({
+            description: "Cleanup",
+            price: null,
+            price_status: "included",
+          }),
+          expect.objectContaining({
+            description: "Edging",
+            price: null,
+            price_status: "unknown",
+          }),
+        ]),
       }));
     });
   });

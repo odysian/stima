@@ -242,6 +242,111 @@ async def test_extract_combined_persists_included_price_status_from_provider(
     assert detail_payload["line_items"][0]["price_status"] == "included"
 
 
+async def test_extract_combined_preserves_mixed_price_status_rows_across_reload(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_extract = _MockExtractionIntegration.extract
+
+    async def _extract_mixed_price_status_rows(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        transcript = (
+            notes.transcript.strip() if isinstance(notes, PreparedCaptureInput) else notes.strip()
+        )
+        if transcript != "mixed price status regression check":
+            return await original_extract(self, notes, mode=mode)
+        return ExtractionResult(
+            transcript=transcript,
+            line_items=[
+                LineItemExtractedV2(
+                    raw_text="Mulch 120",
+                    description="Mulch",
+                    details="3 yards",
+                    price=120,
+                    price_status="priced",
+                    confidence="medium",
+                ),
+                LineItemExtractedV2(
+                    raw_text="Cleanup included",
+                    description="Cleanup",
+                    details="Included / no charge",
+                    price=None,
+                    price_status="included",
+                    confidence="medium",
+                ),
+                LineItemExtractedV2(
+                    raw_text="Edging TBD",
+                    description="Edging",
+                    details="Need exact material cost",
+                    price=None,
+                    price_status="unknown",
+                    confidence="low",
+                ),
+            ],
+            pricing_hints=PricingHints(explicit_total=180),
+        )
+
+    monkeypatch.setattr(_MockExtractionIntegration, "extract", _extract_mixed_price_status_rows)
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mixed price status regression check"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["price_status"] for item in payload["line_items"]] == [
+        "priced",
+        "included",
+        "unknown",
+    ]
+    assert payload["line_items"][2]["price"] is None
+
+    quote_id = payload["quote_id"]
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert [item["price_status"] for item in detail_payload["line_items"]] == [
+        "priced",
+        "included",
+        "unknown",
+    ]
+    assert detail_payload["line_items"][2]["price"] is None
+    assert detail_payload["total_amount"] == 180
+    assert detail_payload["extraction_review_metadata"]["review_state"]["pricing_pending"] is True
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={"title": "Review mixed pricing"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert patch_response.status_code == 200
+    patched_payload = patch_response.json()
+    assert [item["price_status"] for item in patched_payload["line_items"]] == [
+        "priced",
+        "included",
+        "unknown",
+    ]
+
+    reloaded_detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert reloaded_detail_response.status_code == 200
+    reloaded_detail_payload = reloaded_detail_response.json()
+    assert [item["price_status"] for item in reloaded_detail_payload["line_items"]] == [
+        "priced",
+        "included",
+        "unknown",
+    ]
+    assert reloaded_detail_payload["line_items"][2]["price"] is None
+    assert reloaded_detail_payload["total_amount"] == 180
+
+
 async def test_extract_combined_sync_passes_initial_mode_to_extraction_integration(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,

@@ -78,6 +78,18 @@ Record conventions that already exist in code.
 - Event-log DB persistence is disabled by default in backend test fixtures to avoid background-task coupling.
 - External-provider tests are opt-in via `@pytest.mark.live` and excluded from default verify (`-m "not live"`).
 
+## Extraction DTO Layering And Subtotal Authority
+- Keep extraction flow contracts split across four DTO layers:
+  - provider candidate DTO (integration request/response contract)
+  - internal applied extraction result (service/domain write contract)
+  - extraction/job response DTO (public API payload contract)
+  - review sidecar metadata DTO (persisted review-state and hidden-actionable lifecycle)
+- Avoid convenience pass-through mappings that reintroduce provider/internal-only fields into public extraction or job responses.
+- Treat subtotal authority as `price_status`-aware:
+  - null-price `unknown` rows block authoritative subtotal derivation
+  - null-price `included` rows do not block subtotal derivation when priced rows exist
+  - unknown/included statuses must survive persistence, hydration, and save/reload round trips unless an operator explicitly edits them
+
 ## Quote and invoice API integration tests (layout)
 
 - Quote and invoice **HTTP API** behavior tests live in **cohort modules** under `backend/app/features/quotes/tests/` and `backend/app/features/invoices/tests/`. Examples: `test_quote_crud.py`, `test_quote_outcomes.py`, `test_quote_to_invoice.py`, `test_quote_email.py`, `test_quote_auth_csrf.py`, `test_quote_extraction.py`, `test_quote_append_extraction.py`, `test_invoice_api.py`, `test_invoice_doc_type.py`, `test_invoice_outcomes.py`, `test_invoice_email.py`. Pick the file that matches the behavior or route under test.
