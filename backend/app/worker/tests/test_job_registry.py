@@ -11,7 +11,12 @@ from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.models import Document
-from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput, PricingHints
+from app.features.quotes.schemas import (
+    ExtractionMode,
+    ExtractionResult,
+    PreparedCaptureInput,
+    PricingHints,
+)
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.extraction import ExtractionCallMetadata, ExtractionError
 from app.shared import event_logger, observability
@@ -89,6 +94,57 @@ async def test_extraction_job_accepts_legacy_enqueued_payload_without_source_met
     assert legacy_input.source_type == "text"  # nosec B101 - pytest assertion
     assert legacy_input.raw_typed_notes == "legacy queued transcript"  # nosec B101 - pytest assertion
     assert legacy_input.raw_transcript is None  # nosec B101 - pytest assertion
+
+
+async def test_extraction_job_passes_append_mode_to_integration_for_append_jobs(
+    db_session: AsyncSession,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    create_record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    await extraction_job(
+        _worker_context(
+            db_session,
+            extraction_integration=_SuccessfulExtractionIntegration(),
+        ),
+        str(create_record.id),
+        transcript="initial quote transcript",
+        source_type="text",
+        capture_detail="notes",
+        extraction_mode="initial",
+    )
+
+    created_job = await _load_job_record(db_session, create_record.id)
+    assert created_job is not None  # nosec B101 - pytest assertion
+    assert created_job.document_id is not None  # nosec B101 - pytest assertion
+
+    append_record = await repository.create(
+        user_id=user.id,
+        job_type=JobType.EXTRACTION,
+        document_id=created_job.document_id,
+    )
+    await db_session.commit()
+
+    capture_integration = _CaptureInputExtractionIntegration()
+    await extraction_job(
+        _worker_context(
+            db_session,
+            extraction_integration=capture_integration,
+        ),
+        str(append_record.id),
+        transcript="append note for quote",
+        source_type="text",
+        capture_detail="notes",
+        append_to_quote=True,
+        extraction_mode="append",
+    )
+
+    refreshed_append_job = await _load_job_record(db_session, append_record.id)
+    assert refreshed_append_job is not None  # nosec B101 - pytest assertion
+    assert refreshed_append_job.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
+    assert capture_integration.received_modes == ["append"]  # nosec B101 - pytest assertion
 
 
 async def test_extraction_job_marks_terminal_when_draft_persistence_fails(
@@ -328,7 +384,13 @@ async def test_extraction_job_uses_enqueued_correlation_id_and_logs_failure_meta
 
 
 class _SuccessfulExtractionIntegration:
-    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
+    async def extract(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        del mode
         transcript = _capture_transcript(notes)
         return ExtractionResult(
             transcript=transcript,
@@ -341,9 +403,16 @@ class _SuccessfulExtractionIntegration:
 class _CaptureInputExtractionIntegration:
     def __init__(self) -> None:
         self.received_inputs: list[PreparedCaptureInput] = []
+        self.received_modes: list[ExtractionMode] = []
 
-    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
+    async def extract(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
         transcript = _capture_transcript(notes)
+        self.received_modes.append(mode)
         if isinstance(notes, PreparedCaptureInput):
             self.received_inputs.append(notes)
         return ExtractionResult(
@@ -361,15 +430,26 @@ class _RetryableProviderError(Exception):
 
 
 class _RetryableFailureExtractionIntegration:
-    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
-        del notes
+    async def extract(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        del notes, mode
         raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)
 
 
 class _ValidationRepairFailedExtractionIntegration:
     model_id = "claude-haiku-4-5-20251001"
 
-    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
+    async def extract(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        del mode
         transcript = _capture_transcript(notes)
         return ExtractionResult(
             transcript=transcript,
@@ -391,8 +471,13 @@ class _ValidationRepairFailedExtractionIntegration:
 
 
 class _NonRetryableFailureExtractionIntegration:
-    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
-        del notes
+    async def extract(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        del notes, mode
         raise ExtractionError("Claude request failed: malformed payload")
 
 
@@ -405,8 +490,13 @@ class _NonRetryableProviderError(Exception):
 class _MetadataFailureExtractionIntegration:
     model_id = "claude-haiku-4-5-20251001"
 
-    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
-        del notes
+    async def extract(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        del notes, mode
         raise ExtractionError(
             "Claude request failed: malformed payload"
         ) from _NonRetryableProviderError(status_code=400)

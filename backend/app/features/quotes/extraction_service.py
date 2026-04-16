@@ -15,7 +15,7 @@ from app.features.quotes.extraction_outcomes import (
     log_draft_generation_failed_event,
     should_persist_degraded_retryable_error,
 )
-from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
+from app.features.quotes.schemas import ExtractionMode, ExtractionResult, PreparedCaptureInput
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
@@ -30,7 +30,12 @@ from app.shared.input_limits import (
 class ExtractionIntegrationProtocol(Protocol):
     """Structural protocol for extraction integration dependency."""
 
-    async def extract(self, capture_input: PreparedCaptureInput) -> ExtractionResult: ...
+    async def extract(
+        self,
+        capture_input: PreparedCaptureInput,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult: ...
 
 
 class AudioIntegrationProtocol(Protocol):
@@ -74,7 +79,7 @@ class ExtractionService:
             transcript=notes,
             source_type="text",
         )
-        return await self._extract_prepared_input(prepared_input)
+        return await self._extract_prepared_input(prepared_input, mode="initial")
 
     async def prepare_capture_input(
         self,
@@ -145,6 +150,7 @@ class ExtractionService:
         clips: Sequence[CaptureAudioClip] | None,
         notes: str | None,
         *,
+        mode: ExtractionMode = "initial",
         user_id: UUID | None = None,
         allow_degraded_persist_on_retryable_failure: bool = False,
     ) -> ExtractionResult:
@@ -156,7 +162,7 @@ class ExtractionService:
                 user_id=user_id,
             )
             try:
-                extraction = await self._extract_prepared_input(prepared_input)
+                extraction = await self._extract_prepared_input(prepared_input, mode=mode)
             except QuoteServiceError as exc:
                 should_persist_degraded = (
                     allow_degraded_persist_on_retryable_failure
@@ -180,9 +186,11 @@ class ExtractionService:
     async def _extract_prepared_input(
         self,
         prepared_input: PreparedCaptureInput,
+        *,
+        mode: ExtractionMode = "initial",
     ) -> ExtractionResult:
         try:
-            return await self._extraction.extract(prepared_input)
+            return await self._extraction.extract(prepared_input, mode=mode)
         except ExtractionError as exc:
             sentry_sdk.capture_exception(exc)
             raise QuoteServiceError(

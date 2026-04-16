@@ -265,6 +265,7 @@ async def extract_combined(
                 extraction = await extraction_service.extract_combined(
                     clip_inputs,
                     notes,
+                    mode="initial",
                     user_id=user.id,
                     allow_degraded_persist_on_retryable_failure=True,
                 )
@@ -329,6 +330,7 @@ async def extract_combined(
             _job_id=str(job.id),
             correlation_id=current_correlation_id(),
             prepared_capture_input=prepared_capture_input.model_dump(mode="json"),
+            extraction_mode="initial",
             source_type=source_type,
             capture_detail=capture_detail,
             customer_id=str(customer_id) if customer_id is not None else None,
@@ -385,6 +387,7 @@ async def append_extraction(
                 extraction = await extraction_service.extract_combined(
                     clip_inputs,
                     notes,
+                    mode="append",
                     user_id=user.id,
                     allow_degraded_persist_on_retryable_failure=True,
                 )
@@ -440,6 +443,7 @@ async def append_extraction(
             _job_id=str(job.id),
             correlation_id=current_correlation_id(),
             prepared_capture_input=prepared_capture_input.model_dump(mode="json"),
+            extraction_mode="append",
             source_type=source_type,
             capture_detail=capture_detail,
             append_to_quote=True,

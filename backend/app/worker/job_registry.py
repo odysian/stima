@@ -27,7 +27,7 @@ from app.features.quotes.extraction_outcomes import (
     should_persist_degraded_retryable_error,
 )
 from app.features.quotes.repository import QuoteEmailContext, QuoteRepository
-from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
+from app.features.quotes.schemas import ExtractionMode, ExtractionResult, PreparedCaptureInput
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.integrations.email import EmailService
 from app.integrations.extraction import (
@@ -84,6 +84,7 @@ async def extraction_job(
     correlation_id: str | None = None,
     transcript: str | None = None,
     prepared_capture_input: dict[str, Any] | PreparedCaptureInput | None = None,
+    extraction_mode: str | None = None,
     source_type: str = "text",
     capture_detail: str | None = None,
     customer_id: str | None = None,
@@ -100,6 +101,10 @@ async def extraction_job(
         source_type=source_type,
         capture_detail=capture_detail,
     )
+    resolved_extraction_mode = _resolve_worker_extraction_mode(
+        extraction_mode=extraction_mode,
+        append_to_quote=append_to_quote,
+    )
     try:
         await process_job(
             ctx,
@@ -110,6 +115,7 @@ async def extraction_job(
             handler=lambda: _extract_quote_data(
                 ctx,
                 resolved_capture_input,
+                extraction_mode=resolved_extraction_mode,
                 job_id=parsed_job_id,
             ),
             on_success=lambda runtime, result: _store_extraction_result(
@@ -239,6 +245,7 @@ async def _extract_quote_data(
     ctx: dict[str, Any],
     prepared_capture_input: PreparedCaptureInput,
     *,
+    extraction_mode: ExtractionMode,
     job_id: UUID,
 ) -> ExtractionResult:
     extraction_integration = ctx.get("extraction_integration")
@@ -256,7 +263,10 @@ async def _extract_quote_data(
     )
 
     try:
-        result = await extraction_integration.extract(prepared_capture_input)
+        result = await extraction_integration.extract(
+            prepared_capture_input,
+            mode=extraction_mode,
+        )
     except ExtractionError as exc:
         metadata = _pop_extraction_call_metadata(extraction_integration)
         resolved_last_model_id = _resolve_last_model_id(
@@ -494,6 +504,12 @@ def _validate_extraction_source_type(source_type: str) -> Literal["text", "voice
     return cast(Literal["text", "voice"], source_type)
 
 
+def _validate_extraction_mode(extraction_mode: str) -> ExtractionMode:
+    if extraction_mode not in {"initial", "append"}:
+        raise NonRetryableJobError("Extraction job missing valid extraction_mode")
+    return cast(ExtractionMode, extraction_mode)
+
+
 def _parse_optional_uuid(value: str | None) -> UUID | None:
     if value is None:
         return None
@@ -507,6 +523,17 @@ def _resolve_worker_capture_detail(*, source_type: str, capture_detail: str | No
     if source_type == "voice":
         return "audio"
     return "notes"
+
+
+def _resolve_worker_extraction_mode(
+    *,
+    extraction_mode: str | None,
+    append_to_quote: bool,
+) -> ExtractionMode:
+    normalized_mode = (extraction_mode or "").strip().lower()
+    if not normalized_mode:
+        return "append" if append_to_quote else "initial"
+    return _validate_extraction_mode(normalized_mode)
 
 
 def _resolve_prepared_capture_input(

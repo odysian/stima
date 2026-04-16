@@ -16,7 +16,12 @@ from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.models import Document, QuoteStatus
-from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput, PricingHints
+from app.features.quotes.schemas import (
+    ExtractionMode,
+    ExtractionResult,
+    PreparedCaptureInput,
+    PricingHints,
+)
 from app.features.quotes.service import QuoteService, QuoteServiceError
 from app.features.quotes.tests import test_quotes as quotes_test_module
 from app.features.quotes.tests.support.helpers import (
@@ -170,6 +175,36 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     assert payload["confidence_notes"] == []
 
 
+async def test_extract_combined_sync_passes_initial_mode_to_extraction_integration(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded_modes: list[ExtractionMode] = []
+    original_extract = _MockExtractionIntegration.extract
+
+    async def _capture_mode(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        recorded_modes.append(mode)
+        return await original_extract(self, notes, mode=mode)
+
+    monkeypatch.setattr(_MockExtractionIntegration, "extract", _capture_mode)
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "initial extraction mode check"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert recorded_modes == ["initial"]
+
+
 async def test_extract_combined_falls_back_to_sync_when_no_arq_pool_is_available(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -212,8 +247,13 @@ async def test_extract_combined_sync_retryable_failure_persists_degraded_draft(
     def _capture(message: str) -> None:
         emitted_events.append(json.loads(message))
 
-    async def _retryable_extract(self, notes: str) -> ExtractionResult:  # noqa: ANN001
-        del self, notes
+    async def _retryable_extract(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:  # noqa: ANN001
+        del self, notes, mode
         raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)
 
     monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
@@ -285,6 +325,7 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
                     "raw_typed_notes": "mulch the front beds",
                     "raw_transcript": None,
                 },
+                "extraction_mode": "initial",
                 "source_type": "text",
                 "capture_detail": "notes",
                 "customer_id": None,
@@ -748,7 +789,13 @@ async def test_convert_notes_rejects_when_concurrency_limit_is_exhausted(
             self.started = asyncio.Event()
             self.release = asyncio.Event()
 
-        async def extract(self, notes: PreparedCaptureInput) -> ExtractionResult:
+        async def extract(
+            self,
+            notes: PreparedCaptureInput,
+            *,
+            mode: ExtractionMode = "initial",
+        ) -> ExtractionResult:
+            del mode
             self.started.set()
             await self.release.wait()
             return ExtractionResult(

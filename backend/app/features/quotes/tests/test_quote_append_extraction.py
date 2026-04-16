@@ -15,6 +15,7 @@ from app.features.jobs.repository import JobRepository
 from app.features.quotes.models import Document
 from app.features.quotes.review_metadata import build_hidden_item_id
 from app.features.quotes.schemas import (
+    ExtractionMode,
     ExtractionResult,
     ExtractionReviewAppendSuggestion,
     ExtractionReviewHiddenDetails,
@@ -59,8 +60,13 @@ async def test_append_extraction_sync_retryable_failure_uses_degraded_append_sem
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _retryable_extract(self, notes: str) -> ExtractionResult:  # noqa: ANN001
-        del self, notes
+    async def _retryable_extract(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:  # noqa: ANN001
+        del self, notes, mode
         raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)
 
     monkeypatch.setattr(_MockExtractionIntegration, "extract", _retryable_extract)
@@ -145,12 +151,50 @@ async def test_append_extraction_sync_appends_line_items_and_merges_transcript_e
     assert "Added later (2):" not in payload["transcript"]
 
 
+async def test_append_extraction_sync_passes_append_mode_to_extraction_integration(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded_modes: list[ExtractionMode] = []
+    original_extract = _MockExtractionIntegration.extract
+
+    async def _capture_mode(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        recorded_modes.append(mode)
+        return await original_extract(self, notes, mode=mode)
+
+    monkeypatch.setattr(_MockExtractionIntegration, "extract", _capture_mode)
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+    app.state.arq_pool = None
+
+    response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "append extraction mode check"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert recorded_modes == ["append"]
+
+
 async def test_append_extraction_keeps_populated_notes_and_total_and_records_append_suggestions(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _extract_blocked_append_fields(self, notes: str) -> ExtractionResult:  # noqa: ANN001
-        del self, notes
+    async def _extract_blocked_append_fields(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:  # noqa: ANN001
+        del self, notes, mode
         return ExtractionResult(
             transcript="append blocked fields",
             line_items=[],
@@ -218,8 +262,13 @@ async def test_append_extraction_resurfaces_previously_dismissed_matching_sugges
     suggestion_text = "Add driveway gate code"
     suggestion_id = build_hidden_item_id("append", "note", "none", suggestion_text)
 
-    async def _extract_blocked_note(self, notes: str) -> ExtractionResult:  # noqa: ANN001
-        del self, notes
+    async def _extract_blocked_note(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:  # noqa: ANN001
+        del self, notes, mode
         return ExtractionResult(
             transcript="append blocked note",
             line_items=[],
@@ -279,8 +328,13 @@ async def test_append_extraction_preserves_existing_confidence_notes_when_new_no
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _extract_without_confidence_notes(self, notes: str) -> ExtractionResult:  # noqa: ANN001
-        del self, notes
+    async def _extract_without_confidence_notes(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:  # noqa: ANN001
+        del self, notes, mode
         return ExtractionResult(
             transcript="append without confidence notes",
             line_items=[
@@ -580,6 +634,7 @@ async def test_append_extraction_enqueues_async_job_for_owned_quote(
                     "raw_typed_notes": "append this",
                     "raw_transcript": None,
                 },
+                "extraction_mode": "append",
                 "source_type": "text",
                 "capture_detail": "notes",
                 "append_to_quote": True,

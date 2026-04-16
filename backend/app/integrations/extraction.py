@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from app.features.quotes.schemas import (
     CaptureSegment,
     CaptureSegmentHints,
+    ExtractionMode,
     ExtractionResult,
     ExtractionResultV2,
     LineItemExtractedV2,
@@ -253,7 +254,12 @@ class ExtractionIntegration:
         )
         self._client = client
 
-    async def extract(self, capture_input: PreparedCaptureInput | str) -> ExtractionResult:
+    async def extract(
+        self,
+        capture_input: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
         """Call Claude structured output and validate the V2 contract."""
         prepared_input = _coerce_prepared_capture_input(capture_input)
         _set_last_call_metadata(
@@ -293,6 +299,7 @@ class ExtractionIntegration:
                     stage=tier.tier,
                     outcome="failed",
                     level=logging.WARNING,
+                    extraction_mode=mode,
                     extraction_model_id=tier.model_id,
                     extraction_prompt_variant=tier.prompt_variant,
                     error_class=type(exc).__name__,
@@ -307,6 +314,7 @@ class ExtractionIntegration:
             stage="result",
             outcome="failed",
             level=logging.ERROR,
+            extraction_mode=mode,
             reason="all_tiers_failed",
             error_class=type(last_error).__name__,
             error_message=str(last_error),

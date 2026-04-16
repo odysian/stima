@@ -6,6 +6,7 @@ from typing import TypedDict
 
 from app.features.quotes.repository import QuoteRenderContext
 from app.features.quotes.schemas import (
+    ExtractionMode,
     ExtractionResult,
     LineItemExtractedV2,
     PreparedCaptureInput,
@@ -20,7 +21,13 @@ from app.shared.idempotency import IdempotencyBeginResult
 
 
 class _MockExtractionIntegration:
-    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
+    async def extract(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        del mode
         normalized_notes = _capture_transcript(notes)
         if "malformed" in normalized_notes.lower():
             raise ExtractionError("mock malformed extraction payload")
@@ -187,6 +194,11 @@ class _RetryableProviderError(Exception):
 
 
 class _RetryableFailureExtractionIntegration:
-    async def extract(self, notes: PreparedCaptureInput | str) -> ExtractionResult:
-        del notes
+    async def extract(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        del notes, mode
         raise ExtractionError("Claude request failed: retryable") from _RetryableProviderError(429)

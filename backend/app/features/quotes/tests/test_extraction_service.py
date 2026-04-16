@@ -8,7 +8,7 @@ import pytest
 import sentry_sdk
 
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
-from app.features.quotes.schemas import ExtractionResult, PreparedCaptureInput
+from app.features.quotes.schemas import ExtractionMode, ExtractionResult, PreparedCaptureInput
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
@@ -23,8 +23,13 @@ pytestmark = pytest.mark.asyncio
 
 
 class _FailingExtractionIntegration:
-    async def extract(self, capture_input: PreparedCaptureInput) -> ExtractionResult:
-        del capture_input
+    async def extract(
+        self,
+        capture_input: PreparedCaptureInput,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        del capture_input, mode
         raise ExtractionError("mock extraction failure")
 
 
@@ -48,10 +53,15 @@ class _SuccessfulAudioIntegration:
 
 class _SuccessfulExtractionIntegration:
     def __init__(self) -> None:
-        self.calls: list[PreparedCaptureInput] = []
+        self.calls: list[tuple[PreparedCaptureInput, ExtractionMode]] = []
 
-    async def extract(self, capture_input: PreparedCaptureInput) -> ExtractionResult:
-        self.calls.append(capture_input)
+    async def extract(
+        self,
+        capture_input: PreparedCaptureInput,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        self.calls.append((capture_input, mode))
         return ExtractionResult(
             transcript=capture_input.transcript,
             line_items=[],
@@ -132,11 +142,12 @@ async def test_extract_combined_allows_audio_and_notes_up_to_extraction_limit() 
 
     expected_transcript = f"{transcript}\n\n{notes}"
     assert len(extraction.calls) == 1
-    prepared_capture_input = extraction.calls[0]
+    prepared_capture_input, extraction_mode = extraction.calls[0]
     assert prepared_capture_input.source_type == "voice+text"
     assert prepared_capture_input.raw_typed_notes == notes
     assert prepared_capture_input.raw_transcript == transcript
     assert prepared_capture_input.transcript == expected_transcript
+    assert extraction_mode == "initial"
     assert result.transcript == expected_transcript
     assert len(result.transcript) == EXTRACTION_TRANSCRIPT_MAX_CHARS
 
