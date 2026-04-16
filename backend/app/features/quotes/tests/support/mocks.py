@@ -49,7 +49,6 @@ class _MockExtractionIntegration:
                     )
                 ],
                 pricing_hints=PricingHints(explicit_total=120),
-                confidence_notes=[],
             )
 
         return ExtractionResult(
@@ -64,7 +63,6 @@ class _MockExtractionIntegration:
                 )
             ],
             pricing_hints=PricingHints(explicit_total=120),
-            confidence_notes=[],
         )
 
 

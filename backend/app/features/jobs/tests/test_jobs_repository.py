@@ -25,7 +25,7 @@ async def test_job_repository_supports_explicit_status_paths(
     await repository.set_running(success_record.id, expected_job_type=JobType.EXTRACTION)
     await repository.set_success_with_result(
         success_record.id,
-        result_json='{"transcript":"mulch","line_items":[],"total":null,"confidence_notes":[]}',
+        result_json='{"transcript":"mulch","line_items":[],"total":null}',
         expected_job_type=JobType.EXTRACTION,
     )
 

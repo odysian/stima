@@ -18,11 +18,10 @@ from app.features.quotes.review_metadata import build_hidden_item_id
 from app.features.quotes.schemas import (
     ExtractionMode,
     ExtractionResult,
-    ExtractionReviewAppendSuggestion,
+    ExtractionReviewActionableItem,
     ExtractionReviewHiddenDetails,
     ExtractionReviewMetadataV1,
     ExtractionReviewState,
-    ExtractionReviewUnresolvedSegment,
     ExtractionSuggestion,
     HiddenItemState,
     LineItemExtractedV2,
@@ -57,46 +56,33 @@ _override_extraction_service_dependency = quotes_test_module._override_extractio
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
 
 
-async def test_extraction_review_metadata_parses_legacy_grouped_hidden_details() -> None:
+async def test_extraction_review_metadata_accepts_items_only_hidden_details() -> None:
     metadata = ExtractionReviewMetadataV1.model_validate(
         {
-            "pipeline_version": "v2",
+            "pipeline_version": "v2.5",
             "hidden_details": {
-                "append_suggestions": [
+                "items": [
                     {
                         "id": "append-note-1",
-                        "kind": "note",
-                        "raw_text": "Add gate note",
+                        "kind": "append_suggestion",
+                        "field": "notes",
+                        "reason": "append_capture",
                         "confidence": "medium",
-                        "source": "append_capture",
-                        "pricing_field": None,
+                        "text": "Add gate note",
                     }
                 ],
-                "unresolved_segments": [
-                    {
-                        "id": "unresolved-1",
-                        "raw_text": "Clarify edging scope",
-                        "confidence": "low",
-                        "source": "leftover_classification",
-                    }
-                ],
-                "confidence_notes": ["Legacy confidence note"],
             },
             "hidden_detail_state": {
-                "append-note-1": {"reviewed": False, "dismissed": True},
+                "append-note-1": {"dismissed": True},
             },
         }
     )
 
     assert [item["kind"] for item in metadata.hidden_details.model_dump(mode="json")["items"]] == [
         "append_suggestion",
-        "unresolved_segment",
-        "confidence_note",
     ]
     assert metadata.hidden_details.items[0].field == "notes"
     assert metadata.hidden_details.items[0].text == "Add gate note"
-    assert metadata.hidden_details.items[1].reason == "leftover_classification"
-    assert metadata.hidden_details.items[2].text == "Legacy confidence note"
 
 
 async def test_append_extraction_sync_retryable_failure_uses_degraded_append_semantics(
@@ -249,7 +235,6 @@ async def test_append_extraction_routes_corrective_language_to_unresolved_hidden
                 )
             ],
             pricing_hints=PricingHints(),
-            confidence_notes=[],
         )
 
     monkeypatch.setattr(
@@ -306,7 +291,6 @@ async def test_append_extraction_withholds_populated_notes_and_deposit_but_seeds
                 confidence="medium",
                 source="leftover_classification",
             ),
-            confidence_notes=[],
         )
 
     monkeypatch.setattr(
@@ -341,33 +325,32 @@ async def test_append_extraction_withholds_populated_notes_and_deposit_but_seeds
     assert payload["total_amount"] == 59.54
     assert payload["deposit_amount"] == 40
     assert payload["tax_rate"] == 0.0825
-    append_suggestions = payload["extraction_review_metadata"]["hidden_details"][
-        "append_suggestions"
-    ]
+    items = payload["extraction_review_metadata"]["hidden_details"]["items"]
+    append_suggestions = [item for item in items if item["kind"] == "append_suggestion"]
     assert append_suggestions == [
         {
             "id": append_suggestions[0]["id"],
-            "kind": "note",
-            "raw_text": "Add driveway gate code",
+            "kind": "append_suggestion",
+            "field": "notes",
+            "reason": "append_capture",
             "confidence": "medium",
-            "source": "append_capture",
-            "pricing_field": None,
+            "text": "Add driveway gate code",
         },
         {
             "id": append_suggestions[1]["id"],
-            "kind": "pricing",
-            "raw_text": "Total 999",
+            "kind": "append_suggestion",
+            "field": "explicit_total",
+            "reason": "append_capture",
             "confidence": "medium",
-            "source": "append_capture",
-            "pricing_field": "explicit_total",
+            "text": "Total 999",
         },
         {
             "id": append_suggestions[2]["id"],
-            "kind": "pricing",
-            "raw_text": "Deposit 150",
+            "kind": "append_suggestion",
+            "field": "deposit_amount",
+            "reason": "append_capture",
             "confidence": "medium",
-            "source": "append_capture",
-            "pricing_field": "deposit_amount",
+            "text": "Deposit 150",
         },
     ]
 
@@ -390,7 +373,6 @@ async def test_append_extraction_withholds_ambiguous_explicit_total_when_tax_can
                 explicit_total=200,
                 tax_rate=0.0825,
             ),
-            confidence_notes=[],
         )
 
     monkeypatch.setattr(
@@ -436,17 +418,16 @@ async def test_append_extraction_withholds_ambiguous_explicit_total_when_tax_can
     payload = detail_response.json()
     assert payload["total_amount"] is None
     assert payload["tax_rate"] is None
-    append_suggestions = payload["extraction_review_metadata"]["hidden_details"][
-        "append_suggestions"
-    ]
+    items = payload["extraction_review_metadata"]["hidden_details"]["items"]
+    append_suggestions = [item for item in items if item["kind"] == "append_suggestion"]
     assert append_suggestions == [
         {
             "id": append_suggestions[0]["id"],
-            "kind": "pricing",
-            "raw_text": "Total 200",
+            "kind": "append_suggestion",
+            "field": "explicit_total",
+            "reason": "append_capture",
             "confidence": "medium",
-            "source": "append_capture",
-            "pricing_field": "explicit_total",
+            "text": "Total 200",
         }
     ]
 
@@ -475,7 +456,6 @@ async def test_append_extraction_resurfaces_previously_dismissed_matching_sugges
                 confidence="low",
                 source="leftover_classification",
             ),
-            confidence_notes=[],
         )
 
     monkeypatch.setattr(
@@ -494,16 +474,18 @@ async def test_append_extraction_resurfaces_previously_dismissed_matching_sugges
     assert persisted_quote is not None
     persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
         hidden_details=ExtractionReviewHiddenDetails(
-            append_suggestions=[
-                ExtractionReviewAppendSuggestion(
+            items=[
+                ExtractionReviewActionableItem(
                     id=suggestion_id,
-                    kind="note",
-                    raw_text=suggestion_text,
+                    kind="append_suggestion",
+                    field="notes",
+                    reason="append_capture",
                     confidence="low",
+                    text=suggestion_text,
                 )
             ]
         ),
-        hidden_detail_state={suggestion_id: HiddenItemState(reviewed=True, dismissed=True)},
+        hidden_detail_state={suggestion_id: HiddenItemState(dismissed=True)},
     ).model_dump(mode="json")
     await db_session.commit()
 
@@ -524,70 +506,7 @@ async def test_append_extraction_resurfaces_previously_dismissed_matching_sugges
         if item["kind"] == "append_suggestion" and item["text"] == suggestion_text
     )
     assert next_item["id"] != suggestion_id
-    assert hidden_state[next_item["id"]] == {"reviewed": False, "dismissed": False}
-
-
-async def test_append_extraction_preserves_existing_confidence_notes_when_new_notes_empty(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def _extract_without_confidence_notes(
-        self,
-        notes: str,
-        *,
-        mode: ExtractionMode = "initial",
-    ) -> ExtractionResult:  # noqa: ANN001
-        del self, notes, mode
-        return ExtractionResult(
-            transcript="append without confidence notes",
-            line_items=[
-                LineItemExtractedV2(
-                    raw_text="Added labor 15",
-                    description="Added labor",
-                    details=None,
-                    price=15,
-                    confidence="medium",
-                )
-            ],
-            pricing_hints=PricingHints(explicit_total=15),
-            confidence_notes=[],
-        )
-
-    monkeypatch.setattr(
-        _MockExtractionIntegration,
-        "extract",
-        _extract_without_confidence_notes,
-    )
-
-    csrf_token = await _register_and_login(client, _credentials())
-    customer_id = await _create_customer(client, csrf_token)
-    quote = await _create_quote(client, csrf_token, customer_id)
-    quote_id = UUID(quote["id"])
-    app.state.arq_pool = None
-
-    persisted_quote = await db_session.get(Document, quote_id)
-    assert persisted_quote is not None
-    persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
-        hidden_details=ExtractionReviewHiddenDetails(
-            confidence_notes=["keep existing confidence note"]
-        ),
-    ).model_dump(mode="json")
-    await db_session.commit()
-
-    append_response = await client.post(
-        f"/api/quotes/{quote_id}/append-extraction",
-        files=[("notes", (None, "append this follow-up"))],
-        headers={"X-CSRF-Token": csrf_token},
-    )
-    assert append_response.status_code == 200
-
-    detail_response = await client.get(f"/api/quotes/{quote_id}")
-    assert detail_response.status_code == 200
-    detail_payload = detail_response.json()
-    assert detail_payload["extraction_review_metadata"]["hidden_details"]["confidence_notes"] == [
-        "keep existing confidence note"
-    ]
+    assert hidden_state[next_item["id"]] == {"dismissed": False}
 
 
 async def test_patch_extraction_review_metadata_updates_sidecar_only(
@@ -603,12 +522,14 @@ async def test_patch_extraction_review_metadata_updates_sidecar_only(
     assert persisted_quote is not None
     persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
         hidden_details=ExtractionReviewHiddenDetails(
-            append_suggestions=[
-                ExtractionReviewAppendSuggestion(
+            items=[
+                ExtractionReviewActionableItem(
                     id="append-note-1",
-                    kind="note",
-                    raw_text="Add mulch color confirmation",
+                    kind="append_suggestion",
+                    field="notes",
+                    reason="append_capture",
                     confidence="medium",
+                    text="Add mulch color confirmation",
                 )
             ]
         ),
@@ -622,7 +543,6 @@ async def test_patch_extraction_review_metadata_updates_sidecar_only(
     )
     assert patch_response.status_code == 200
     assert patch_response.json()["hidden_detail_state"]["append-note-1"] == {
-        "reviewed": False,
         "dismissed": True,
     }
 
@@ -633,53 +553,7 @@ async def test_patch_extraction_review_metadata_updates_sidecar_only(
     assert payload["total_amount"] == 55
     assert payload["line_items"][0]["description"] == "line item"
     assert payload["extraction_review_metadata"]["hidden_detail_state"]["append-note-1"] == {
-        "reviewed": False,
         "dismissed": True,
-    }
-
-
-async def test_patch_extraction_review_metadata_marks_hidden_item_reviewed(
-    client: AsyncClient,
-    db_session: AsyncSession,
-) -> None:
-    csrf_token = await _register_and_login(client, _credentials())
-    customer_id = await _create_customer(client, csrf_token)
-    quote = await _create_quote(client, csrf_token, customer_id)
-    quote_id = UUID(quote["id"])
-
-    persisted_quote = await db_session.get(Document, quote_id)
-    assert persisted_quote is not None
-    persisted_quote.extraction_review_metadata = ExtractionReviewMetadataV1(
-        hidden_details=ExtractionReviewHiddenDetails(
-            unresolved_segments=[
-                ExtractionReviewUnresolvedSegment(
-                    id="unresolved-1",
-                    raw_text="Confirm edging scope",
-                    confidence="low",
-                    source="leftover_classification",
-                )
-            ]
-        ),
-    ).model_dump(mode="json")
-    await db_session.commit()
-
-    patch_response = await client.patch(
-        f"/api/quotes/{quote_id}/extraction-review-metadata",
-        json={"review_hidden_item": "unresolved-1"},
-        headers={"X-CSRF-Token": csrf_token},
-    )
-    assert patch_response.status_code == 200
-    assert patch_response.json()["hidden_detail_state"]["unresolved-1"] == {
-        "reviewed": True,
-        "dismissed": False,
-    }
-
-    detail_response = await client.get(f"/api/quotes/{quote_id}")
-    assert detail_response.status_code == 200
-    payload = detail_response.json()
-    assert payload["extraction_review_metadata"]["hidden_detail_state"]["unresolved-1"] == {
-        "reviewed": True,
-        "dismissed": False,
     }
 
 
@@ -700,23 +574,24 @@ async def test_quote_patch_clears_related_append_suggestions_on_real_field_edits
             pricing_pending=True,
         ),
         hidden_details=ExtractionReviewHiddenDetails(
-            unresolved_segments=[],
-            append_suggestions=[
-                ExtractionReviewAppendSuggestion(
+            items=[
+                ExtractionReviewActionableItem(
                     id="append-note-1",
-                    kind="note",
-                    raw_text="Add customer gate code",
+                    kind="append_suggestion",
+                    field="notes",
+                    reason="append_capture",
                     confidence="medium",
+                    text="Add customer gate code",
                 ),
-                ExtractionReviewAppendSuggestion(
+                ExtractionReviewActionableItem(
                     id="append-pricing-1",
-                    kind="pricing",
-                    raw_text="Total 120",
+                    kind="append_suggestion",
+                    field="explicit_total",
+                    reason="append_capture",
                     confidence="medium",
-                    pricing_field="explicit_total",
+                    text="Total 120",
                 ),
             ],
-            confidence_notes=[],
         ),
     ).model_dump(mode="json")
     await db_session.commit()
@@ -732,14 +607,14 @@ async def test_quote_patch_clears_related_append_suggestions_on_real_field_edits
     assert first_detail_response.status_code == 200
     first_metadata = first_detail_response.json()["extraction_review_metadata"]
     assert first_metadata["review_state"] == {"notes_pending": False, "pricing_pending": True}
-    assert first_metadata["hidden_details"]["append_suggestions"] == [
+    assert first_metadata["hidden_details"]["items"] == [
         {
             "id": "append-pricing-1",
-            "kind": "pricing",
-            "raw_text": "Total 120",
+            "kind": "append_suggestion",
+            "field": "explicit_total",
+            "reason": "append_capture",
             "confidence": "medium",
-            "source": "append_capture",
-            "pricing_field": "explicit_total",
+            "text": "Total 120",
         }
     ]
 
@@ -754,7 +629,7 @@ async def test_quote_patch_clears_related_append_suggestions_on_real_field_edits
     assert second_detail_response.status_code == 200
     second_metadata = second_detail_response.json()["extraction_review_metadata"]
     assert second_metadata["review_state"] == {"notes_pending": False, "pricing_pending": False}
-    assert second_metadata["hidden_details"]["append_suggestions"] == []
+    assert second_metadata["hidden_details"]["items"] == []
 
 
 async def test_append_extraction_sync_cleans_obsolete_pdf_artifact_after_commit(

@@ -192,7 +192,6 @@ def apply_hidden_detail_lifecycle_updates(
     metadata: ExtractionReviewMetadataV1,
     *,
     dismiss_hidden_item: str | None = None,
-    review_hidden_item: str | None = None,
     clear_notes_pending: bool = False,
     clear_pricing_pending: bool = False,
 ) -> ExtractionReviewMetadataV1:
@@ -200,7 +199,6 @@ def apply_hidden_detail_lifecycle_updates(
     if not any(
         (
             dismiss_hidden_item is not None,
-            review_hidden_item is not None,
             clear_notes_pending,
             clear_pricing_pending,
         )
@@ -211,18 +209,8 @@ def apply_hidden_detail_lifecycle_updates(
         item_id: value.model_copy(deep=True)
         for item_id, value in metadata.hidden_detail_state.items()
     }
-    if review_hidden_item is not None:
-        previous = next_state.get(review_hidden_item, HiddenItemState())
-        next_state[review_hidden_item] = HiddenItemState(
-            reviewed=True,
-            dismissed=previous.dismissed,
-        )
     if dismiss_hidden_item is not None:
-        previous = next_state.get(dismiss_hidden_item, HiddenItemState())
-        next_state[dismiss_hidden_item] = HiddenItemState(
-            reviewed=previous.reviewed,
-            dismissed=True,
-        )
+        next_state[dismiss_hidden_item] = HiddenItemState(dismissed=True)
 
     updated_review_state = metadata.review_state.model_copy(
         update={
@@ -270,10 +258,7 @@ def _build_hidden_detail_state(
     merged: dict[str, HiddenItemState] = {}
     for item_id in current_item_ids:
         previous = previous_state.get(item_id, HiddenItemState())
-        merged[item_id] = HiddenItemState(
-            reviewed=previous.reviewed,
-            dismissed=previous.dismissed,
-        )
+        merged[item_id] = HiddenItemState(dismissed=previous.dismissed)
     return merged
 
 
@@ -325,34 +310,6 @@ def _build_actionable_items(
             reason=suggestion.source,
             confidence=suggestion.confidence,
             text=suggestion.raw_text,
-        )
-        signature = _actionable_signature(candidate)
-        previous = previous_by_signature.get(signature)
-        previous_item_state = previous_state.get(previous.id) if previous is not None else None
-        deduped[signature] = candidate.model_copy(
-            update={
-                "id": (
-                    previous.id
-                    if previous is not None
-                    and (previous_item_state is None or not previous_item_state.dismissed)
-                    else _build_new_occurrence_id()
-                )
-            }
-        )
-
-    confidence_notes = (
-        list(extraction_result.confidence_notes)
-        if extraction_result.confidence_notes
-        else [item.text for item in previous_items if item.kind == "confidence_note"]
-    )
-    for note in confidence_notes:
-        candidate = ExtractionReviewActionableItem(
-            id="pending",
-            kind="confidence_note",
-            field=None,
-            reason="confidence_note",
-            confidence=None,
-            text=note,
         )
         signature = _actionable_signature(candidate)
         previous = previous_by_signature.get(signature)

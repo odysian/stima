@@ -60,7 +60,6 @@ def build_degraded_extraction_result(
         pricing_hints=PricingHints(),
         customer_notes_suggestion=None,
         unresolved_segments=[],
-        confidence_notes=[],
         extraction_tier=EXTRACTION_TIER_DEGRADED,
         extraction_degraded_reason_code=reason_code,
     )

@@ -326,7 +326,6 @@ class QuoteMutationService:
         next_metadata = apply_hidden_detail_lifecycle_updates(
             metadata,
             dismiss_hidden_item=data.dismiss_hidden_item,
-            review_hidden_item=data.review_hidden_item,
             clear_notes_pending=(
                 data.clear_review_state is not None
                 and data.clear_review_state.notes_pending is True

@@ -86,7 +86,6 @@ async def test_extract_keeps_null_prices_without_zero_fill() -> None:
                             },
                         ],
                         "total": None,
-                        "confidence_notes": ["No explicit pricing in notes"],
                     },
                 }
             ]
@@ -118,7 +117,6 @@ async def test_extract_preserves_total_only_payload() -> None:
                             }
                         ],
                         "pricing_hints": {"explicit_total": 2100},
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -154,7 +152,6 @@ async def test_extract_handles_ambiguous_partial_input_without_raising() -> None
                             },
                         ],
                         "total": None,
-                        "confidence_notes": ["Siding price ambiguous in transcript"],
                     },
                 }
             ]
@@ -166,7 +163,6 @@ async def test_extract_handles_ambiguous_partial_input_without_raising() -> None
 
     assert result.line_items
     assert result.line_items[0].description == "Power wash deck"
-    assert result.confidence_notes == []
 
 
 async def test_extract_returns_degraded_result_when_repair_is_still_invalid() -> None:
@@ -181,7 +177,6 @@ async def test_extract_returns_degraded_result_when_repair_is_still_invalid() ->
                             "transcript": transcript,
                             "line_items": "invalid-shape",
                             "total": 435,
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -194,7 +189,6 @@ async def test_extract_returns_degraded_result_when_repair_is_still_invalid() ->
                             "transcript": transcript,
                             "line_items": "still-invalid",
                             "total": 435,
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -223,7 +217,6 @@ async def test_extract_attempts_one_repair_then_accepts_valid_repaired_payload()
                             "transcript": transcript,
                             "line_items": "invalid-shape",
                             "total": 435,
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -242,7 +235,6 @@ async def test_extract_attempts_one_repair_then_accepts_valid_repaired_payload()
                                 }
                             ],
                             "pricing_hints": {"explicit_total": 125},
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -284,7 +276,6 @@ async def test_extract_sets_repair_failure_metadata_when_repair_request_errors()
                             "transcript": transcript,
                             "line_items": "invalid-shape",
                             "total": 435,
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -327,7 +318,6 @@ async def test_extract_builds_client_with_configured_timeout_and_disabled_sdk_re
                             "input": {
                                 "transcript": transcript,
                                 "line_items": [],
-                                "confidence_notes": [],
                             },
                         }
                     ]
@@ -374,7 +364,6 @@ async def test_extract_retries_rate_limit_then_succeeds(
                         "input": {
                             "transcript": transcript,
                             "line_items": [],
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -413,7 +402,6 @@ async def test_extract_does_not_invoke_fallback_before_primary_exhaustion() -> N
                         "input": {
                             "transcript": transcript,
                             "line_items": [],
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -451,7 +439,6 @@ async def test_extract_invokes_fallback_after_primary_exhaustion_and_tags_metada
                         "input": {
                             "transcript": transcript,
                             "line_items": [],
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -521,7 +508,6 @@ async def test_extract_accepts_flagged_line_items_with_reason() -> None:
                             }
                         ],
                         "total": 9000,
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -552,7 +538,6 @@ async def test_extract_defaults_flag_fields_when_omitted() -> None:
                             }
                         ],
                         "total": 350,
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -612,7 +597,6 @@ async def test_extract_degrades_when_substantial_transcript_has_no_line_items() 
                         "transcript": transcript,
                         "line_items": [],
                         "total": None,
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -627,7 +611,6 @@ async def test_extract_degrades_when_substantial_transcript_has_no_line_items() 
         result.extraction_degraded_reason_code
         == SEMANTIC_DEGRADED_REASON_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT
     )
-    assert result.confidence_notes == []
 
 
 async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> None:
@@ -647,7 +630,6 @@ async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> Non
                             }
                         ],
                         "pricing_hints": {"explicit_total": 2100},
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -659,7 +641,6 @@ async def test_extract_adds_warning_when_total_has_no_priced_line_items() -> Non
 
     assert result.extraction_tier == "primary"
     assert result.extraction_degraded_reason_code is None
-    assert result.confidence_notes == []
     assert any(
         "explicit total was extracted without priced line items" in segment.raw_text.lower()
         for segment in result.unresolved_segments
@@ -688,7 +669,6 @@ async def test_extract_flags_duplicate_line_items_with_warning_note() -> None:
                             },
                         ],
                         "total": 240,
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -701,7 +681,6 @@ async def test_extract_flags_duplicate_line_items_with_warning_note() -> None:
     assert result.extraction_tier == "primary"
     assert all(item.flagged is True for item in result.line_items)
     assert all(item.flag_reason for item in result.line_items)
-    assert result.confidence_notes == []
 
 
 async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
@@ -831,7 +810,6 @@ async def test_extract_exercises_all_transcript_fixtures(fixture_name: str) -> N
                             }
                         ],
                         "total": None,
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -879,7 +857,6 @@ async def test_extract_emits_trace_events_for_primary_repair_and_result_stages(
                             "transcript": transcript,
                             "line_items": "invalid-shape",
                             "total": 435,
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -898,7 +875,6 @@ async def test_extract_emits_trace_events_for_primary_repair_and_result_stages(
                                 }
                             ],
                             "pricing_hints": {"explicit_total": 125},
-                            "confidence_notes": [],
                         },
                     }
                 ]
@@ -941,7 +917,6 @@ async def test_guard_flags_line_items_with_price_in_description() -> None:
                             },
                         ],
                         "total": None,
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -954,7 +929,6 @@ async def test_guard_flags_line_items_with_price_in_description() -> None:
     assert result.line_items[0].flagged is True
     assert "price token" in (result.line_items[0].flag_reason or "").lower()
     assert result.line_items[1].flagged is False
-    assert result.confidence_notes == []
 
 
 async def test_guard_flags_line_items_with_duplicate_details() -> None:
@@ -979,7 +953,6 @@ async def test_guard_flags_line_items_with_duplicate_details() -> None:
                             },
                         ],
                         "total": None,
-                        "confidence_notes": [],
                     },
                 }
             ]
@@ -992,7 +965,6 @@ async def test_guard_flags_line_items_with_duplicate_details() -> None:
     assert result.line_items[0].flagged is True
     assert "duplicate" in (result.line_items[0].flag_reason or "").lower()
     assert result.line_items[1].flagged is False
-    assert result.confidence_notes == []
 
 
 async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> None:
@@ -1020,7 +992,6 @@ async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> 
                     "input": {
                         "transcript": prepared_capture_input.transcript,
                         "line_items": [],
-                        "confidence_notes": [],
                     },
                 }
             ]

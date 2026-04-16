@@ -83,7 +83,7 @@ function makeQuote(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
     deposit_amount: null,
     notes: "Thanks for your business",
     extraction_review_metadata: {
-      pipeline_version: "v2",
+      pipeline_version: "v2.5",
       review_state: {
         notes_pending: false,
         pricing_pending: false,
@@ -98,9 +98,7 @@ function makeQuote(overrides: Partial<QuoteDetail> = {}): QuoteDetail {
         },
       },
       hidden_details: {
-        unresolved_segments: [],
-        append_suggestions: [],
-        confidence_notes: [],
+        items: [],
       },
       hidden_detail_state: {},
       extraction_degraded_reason_code: null,
@@ -262,7 +260,7 @@ beforeEach(() => {
     id: "doc-1",
   } as never);
   mockedQuoteService.updateExtractionReviewMetadata.mockResolvedValue({
-    pipeline_version: "v2",
+    pipeline_version: "v2.5",
     review_state: {
       notes_pending: false,
       pricing_pending: false,
@@ -277,9 +275,7 @@ beforeEach(() => {
       },
     },
     hidden_details: {
-      unresolved_segments: [],
-      append_suggestions: [],
-      confidence_notes: [],
+      items: [],
     },
     hidden_detail_state: {},
     extraction_degraded_reason_code: null,
@@ -422,16 +418,15 @@ describe("DocumentEditScreen", () => {
             pricing_pending: false,
           },
           hidden_details: {
-            unresolved_segments: [
+            items: [
               {
                 id: "unresolved-1",
-                raw_text: "maybe add edging",
-                confidence: "low",
-                source: "leftover_classification",
+                kind: "unresolved_segment",
+                field: null,
+                reason: "leftover_classification",
+                text: "maybe add edging",
               },
             ],
-            append_suggestions: [],
-            confidence_notes: [],
           },
         },
       }),
@@ -449,9 +444,7 @@ describe("DocumentEditScreen", () => {
         extraction_review_metadata: {
           ...makeQuote().extraction_review_metadata!,
           hidden_details: {
-            unresolved_segments: [],
-            append_suggestions: [],
-            confidence_notes: [],
+            items: [],
           },
         },
       }),
@@ -466,17 +459,15 @@ describe("DocumentEditScreen", () => {
         extraction_review_metadata: {
           ...makeQuote().extraction_review_metadata!,
           hidden_details: {
-            unresolved_segments: [],
-            append_suggestions: [
+            items: [
               {
                 id: "append-1",
-                kind: "note",
-                raw_text: "Add gate latch note",
-                confidence: "low",
-                source: "append_capture",
+                kind: "append_suggestion",
+                field: "notes",
+                reason: "append_capture",
+                text: "Add gate latch note",
               },
             ],
-            confidence_notes: [],
           },
         },
       }),
@@ -490,25 +481,22 @@ describe("DocumentEditScreen", () => {
         extraction_review_metadata: {
           ...makeQuote().extraction_review_metadata!,
           hidden_details: {
-            append_suggestions: [
+            items: [
               {
                 id: "append-1",
-                kind: "pricing",
-                raw_text: "discount 25",
-                confidence: "low",
-                source: "append_capture",
-                pricing_field: "discount",
+                kind: "append_suggestion",
+                field: "discount",
+                reason: "append_capture",
+                text: "discount 25",
               },
-            ],
-            unresolved_segments: [
               {
                 id: "unresolved-1",
-                raw_text: "trim rose bed maybe",
-                confidence: "low",
-                source: "typed_conflict",
+                kind: "unresolved_segment",
+                field: null,
+                reason: "typed_conflict",
+                text: "trim rose bed maybe",
               },
             ],
-            confidence_notes: ["Check driveway edging scope."],
           },
         },
         transcript: "Original capture transcript text.",
@@ -537,17 +525,15 @@ describe("DocumentEditScreen", () => {
         extraction_review_metadata: {
           ...makeQuote().extraction_review_metadata!,
           hidden_details: {
-            append_suggestions: [
+            items: [
               {
                 id: "append-1",
-                kind: "note",
-                raw_text: "Add gate latch note",
-                confidence: "low",
-                source: "append_capture",
+                kind: "append_suggestion",
+                field: "notes",
+                reason: "append_capture",
+                text: "Add gate latch note",
               },
             ],
-            unresolved_segments: [],
-            confidence_notes: [],
           },
           hidden_detail_state: {},
         },
@@ -594,17 +580,15 @@ describe("DocumentEditScreen", () => {
       extraction_review_metadata: {
         ...makeQuote().extraction_review_metadata!,
         hidden_details: {
-          append_suggestions: [
+          items: [
             {
               id: "append-2",
-              kind: "note",
-              raw_text: "Add gate latch note",
-              confidence: "low",
-              source: "append_capture",
+              kind: "append_suggestion",
+              field: "notes",
+              reason: "append_capture",
+              text: "Add gate latch note",
             },
           ],
-          unresolved_segments: [],
-          confidence_notes: [],
         },
         hidden_detail_state: {},
       },

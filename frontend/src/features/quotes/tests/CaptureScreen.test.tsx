@@ -73,7 +73,7 @@ const mockedJobService = vi.mocked(jobService);
 
 const extractionFixture: ExtractionResult = {
   transcript: "5 yards brown mulch",
-  pipeline_version: "v2",
+  pipeline_version: "v2.5",
   line_items: [
     {
       raw_text: "5 yards brown mulch",
@@ -94,7 +94,6 @@ const extractionFixture: ExtractionResult = {
   },
   customer_notes_suggestion: null,
   unresolved_segments: [],
-  confidence_notes: [],
   extraction_tier: "primary",
   extraction_degraded_reason_code: null,
 };
@@ -105,7 +104,7 @@ const quoteDetailFixture: QuoteDetail = {
   extraction_tier: "primary",
   extraction_degraded_reason_code: null,
   extraction_review_metadata: {
-    pipeline_version: "v2",
+    pipeline_version: "v2.5",
     review_state: {
       notes_pending: false,
       pricing_pending: false,
@@ -120,9 +119,7 @@ const quoteDetailFixture: QuoteDetail = {
       },
     },
     hidden_details: {
-      unresolved_segments: [],
-      append_suggestions: [],
-      confidence_notes: [],
+      items: [],
     },
     hidden_detail_state: {},
     extraction_degraded_reason_code: null,
@@ -600,23 +597,26 @@ describe("CaptureScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/documents/quote-manual-home/edit");
   });
 
-  it("submits append extraction from review and requests draft reseed without local confidence-note writes", async () => {
+  it("submits append extraction from review and requests draft reseed", async () => {
     mockedQuoteService.appendExtraction.mockResolvedValueOnce({
       type: "sync",
       quoteId: "quote-1",
-      result: {
-        ...extractionFixture,
-        confidence_notes: ["Backend output remains available for metadata, but review state is sidecar-driven."],
-      },
+      result: extractionFixture,
     });
     mockedQuoteService.getQuote.mockResolvedValueOnce({
       ...quoteDetailFixture,
       extraction_review_metadata: {
         ...quoteDetailFixture.extraction_review_metadata!,
         hidden_details: {
-          unresolved_segments: [],
-          append_suggestions: [],
-          confidence_notes: ["New note"],
+          items: [
+            {
+              id: "append-new-note",
+              kind: "append_suggestion",
+              field: "notes",
+              reason: "append_capture",
+              text: "New note",
+            },
+          ],
         },
         hidden_detail_state: {},
       },
@@ -642,7 +642,6 @@ describe("CaptureScreen", () => {
       state: { reseedDraft: true },
     });
     expect(setDraftMock).not.toHaveBeenCalled();
-    expect(window.localStorage.getItem("stima_review_confidence_notes:quote-1")).toBeNull();
   });
 
   it("submits home capture without customer context and routes when polling returns quote_id", async () => {
