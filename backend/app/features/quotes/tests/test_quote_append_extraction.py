@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import UUID
 
 import pytest
@@ -180,12 +181,11 @@ async def test_append_extraction_sync_appends_line_items_and_merges_transcript_e
     detail_response = await client.get(f"/api/quotes/{quote_id}")
     assert detail_response.status_code == 200
     payload = detail_response.json()
-    assert [item["sort_order"] for item in payload["line_items"]] == [0, 1, 2]
+    assert [item["sort_order"] for item in payload["line_items"]] == [0, 1]
     assert payload["line_items"][0]["id"] == original_line_item_id
     assert payload["line_items"][0]["description"] == "line item"
     assert payload["line_items"][1]["description"] == "Brown mulch"
-    assert payload["line_items"][2]["description"] == "Brown mulch"
-    assert payload["total_amount"] == 295
+    assert payload["total_amount"] == 175
     assert "quote transcript" in payload["transcript"]
     assert "Added later:" in payload["transcript"]
     assert "- first follow-up request" in payload["transcript"]
@@ -226,8 +226,64 @@ async def test_append_extraction_sync_passes_append_mode_to_extraction_integrati
     assert recorded_modes == ["append"]
 
 
-async def test_append_extraction_keeps_populated_notes_and_total_and_records_append_suggestions(
+async def test_append_extraction_routes_corrective_language_to_unresolved_hidden_items(
     client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _extract_corrective_candidate(
+        self,
+        notes: str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:  # noqa: ANN001
+        del self, notes, mode
+        return ExtractionResult(
+            transcript="append corrective note",
+            line_items=[
+                LineItemExtractedV2(
+                    raw_text="Remove old mulch line",
+                    description="Remove old mulch line",
+                    details="Replace with prior scope",
+                    price=0,
+                    confidence="medium",
+                )
+            ],
+            pricing_hints=PricingHints(),
+            confidence_notes=[],
+        )
+
+    monkeypatch.setattr(
+        _MockExtractionIntegration,
+        "extract",
+        _extract_corrective_candidate,
+    )
+
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+    app.state.arq_pool = None
+
+    append_response = await client.post(
+        f"/api/quotes/{quote_id}/append-extraction",
+        files=[("notes", (None, "corrective append input"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert append_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote_id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert len(payload["line_items"]) == 1
+    assert any(
+        item["kind"] == "unresolved_segment" and "remove old mulch line" in item["text"].lower()
+        for item in payload["extraction_review_metadata"]["hidden_details"]["items"]
+    )
+
+
+async def test_append_extraction_withholds_populated_notes_and_deposit_but_seeds_empty_tax(
+    client: AsyncClient,
+    db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _extract_blocked_append_fields(
@@ -240,7 +296,11 @@ async def test_append_extraction_keeps_populated_notes_and_total_and_records_app
         return ExtractionResult(
             transcript="append blocked fields",
             line_items=[],
-            pricing_hints=PricingHints(explicit_total=999),
+            pricing_hints=PricingHints(
+                explicit_total=999,
+                deposit_amount=150,
+                tax_rate=0.0825,
+            ),
             customer_notes_suggestion=ExtractionSuggestion(
                 text="Add driveway gate code",
                 confidence="medium",
@@ -259,6 +319,12 @@ async def test_append_extraction_keeps_populated_notes_and_total_and_records_app
     customer_id = await _create_customer(client, csrf_token)
     quote = await _create_quote(client, csrf_token, customer_id)
     quote_id = quote["id"]
+
+    persisted_quote = await db_session.get(Document, UUID(quote_id))
+    assert persisted_quote is not None
+    persisted_quote.deposit_amount = Decimal("40")
+    await db_session.commit()
+
     app.state.arq_pool = None
 
     append_response = await client.post(
@@ -272,7 +338,9 @@ async def test_append_extraction_keeps_populated_notes_and_total_and_records_app
     assert detail_response.status_code == 200
     payload = detail_response.json()
     assert payload["notes"] == "Original note"
-    assert payload["total_amount"] == 55
+    assert payload["total_amount"] == 59.54
+    assert payload["deposit_amount"] == 40
+    assert payload["tax_rate"] == 0.0825
     append_suggestions = payload["extraction_review_metadata"]["hidden_details"][
         "append_suggestions"
     ]
@@ -292,6 +360,14 @@ async def test_append_extraction_keeps_populated_notes_and_total_and_records_app
             "confidence": "medium",
             "source": "append_capture",
             "pricing_field": "explicit_total",
+        },
+        {
+            "id": append_suggestions[2]["id"],
+            "kind": "pricing",
+            "raw_text": "Deposit 150",
+            "confidence": "medium",
+            "source": "append_capture",
+            "pricing_field": "deposit_amount",
         },
     ]
 

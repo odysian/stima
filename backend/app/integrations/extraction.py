@@ -16,6 +16,8 @@ from anthropic import AsyncAnthropic
 from pydantic import ValidationError
 
 from app.features.quotes.schemas import (
+    AppendExtractionCandidate,
+    AppendUnresolvedItem,
     CaptureSegment,
     CaptureSegmentHints,
     ExtractionMode,
@@ -40,6 +42,36 @@ from app.shared.input_limits import (
 from app.shared.observability import log_provider_quota_exhausted, log_provider_retry
 
 EXTRACTION_TOOL_NAME = "extract_quote"
+_LINE_ITEM_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "description": {
+            "type": "string",
+            "maxLength": LINE_ITEM_DESCRIPTION_MAX_CHARS,
+        },
+        "details": {
+            "type": ["string", "null"],
+            "maxLength": LINE_ITEM_DETAILS_MAX_CHARS,
+        },
+        "price": {"type": ["number", "null"]},
+        "flagged": {"type": "boolean"},
+        "flag_reason": {"type": ["string", "null"]},
+    },
+    "required": ["description"],
+    "additionalProperties": False,
+}
+
+_PRICING_CANDIDATES_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "explicit_total": {"type": ["number", "null"]},
+        "deposit_amount": {"type": ["number", "null"]},
+        "tax_rate": {"type": ["number", "null"]},
+        "discount_type": {"type": ["string", "null"], "enum": ["fixed", "percent", None]},
+        "discount_value": {"type": ["number", "null"]},
+    },
+    "additionalProperties": False,
+}
 
 EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -47,40 +79,13 @@ EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
         "line_items": {
             "type": "array",
             "maxItems": DOCUMENT_LINE_ITEMS_MAX_ITEMS,
-            "items": {
-                "type": "object",
-                "properties": {
-                    "description": {
-                        "type": "string",
-                        "maxLength": LINE_ITEM_DESCRIPTION_MAX_CHARS,
-                    },
-                    "details": {
-                        "type": ["string", "null"],
-                        "maxLength": LINE_ITEM_DETAILS_MAX_CHARS,
-                    },
-                    "price": {"type": ["number", "null"]},
-                    "flagged": {"type": "boolean"},
-                    "flag_reason": {"type": ["string", "null"]},
-                },
-                "required": ["description"],
-                "additionalProperties": False,
-            },
+            "items": _LINE_ITEM_SCHEMA,
         },
         "notes_candidate": {
             "type": ["string", "null"],
             "maxLength": LINE_ITEM_DETAILS_MAX_CHARS,
         },
-        "pricing_candidates": {
-            "type": "object",
-            "properties": {
-                "explicit_total": {"type": ["number", "null"]},
-                "deposit_amount": {"type": ["number", "null"]},
-                "tax_rate": {"type": ["number", "null"]},
-                "discount_type": {"type": ["string", "null"], "enum": ["fixed", "percent", None]},
-                "discount_value": {"type": ["number", "null"]},
-            },
-            "additionalProperties": False,
-        },
+        "pricing_candidates": _PRICING_CANDIDATES_SCHEMA,
         "unresolved_items": {
             "type": "array",
             "items": {
@@ -113,6 +118,52 @@ EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+APPEND_EXTRACTION_TOOL_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "new_line_items": {
+            "type": "array",
+            "maxItems": DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+            "items": _LINE_ITEM_SCHEMA,
+        },
+        "notes_candidate": {
+            "type": ["string", "null"],
+            "maxLength": LINE_ITEM_DETAILS_MAX_CHARS,
+        },
+        "pricing_candidates": _PRICING_CANDIDATES_SCHEMA,
+        "unresolved_items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "maxLength": EXTRACTION_TRANSCRIPT_MAX_CHARS,
+                    },
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "ambiguous_scope",
+                            "possible_conflict",
+                            "unplaced_content",
+                            "correction",
+                        ],
+                    },
+                },
+                "required": ["text", "reason"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": [
+        "new_line_items",
+        "notes_candidate",
+        "pricing_candidates",
+        "unresolved_items",
+    ],
+    "additionalProperties": False,
+}
+
 EXTRACTION_SYSTEM_PROMPT = (
     "Extract quote line items, pricing candidates, and unresolved capture details from structured "
     "capture input. "
@@ -121,6 +172,16 @@ EXTRACTION_SYSTEM_PROMPT = (
     "clearly implausible single-item prices, or critically ambiguous quantity/unit phrasing. "
     "When flagged=true, include a short flag_reason. Keep flagged false otherwise. "
     "Use notes_candidate only when a short customer-facing note should be seeded. "
+    "Return only structured tool output."
+)
+
+APPEND_EXTRACTION_SYSTEM_PROMPT = (
+    "Extract append-only quote candidates from structured capture input. "
+    "Return only additive new_line_items; do not rewrite or restate existing scope. "
+    "Route corrective/removal/replacement language to unresolved_items with reason='correction'. "
+    "Use notes_candidate and pricing_candidates only for additive candidates that could fill empty "
+    "visible fields. "
+    "Do not invent pricing. Use null for missing values. "
     "Return only structured tool output."
 )
 
@@ -149,6 +210,12 @@ _UNRESOLVED_REASON_TO_SOURCE: dict[str, str] = {
     "ambiguous_scope": "leftover_classification",
     "possible_conflict": "transcript_conflict",
     "unplaced_content": "leftover_classification",
+}
+_APPEND_UNRESOLVED_REASON_TO_SOURCE: dict[str, str] = {
+    "ambiguous_scope": "leftover_classification",
+    "possible_conflict": "transcript_conflict",
+    "unplaced_content": "leftover_classification",
+    "correction": "transcript_conflict",
 }
 _LEGACY_UNRESOLVED_SOURCE_TO_REASON: dict[str, str] = {
     "leftover_classification": "unplaced_content",
@@ -262,6 +329,7 @@ class ExtractionIntegration:
                 return await self._extract_for_tier(
                     typed_client,
                     prepared_input,
+                    mode=mode,
                     tier=tier,
                 )
             except ExtractionError as exc:
@@ -326,13 +394,19 @@ class ExtractionIntegration:
         typed_client: Any,
         prepared_input: PreparedCaptureInput,
         *,
+        mode: ExtractionMode,
         tier: _ExtractionTierConfig,
     ) -> ExtractionResult:
-        request_content = _build_extraction_request(prepared_input)
+        request_content = _build_extraction_request(prepared_input, mode=mode)
+        tool_schema = APPEND_EXTRACTION_TOOL_SCHEMA if mode == "append" else EXTRACTION_TOOL_SCHEMA
+        system_prompt = (
+            APPEND_EXTRACTION_SYSTEM_PROMPT if mode == "append" else EXTRACTION_SYSTEM_PROMPT
+        )
         log_extraction_trace(
             _TRACE_EVENT_NAME,
             stage=tier.tier,
             outcome="started",
+            extraction_mode=mode,
             extraction_model_id=tier.model_id,
             extraction_prompt_variant=tier.prompt_variant,
             transcript_chars=len(prepared_input.transcript),
@@ -351,6 +425,8 @@ class ExtractionIntegration:
             model_id=tier.model_id,
             invocation_tier=tier.tier,
             prompt_variant=tier.prompt_variant,
+            tool_schema=tool_schema,
+            system_prompt=system_prompt,
         )
         response_model_id = getattr(response, "model", None) or tier.model_id
         response_token_usage = _extract_token_usage(response)
@@ -365,16 +441,22 @@ class ExtractionIntegration:
         )
 
         payload = _extract_tool_payload(response)
-        candidate_payload = _coerce_initial_candidate_payload(payload)
+        candidate_payload = (
+            _coerce_append_candidate_payload(payload)
+            if mode == "append"
+            else _coerce_initial_candidate_payload(payload)
+        )
+        line_item_field = "new_line_items" if mode == "append" else "line_items"
         log_extraction_trace(
             _TRACE_EVENT_NAME,
             stage=tier.tier,
             outcome="provider_response",
+            extraction_mode=mode,
             extraction_model_id=response_model_id,
             extraction_prompt_variant=tier.prompt_variant,
             token_input_tokens=_token_usage_value(response_token_usage, "input_tokens"),
             token_output_tokens=_token_usage_value(response_token_usage, "output_tokens"),
-            line_item_count=_list_count(candidate_payload.get("line_items")),
+            line_item_count=_list_count(candidate_payload.get(line_item_field)),
             unresolved_item_count=_list_count(candidate_payload.get("unresolved_items")),
             notes_candidate_present=bool(candidate_payload.get("notes_candidate")),
             total_present=(
@@ -388,11 +470,22 @@ class ExtractionIntegration:
         )
 
         try:
-            validated_candidate = InitialExtractionCandidate.model_validate(candidate_payload)
-            result = _build_extraction_result_from_candidate(
-                candidate=validated_candidate,
-                transcript=prepared_input.transcript,
-            )
+            if mode == "append":
+                validated_append_candidate = AppendExtractionCandidate.model_validate(
+                    candidate_payload
+                )
+                result = _build_extraction_result_from_append_candidate(
+                    candidate=validated_append_candidate,
+                    transcript=prepared_input.transcript,
+                )
+            else:
+                validated_initial_candidate = InitialExtractionCandidate.model_validate(
+                    candidate_payload
+                )
+                result = _build_extraction_result_from_candidate(
+                    candidate=validated_initial_candidate,
+                    transcript=prepared_input.transcript,
+                )
             _log_result_trace(
                 result=result,
                 invocation_tier=tier.tier,
@@ -428,6 +521,7 @@ class ExtractionIntegration:
                     model_id=tier.model_id,
                     invocation_tier=tier.tier,
                     prompt_variant=repair_prompt_variant,
+                    tool_schema=tool_schema,
                     system_prompt=EXTRACTION_REPAIR_SYSTEM_PROMPT,
                 )
             except ExtractionError:
@@ -455,11 +549,20 @@ class ExtractionIntegration:
             repair_usage = _extract_token_usage(repair_response)
             repair_model_id = getattr(repair_response, "model", None) or tier.model_id
             repair_payload = _extract_tool_payload(repair_response)
-            repair_candidate_payload = _coerce_initial_candidate_payload(repair_payload)
+            repair_candidate_payload = (
+                _coerce_append_candidate_payload(repair_payload)
+                if mode == "append"
+                else _coerce_initial_candidate_payload(repair_payload)
+            )
             try:
-                repaired_candidate = InitialExtractionCandidate.model_validate(
-                    repair_candidate_payload
-                )
+                if mode == "append":
+                    repaired_append_candidate = AppendExtractionCandidate.model_validate(
+                        repair_candidate_payload
+                    )
+                else:
+                    repaired_initial_candidate = InitialExtractionCandidate.model_validate(
+                        repair_candidate_payload
+                    )
             except ValidationError:
                 _set_last_call_metadata(
                     model_id=repair_model_id,
@@ -514,7 +617,7 @@ class ExtractionIntegration:
                 validation_error_count=len(validation_errors),
                 token_input_tokens=_token_usage_value(repair_usage, "input_tokens"),
                 token_output_tokens=_token_usage_value(repair_usage, "output_tokens"),
-                line_item_count=_list_count(repair_candidate_payload.get("line_items")),
+                line_item_count=_list_count(repair_candidate_payload.get(line_item_field)),
                 unresolved_item_count=_list_count(repair_candidate_payload.get("unresolved_items")),
                 notes_candidate_present=bool(repair_candidate_payload.get("notes_candidate")),
                 total_present=(
@@ -526,10 +629,16 @@ class ExtractionIntegration:
                 raw_transcript=prepared_input.transcript,
                 raw_tool_payload=repair_candidate_payload,
             )
-            result = _build_extraction_result_from_candidate(
-                candidate=repaired_candidate,
-                transcript=prepared_input.transcript,
-            )
+            if mode == "append":
+                result = _build_extraction_result_from_append_candidate(
+                    candidate=repaired_append_candidate,
+                    transcript=prepared_input.transcript,
+                )
+            else:
+                result = _build_extraction_result_from_candidate(
+                    candidate=repaired_initial_candidate,
+                    transcript=prepared_input.transcript,
+                )
             _log_result_trace(
                 result=result,
                 invocation_tier=tier.tier,
@@ -546,6 +655,7 @@ class ExtractionIntegration:
         model_id: str,
         invocation_tier: Literal["primary", "fallback"],
         prompt_variant: str,
+        tool_schema: dict[str, Any],
         system_prompt: str = EXTRACTION_SYSTEM_PROMPT,
     ) -> object:
         last_error: Exception | None = None
@@ -569,7 +679,7 @@ class ExtractionIntegration:
                                 "Extract quote line items, pricing candidates, optional notes "
                                 "candidate, and unresolved items."
                             ),
-                            "input_schema": EXTRACTION_TOOL_SCHEMA,
+                            "input_schema": tool_schema,
                         }
                     ],
                     tool_choice={"type": "tool", "name": EXTRACTION_TOOL_NAME},
@@ -656,12 +766,32 @@ def _coerce_prepared_capture_input(
     )
 
 
-def _build_extraction_request(prepared_input: PreparedCaptureInput) -> str:
+def _build_extraction_request(
+    prepared_input: PreparedCaptureInput,
+    *,
+    mode: ExtractionMode,
+) -> str:
     segments = _segment_capture_input(prepared_input.transcript)
-    request_payload = {
-        "prepared_capture_input": prepared_input.model_dump(mode="json"),
-        "capture_segments": [segment.model_dump(mode="json") for segment in segments],
-        "instructions": {
+    if mode == "append":
+        mode_instructions = {
+            "line_item_rule": (
+                "Return only additive new_line_items. Do not rewrite, remove, or replace "
+                "existing visible quote scope."
+            ),
+            "notes_candidate_rule": (
+                "Use notes_candidate only for additive context that can fill an empty notes field."
+            ),
+            "pricing_rule": (
+                "Use pricing_candidates only for additive pricing directives that can fill empty "
+                "visible pricing fields."
+            ),
+            "correction_rule": (
+                "Corrective/removal/replacement language belongs in unresolved_items with "
+                "reason='correction', not in new_line_items."
+            ),
+        }
+    else:
+        mode_instructions = {
             "line_item_description_rule": (
                 "Use short customer-facing labels; move remainder to details."
             ),
@@ -675,7 +805,12 @@ def _build_extraction_request(prepared_input: PreparedCaptureInput) -> str:
             "unresolved_items_rule": (
                 "Use unresolved_items for ambiguous or conflicting content that needs review."
             ),
-        },
+        }
+    request_payload = {
+        "extraction_mode": mode,
+        "prepared_capture_input": prepared_input.model_dump(mode="json"),
+        "capture_segments": [segment.model_dump(mode="json") for segment in segments],
+        "instructions": mode_instructions,
     }
     return json.dumps(request_payload, ensure_ascii=True, separators=(",", ":"))
 
@@ -804,6 +939,27 @@ def _coerce_initial_candidate_payload(payload: dict[str, Any]) -> dict[str, Any]
     return normalized_payload
 
 
+def _coerce_append_candidate_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized_payload = dict(payload)
+    normalized_payload.setdefault("new_line_items", [])
+    normalized_payload["new_line_items"] = _normalize_initial_line_item_payloads(
+        normalized_payload.get("new_line_items")
+    )
+    normalized_payload["pricing_candidates"] = _pricing_candidates_payload(
+        normalized_payload.get("pricing_candidates")
+    )
+    notes_candidate = normalized_payload.get("notes_candidate")
+    if not isinstance(notes_candidate, str):
+        notes_candidate = None
+    normalized_payload["notes_candidate"] = notes_candidate
+
+    unresolved_items = normalized_payload.get("unresolved_items")
+    if not isinstance(unresolved_items, list):
+        unresolved_items = []
+    normalized_payload["unresolved_items"] = unresolved_items
+    return normalized_payload
+
+
 def _build_extraction_result_from_candidate(
     *,
     candidate: InitialExtractionCandidate,
@@ -847,9 +1003,65 @@ def _build_extraction_result_from_candidate(
     return _apply_semantic_guard_rules(result)
 
 
+def _build_extraction_result_from_append_candidate(
+    *,
+    candidate: AppendExtractionCandidate,
+    transcript: str,
+) -> ExtractionResult:
+    notes_candidate = (candidate.notes_candidate or "").strip()
+    unresolved_segments = [
+        _to_append_unresolved_segment(unresolved_item)
+        for unresolved_item in candidate.unresolved_items
+    ]
+    result = ExtractionResult(
+        transcript=transcript,
+        pipeline_version="v2.5",
+        line_items=[
+            LineItemExtractedV2(
+                raw_text=(line_item.details or line_item.description).strip()
+                or line_item.description,
+                confidence="medium",
+                description=line_item.description,
+                details=line_item.details,
+                price=line_item.price,
+                flagged=line_item.flagged,
+                flag_reason=line_item.flag_reason,
+            )
+            for line_item in candidate.new_line_items
+        ],
+        pricing_hints=PricingHints.model_validate(
+            candidate.pricing_candidates.model_dump(mode="json")
+        ),
+        customer_notes_suggestion=(
+            ExtractionSuggestion(
+                text=notes_candidate,
+                confidence="medium",
+                source="leftover_classification",
+            )
+            if notes_candidate
+            else None
+        ),
+        unresolved_segments=unresolved_segments,
+        confidence_notes=[],
+    )
+    return _apply_semantic_guard_rules(result)
+
+
 def _to_unresolved_segment(item: UnresolvedItem) -> UnresolvedSegment:
     source = _UNRESOLVED_REASON_TO_SOURCE.get(item.reason, "leftover_classification")
     confidence: Literal["medium", "low"] = "medium" if item.reason == "possible_conflict" else "low"
+    return UnresolvedSegment(
+        raw_text=item.text.strip(),
+        confidence=confidence,
+        source=cast(UnresolvedSegmentSource, source),
+    )
+
+
+def _to_append_unresolved_segment(item: AppendUnresolvedItem) -> UnresolvedSegment:
+    source = _APPEND_UNRESOLVED_REASON_TO_SOURCE.get(item.reason, "leftover_classification")
+    confidence: Literal["medium", "low"] = (
+        "medium" if item.reason in {"possible_conflict", "correction"} else "low"
+    )
     return UnresolvedSegment(
         raw_text=item.text.strip(),
         confidence=confidence,

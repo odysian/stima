@@ -306,6 +306,20 @@ class QuoteRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_id_for_update(self, quote_id: UUID, user_id: UUID) -> Document | None:
+        """Return one quote row with a write lock for serialized append application."""
+        result = await self._session.execute(
+            select(Document)
+            .where(
+                Document.id == quote_id,
+                Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
+            )
+            .with_for_update()
+            .options(selectinload(Document.line_items))
+        )
+        return result.scalar_one_or_none()
+
     async def get_detail_by_id(self, quote_id: UUID, user_id: UUID) -> QuoteDetailRow | None:
         """Return one quote detail row with customer contact fields."""
         result = await self._session.execute(

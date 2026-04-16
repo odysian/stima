@@ -16,6 +16,7 @@ from app.features.quotes.review_metadata import build_hidden_item_id
 from app.features.quotes.schemas import PreparedCaptureInput
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
 from app.integrations.extraction import (
+    APPEND_EXTRACTION_TOOL_SCHEMA,
     EXTRACTION_TOOL_SCHEMA,
     SEMANTIC_DEGRADED_REASON_EMPTY_LINE_ITEMS_SUBSTANTIAL_TRANSCRIPT,
     ExtractionError,
@@ -719,6 +720,71 @@ async def test_tool_schema_line_items_include_optional_flag_fields() -> None:
     assert "transcript" not in required_fields
     assert "pipeline_version" not in required_fields
     assert "confidence_notes" not in required_fields
+
+
+async def test_append_mode_uses_append_contract_and_routes_correction_to_unresolved() -> None:
+    transcript = "replace the prior mulch with river rock"
+    captured_schema: dict[str, object] | None = None
+
+    def _factory(kwargs: dict[str, object]) -> _FakeResponse:
+        nonlocal captured_schema
+        tools = kwargs["tools"]
+        assert isinstance(tools, list)
+        assert tools
+        tool = tools[0]
+        assert isinstance(tool, dict)
+        input_schema = tool["input_schema"]
+        assert isinstance(input_schema, dict)
+        captured_schema = input_schema
+        return _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "new_line_items": [],
+                        "notes_candidate": None,
+                        "pricing_candidates": {},
+                        "unresolved_items": [
+                            {
+                                "text": "Replace previous mulch line item",
+                                "reason": "correction",
+                            }
+                        ],
+                    },
+                }
+            ]
+        )
+
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="test-model",
+        client=_FakeClient(_factory),
+    )
+    result = await integration.extract(transcript, mode="append")
+
+    assert captured_schema == APPEND_EXTRACTION_TOOL_SCHEMA
+    assert result.line_items == []
+    assert any(
+        segment.raw_text == "Replace previous mulch line item"
+        and segment.source == "transcript_conflict"
+        for segment in result.unresolved_segments
+    )
+
+
+async def test_append_tool_schema_uses_new_line_items_contract() -> None:
+    line_item_schema = APPEND_EXTRACTION_TOOL_SCHEMA["properties"]["new_line_items"]["items"]
+    assert line_item_schema["properties"]["flagged"] == {"type": "boolean"}
+    assert line_item_schema["properties"]["flag_reason"] == {"type": ["string", "null"]}
+    assert "flagged" not in line_item_schema["required"]
+    assert "flag_reason" not in line_item_schema["required"]
+    assert "line_items" not in APPEND_EXTRACTION_TOOL_SCHEMA["properties"]
+    assert "new_line_items" in APPEND_EXTRACTION_TOOL_SCHEMA["properties"]
+
+    required_fields = set(APPEND_EXTRACTION_TOOL_SCHEMA["required"])
+    assert "new_line_items" in required_fields
+    assert "notes_candidate" in required_fields
+    assert "pricing_candidates" in required_fields
+    assert "unresolved_items" in required_fields
 
 
 async def test_hidden_item_id_is_deterministic_and_distinguishes_content() -> None:

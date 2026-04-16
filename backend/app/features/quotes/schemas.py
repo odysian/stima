@@ -201,6 +201,12 @@ class PricingCandidates(PricingHints):
 
 
 UnresolvedItemReason = Literal["ambiguous_scope", "possible_conflict", "unplaced_content"]
+AppendUnresolvedItemReason = Literal[
+    "ambiguous_scope",
+    "possible_conflict",
+    "unplaced_content",
+    "correction",
+]
 
 
 class UnresolvedItem(BaseModel):
@@ -220,6 +226,25 @@ class InitialExtractionCandidate(BaseModel):
     notes_candidate: str | None = Field(default=None, max_length=LINE_ITEM_DETAILS_MAX_CHARS)
     pricing_candidates: PricingCandidates = Field(default_factory=PricingCandidates)
     unresolved_items: list[UnresolvedItem] = Field(default_factory=list)
+
+
+class AppendUnresolvedItem(BaseModel):
+    """Append 2.5 provider unresolved content candidate."""
+
+    text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    reason: AppendUnresolvedItemReason
+
+
+class AppendExtractionCandidate(BaseModel):
+    """Append 2.5 provider candidate payload prior to backend stamping/adapters."""
+
+    new_line_items: list[LineItemExtracted] = Field(
+        default_factory=list,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
+    notes_candidate: str | None = Field(default=None, max_length=LINE_ITEM_DETAILS_MAX_CHARS)
+    pricing_candidates: PricingCandidates = Field(default_factory=PricingCandidates)
+    unresolved_items: list[AppendUnresolvedItem] = Field(default_factory=list)
 
 
 class ExtractionSuggestion(BaseModel):
