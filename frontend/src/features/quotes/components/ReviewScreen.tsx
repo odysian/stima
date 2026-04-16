@@ -4,6 +4,7 @@ import { useBeforeUnload, useLocation, useNavigate, useParams } from "react-rout
 import { profileService } from "@/features/profile/services/profileService";
 import { DocumentEditScreenView } from "@/features/quotes/components/DocumentEditScreenView";
 import { buildDefaultInvoiceDueDate, buildDocumentSnapshotKey, buildSaveValidationMessage, isInvoiceDocument, persistDocumentDraft } from "@/features/quotes/components/documentEditUtils";
+import { useCaptureDetailsWarning } from "@/features/quotes/hooks/useCaptureDetailsWarning";
 import { useHiddenDetailLifecycle } from "@/features/quotes/hooks/useHiddenDetailLifecycle";
 import { applyLineItemSheetDelete, applyLineItemSheetSave, resolveLineItemSheetInitialItem, type ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { buildLineItemSubmitState, EMPTY_LINE_ITEM } from "@/features/quotes/components/reviewScreenUtils";
@@ -33,7 +34,7 @@ export function DocumentEditScreen(): React.ReactElement {
   const [submitAction, setSubmitAction] = useState<"save" | "continue" | null>(null);
   const [isAssignmentSheetOpen, setIsAssignmentSheetOpen] = useState(false);
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
-  const [showContinueWarning, setShowContinueWarning] = useState(false);
+  const [continueWarningReason, setContinueWarningReason] = useState<"review" | "capture-details" | null>(null);
   const [pendingNavigationTarget, setPendingNavigationTarget] = useState<{
     to: string;
     replace?: boolean;
@@ -82,13 +83,22 @@ export function DocumentEditScreen(): React.ReactElement {
   const documentId = id ?? "";
   const {
     isMutatingHiddenItems,
-    reviewHiddenItem,
     dismissHiddenItem,
   } = useHiddenDetailLifecycle({
     canMutate: Boolean(document && !isInvoiceDocument(document)),
     documentId,
     refreshDocument: async () => refreshDocument(),
     setSaveError,
+  });
+  const extractionReviewMetadata = document && !isInvoiceDocument(document)
+    ? document.extraction_review_metadata
+    : undefined;
+  const hiddenDetailState = extractionReviewMetadata?.hidden_detail_state;
+  const { shouldWarnOnContinue, markCaptureDetailsOpened } = useCaptureDetailsWarning({
+    documentId,
+    isQuoteDocument: draft?.docType === "quote",
+    hiddenDetails: extractionReviewMetadata?.hidden_details,
+    hiddenDetailState,
   });
   useEffect(() => {
     if (!id) {
@@ -138,7 +148,6 @@ export function DocumentEditScreen(): React.ReactElement {
   const hasUnsavedChanges = currentSnapshotKey !== null
     && savedSnapshotKey !== null
     && currentSnapshotKey !== savedSnapshotKey;
-
   useBeforeUnload((event) => {
     if (!hasUnsavedChanges) {
       return;
@@ -163,7 +172,6 @@ export function DocumentEditScreen(): React.ReactElement {
       navigate(nextTarget.to, { replace: nextTarget.replace });
     }
   }
-
   function handleLeaveCancel(): void {
     setShowLeaveWarning(false);
     setPendingNavigationTarget(null);
@@ -175,7 +183,6 @@ export function DocumentEditScreen(): React.ReactElement {
       </main>
     );
   }
-
   const activeDocumentType = draft?.docType ?? (document && isInvoiceDocument(document) ? "invoice" : "quote");
   const shouldUseQuoteListBackTarget = locationState.origin === "preview" && requiresCustomerAssignment;
   const invoiceBackTarget = `/invoices/${documentId}`;
@@ -212,10 +219,6 @@ export function DocumentEditScreen(): React.ReactElement {
     lineItemsForSubmit,
     lineItemSum,
   } = buildLineItemSubmitState(activeDraft.lineItems);
-  const extractionReviewMetadata = !isInvoiceDocument(activeDocument)
-    ? activeDocument.extraction_review_metadata
-    : undefined;
-  const hiddenDetailState = extractionReviewMetadata?.hidden_detail_state;
   const notesReviewPending = activeDraft.docType === "quote"
     && Boolean(extractionReviewMetadata?.review_state.notes_pending);
   const pricingReviewPending = activeDraft.docType === "quote"
@@ -351,7 +354,7 @@ export function DocumentEditScreen(): React.ReactElement {
       lineItemSheetInitialItem={lineItemSheetInitialItem}
       toastMessage={toastMessage}
       showLeaveWarning={showLeaveWarning}
-      showContinueWarning={showContinueWarning}
+      continueWarningReason={continueWarningReason}
       isSavingDraft={submitAction === "save"}
       isContinuing={submitAction === "continue"}
       onRequestNavigation={requestNavigation}
@@ -399,12 +402,16 @@ export function DocumentEditScreen(): React.ReactElement {
       onDiscountValueChange={(nextDiscountValue) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, discountValue: nextDiscountValue })); }}
       onDepositAmountChange={(nextDepositAmount) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, depositAmount: nextDepositAmount })); }}
       onNotesChange={(nextNotes) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, notes: nextNotes })); }}
-      onReviewHiddenItem={reviewHiddenItem}
       onDismissHiddenItem={dismissHiddenItem}
+      onCaptureDetailsOpen={markCaptureDetailsOpened}
       onSaveDraft={() => { void saveDraft("save"); }}
       onPrimaryAction={() => {
         if (activeDraft.docType === "quote" && (notesReviewPending || pricingReviewPending)) {
-          setShowContinueWarning(true);
+          setContinueWarningReason("review");
+          return;
+        }
+        if (shouldWarnOnContinue) {
+          setContinueWarningReason("capture-details");
           return;
         }
         void saveDraft("continue");
@@ -433,10 +440,10 @@ export function DocumentEditScreen(): React.ReactElement {
       onLeaveConfirm={handleLeaveConfirm}
       onLeaveCancel={handleLeaveCancel}
       onContinueConfirm={() => {
-        setShowContinueWarning(false);
+        setContinueWarningReason(null);
         void saveDraft("continue");
       }}
-      onContinueCancel={() => setShowContinueWarning(false)}
+      onContinueCancel={() => setContinueWarningReason(null)}
     />
   );
 }

@@ -1,6 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 
 import type { ExtractionReviewHiddenDetails, HiddenItemState } from "@/features/quotes/types/quote.types";
+import { resolveCaptureDetailsActionableItems } from "@/features/quotes/utils/captureDetails";
 
 interface CaptureDetailsSheetProps {
   open: boolean;
@@ -8,17 +9,8 @@ interface CaptureDetailsSheetProps {
   transcript: string;
   hiddenDetails?: ExtractionReviewHiddenDetails;
   hiddenDetailState?: Record<string, HiddenItemState>;
-  onReviewHiddenItem?: (itemId: string) => Promise<void> | void;
   onDismissHiddenItem?: (itemId: string) => Promise<void> | void;
   isMutating?: boolean;
-}
-
-interface ResolvedHiddenItem {
-  id: string;
-  kind: "append_suggestion" | "unresolved_segment" | "confidence_note";
-  field: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
-  reason: string | null;
-  text: string;
 }
 
 function formatPricingField(
@@ -40,50 +32,21 @@ function formatPricingField(
   return "discount";
 }
 
-function renderEmptySection(message: string): React.ReactElement {
-  return (
-    <p className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface-variant">
-      {message}
-    </p>
-  );
-}
-
-function resolveHiddenItems(hiddenDetails?: ExtractionReviewHiddenDetails): ResolvedHiddenItem[] {
-  if (!hiddenDetails) {
-    return [];
+function buildActionableLabel(item: {
+  kind: "append_suggestion" | "unresolved_segment" | "confidence_note";
+  field: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
+  reason: string | null;
+}): string {
+  if (item.kind === "append_suggestion") {
+    const pricingField = formatPricingField(item.field === "notes" ? null : item.field);
+    return item.field === "notes"
+      ? "Notes suggestion"
+      : `Pricing suggestion${pricingField ? ` (${pricingField})` : ""}`;
   }
-  if (Array.isArray(hiddenDetails.items) && hiddenDetails.items.length > 0) {
-    return hiddenDetails.items.map((item) => ({
-      id: item.id,
-      kind: item.kind,
-      field: item.field ?? null,
-      reason: item.reason ?? null,
-      text: item.text,
-    }));
+  if (item.kind === "unresolved_segment") {
+    return (item.reason ?? "leftover_classification").replaceAll("_", " ");
   }
-
-  const fromSuggestions: ResolvedHiddenItem[] = hiddenDetails.append_suggestions.map((suggestion) => ({
-    id: suggestion.id,
-    kind: "append_suggestion",
-    field: suggestion.pricing_field ?? "notes",
-    reason: suggestion.source,
-    text: suggestion.raw_text,
-  }));
-  const fromUnresolved: ResolvedHiddenItem[] = hiddenDetails.unresolved_segments.map((segment) => ({
-    id: segment.id,
-    kind: "unresolved_segment",
-    field: null,
-    reason: segment.source,
-    text: segment.raw_text,
-  }));
-  const fromConfidence: ResolvedHiddenItem[] = hiddenDetails.confidence_notes.map((note, index) => ({
-    id: `legacy-confidence-${index}`,
-    kind: "confidence_note",
-    field: null,
-    reason: "legacy_confidence_note",
-    text: note,
-  }));
-  return [...fromSuggestions, ...fromUnresolved, ...fromConfidence];
+  return "Capture note";
 }
 
 export function CaptureDetailsSheet({
@@ -92,20 +55,11 @@ export function CaptureDetailsSheet({
   transcript,
   hiddenDetails,
   hiddenDetailState,
-  onReviewHiddenItem,
   onDismissHiddenItem,
   isMutating = false,
 }: CaptureDetailsSheetProps): React.ReactElement {
-  const hiddenItems = resolveHiddenItems(hiddenDetails);
-  const visibleAppendSuggestions = hiddenItems.filter(
-    (item) => item.kind === "append_suggestion" && !hiddenDetailState?.[item.id]?.dismissed,
-  );
-  const visibleUnresolvedSegments = hiddenItems.filter(
-    (item) => item.kind === "unresolved_segment" && !hiddenDetailState?.[item.id]?.dismissed,
-  );
-  const visibleConfidenceNotes = hiddenItems.filter(
-    (item) => item.kind === "confidence_note" && !hiddenDetailState?.[item.id]?.dismissed,
-  );
+  const actionableItems = resolveCaptureDetailsActionableItems(hiddenDetails)
+    .filter((item) => !hiddenDetailState?.[item.id]?.dismissed);
 
   return (
     <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
@@ -126,119 +80,32 @@ export function CaptureDetailsSheet({
             <div className="mt-4 max-h-[70vh] space-y-5 overflow-y-auto pr-1">
               <section className="space-y-2">
                 <h3 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                  New Suggestions From Latest Capture
+                  Actionable Capture Details
                 </h3>
-                {visibleAppendSuggestions.length === 0 ? renderEmptySection("No new suggestions from the latest capture.") : (
+                {actionableItems.length > 0 ? (
                   <ul className="space-y-2">
-                    {visibleAppendSuggestions.map((suggestion) => {
-                      const pricingField = formatPricingField(
-                        suggestion.field === "notes" ? null : suggestion.field,
-                      );
-                      const itemState = hiddenDetailState?.[suggestion.id];
-                      return (
-                        <li
-                          key={suggestion.id}
-                          className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
-                        >
-                          <p className="font-semibold">
-                            {suggestion.field === "notes" ? "Notes suggestion" : "Pricing suggestion"}
-                            {pricingField ? ` (${pricingField})` : ""}
-                          </p>
-                          <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{suggestion.text}</p>
-                          <div className="mt-3 flex items-center gap-2">
-                            {itemState?.reviewed ? (
-                              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-success">
-                                Reviewed
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={isMutating || !onReviewHiddenItem}
-                                onClick={() => { void onReviewHiddenItem?.(suggestion.id); }}
-                              >
-                                Mark reviewed
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
-                              disabled={isMutating || !onDismissHiddenItem}
-                              onClick={() => { void onDismissHiddenItem?.(suggestion.id); }}
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-
-              <section className="space-y-2">
-                <h3 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                  Unresolved Capture Details
-                </h3>
-                {visibleUnresolvedSegments.length === 0 ? renderEmptySection("No unresolved capture details.") : (
-                  <ul className="space-y-2">
-                    {visibleUnresolvedSegments.map((segment) => {
-                      const itemState = hiddenDetailState?.[segment.id];
-                      return (
-                        <li
-                          key={segment.id}
-                          className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
-                        >
-                          <p className="font-semibold">
-                            {(segment.reason ?? "leftover_classification").replaceAll("_", " ")}
-                          </p>
-                          <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{segment.text}</p>
-                          <div className="mt-3 flex items-center gap-2">
-                            {itemState?.reviewed ? (
-                              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-success">
-                                Reviewed
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={isMutating || !onReviewHiddenItem}
-                                onClick={() => { void onReviewHiddenItem?.(segment.id); }}
-                              >
-                                Mark reviewed
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
-                              disabled={isMutating || !onDismissHiddenItem}
-                              onClick={() => { void onDismissHiddenItem?.(segment.id); }}
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-
-              <section className="space-y-2">
-                <h3 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                  AI Review Notes
-                </h3>
-                {visibleConfidenceNotes.length === 0 ? renderEmptySection("No AI review notes.") : (
-                  <ul className="space-y-2">
-                    {visibleConfidenceNotes.map((note) => (
+                    {actionableItems.map((item) => (
                       <li
-                        key={note.id}
-                        className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface whitespace-pre-wrap"
+                        key={item.id}
+                        className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
                       >
-                        {note.text}
+                        <p className="font-semibold">{buildActionableLabel(item)}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{item.text}</p>
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={isMutating || !onDismissHiddenItem}
+                            onClick={() => { void onDismissHiddenItem?.(item.id); }}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
+                ) : (
+                  <p className="text-sm text-on-surface-variant">No actionable capture details.</p>
                 )}
               </section>
 

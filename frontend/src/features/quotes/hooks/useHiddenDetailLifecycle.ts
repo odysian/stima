@@ -12,7 +12,6 @@ interface UseHiddenDetailLifecycleParams {
 
 interface HiddenDetailLifecycleActions {
   isMutatingHiddenItems: boolean;
-  reviewHiddenItem: (itemId: string) => Promise<void>;
   dismissHiddenItem: (itemId: string) => Promise<void>;
 }
 
@@ -45,13 +44,6 @@ export function useHiddenDetailLifecycle({
     [canMutate, documentId, refreshDocument, setSaveError],
   );
 
-  const reviewHiddenItem = useCallback(
-    async (itemId: string): Promise<void> => {
-      await mutateExtractionReviewMetadata({ review_hidden_item: itemId });
-    },
-    [mutateExtractionReviewMetadata],
-  );
-
   const dismissHiddenItem = useCallback(
     async (itemId: string): Promise<void> => {
       await mutateExtractionReviewMetadata({ dismiss_hidden_item: itemId });
@@ -61,7 +53,6 @@ export function useHiddenDetailLifecycle({
 
   return {
     isMutatingHiddenItems,
-    reviewHiddenItem,
     dismissHiddenItem,
   };
 }

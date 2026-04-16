@@ -6,6 +6,7 @@ import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/
 import { ReviewLineItemsSection } from "@/features/quotes/components/ReviewLineItemsSection";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
 import type { ExtractionReviewHiddenDetails, ExtractionTier, HiddenItemState } from "@/features/quotes/types/quote.types";
+import { hasUndismissedCaptureDetailsItems, resolveCaptureDetailsActionableItems } from "@/features/quotes/utils/captureDetails";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   DOCUMENT_NOTES_MAX_CHARS,
@@ -28,22 +29,6 @@ function ReviewPendingMarker({ title, message }: ReviewPendingMarkerProps): Reac
       </div>
     </section>
   );
-}
-
-function resolveHiddenActionableItems(hiddenDetails?: ExtractionReviewHiddenDetails): Array<{ id: string }> {
-  if (!hiddenDetails) {
-    return [];
-  }
-  if (Array.isArray(hiddenDetails.items) && hiddenDetails.items.length > 0) {
-    return hiddenDetails.items;
-  }
-
-  const legacyItems = [
-    ...hiddenDetails.append_suggestions.map((item) => ({ id: item.id })),
-    ...hiddenDetails.unresolved_segments.map((item) => ({ id: item.id })),
-    ...hiddenDetails.confidence_notes.map((_, index) => ({ id: `legacy-confidence-${index}` })),
-  ];
-  return legacyItems;
 }
 
 interface ReviewFormContentProps {
@@ -98,8 +83,8 @@ interface ReviewFormContentProps {
   onDiscountValueChange: (nextDiscountValue: number | null) => void;
   onDepositAmountChange: (nextDepositAmount: number | null) => void;
   onNotesChange: (nextNotes: string) => void;
-  onReviewHiddenItem: (itemId: string) => Promise<void>;
   onDismissHiddenItem: (itemId: string) => Promise<void>;
+  onCaptureDetailsOpen: () => void;
 }
 
 export function ReviewFormContent({
@@ -136,16 +121,18 @@ export function ReviewFormContent({
   onDiscountValueChange,
   onDepositAmountChange,
   onNotesChange,
-  onReviewHiddenItem,
   onDismissHiddenItem,
+  onCaptureDetailsOpen,
 }: ReviewFormContentProps): React.ReactElement {
   const [isCaptureDetailsOpen, setIsCaptureDetailsOpen] = useState(false);
   const showDueDateField = documentType === "invoice";
   const showQuoteOnlySections = documentType === "quote";
   const showSevereDegradedMarker = extractionTier === "degraded"
     && draft.lineItems.length === 0;
-  const hasHiddenActionableItems = resolveHiddenActionableItems(hiddenDetails)
-    .some((item) => !hiddenDetailState?.[item.id]?.dismissed);
+  const hasHiddenActionableItems = hasUndismissedCaptureDetailsItems(
+    resolveCaptureDetailsActionableItems(hiddenDetails),
+    hiddenDetailState,
+  );
 
   return (
     <form
@@ -234,12 +221,15 @@ export function ReviewFormContent({
           <button
             type="button"
             className="inline-flex w-full cursor-pointer items-center justify-between rounded-lg border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-colors hover:bg-surface-container-lowest"
-            onClick={() => setIsCaptureDetailsOpen(true)}
+            onClick={() => {
+              onCaptureDetailsOpen();
+              setIsCaptureDetailsOpen(true);
+            }}
           >
             <div>
               <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Capture Details</p>
               <p className="text-sm text-on-surface-variant">
-                Suggestions, unresolved details, AI review notes, and transcript.
+                Actionable items and transcript.
               </p>
             </div>
             <div className="inline-flex items-center gap-1.5">
@@ -322,7 +312,6 @@ export function ReviewFormContent({
           transcript={draft.transcript ?? ""}
           hiddenDetails={hiddenDetails}
           hiddenDetailState={hiddenDetailState}
-          onReviewHiddenItem={onReviewHiddenItem}
           onDismissHiddenItem={onDismissHiddenItem}
           isMutating={isMutatingHiddenItems}
         />
