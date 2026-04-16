@@ -7,6 +7,11 @@ interface DraftLineItemTotalsState {
   total: number | null;
 }
 
+export interface LineItemAuthoritativeSubtotal {
+  definesSubtotal: boolean;
+  subtotal: number | null;
+}
+
 export function syncDraftTotalWithLineItems(
   currentState: DraftLineItemTotalsState,
   nextLineItems: LineItemDraftWithFlags[],
@@ -26,10 +31,9 @@ export function syncDraftTotalWithLineItems(
   return nextDerivedSubtotal.subtotal;
 }
 
-function resolveLineItemAuthoritativeSubtotal(lineItems: LineItemDraftWithFlags[]): {
-  definesSubtotal: boolean;
-  subtotal: number | null;
-} {
+export function resolveLineItemAuthoritativeSubtotal(
+  lineItems: LineItemDraftWithFlags[],
+): LineItemAuthoritativeSubtotal {
   const substantiveLineItems = lineItems.filter(hasLineItemContent);
   if (substantiveLineItems.length === 0) {
     return { definesSubtotal: true, subtotal: null };

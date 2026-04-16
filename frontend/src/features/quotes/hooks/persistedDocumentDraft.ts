@@ -1,10 +1,7 @@
 import type { InvoiceDetail } from "@/features/invoices/types/invoice.types";
 import type { LineItemDraftWithFlags, QuoteDetail } from "@/features/quotes/types/quote.types";
-import {
-  calculatePricingFromPersisted,
-  resolveLineItemSum,
-  type DiscountType,
-} from "@/shared/lib/pricing";
+import { resolveLineItemAuthoritativeSubtotal } from "@/features/quotes/utils/lineItemDraftTotals";
+import { calculatePricingFromPersisted, type DiscountType, type PricingFields } from "@/shared/lib/pricing";
 
 const EDIT_STORAGE_KEY = "stima_document_edit";
 
@@ -160,9 +157,28 @@ export function clearDocumentDraftFromStorage(): void {
   window.sessionStorage.removeItem(EDIT_STORAGE_KEY);
 }
 
-export function mapQuoteToEditDraft(quote: QuoteDetail): DocumentEditDraft {
-  const lineItemSum = resolveLineItemSum(quote.line_items.map((item) => item.price));
+function resolvePersistedDraftSubtotal(
+  pricing: PricingFields,
+  lineItems: LineItemDraftWithFlags[],
+): number | null {
+  const authoritativeSubtotal = resolveLineItemAuthoritativeSubtotal(lineItems);
   const breakdown = calculatePricingFromPersisted(
+    pricing,
+    authoritativeSubtotal.definesSubtotal ? authoritativeSubtotal.subtotal : null,
+  );
+  return breakdown.subtotal ?? pricing.totalAmount;
+}
+
+export function mapQuoteToEditDraft(quote: QuoteDetail): DocumentEditDraft {
+  const lineItems = quote.line_items.map((item) => ({
+    description: item.description,
+    details: item.details,
+    price: item.price,
+    priceStatus: item.price_status,
+    flagged: item.flagged,
+    flagReason: item.flag_reason,
+  }));
+  const total = resolvePersistedDraftSubtotal(
     {
       totalAmount: quote.total_amount,
       taxRate: quote.tax_rate,
@@ -170,7 +186,7 @@ export function mapQuoteToEditDraft(quote: QuoteDetail): DocumentEditDraft {
       discountValue: quote.discount_value,
       depositAmount: quote.deposit_amount,
     },
-    lineItemSum,
+    lineItems,
   );
 
   return {
@@ -178,15 +194,8 @@ export function mapQuoteToEditDraft(quote: QuoteDetail): DocumentEditDraft {
     docType: quote.doc_type === "invoice" ? "invoice" : "quote",
     title: quote.title?.trim() ?? "",
     transcript: quote.transcript,
-    lineItems: quote.line_items.map((item) => ({
-      description: item.description,
-      details: item.details,
-      price: item.price,
-      priceStatus: item.price_status,
-      flagged: item.flagged,
-      flagReason: item.flag_reason,
-    })),
-    total: breakdown.subtotal ?? quote.total_amount,
+    lineItems,
+    total,
     taxRate: quote.tax_rate,
     discountType: quote.discount_type,
     discountValue: quote.discount_value,
@@ -197,8 +206,13 @@ export function mapQuoteToEditDraft(quote: QuoteDetail): DocumentEditDraft {
 }
 
 export function mapInvoiceToEditDraft(invoice: InvoiceDetail): DocumentEditDraft {
-  const lineItemSum = resolveLineItemSum(invoice.line_items.map((item) => item.price));
-  const breakdown = calculatePricingFromPersisted(
+  const lineItems = invoice.line_items.map((item) => ({
+    description: item.description,
+    details: item.details,
+    price: item.price,
+    priceStatus: item.price_status ?? (item.price !== null ? "priced" : "unknown"),
+  }));
+  const total = resolvePersistedDraftSubtotal(
     {
       totalAmount: invoice.total_amount,
       taxRate: invoice.tax_rate,
@@ -206,7 +220,7 @@ export function mapInvoiceToEditDraft(invoice: InvoiceDetail): DocumentEditDraft
       discountValue: invoice.discount_value,
       depositAmount: invoice.deposit_amount,
     },
-    lineItemSum,
+    lineItems,
   );
 
   return {
@@ -214,13 +228,8 @@ export function mapInvoiceToEditDraft(invoice: InvoiceDetail): DocumentEditDraft
     docType: "invoice",
     title: invoice.title ?? "",
     transcript: "",
-    lineItems: invoice.line_items.map((item) => ({
-      description: item.description,
-      details: item.details,
-      price: item.price,
-      priceStatus: item.price_status ?? (item.price !== null ? "priced" : "unknown"),
-    })),
-    total: breakdown.subtotal ?? invoice.total_amount,
+    lineItems,
+    total,
     taxRate: invoice.tax_rate,
     discountType: invoice.discount_type,
     discountValue: invoice.discount_value,

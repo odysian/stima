@@ -312,6 +312,92 @@ describe("DocumentEditScreen", () => {
     expect(draft.lineItems[0]?.priceStatus).toBe("included");
   });
 
+  it("hydrates priced + included quote rows with an authoritative subtotal", () => {
+    const quote = makeQuote({
+      total_amount: null,
+      line_items: [
+        {
+          id: "line-priced",
+          description: "Mulch",
+          details: "3 yards",
+          price: 120,
+          price_status: "priced",
+          sort_order: 0,
+        },
+        {
+          id: "line-included",
+          description: "Cleanup",
+          details: "Included in project scope",
+          price: null,
+          price_status: "included",
+          sort_order: 1,
+        },
+      ],
+    });
+
+    const draft = mapQuoteToEditDraft(quote);
+    expect(draft.total).toBe(120);
+  });
+
+  it("keeps quote subtotal null when unknown rows are present and no backend total exists", () => {
+    const quote = makeQuote({
+      total_amount: null,
+      line_items: [
+        {
+          id: "line-priced",
+          description: "Mulch",
+          details: "3 yards",
+          price: 120,
+          price_status: "priced",
+          sort_order: 0,
+        },
+        {
+          id: "line-unknown",
+          description: "Edging",
+          details: "Need to confirm exact material cost",
+          price: null,
+          price_status: "unknown",
+          sort_order: 1,
+        },
+      ],
+    });
+
+    const draft = mapQuoteToEditDraft(quote);
+    expect(draft.total).toBeNull();
+  });
+
+  it("keeps quote subtotal null when all rows are unknown or included", () => {
+    const unknownOnlyQuote = makeQuote({
+      total_amount: null,
+      line_items: [
+        {
+          id: "line-unknown",
+          description: "Edging",
+          details: "Need to confirm exact material cost",
+          price: null,
+          price_status: "unknown",
+          sort_order: 0,
+        },
+      ],
+    });
+    const includedOnlyQuote = makeQuote({
+      total_amount: null,
+      line_items: [
+        {
+          id: "line-included",
+          description: "Cleanup",
+          details: "Included in project scope",
+          price: null,
+          price_status: "included",
+          sort_order: 0,
+        },
+      ],
+    });
+
+    expect(mapQuoteToEditDraft(unknownOnlyQuote).total).toBeNull();
+    expect(mapQuoteToEditDraft(includedOnlyQuote).total).toBeNull();
+  });
+
   it("disables invoice type when no customer is selected", async () => {
     renderScreen({
       document: makeQuote({
@@ -620,6 +706,40 @@ describe("DocumentEditScreen", () => {
       }));
     });
     expect(navigateMock).toHaveBeenCalledWith("/invoices/doc-1", { replace: true });
+  });
+
+  it("keeps total_amount null when saving unknown-price quotes without pricing edits", async () => {
+    renderScreen({
+      document: makeQuote({
+        total_amount: null,
+        line_items: [
+          {
+            id: "line-priced",
+            description: "Mulch",
+            details: "3 yards",
+            price: 120,
+            price_status: "priced",
+            sort_order: 0,
+          },
+          {
+            id: "line-unknown",
+            description: "Edging",
+            details: "Need to confirm exact material cost",
+            price: null,
+            price_status: "unknown",
+            sort_order: 1,
+          },
+        ],
+      }),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
+        total_amount: null,
+      }));
+    });
   });
 
   it("saves invoice edits through invoice endpoint when document starts as invoice", async () => {
