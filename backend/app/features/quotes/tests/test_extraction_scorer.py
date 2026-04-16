@@ -72,6 +72,7 @@ def test_match_line_items_enforces_one_to_one_consumption() -> None:
 def test_score_case_zero_division_guards_no_must_match_items() -> None:
     case = ExtractionQualityCase(
         name="no_must_match",
+        extraction_mode="initial",
         transcript="optional only",
         expected_line_items=(ExpectedLineItem(description="optional service", must_match=False),),
         expected_total=None,
@@ -86,6 +87,7 @@ def test_score_case_zero_division_guards_no_must_match_items() -> None:
 def test_score_case_zero_division_guards_no_priced_or_details_items() -> None:
     case = ExtractionQualityCase(
         name="no_price_no_details",
+        extraction_mode="initial",
         transcript="trim shrubs",
         expected_line_items=(
             ExpectedLineItem(description="trim shrubs", price=None, details=None),
@@ -99,9 +101,30 @@ def test_score_case_zero_division_guards_no_priced_or_details_items() -> None:
     assert score.total_score == pytest.approx(1.0)
 
 
+def test_score_case_high_quality_no_longer_depends_on_confidence_notes() -> None:
+    case = ExtractionQualityCase(
+        name="no_confidence_notes_needed",
+        extraction_mode="initial",
+        transcript="weekly lawn service 45 with 6.5 percent tax",
+        expected_line_items=(ExpectedLineItem(description="weekly lawn service", price=45),),
+        expected_total=45,
+        expected_pricing_fields=("tax_rate",),
+    )
+
+    result = _result([_item("weekly lawn service", price=45)], total=45).model_copy(
+        update={"pricing_hints": PricingHints(explicit_total=45, tax_rate=6.5)}
+    )
+
+    score = score_case(case, result)
+
+    assert score.pricing_behavior_score == pytest.approx(1.0)
+    assert score.overall > 0.95
+
+
 def test_score_case_clamps_overall_upper_bound(monkeypatch: pytest.MonkeyPatch) -> None:
     case = ExtractionQualityCase(
         name="clamp_upper",
+        extraction_mode="initial",
         transcript="x",
         expected_line_items=(ExpectedLineItem(description="x"),),
     )
@@ -120,6 +143,7 @@ def test_score_case_clamps_overall_upper_bound(monkeypatch: pytest.MonkeyPatch) 
 def test_score_case_clamps_overall_lower_bound(monkeypatch: pytest.MonkeyPatch) -> None:
     case = ExtractionQualityCase(
         name="clamp_lower",
+        extraction_mode="initial",
         transcript="x",
         expected_line_items=(ExpectedLineItem(description="x"),),
     )
@@ -161,7 +185,10 @@ def test_aggregate_scores_groups_by_category_and_difficulty() -> None:
             difficulty="easy",
             item_scores=(),
             total_score=1.0,
-            confidence_note_score=None,
+            flag_accuracy=1.0,
+            unresolved_score=1.0,
+            pricing_behavior_score=1.0,
+            append_outcome_score=None,
             precision=1.0,
             recall=1.0,
             extras_count=0,
@@ -174,7 +201,10 @@ def test_aggregate_scores_groups_by_category_and_difficulty() -> None:
             difficulty="hard",
             item_scores=(),
             total_score=1.0,
-            confidence_note_score=None,
+            flag_accuracy=1.0,
+            unresolved_score=1.0,
+            pricing_behavior_score=1.0,
+            append_outcome_score=None,
             precision=1.0,
             recall=1.0,
             extras_count=0,
@@ -187,7 +217,10 @@ def test_aggregate_scores_groups_by_category_and_difficulty() -> None:
             difficulty="easy",
             item_scores=(),
             total_score=1.0,
-            confidence_note_score=None,
+            flag_accuracy=1.0,
+            unresolved_score=1.0,
+            pricing_behavior_score=1.0,
+            append_outcome_score=None,
             precision=1.0,
             recall=1.0,
             extras_count=0,
@@ -208,6 +241,7 @@ def test_aggregate_scores_groups_by_category_and_difficulty() -> None:
 def test_format_report_includes_case_lines_and_summary() -> None:
     case = ExtractionQualityCase(
         name="report_case",
+        extraction_mode="initial",
         transcript="trim shrubs for 50",
         expected_line_items=(ExpectedLineItem(description="trim shrubs", price=50),),
         expected_total=50,
