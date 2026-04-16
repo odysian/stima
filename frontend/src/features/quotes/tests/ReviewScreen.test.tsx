@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -182,9 +182,13 @@ function makeInvoice(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
 function renderScreen(options?: {
   document?: QuoteDetail | InvoiceDetail;
   locationState?: unknown;
-}): { clearDraftMock: ReturnType<typeof vi.fn> } {
+}): {
+  clearDraftMock: ReturnType<typeof vi.fn>;
+  setDocument: (nextDocument: QuoteDetail | InvoiceDetail) => void;
+} {
   const document = options?.document ?? makeQuote();
   const clearDraftMock = vi.fn();
+  let setDocumentStateRef: ((nextDocument: QuoteDetail | InvoiceDetail) => void) | null = null;
 
   useLocationMock.mockReturnValue({ state: options?.locationState ?? null });
 
@@ -193,6 +197,9 @@ function renderScreen(options?: {
     const [draftState, setDraftState] = useState(
       "customer" in document ? mapInvoiceToEditDraft(document) : mapQuoteToEditDraft(document),
     );
+    setDocumentStateRef = (nextDocument) => {
+      setDocumentState(nextDocument);
+    };
 
     return {
       document: documentState,
@@ -223,7 +230,17 @@ function renderScreen(options?: {
     </MemoryRouter>,
   );
 
-  return { clearDraftMock };
+  return {
+    clearDraftMock,
+    setDocument: (nextDocument) => {
+      if (!setDocumentStateRef) {
+        return;
+      }
+      act(() => {
+        setDocumentStateRef?.(nextDocument);
+      });
+    },
+  };
 }
 
 beforeEach(() => {
@@ -395,7 +412,7 @@ describe("DocumentEditScreen", () => {
     });
   });
 
-  it("does not gate Continue when only hidden Capture Details items exist", async () => {
+  it("shows a soft Continue warning when new undismissed Capture Details items exist", async () => {
     renderScreen({
       document: makeQuote({
         extraction_review_metadata: {
@@ -422,12 +439,8 @@ describe("DocumentEditScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
 
-    expect(screen.queryByRole("dialog", { name: /review pending extraction markers/i })).not.toBeInTheDocument();
-    await waitFor(() => {
-      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
-        doc_type: "quote",
-      }));
-    });
+    expect(screen.getByRole("dialog", { name: /review capture details before continuing/i })).toBeInTheDocument();
+    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
   });
 
   it("does not show the capture-details alert icon for transcript-only details", async () => {
@@ -471,7 +484,7 @@ describe("DocumentEditScreen", () => {
     expect(await screen.findByLabelText("Capture details need review")).toBeInTheDocument();
   });
 
-  it("renders Capture Details sections in the required order", async () => {
+  it("renders one unified actionable feed plus transcript with dismiss-only actions", async () => {
     renderScreen({
       document: makeQuote({
         extraction_review_metadata: {
@@ -504,22 +517,22 @@ describe("DocumentEditScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /capture details/i }));
 
-    const section1 = await screen.findByText("New Suggestions From Latest Capture");
-    const section2 = screen.getByText("Unresolved Capture Details");
-    const section3 = screen.getByText("AI Review Notes");
-    const section4 = screen.getByText("Transcript");
-
-    expect(section1.compareDocumentPosition(section2)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(section2.compareDocumentPosition(section3)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(section3.compareDocumentPosition(section4)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const actionableHeading = await screen.findByText("Actionable Capture Details");
+    const transcriptHeading = screen.getByText("Transcript");
+    expect(actionableHeading.compareDocumentPosition(transcriptHeading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.queryByText("New Suggestions From Latest Capture")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unresolved Capture Details")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI Review Notes")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mark reviewed/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^dismiss$/i }).length).toBeGreaterThan(0);
     expect(screen.getByText("Original capture transcript text.")).toBeInTheDocument();
-    const transcriptSection = section4.closest("section");
+    const transcriptSection = transcriptHeading.closest("section");
     expect(transcriptSection).not.toBeNull();
     expect(within(transcriptSection as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
-  it("persists dismiss actions for hidden items through sidecar metadata patch", async () => {
-    renderScreen({
+  it("updates capture-details fingerprint on open, ignores dismiss-only changes, and re-warns on new occurrences", async () => {
+    const { setDocument } = renderScreen({
       document: makeQuote({
         extraction_review_metadata: {
           ...makeQuote().extraction_review_metadata!,
@@ -541,6 +554,23 @@ describe("DocumentEditScreen", () => {
       }),
     });
 
+    fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
+    expect(screen.getByRole("dialog", { name: /review capture details before continuing/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /review now/i }));
+    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByRole("button", { name: /capture details/i }));
+    expect(window.localStorage.getItem("stima_capture_details_fingerprint:doc-1")).toBe("append-1");
+    fireEvent.click(screen.getByRole("button", { name: /^close$/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
+        doc_type: "quote",
+      }));
+    });
+    mockedQuoteService.updateQuote.mockClear();
+
     fireEvent.click(await screen.findByRole("button", { name: /capture details/i }));
     fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
 
@@ -549,6 +579,39 @@ describe("DocumentEditScreen", () => {
         dismiss_hidden_item: "append-1",
       });
     });
+
+    fireEvent.click(screen.getByRole("button", { name: /^close$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
+        doc_type: "quote",
+      }));
+    });
+    expect(screen.queryByRole("dialog", { name: /review capture details before continuing/i })).not.toBeInTheDocument();
+    mockedQuoteService.updateQuote.mockClear();
+
+    setDocument(makeQuote({
+      extraction_review_metadata: {
+        ...makeQuote().extraction_review_metadata!,
+        hidden_details: {
+          append_suggestions: [
+            {
+              id: "append-2",
+              kind: "note",
+              raw_text: "Add gate latch note",
+              confidence: "low",
+              source: "append_capture",
+            },
+          ],
+          unresolved_segments: [],
+          confidence_notes: [],
+        },
+        hidden_detail_state: {},
+      },
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
+    expect(screen.getByRole("dialog", { name: /review capture details before continuing/i })).toBeInTheDocument();
   });
 
   it("locks type selector after sharing", async () => {

@@ -34,7 +34,7 @@ interface DocumentEditScreenViewProps {
   lineItemSheetInitialItem: LineItemDraftWithFlags;
   toastMessage: string | null;
   showLeaveWarning: boolean;
-  showContinueWarning: boolean;
+  continueWarningReason: "review" | "capture-details" | null;
   isSavingDraft: boolean;
   isContinuing: boolean;
   onRequestNavigation: (target: { to: string; replace?: boolean }) => void;
@@ -51,8 +51,8 @@ interface DocumentEditScreenViewProps {
   onDiscountValueChange: (nextDiscountValue: number | null) => void;
   onDepositAmountChange: (nextDepositAmount: number | null) => void;
   onNotesChange: (nextNotes: string) => void;
-  onReviewHiddenItem: (itemId: string) => Promise<void>;
   onDismissHiddenItem: (itemId: string) => Promise<void>;
+  onCaptureDetailsOpen: () => void;
   onSaveDraft: () => void;
   onPrimaryAction: () => void;
   onCloseAssignment: () => void;
@@ -93,7 +93,7 @@ export function DocumentEditScreenView({
   lineItemSheetInitialItem,
   toastMessage,
   showLeaveWarning,
-  showContinueWarning,
+  continueWarningReason,
   isSavingDraft,
   isContinuing,
   onRequestNavigation,
@@ -110,8 +110,8 @@ export function DocumentEditScreenView({
   onDiscountValueChange,
   onDepositAmountChange,
   onNotesChange,
-  onReviewHiddenItem,
   onDismissHiddenItem,
+  onCaptureDetailsOpen,
   onSaveDraft,
   onPrimaryAction,
   onCloseAssignment,
@@ -171,8 +171,8 @@ export function DocumentEditScreenView({
         onDiscountValueChange={onDiscountValueChange}
         onDepositAmountChange={onDepositAmountChange}
         onNotesChange={onNotesChange}
-        onReviewHiddenItem={onReviewHiddenItem}
         onDismissHiddenItem={onDismissHiddenItem}
+        onCaptureDetailsOpen={onCaptureDetailsOpen}
       />
 
       <ReviewActionFooter
@@ -200,7 +200,7 @@ export function DocumentEditScreenView({
         showLeaveWarning={showLeaveWarning}
         onLeaveConfirm={onLeaveConfirm}
         onLeaveCancel={onLeaveCancel}
-        showContinueWarning={showContinueWarning}
+        continueWarningReason={continueWarningReason}
         onContinueConfirm={onContinueConfirm}
         onContinueCancel={onContinueCancel}
       />

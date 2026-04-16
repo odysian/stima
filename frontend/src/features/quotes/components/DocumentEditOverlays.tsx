@@ -20,7 +20,7 @@ interface DocumentEditOverlaysProps {
   showLeaveWarning: boolean;
   onLeaveConfirm: () => void;
   onLeaveCancel: () => void;
-  showContinueWarning: boolean;
+  continueWarningReason: "review" | "capture-details" | null;
   onContinueConfirm: () => void;
   onContinueCancel: () => void;
 }
@@ -40,10 +40,21 @@ export function DocumentEditOverlays({
   showLeaveWarning,
   onLeaveConfirm,
   onLeaveCancel,
-  showContinueWarning,
+  continueWarningReason,
   onContinueConfirm,
   onContinueCancel,
 }: DocumentEditOverlaysProps): React.ReactElement {
+  const showContinueWarning = continueWarningReason !== null;
+  const continueWarningCopy = continueWarningReason === "capture-details"
+    ? {
+        title: "Review Capture Details before continuing?",
+        body: "New capture details are available. Open Capture Details now, or continue anyway.",
+      }
+    : {
+        title: "Review pending extraction markers?",
+        body: "Notes and pricing still have pending review markers. Review now, or continue anyway.",
+      };
+
   return (
     <>
       {isAssignmentSheetOpen ? (
@@ -82,8 +93,8 @@ export function DocumentEditOverlays({
 
       {showContinueWarning ? (
         <ConfirmModal
-          title="Review pending extraction markers?"
-          body="Notes and pricing still have pending review markers. Review now, or continue anyway."
+          title={continueWarningCopy.title}
+          body={continueWarningCopy.body}
           confirmLabel="Continue anyway"
           cancelLabel="Review now"
           onConfirm={onContinueConfirm}
