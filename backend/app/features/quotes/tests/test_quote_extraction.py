@@ -19,6 +19,7 @@ from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.schemas import (
     ExtractionMode,
     ExtractionResult,
+    LineItemExtractedV2,
     PreparedCaptureInput,
     PricingHints,
 )
@@ -172,6 +173,60 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     assert payload["quote_id"]
     assert payload["transcript"] == "add 10 percent travel surcharge"
     assert payload["line_items"]
+
+
+async def test_extract_combined_persists_included_price_status_from_provider(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_extract = _MockExtractionIntegration.extract
+
+    async def _extract_with_included_scope(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        transcript = (
+            notes.transcript.strip() if isinstance(notes, PreparedCaptureInput) else notes.strip()
+        )
+        if transcript != "included scope provider status check":
+            return await original_extract(self, notes, mode=mode)
+        return ExtractionResult(
+            transcript=transcript,
+            line_items=[
+                LineItemExtractedV2(
+                    raw_text="Cleanup labor included",
+                    description="Cleanup labor",
+                    details="Included / no charge",
+                    price=None,
+                    price_status="included",
+                    confidence="medium",
+                )
+            ],
+            pricing_hints=PricingHints(explicit_total=None),
+        )
+
+    monkeypatch.setattr(_MockExtractionIntegration, "extract", _extract_with_included_scope)
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "included scope provider status check"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["line_items"][0]["price"] is None
+    assert payload["line_items"][0]["price_status"] == "included"
+
+    detail_response = await client.get(f"/api/quotes/{payload['quote_id']}")
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert detail_payload["line_items"][0]["price"] is None
+    assert detail_payload["line_items"][0]["price_status"] == "included"
 
 
 async def test_extract_combined_sync_passes_initial_mode_to_extraction_integration(

@@ -43,6 +43,7 @@ class _MockExtractionIntegration:
                         description="Brown mulch",
                         details="5 yards",
                         price=120,
+                        price_status="priced",
                         flagged=True,
                         flag_reason="Unit or price sounds inconsistent with the transcript",
                         confidence="medium",
@@ -59,6 +60,7 @@ class _MockExtractionIntegration:
                     description="Brown mulch",
                     details="5 yards",
                     price=120,
+                    price_status="priced",
                     confidence="medium",
                 )
             ],
