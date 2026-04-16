@@ -57,6 +57,17 @@ _override_extraction_service_dependency = quotes_test_module._override_extractio
 _reset_rate_limiter = quotes_test_module._reset_rate_limiter
 
 
+def _assert_public_extraction_contract(payload: dict[str, object]) -> None:
+    assert "pipeline_version" not in payload
+    assert "unresolved_segments" not in payload
+    line_items = payload.get("line_items")
+    assert isinstance(line_items, list)
+    for line_item in line_items:
+        assert isinstance(line_item, dict)
+        assert "raw_text" not in line_item
+        assert "confidence" not in line_item
+
+
 async def test_convert_notes_returns_422_for_extraction_errors(
     client: AsyncClient,
 ) -> None:
@@ -95,6 +106,7 @@ async def test_convert_notes_can_return_flagged_line_items(client: AsyncClient) 
 
     assert response.status_code == 200
     payload = response.json()
+    _assert_public_extraction_contract(payload)
     assert payload["line_items"][0]["flagged"] is True
     assert payload["line_items"][0]["flag_reason"]
 
@@ -170,6 +182,7 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    _assert_public_extraction_contract(payload)
     assert payload["quote_id"]
     assert payload["transcript"] == "add 10 percent travel surcharge"
     assert payload["line_items"]
@@ -450,6 +463,8 @@ async def test_extract_combined_async_worker_persists_draft_and_returns_quote_id
     assert status_payload["status"] == "success"
     assert status_payload["quote_id"] is not None
     assert status_payload["document_id"] == status_payload["quote_id"]
+    assert status_payload["extraction_result"] is not None
+    _assert_public_extraction_contract(status_payload["extraction_result"])
     assert status_payload["extraction_result"]["transcript"] == "mulch the front beds"
 
     quote_response = await client.get(f"/api/quotes/{status_payload['quote_id']}")
@@ -510,6 +525,8 @@ async def test_extract_combined_async_final_retryable_failure_persists_degraded_
     status_payload = status_response.json()
     assert status_payload["status"] == "success"
     assert status_payload["quote_id"] is not None
+    assert status_payload["extraction_result"] is not None
+    _assert_public_extraction_contract(status_payload["extraction_result"])
     assert status_payload["extraction_result"]["line_items"] == []
     assert status_payload["extraction_result"]["extraction_tier"] == "degraded"
     assert (

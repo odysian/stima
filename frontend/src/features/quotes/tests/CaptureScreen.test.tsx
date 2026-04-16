@@ -73,16 +73,13 @@ const mockedJobService = vi.mocked(jobService);
 
 const extractionFixture: ExtractionResult = {
   transcript: "5 yards brown mulch",
-  pipeline_version: "v2.5",
   line_items: [
     {
-      raw_text: "5 yards brown mulch",
       description: "Brown mulch",
       details: "5 yards",
       price: 120,
       flagged: true,
       flag_reason: "Unit phrasing may be ambiguous",
-      confidence: "medium",
     },
   ],
   pricing_hints: {
@@ -93,7 +90,6 @@ const extractionFixture: ExtractionResult = {
     discount_value: null,
   },
   customer_notes_suggestion: null,
-  unresolved_segments: [],
   extraction_tier: "primary",
   extraction_degraded_reason_code: null,
 };

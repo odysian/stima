@@ -15,7 +15,6 @@ const mockedRequest = vi.mocked(request);
 describe("quoteService.extract", () => {
   const extractionPayload = {
     transcript: "typed note only",
-    pipeline_version: "v2.5" as const,
     line_items: [],
     pricing_hints: {
       explicit_total: null,
@@ -25,7 +24,6 @@ describe("quoteService.extract", () => {
       discount_value: null,
     },
     customer_notes_suggestion: null,
-    unresolved_segments: [],
     extraction_tier: "primary" as const,
     extraction_degraded_reason_code: null,
   };

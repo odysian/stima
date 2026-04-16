@@ -85,6 +85,57 @@ async def test_extraction_review_metadata_accepts_items_only_hidden_details() ->
     assert metadata.hidden_details.items[0].text == "Add gate note"
 
 
+async def test_extraction_review_metadata_normalizes_legacy_grouped_hidden_details() -> None:
+    metadata = ExtractionReviewMetadataV1.model_validate_with_defaults(
+        {
+            "pipeline_version": "v2",
+            "hidden_details": {
+                "append_suggestions": [
+                    {
+                        "id": "append-note-legacy",
+                        "kind": "note",
+                        "raw_text": "Add gate note",
+                        "confidence": "medium",
+                        "source": "append_capture",
+                    }
+                ],
+                "unresolved_segments": [
+                    {
+                        "id": "unresolved-legacy",
+                        "raw_text": "Need to confirm edging cost",
+                        "confidence": "low",
+                        "source": "typed_conflict",
+                    }
+                ],
+            },
+            "hidden_detail_state": {
+                "append-note-legacy": {"dismissed": True},
+            },
+        },
+        extraction_degraded_reason_code=None,
+    )
+
+    assert metadata.hidden_details.model_dump(mode="json")["items"] == [
+        {
+            "id": "append-note-legacy",
+            "kind": "append_suggestion",
+            "field": "notes",
+            "reason": "append_capture",
+            "confidence": "medium",
+            "text": "Add gate note",
+        },
+        {
+            "id": "unresolved-legacy",
+            "kind": "unresolved_segment",
+            "field": None,
+            "reason": "typed_conflict",
+            "confidence": "low",
+            "text": "Need to confirm edging cost",
+        },
+    ]
+    assert metadata.hidden_detail_state["append-note-legacy"].dismissed is True
+
+
 async def test_append_extraction_sync_retryable_failure_uses_degraded_append_semantics(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,

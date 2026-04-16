@@ -42,7 +42,7 @@ from app.features.quotes.review_metadata import normalize_extraction_review_meta
 from app.features.quotes.schemas import (
     ConvertNotesRequest,
     DiscountType,
-    ExtractionResult,
+    ExtractionResponse,
     ExtractionReviewMetadataUpdateRequest,
     ExtractionReviewMetadataV1,
     LineItemResponse,
@@ -152,7 +152,7 @@ async def _parse_upload_clips(clips: list[UploadFile]) -> list[CaptureAudioClip]
 
 @router.post(
     "/convert-notes",
-    response_model=ExtractionResult,
+    response_model=ExtractionResponse,
     dependencies=[Depends(require_csrf)],
 )
 @limiter.limit(lambda: get_settings().quote_text_extraction_rate_limit, key_func=get_user_key)
@@ -161,13 +161,13 @@ async def convert_notes(
     payload: ConvertNotesRequest,
     user: Annotated[User, Depends(get_current_user)],
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
-) -> ExtractionResult:
+) -> ExtractionResponse:
     """Convert notes into extraction output without creating a persisted draft."""
     del request
     async with extraction_capacity_guard(user.id):
         try:
             extraction = await extraction_service.convert_notes(payload.notes)
-            return extraction
+            return ExtractionResponse.from_internal_result(extraction)
         except QuoteServiceError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -300,9 +300,9 @@ async def extract_combined(
             capture_detail=capture_detail,
             extraction_result=extraction,
         )
-        return PersistedExtractionResponse(
+        return PersistedExtractionResponse.from_internal_persisted_result(
             quote_id=quote.id,
-            **extraction.model_dump(),
+            result=extraction,
         )
 
     try:
@@ -412,9 +412,9 @@ async def append_extraction(
             customer_id=updated_quote.customer_id,
             detail=capture_detail,
         )
-        return PersistedExtractionResponse(
+        return PersistedExtractionResponse.from_internal_persisted_result(
             quote_id=updated_quote.id,
-            **merged_extraction.model_dump(),
+            result=merged_extraction,
         )
 
     try:

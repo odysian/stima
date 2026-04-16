@@ -340,6 +340,38 @@ class ExtractionResult(ExtractionResultV2):
         return self.pricing_hints.explicit_total
 
 
+class ExtractionResponse(BaseModel):
+    """Public extraction contract returned by quote extract and job APIs."""
+
+    transcript: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    line_items: list[LineItemExtracted] = Field(
+        default_factory=list,
+        max_length=DOCUMENT_LINE_ITEMS_MAX_ITEMS,
+    )
+    pricing_hints: PricingHints = Field(default_factory=PricingHints)
+    customer_notes_suggestion: ExtractionSuggestion | None = None
+    extraction_tier: Literal["primary", "degraded"] = "primary"
+    extraction_degraded_reason_code: str | None = None
+
+    @classmethod
+    def from_internal_result(cls, result: ExtractionResult) -> ExtractionResponse:
+        """Project internal extraction metadata into the public contract shape."""
+        return cls.model_validate(
+            {
+                "transcript": result.transcript,
+                "line_items": [item.model_dump(mode="json") for item in result.line_items],
+                "pricing_hints": result.pricing_hints.model_dump(mode="json"),
+                "customer_notes_suggestion": (
+                    None
+                    if result.customer_notes_suggestion is None
+                    else result.customer_notes_suggestion.model_dump(mode="json")
+                ),
+                "extraction_tier": result.extraction_tier,
+                "extraction_degraded_reason_code": result.extraction_degraded_reason_code,
+            }
+        )
+
+
 PricingFieldName = Literal["explicit_total", "deposit_amount", "tax_rate", "discount"]
 
 
@@ -428,6 +460,133 @@ class HiddenItemState(BaseModel):
     dismissed: bool = False
 
 
+def _normalize_legacy_hidden_details_payload(value: object) -> object:
+    if not isinstance(value, dict):
+        return value
+
+    payload = dict(value)
+    hidden_details_payload = _coerce_mapping(payload.get("hidden_details"))
+
+    normalized_items: list[dict[str, Any]] = []
+    normalized_items.extend(
+        _coerce_items_list(hidden_details_payload.get("items") if hidden_details_payload else None)
+    )
+    normalized_items.extend(
+        _normalize_legacy_append_suggestions(
+            hidden_details_payload.get("append_suggestions") if hidden_details_payload else None
+        )
+    )
+    normalized_items.extend(
+        _normalize_legacy_unresolved_segments(
+            hidden_details_payload.get("unresolved_segments") if hidden_details_payload else None
+        )
+    )
+    normalized_items.extend(_normalize_legacy_append_suggestions(payload.get("append_suggestions")))
+    normalized_items.extend(
+        _normalize_legacy_unresolved_segments(payload.get("unresolved_segments"))
+    )
+
+    if normalized_items:
+        payload["hidden_details"] = {"items": normalized_items}
+
+    payload.pop("append_suggestions", None)
+    payload.pop("unresolved_segments", None)
+    return payload
+
+
+def _coerce_mapping(value: object) -> dict[str, Any] | None:
+    if isinstance(value, dict):
+        return dict(value)
+    model_dump = getattr(value, "model_dump", None)
+    if not callable(model_dump):
+        return None
+    dumped = model_dump(mode="json")
+    return dict(dumped) if isinstance(dumped, dict) else None
+
+
+def _coerce_items_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    items: list[dict[str, Any]] = []
+    for candidate in value:
+        coerced = _coerce_mapping(candidate)
+        if coerced is not None:
+            items.append(coerced)
+    return items
+
+
+def _normalize_legacy_append_suggestions(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for index, candidate in enumerate(value):
+        payload = _coerce_mapping(candidate)
+        if payload is None:
+            continue
+        text = (
+            payload.get("text") if isinstance(payload.get("text"), str) else payload.get("raw_text")
+        )
+        if not isinstance(text, str) or text.strip() == "":
+            continue
+        kind = payload.get("kind") if isinstance(payload.get("kind"), str) else None
+        pricing_field = (
+            payload.get("pricing_field") if isinstance(payload.get("pricing_field"), str) else None
+        )
+        field: str | None
+        if pricing_field in {"explicit_total", "deposit_amount", "tax_rate", "discount"}:
+            field = pricing_field
+        elif kind == "pricing":
+            field = None
+        else:
+            field = "notes"
+        confidence = payload.get("confidence")
+        item_id = payload.get("id") if isinstance(payload.get("id"), str) else None
+        normalized.append(
+            {
+                "id": item_id or f"legacy-append:{index}",
+                "kind": "append_suggestion",
+                "field": field,
+                "reason": (
+                    payload.get("source")
+                    if isinstance(payload.get("source"), str)
+                    else "append_capture"
+                ),
+                "confidence": confidence if confidence in {"medium", "low"} else None,
+                "text": text.strip(),
+            }
+        )
+    return normalized
+
+
+def _normalize_legacy_unresolved_segments(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for index, candidate in enumerate(value):
+        payload = _coerce_mapping(candidate)
+        if payload is None:
+            continue
+        text = (
+            payload.get("text") if isinstance(payload.get("text"), str) else payload.get("raw_text")
+        )
+        if not isinstance(text, str) or text.strip() == "":
+            continue
+        source = payload.get("source") if isinstance(payload.get("source"), str) else None
+        confidence = payload.get("confidence")
+        item_id = payload.get("id") if isinstance(payload.get("id"), str) else None
+        normalized.append(
+            {
+                "id": item_id or f"legacy-unresolved:{index}",
+                "kind": "unresolved_segment",
+                "field": None,
+                "reason": source,
+                "confidence": confidence if confidence in {"medium", "low"} else None,
+                "text": text.strip(),
+            }
+        )
+    return normalized
+
+
 class ExtractionReviewMetadataV1(BaseModel):
     """Sidecar metadata persisted for V2 extraction review behavior."""
 
@@ -439,6 +598,10 @@ class ExtractionReviewMetadataV1(BaseModel):
     )
     hidden_detail_state: dict[str, HiddenItemState] = Field(default_factory=dict)
     extraction_degraded_reason_code: str | None = None
+
+    _normalize_legacy_hidden_details = model_validator(mode="before")(
+        _normalize_legacy_hidden_details_payload
+    )
 
     @classmethod
     def model_validate_with_defaults(
@@ -461,10 +624,21 @@ class ExtractionReviewMetadataV1(BaseModel):
         return metadata
 
 
-class PersistedExtractionResponse(ExtractionResult):
+class PersistedExtractionResponse(ExtractionResponse):
     """Successful unified extraction response with the persisted draft id."""
 
     quote_id: UUID
+
+    @classmethod
+    def from_internal_persisted_result(
+        cls,
+        *,
+        quote_id: UUID,
+        result: ExtractionResult,
+    ) -> PersistedExtractionResponse:
+        """Build persisted extraction responses from the internal extraction contract."""
+        public_payload = ExtractionResponse.from_internal_result(result).model_dump(mode="json")
+        return cls(quote_id=quote_id, **public_payload)
 
 
 class ConvertNotesRequest(BaseModel):
