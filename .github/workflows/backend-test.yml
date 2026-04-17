@@ -91,7 +91,7 @@ jobs:
             ffmpeg-version: 7.0.2
           attempt_limit: 3
           attempt_delay: 15000
-          time_out: 180000
+          time_out: 25000
       - name: FFmpeg diagnostics
         run: |
           ffmpeg -version
