@@ -31,8 +31,11 @@ Read in order:
 ### C) Plan / Create Issues / Choose Mode
 Read:
 1. `docs/ISSUES_WORKFLOW.md` (authoritative for control plane)
-2. `docs/template/KICKOFF.md` section 2 for planning-only kickoff format
-3. Additional planning docs only when needed by touched scope
+2. `docs/template/KICKOFF.md` section 1.5 for Domain Pass prompt text when applicable, and section 2 for planning-only kickoff format
+3. `CONTEXT.md` for current product/domain terminology
+4. Additional planning docs only when needed by touched scope
+
+If the feature introduces or changes business terms, lifecycle state meaning, or crosses layer/service boundaries, run a Domain Pass before issue drafting — see `docs/ISSUES_WORKFLOW.md` "When Domain Pass Is Required". Reflect resolved terms consistently in issue titles, summaries, acceptance criteria, and PR descriptions.
 
 ### D) Docs / Architecture / Pattern Work
 Read only touched docs:

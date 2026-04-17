@@ -86,6 +86,22 @@ Deliver:
 4. Return concise patch summary + targeted verification + follow-up (if any).
 ```
 
+## 1.5) Optional: Domain Pass and Post-Domain Grill-Me
+
+Use these before issue creation when the feature introduces or changes business terms, lifecycle state meaning, or crosses layer/service boundaries. See `docs/ISSUES_WORKFLOW.md` "When Domain Pass Is Required" for full qualifying criteria.
+
+**Domain Pass prompt:**
+
+```text
+Run a domain pass on <feature/plan>. Challenge terminology against the repo's current language, cross-check against code, update CONTEXT.md inline when terms are resolved, and only suggest an ADR if the decision is hard to reverse, surprising without context, and the result of a real trade-off.
+```
+
+**Post-domain grill-me prompt** (use after Domain Pass when execution risk or edge cases remain):
+
+```text
+Now grill this updated plan for execution risk, hidden edge cases, sequencing problems, and verification gaps. Ask one question at a time and recommend an answer for each.
+```
+
 ## 2) Planning-Only Kickoff (No Code Changes)
 
 ```text
@@ -130,11 +146,12 @@ Required output shape remains authoritative:
 The approving reviewer generates this once in the same `APPROVED` response.
 
 ```text
+Learning handoff:
+- Concept primer: <plain-language explanation of the underlying idea before this PR's specifics>
 - What changed: <2-3 sentences max>
 - Why it was done this way: <brief rationale>
 - Tradeoff or pattern worth learning: <one point>
-- What to review first: <how a junior operator should read the diff>
-
-Code pointers:
-- `path:line-line — why it matters`
+- How to review this kind of change: <what a junior operator should inspect first next time>
 ```
+
+Keep the concept primer to 2-4 sentences. Natural file mentions are allowed when they help the explanation, but dedicated code-pointer blocks are not required.

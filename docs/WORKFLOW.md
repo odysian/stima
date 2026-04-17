@@ -13,6 +13,8 @@ Stima workflow index: use this file to route into implementation, review, and ve
 | Rule type | Authoritative source |
 | --- | --- |
 | Execution control plane (modes, DoR/DoD, branching, issue lifecycle) | `docs/ISSUES_WORKFLOW.md` |
+| Product/domain language and glossary | `CONTEXT.md` |
+| Domain Pass — when required and how | `docs/ISSUES_WORKFLOW.md` "When Domain Pass Is Required" + `docs/workflow/IMPLEMENT.md` "Domain Pass" |
 | Kickoff prompts and reviewer output contract | `docs/template/KICKOFF.md` |
 | Implementation-loop guidance | `docs/workflow/IMPLEMENT.md` |
 | Review-loop guidance | `docs/workflow/REVIEW.md` |
