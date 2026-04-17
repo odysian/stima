@@ -122,6 +122,23 @@ Test-focused tasks must include a **"Do NOT duplicate"** section listing what is
 
 Dev tooling, CI fixes, proxy config, and startup scripts that don't fit cleanly in a feature task should be scoped into the task where they are discovered or into the hardening pass. Don't leave them unowned — if the work is needed to make the feature work end-to-end, it belongs in a task.
 
+## When Domain Pass Is Required
+
+Run a Domain Pass (using the `domain-model` skill or the prompt in `docs/template/KICKOFF.md`) before issue creation when any of the following are true:
+
+- the feature introduces a new core noun or overloaded term
+- the feature changes lifecycle or state meaning
+- the feature crosses backend/frontend/provider boundaries
+- the feature affects user-facing business terminology
+- the feature creates a new service or module boundary
+- the feature is `gated` or otherwise high-risk
+
+Skip it for purely visual polish, isolated bug fixes with stable terminology, and low-risk `fast`-mode maintenance where terminology is unchanged.
+
+Domain Pass output should be reflected in `CONTEXT.md` (resolved terms) and used consistently in issue titles, acceptance criteria, and PR descriptions. Decision Locks should use canonical terms from `CONTEXT.md`.
+
+ADRs remain optional and rare — only create one when the decision is hard to reverse, surprising without context, and the result of a real trade-off.
+
 ## Definition Of Ready
 
 A Task is ready when:
@@ -133,6 +150,7 @@ A Task is ready when:
 - for backend-coupled work: Decision Locks are checked in the controlling issue (Task in `single`, Spec in `gated`)
 - for no-contract refactors: parity lock checklist is explicitly listed in acceptance criteria
 - for bug fixes, backend business logic, contract-sensitive behavior, and stateful/cross-layer changes: the first test/assertion to add is identified when practical
+- for domain-affecting work: glossary terms are resolved in `CONTEXT.md` or explicitly called out as open questions in the issue
 
 ## Definition Of Done
 

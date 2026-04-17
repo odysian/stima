@@ -19,13 +19,41 @@ Core defaults:
 Every feature follows:
 
 1. Whiteboard
-2. Document
-3. Implement
-4. Verify
-5. Review handoff
-6. Patch (if needed)
-7. In-chat learning handoff in the approving review response
-8. Finalize
+2. Domain Pass (qualifying work only — see Domain Pass section below)
+3. Draft/update spec or issue
+4. Implement
+5. Verify
+6. Review handoff
+7. Patch (if needed)
+8. In-chat learning handoff in the approving review response
+9. Finalize
+
+## Domain Pass (Conditional Planning Step)
+
+Run a Domain Pass before issue creation when any of the following are true:
+
+- the feature introduces a new core noun or overloaded term
+- the feature changes lifecycle or state meaning
+- the feature crosses backend/frontend/provider boundaries
+- the feature affects user-facing business terminology
+- the feature creates a new service or module boundary
+- the feature is `gated` or otherwise high-risk
+
+Skip it for:
+
+- purely visual polish
+- isolated bug fixes with stable terminology
+- low-risk maintenance in `fast` mode unless terminology changed
+
+Domain Pass prompt (copy-paste):
+
+```text
+Run a domain pass on <feature/plan>. Challenge terminology against the repo's current language, cross-check against code, update CONTEXT.md inline when terms are resolved, and only suggest an ADR if the decision is hard to reverse, surprising without context, and the result of a real trade-off.
+```
+
+After a Domain Pass, run `grill-me` for execution-risk and edge-case pressure testing when risk or complexity remains. See `docs/template/KICKOFF.md` for copy-paste Domain Pass and post-domain grill-me prompts.
+
+Resolved terms should be reflected in `CONTEXT.md` and carried through to issue titles, acceptance criteria, and PR descriptions.
 
 ## Operator Flow Optimization
 

@@ -55,9 +55,10 @@ The lightweight tutoring handoff is generated once, by the approving reviewer, i
 - Do not generate a second learning handoff after approval is relayed back; the implementation agent finalizes after approval.
 - Do not create a separate markdown handoff unless explicitly requested.
 - Keep it ephemeral and practical, not archival documentation.
-- Keep it to 4 short bullets:
-  - what changed
-  - why it was done this way
-  - one tradeoff or pattern worth learning
-  - what to review first
-- Add 3-6 code pointers using `path:line-line — why it matters` format.
+- Use the five-part format from `docs/template/KICKOFF.md` section 4 (single source of truth):
+  - Concept primer (2-4 sentences, plain-language explanation of the underlying idea)
+  - What changed
+  - Why it was done this way
+  - Tradeoff or pattern worth learning
+  - How to review this kind of change
+- Natural file mentions are allowed when they help the explanation; dedicated code-pointer blocks are not required.
