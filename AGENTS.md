@@ -47,6 +47,10 @@ Read only touched docs:
 
 If control-plane rules, issue labels, execution mode, Spec/Task lifecycle, or branching requirements are unclear, read `docs/ISSUES_WORKFLOW.md` before changing process, creating/closing issues, or branching strategy.
 
+## Optional Repo-Local Playbooks
+
+Optional repo-local playbooks under `skills/` can be loaded when helpful for planning or execution refinement. They are portable wrappers around Stima-specific workflow habits, not source-of-truth replacements. If a `skills/*.md` playbook conflicts with canonical repo docs, the repo docs win.
+
 ## Nested AGENTS Discovery
 
 Many tools auto-inject root `AGENTS.md` only. Route to subtree rules explicitly:
