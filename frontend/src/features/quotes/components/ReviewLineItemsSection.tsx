@@ -1,3 +1,5 @@
+import { useRef, useState } from "react";
+
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
@@ -6,6 +8,8 @@ interface ReviewLineItemsSectionProps {
   lineItems: LineItemDraftWithFlags[];
   isInteractionLocked: boolean;
   onEditLineItem: (index: number) => void;
+  onRequestDeleteLineItem: (index: number) => void;
+  onReorderLineItems: (sourceIndex: number, targetIndex: number) => void;
   onAddLineItem: () => void;
 }
 
@@ -13,9 +17,83 @@ export function ReviewLineItemsSection({
   lineItems,
   isInteractionLocked,
   onEditLineItem,
+  onRequestDeleteLineItem,
+  onReorderLineItems,
   onAddLineItem,
 }: ReviewLineItemsSectionProps): React.ReactElement {
   const hasReachedLineItemLimit = lineItems.length >= DOCUMENT_LINE_ITEMS_MAX_ITEMS;
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const draggingIndexRef = useRef<number | null>(null);
+
+  function resolveRowIndexFromPoint(clientX: number, clientY: number): number | null {
+    const row = document
+      .elementFromPoint(clientX, clientY)
+      ?.closest<HTMLElement>("[data-line-item-index]");
+    if (!row) {
+      return null;
+    }
+    const rawIndex = row.dataset.lineItemIndex;
+    if (typeof rawIndex !== "string") {
+      return null;
+    }
+    const parsedIndex = Number.parseInt(rawIndex, 10);
+    if (!Number.isInteger(parsedIndex) || parsedIndex < 0 || parsedIndex >= lineItems.length) {
+      return null;
+    }
+    return parsedIndex;
+  }
+
+  function clearDragState(): void {
+    draggingIndexRef.current = null;
+    setDraggingIndex(null);
+  }
+
+  function handleDragHandlePointerDown(
+    index: number,
+    event: React.PointerEvent<HTMLButtonElement>,
+  ): void {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const pointerId = event.pointerId;
+    const handleElement = event.currentTarget;
+    draggingIndexRef.current = index;
+    setDraggingIndex(index);
+
+    handleElement.setPointerCapture(pointerId);
+
+    function handlePointerMove(pointerEvent: PointerEvent): void {
+      const sourceIndex = draggingIndexRef.current;
+      if (sourceIndex === null) {
+        return;
+      }
+
+      const targetIndex = resolveRowIndexFromPoint(pointerEvent.clientX, pointerEvent.clientY);
+      if (targetIndex === null || targetIndex === sourceIndex) {
+        return;
+      }
+
+      onReorderLineItems(sourceIndex, targetIndex);
+      draggingIndexRef.current = targetIndex;
+      setDraggingIndex(targetIndex);
+    }
+
+    function stopPointerTracking(): void {
+      handleElement.removeEventListener("pointermove", handlePointerMove);
+      handleElement.removeEventListener("pointerup", stopPointerTracking);
+      handleElement.removeEventListener("pointercancel", stopPointerTracking);
+      handleElement.removeEventListener("lostpointercapture", stopPointerTracking);
+      clearDragState();
+    }
+
+    handleElement.addEventListener("pointermove", handlePointerMove);
+    handleElement.addEventListener("pointerup", stopPointerTracking);
+    handleElement.addEventListener("pointercancel", stopPointerTracking);
+    handleElement.addEventListener("lostpointercapture", stopPointerTracking);
+  }
 
   return (
     <section className="space-y-3">
@@ -31,17 +109,22 @@ export function ReviewLineItemsSection({
           lineItems.map((lineItem, index) => {
             const displayDescription = lineItem.description || "Untitled line item";
             return (
-              <LineItemCard
-                key={`review-line-item-${index}`}
-                ariaLabel={`Edit line item ${index + 1}: ${displayDescription}`}
-                description={displayDescription}
-                details={lineItem.details}
-                price={lineItem.price}
-                flagged={lineItem.flagged}
-                flagReason={lineItem.flagReason}
-                disabled={isInteractionLocked}
-                onClick={() => onEditLineItem(index)}
-              />
+              <div key={`review-line-item-${index}`} data-line-item-index={index}>
+                <LineItemCard
+                  ariaLabel={`Edit line item ${index + 1}: ${displayDescription}`}
+                  dragHandleAriaLabel={`Reorder line item ${index + 1}: ${displayDescription}`}
+                  description={displayDescription}
+                  details={lineItem.details}
+                  price={lineItem.price}
+                  flagged={lineItem.flagged}
+                  flagReason={lineItem.flagReason}
+                  disabled={isInteractionLocked}
+                  isDragging={draggingIndex === index}
+                  onEdit={() => onEditLineItem(index)}
+                  onDelete={() => onRequestDeleteLineItem(index)}
+                  onDragHandlePointerDown={(event) => handleDragHandlePointerDown(index, event)}
+                />
+              </div>
             );
           })
         ) : (

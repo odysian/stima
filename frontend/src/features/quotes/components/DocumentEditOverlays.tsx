@@ -14,7 +14,10 @@ interface DocumentEditOverlaysProps {
   lineItemSheetInitialItem: LineItemDraftWithFlags;
   onCloseLineItemSheet: () => void;
   onSaveLineItem: (nextLineItem: LineItemDraftWithFlags) => void;
-  onDeleteLineItem?: () => void;
+  showLineItemDeleteConfirm: boolean;
+  lineItemDeleteDescription: string;
+  onConfirmDeleteLineItem: () => void;
+  onCancelDeleteLineItem: () => void;
   toastMessage: string | null;
   onDismissToast: () => void;
   showLeaveWarning: boolean;
@@ -34,7 +37,10 @@ export function DocumentEditOverlays({
   lineItemSheetInitialItem,
   onCloseLineItemSheet,
   onSaveLineItem,
-  onDeleteLineItem,
+  showLineItemDeleteConfirm,
+  lineItemDeleteDescription,
+  onConfirmDeleteLineItem,
+  onCancelDeleteLineItem,
   toastMessage,
   onDismissToast,
   showLeaveWarning,
@@ -73,7 +79,18 @@ export function DocumentEditOverlays({
           initialLineItem={lineItemSheetInitialItem}
           onClose={onCloseLineItemSheet}
           onSave={onSaveLineItem}
-          onDelete={lineItemSheetState.mode === "edit" ? onDeleteLineItem : undefined}
+        />
+      ) : null}
+
+      {showLineItemDeleteConfirm ? (
+        <ConfirmModal
+          title="Delete this line item?"
+          body={`"${lineItemDeleteDescription}" will be removed from this draft.`}
+          confirmLabel="Delete line item"
+          cancelLabel="Keep line item"
+          onConfirm={onConfirmDeleteLineItem}
+          onCancel={onCancelDeleteLineItem}
+          variant="destructive"
         />
       ) : null}
 

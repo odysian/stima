@@ -6,7 +6,7 @@ import { DocumentEditScreenView } from "@/features/quotes/components/DocumentEdi
 import { buildDefaultInvoiceDueDate, buildDocumentSnapshotKey, buildSaveValidationMessage, isInvoiceDocument, persistDocumentDraft } from "@/features/quotes/components/documentEditUtils";
 import { useCaptureDetailsWarning } from "@/features/quotes/hooks/useCaptureDetailsWarning";
 import { useHiddenDetailLifecycle } from "@/features/quotes/hooks/useHiddenDetailLifecycle";
-import { applyLineItemSheetDelete, applyLineItemSheetSave, resolveLineItemSheetInitialItem, type ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
+import { applyLineItemReorder, applyLineItemSheetDelete, applyLineItemSheetSave, resolveLineItemSheetInitialItem, type ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { buildLineItemSubmitState, EMPTY_LINE_ITEM } from "@/features/quotes/components/reviewScreenUtils";
 import { usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -45,6 +45,7 @@ export function DocumentEditScreen(): React.ReactElement {
   const [isAssigningCustomer, setIsAssigningCustomer] = useState(false);
   const [hasAppliedReseedFromLocation, setHasAppliedReseedFromLocation] = useState(false);
   const [lineItemSheetState, setLineItemSheetState] = useState<ReviewLineItemSheetState | null>(null);
+  const [pendingLineItemDeleteIndex, setPendingLineItemDeleteIndex] = useState<number | null>(null);
   const locationState = useMemo(() => readReviewLocationState(location.state), [location.state]);
   const requiresCustomerAssignment = useMemo(() => {
     if (!document || isInvoiceDocument(document)) {
@@ -347,6 +348,19 @@ export function DocumentEditScreen(): React.ReactElement {
         }
         setLineItemSheetState({ mode: "edit", index: lineItemIndex });
       }}
+      onRequestDeleteLineItem={(lineItemIndex) => {
+        if (isInteractionLocked || !activeDraft.lineItems[lineItemIndex]) {
+          return;
+        }
+        setPendingLineItemDeleteIndex(lineItemIndex);
+      }}
+      onReorderLineItems={(sourceIndex, targetIndex) => {
+        if (isInteractionLocked || sourceIndex === targetIndex) {
+          return;
+        }
+        setToastMessage(null);
+        setDraft((currentDraft) => applyLineItemReorder(currentDraft, sourceIndex, targetIndex));
+      }}
       onAddLineItem={() => {
         if (isInteractionLocked || activeDraft.lineItems.length >= DOCUMENT_LINE_ITEMS_MAX_ITEMS) {
           return;
@@ -385,14 +399,20 @@ export function DocumentEditScreen(): React.ReactElement {
         setDraft((currentDraft) => applyLineItemSheetSave(currentDraft, nextSheetState, nextLineItem));
         setLineItemSheetState(null);
       }}
-      onDeleteLineItem={lineItemSheetState && lineItemSheetState.mode === "edit"
-        ? () => {
-            const nextSheetState = lineItemSheetState;
-            setToastMessage(null);
-            setDraft((currentDraft) => applyLineItemSheetDelete(currentDraft, nextSheetState));
-            setLineItemSheetState(null);
-          }
-        : undefined}
+      showLineItemDeleteConfirm={pendingLineItemDeleteIndex !== null}
+      lineItemDeleteDescription={pendingLineItemDeleteIndex !== null
+        ? (activeDraft.lineItems[pendingLineItemDeleteIndex]?.description.trim() || "Untitled line item")
+        : "Untitled line item"}
+      onConfirmDeleteLineItem={() => {
+        const lineItemIndex = pendingLineItemDeleteIndex;
+        if (lineItemIndex === null) {
+          return;
+        }
+        setToastMessage(null);
+        setDraft((currentDraft) => applyLineItemSheetDelete(currentDraft, { mode: "edit", index: lineItemIndex }));
+        setPendingLineItemDeleteIndex(null);
+      }}
+      onCancelDeleteLineItem={() => setPendingLineItemDeleteIndex(null)}
       onDismissToast={() => setToastMessage(null)}
       onLeaveConfirm={handleLeaveConfirm}
       onLeaveCancel={handleLeaveCancel}
