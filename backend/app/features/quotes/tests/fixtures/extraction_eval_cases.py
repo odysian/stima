@@ -80,7 +80,6 @@ class ExtractionEvalCase:
     expect_degraded_reason_code: str | None = None
     expect_line_item_count_min: int | None = None
     expect_line_item_count_max: int | None = None
-    expect_line_item_price_statuses: tuple[Literal["priced", "included", "unknown"], ...] = ()
     expect_pricing_hints: dict[str, float | str | None] | None = None
     expect_unresolved_segment_sources: tuple[_UNRESOLVED_SEGMENT_SOURCE, ...] = ()
     expect_customer_notes_source: _UNRESOLVED_SEGMENT_SOURCE | None = None
@@ -374,7 +373,7 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         ),
     ),
     ExtractionEvalCase(
-        name="initial_conflicting_total_with_unknown_price_status",
+        name="initial_conflicting_total_with_unknown_prices",
         extraction_mode="initial",
         transcript=(
             "Paint fence and replace gate latch. Pricing is unclear per line item but customer "
@@ -409,7 +408,6 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_extraction_tier="primary",
         expect_line_item_count_min=2,
         expect_line_item_count_max=2,
-        expect_line_item_price_statuses=("unknown", "unknown"),
         expect_pricing_hints={"explicit_total": 225},
         expect_unresolved_segment_sources=("leftover_classification",),
         expect_repair_attempted=False,

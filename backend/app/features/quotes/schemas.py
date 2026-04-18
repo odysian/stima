@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -21,11 +20,6 @@ from app.shared.input_limits import (
 )
 from app.shared.pricing import DiscountType
 
-_INCLUDED_NO_CHARGE_PATTERN = re.compile(
-    r"\b(included|no[\s-]?charge|n/?c|complimentary|at no cost)\b",
-    flags=re.IGNORECASE,
-)
-
 
 def _normalize_optional_title(value: object) -> object:
     """Trim optional title values and collapse blanks to null."""
@@ -43,23 +37,6 @@ class LineItemDraft(BaseModel):
     price: float | None = None
     flagged: bool = False
     flag_reason: str | None = None
-
-    @property
-    def price_status(self) -> Literal["priced", "included", "unknown"]:
-        """Legacy compatibility accessor; active contracts are price/no-price only."""
-        if self.price is not None:
-            return "priced"
-        description_has_included_language = isinstance(
-            self.description,
-            str,
-        ) and _INCLUDED_NO_CHARGE_PATTERN.search(self.description)
-        details_has_included_language = isinstance(
-            self.details,
-            str,
-        ) and _INCLUDED_NO_CHARGE_PATTERN.search(self.details)
-        if description_has_included_language or details_has_included_language:
-            return "included"
-        return "unknown"
 
 
 class LineItemExtracted(LineItemDraft):

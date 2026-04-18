@@ -185,12 +185,6 @@ def _assert_extraction_quality(
         for key, value in case.expect_pricing_hints.items():
             assert pricing_hints_payload[key] == value
 
-    if case.expect_line_item_price_statuses:
-        assert (
-            tuple(item.price_status for item in result.line_items)
-            == case.expect_line_item_price_statuses
-        )
-
     if case.expect_unresolved_segment_sources:
         assert [segment.source for segment in result.unresolved_segments] == list(
             case.expect_unresolved_segment_sources
