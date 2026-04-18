@@ -230,6 +230,10 @@ _BULLET_PREFIX_PATTERN = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
 _HEADING_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9 /\-]{0,40}:\s*$")
 _NOTES_HEADING_PATTERN = re.compile(r"^\s*notes?\s*:\s*$", re.IGNORECASE)
 _PRICE_PATTERN = re.compile(r"\$?\s*(\d+(?:\.\d{1,2})?)")
+_EXPLICIT_PRICE_MARKER_PATTERN = re.compile(
+    r"(\$|usd\b|dollars?\b|bucks?\b|price\b|total\b)",
+    re.IGNORECASE,
+)
 _WORD_TOKEN_PATTERN = re.compile(r"[a-z]+(?:'[a-z]+)?")
 
 _SPOKEN_MONEY_ONES: dict[str, int] = {
@@ -1719,7 +1723,7 @@ def _flag_line_items_with_price_in_description(
     line_items: list[LineItemExtractedV2],
 ) -> list[LineItemExtractedV2]:
     flagged_indexes = [
-        index for index, item in enumerate(line_items) if _contains_price_token(item.description)
+        index for index, item in enumerate(line_items) if _should_flag_price_tokens_for_item(item)
     ]
     if not flagged_indexes:
         return line_items
@@ -1789,5 +1793,28 @@ def _append_semantic_unresolved_segment(
     ]
 
 
-def _contains_price_token(text: str) -> bool:
-    return _PRICE_PATTERN.search(text) is not None
+def _should_flag_price_tokens_for_item(item: LineItemExtractedV2) -> bool:
+    tokens = _price_tokens_in_text(item.description)
+    if not tokens:
+        return False
+
+    if item.price is not None and any(
+        _prices_materially_equal(token, item.price) for token in tokens
+    ):
+        return False
+
+    has_explicit_price_marker = _EXPLICIT_PRICE_MARKER_PATTERN.search(item.description) is not None
+    if item.price is not None and len(tokens) == 1 and not has_explicit_price_marker:
+        return False
+
+    return True
+
+
+def _price_tokens_in_text(text: str) -> list[float]:
+    tokens: list[float] = []
+    for match in _PRICE_PATTERN.finditer(text):
+        candidate = _parse_price_value(match.group(1))
+        if candidate is None:
+            continue
+        tokens.append(candidate)
+    return tokens

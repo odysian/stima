@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
@@ -15,6 +16,7 @@ from app.features.quotes.models import Document
 from app.features.quotes.review_metadata import build_extraction_review_metadata
 from app.features.quotes.schemas import (
     ExtractionResult,
+    ExtractionSuggestion,
     LineItemDraft,
     PricingFieldName,
     QuoteCreateRequest,
@@ -349,7 +351,143 @@ def _seeded_notes_from_result(extraction_result: ExtractionResult) -> str | None
     if suggestion is None:
         return None
     normalized = suggestion.text.strip()
-    return normalized or None
+    if not normalized:
+        return None
+    if _is_redundant_notes_suggestion(
+        suggestion=suggestion,
+        extraction_result=extraction_result,
+    ):
+        return None
+    return normalized
+
+
+_NOTE_TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+_NOTE_STOP_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "at",
+        "for",
+        "from",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "with",
+    }
+)
+_NOTES_PRICING_TOKENS = frozenset(
+    {
+        "amount",
+        "cost",
+        "dollar",
+        "dollars",
+        "price",
+        "priced",
+        "subtotal",
+        "tax",
+        "total",
+    }
+)
+_NOTES_UNCERTAINTY_TOKENS = frozenset(
+    {
+        "check",
+        "confirm",
+        "conflict",
+        "maybe",
+        "unclear",
+        "unknown",
+        "verify",
+    }
+)
+
+
+def _is_redundant_notes_suggestion(
+    *,
+    suggestion: ExtractionSuggestion,
+    extraction_result: ExtractionResult,
+) -> bool:
+    normalized_note = _normalize_for_overlap(suggestion.text)
+    if not normalized_note:
+        return True
+
+    note_tokens = _meaningful_tokens(normalized_note)
+    if not note_tokens:
+        return True
+    if _NOTES_PRICING_TOKENS.intersection(note_tokens):
+        return True
+
+    visible_scope_chunks: list[str] = []
+    for line_item in extraction_result.line_items:
+        combined_line_item_text = " ".join(
+            part for part in (line_item.description, line_item.details) if part
+        ).strip()
+        if combined_line_item_text:
+            visible_scope_chunks.append(combined_line_item_text)
+    if _has_substantial_overlap(
+        note_text=normalized_note,
+        note_tokens=note_tokens,
+        candidates=visible_scope_chunks,
+    ):
+        return True
+
+    unresolved_chunks = [segment.raw_text for segment in extraction_result.unresolved_segments]
+    if _has_substantial_overlap(
+        note_text=normalized_note,
+        note_tokens=note_tokens,
+        candidates=unresolved_chunks,
+    ):
+        return True
+
+    if extraction_result.unresolved_segments and _NOTES_UNCERTAINTY_TOKENS.intersection(
+        note_tokens
+    ):
+        return True
+    return False
+
+
+def _has_substantial_overlap(
+    *,
+    note_text: str,
+    note_tokens: set[str],
+    candidates: Sequence[str],
+) -> bool:
+    for candidate in candidates:
+        normalized_candidate = _normalize_for_overlap(candidate)
+        if not normalized_candidate:
+            continue
+        if note_text in normalized_candidate or normalized_candidate in note_text:
+            return True
+
+        candidate_tokens = _meaningful_tokens(normalized_candidate)
+        if not candidate_tokens:
+            continue
+        common_tokens = note_tokens.intersection(candidate_tokens)
+        if len(common_tokens) < 3:
+            continue
+        smaller_size = min(len(note_tokens), len(candidate_tokens))
+        if smaller_size == 0:
+            continue
+        if len(common_tokens) / smaller_size >= 0.6:
+            return True
+    return False
+
+
+def _normalize_for_overlap(value: str) -> str:
+    return " ".join(value.strip().casefold().split())
+
+
+def _meaningful_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in _NOTE_TOKEN_PATTERN.findall(value)
+        if token not in _NOTE_STOP_WORDS and len(token) > 2
+    }
 
 
 @dataclass(frozen=True, slots=True)

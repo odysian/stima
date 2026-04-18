@@ -905,6 +905,68 @@ async def test_guard_flags_line_items_with_price_in_description() -> None:
     assert result.line_items[1].flagged is False
 
 
+async def test_guard_does_not_flag_clean_priced_row_with_matching_price_token() -> None:
+    transcript = "trim 6 shrubs - 120"
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "trim 6 shrubs - 120",
+                                "details": None,
+                                "price": 120,
+                            }
+                        ],
+                        "total": 120,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].flagged is False
+    assert result.line_items[0].flag_reason is None
+
+
+async def test_guard_preserves_spoken_money_correction_flag_reason() -> None:
+    transcript = "price is four fifty for front mulch"
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Front mulch $450",
+                                "details": "price is four fifty for front mulch",
+                                "price": 450,
+                                "flagged": True,
+                                "flag_reason": SPOKEN_MONEY_CORRECTION_FLAG_REASON,
+                            }
+                        ],
+                        "total": 450,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].flagged is True
+    assert result.line_items[0].flag_reason == SPOKEN_MONEY_CORRECTION_FLAG_REASON
+
+
 async def test_guard_flags_line_items_with_duplicate_details() -> None:
     transcript = TRANSCRIPTS["clean_with_total"]
     client = _FakeClient(
