@@ -20,7 +20,6 @@ from app.features.quotes.tests.fixtures.extraction_eval_cases import (
     ExtractionEvalCase,
 )
 from app.integrations.extraction import (
-    APPEND_EXTRACTION_TOOL_SCHEMA,
     EXTRACTION_TOOL_SCHEMA,
     ExtractionCallMetadata,
     ExtractionError,
@@ -124,12 +123,7 @@ def _assert_request_capture_provenance(
     first_tool = tools[0]
     assert isinstance(first_tool, dict)
     input_schema = first_tool["input_schema"]
-    expected_schema = (
-        APPEND_EXTRACTION_TOOL_SCHEMA
-        if case.extraction_mode == "append"
-        else EXTRACTION_TOOL_SCHEMA
-    )
-    assert input_schema == expected_schema
+    assert input_schema == EXTRACTION_TOOL_SCHEMA
 
     expected_raw_typed_notes = case.raw_typed_notes
     expected_raw_transcript = case.raw_transcript

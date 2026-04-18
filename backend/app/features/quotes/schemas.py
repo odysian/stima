@@ -176,7 +176,7 @@ class CaptureSegment(BaseModel):
 
 
 PlacementConfidence = Literal["high", "medium", "low"]
-ExtractionMode = Literal["initial", "append"]
+ExtractionMode = Literal["initial"]
 UnresolvedSegmentSource = Literal[
     "leftover_classification",
     "typed_conflict",
