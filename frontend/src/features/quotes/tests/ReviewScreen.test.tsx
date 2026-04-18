@@ -530,6 +530,30 @@ describe("DocumentEditScreen", () => {
     expect(screen.queryByRole("button", { name: /capture more notes/i })).not.toBeInTheDocument();
   });
 
+  it("shows edit/delete in row overflow and requires delete confirmation", async () => {
+    renderScreen();
+
+    expect(await screen.findByRole("button", { name: /edit line item 1: brown mulch/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /line item actions for brown mulch/i }));
+    expect(screen.getByRole("menuitem", { name: /edit/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /delete/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /delete/i }));
+    expect(screen.getByRole("dialog", { name: /delete this line item\?/i })).toBeInTheDocument();
+    expect(document.querySelectorAll("[data-line-item-index]").length).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /keep line item/i }));
+    expect(screen.queryByRole("dialog", { name: /delete this line item\?/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit line item 1: brown mulch/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /line item actions for brown mulch/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /delete/i }));
+    fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
+
+    expect(document.querySelectorAll("[data-line-item-index]").length).toBe(0);
+    expect(screen.getByText("No line items on this quote yet.")).toBeInTheDocument();
+  });
+
   it("does not show the capture-details alert icon for transcript-only details", async () => {
     renderScreen({
       document: makeQuote({

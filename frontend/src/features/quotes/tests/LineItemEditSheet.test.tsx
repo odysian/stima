@@ -25,7 +25,6 @@ describe("LineItemEditSheet", () => {
         initialLineItem={makeLineItem()}
         onClose={vi.fn()}
         onSave={vi.fn()}
-        onDelete={vi.fn()}
       />,
     );
 
@@ -34,7 +33,7 @@ describe("LineItemEditSheet", () => {
     expect(screen.getByLabelText(/details/i)).toHaveValue("5 yards");
     expect(screen.getByLabelText(/price/i)).toHaveValue("120");
     expect(screen.getByLabelText(/description/i)).toHaveFocus();
-    expect(screen.getByRole("button", { name: /delete line item/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete line item/i })).not.toBeInTheDocument();
   });
 
   it("renders add mode with empty fields", () => {
@@ -137,9 +136,7 @@ describe("LineItemEditSheet", () => {
     expect(onClose).toHaveBeenCalledTimes(3);
   });
 
-  it("fires onDelete in edit mode", () => {
-    const onDelete = vi.fn();
-
+  it("uses decimal input mode for price entry", () => {
     render(
       <LineItemEditSheet
         open
@@ -147,11 +144,9 @@ describe("LineItemEditSheet", () => {
         initialLineItem={makeLineItem()}
         onClose={vi.fn()}
         onSave={vi.fn()}
-        onDelete={onDelete}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
-    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText(/price/i)).toHaveAttribute("inputmode", "decimal");
   });
 });

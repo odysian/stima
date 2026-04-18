@@ -43,6 +43,8 @@ interface DocumentEditScreenViewProps {
   onOpenAssignment: () => void;
   onTitleChange: (nextTitle: string) => void;
   onEditLineItem: (lineItemIndex: number) => void;
+  onRequestDeleteLineItem: (lineItemIndex: number) => void;
+  onReorderLineItems: (sourceIndex: number, targetIndex: number) => void;
   onAddLineItem: () => void;
   onTotalChange: (nextTotal: number | null) => void;
   onTaxRateChange: (nextTaxRate: number | null) => void;
@@ -58,7 +60,10 @@ interface DocumentEditScreenViewProps {
   onAssignCustomer: (customerId: string) => Promise<void>;
   onCloseLineItemSheet: () => void;
   onSaveLineItem: (nextLineItem: LineItemDraftWithFlags) => void;
-  onDeleteLineItem?: () => void;
+  showLineItemDeleteConfirm: boolean;
+  lineItemDeleteDescription: string;
+  onConfirmDeleteLineItem: () => void;
+  onCancelDeleteLineItem: () => void;
   onDismissToast: () => void;
   onLeaveConfirm: () => void;
   onLeaveCancel: () => void;
@@ -101,6 +106,8 @@ export function DocumentEditScreenView({
   onOpenAssignment,
   onTitleChange,
   onEditLineItem,
+  onRequestDeleteLineItem,
+  onReorderLineItems,
   onAddLineItem,
   onTotalChange,
   onTaxRateChange,
@@ -116,7 +123,10 @@ export function DocumentEditScreenView({
   onAssignCustomer,
   onCloseLineItemSheet,
   onSaveLineItem,
-  onDeleteLineItem,
+  showLineItemDeleteConfirm,
+  lineItemDeleteDescription,
+  onConfirmDeleteLineItem,
+  onCancelDeleteLineItem,
   onDismissToast,
   onLeaveConfirm,
   onLeaveCancel,
@@ -161,6 +171,8 @@ export function DocumentEditScreenView({
         onRequestAssignment={onOpenAssignment}
         onTitleChange={onTitleChange}
         onEditLineItem={onEditLineItem}
+        onRequestDeleteLineItem={onRequestDeleteLineItem}
+        onReorderLineItems={onReorderLineItems}
         onAddLineItem={onAddLineItem}
         onTotalChange={onTotalChange}
         onTaxRateChange={onTaxRateChange}
@@ -191,7 +203,10 @@ export function DocumentEditScreenView({
         lineItemSheetInitialItem={lineItemSheetInitialItem}
         onCloseLineItemSheet={onCloseLineItemSheet}
         onSaveLineItem={onSaveLineItem}
-        onDeleteLineItem={onDeleteLineItem}
+        showLineItemDeleteConfirm={showLineItemDeleteConfirm}
+        lineItemDeleteDescription={lineItemDeleteDescription}
+        onConfirmDeleteLineItem={onConfirmDeleteLineItem}
+        onCancelDeleteLineItem={onCancelDeleteLineItem}
         toastMessage={toastMessage}
         onDismissToast={onDismissToast}
         showLeaveWarning={showLeaveWarning}

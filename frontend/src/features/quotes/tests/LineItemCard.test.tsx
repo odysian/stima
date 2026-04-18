@@ -10,7 +10,8 @@ describe("LineItemCard", () => {
         description="Brown mulch"
         details="5 yards"
         price={120}
-        onClick={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -27,11 +28,11 @@ describe("LineItemCard", () => {
         price={120}
         flagged
         flagReason="spoken_money_correction"
-        onClick={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: /brown mulch/i })).toHaveClass("border-warning-accent/20");
     expect(screen.getByText("REVIEW")).toBeInTheDocument();
     expect(
       screen.getByText("Spoken amount was interpreted as dollars instead of cents."),
@@ -44,25 +45,44 @@ describe("LineItemCard", () => {
         description="Cleanup labor"
         details="No separate charge"
         price={null}
-        onClick={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it("fires onClick when card is clicked", () => {
-    const onClickMock = vi.fn();
+  it("fires onEdit when row body is clicked", () => {
+    const onEditMock = vi.fn();
     render(
       <LineItemCard
         description="Brown mulch"
         details="5 yards"
         price={120}
-        onClick={onClickMock}
+        ariaLabel="Edit line item Brown mulch"
+        onEdit={onEditMock}
+        onDelete={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /brown mulch/i }));
-    expect(onClickMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: /edit line item brown mulch/i }));
+    expect(onEditMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows overflow actions for edit and delete", () => {
+    render(
+      <LineItemCard
+        description="Brown mulch"
+        details="5 yards"
+        price={120}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /line item actions for brown mulch/i }));
+    expect(screen.getByRole("menuitem", { name: /edit/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /delete/i })).toBeInTheDocument();
   });
 });

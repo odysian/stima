@@ -85,3 +85,32 @@ export function applyLineItemSheetDelete<TDraft extends DraftWithLineItems>(
     total: syncDraftTotalWithLineItems(draft, nextLineItems),
   };
 }
+
+export function applyLineItemReorder<TDraft extends DraftWithLineItems>(
+  draft: TDraft,
+  sourceIndex: number,
+  targetIndex: number,
+): TDraft {
+  if (
+    sourceIndex === targetIndex
+    || sourceIndex < 0
+    || targetIndex < 0
+    || sourceIndex >= draft.lineItems.length
+    || targetIndex >= draft.lineItems.length
+  ) {
+    return draft;
+  }
+
+  const nextLineItems = [...draft.lineItems];
+  const [movedLineItem] = nextLineItems.splice(sourceIndex, 1);
+  if (!movedLineItem) {
+    return draft;
+  }
+  nextLineItems.splice(targetIndex, 0, movedLineItem);
+
+  return {
+    ...draft,
+    lineItems: nextLineItems,
+    total: syncDraftTotalWithLineItems(draft, nextLineItems),
+  };
+}
