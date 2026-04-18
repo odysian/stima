@@ -73,7 +73,6 @@ interface ReviewFormContentProps {
   onDocumentTypeChange: (nextType: ReviewDocumentType) => void;
   onDueDateChange: (nextDueDate: string) => void;
   onRequestAssignment: () => void;
-  onAddVoiceNote: () => void;
   onTitleChange: (nextTitle: string) => void;
   onEditLineItem: (lineItemIndex: number) => void;
   onAddLineItem: () => void;
@@ -111,7 +110,6 @@ export function ReviewFormContent({
   onDocumentTypeChange,
   onDueDateChange,
   onRequestAssignment,
-  onAddVoiceNote,
   onTitleChange,
   onEditLineItem,
   onAddLineItem,
@@ -265,8 +263,6 @@ export function ReviewFormContent({
         lineItems={draft.lineItems}
         isInteractionLocked={isInteractionLocked}
         onEditLineItem={onEditLineItem}
-        showCaptureMoreNotes={showQuoteOnlySections}
-        onCaptureMoreNotes={onAddVoiceNote}
         onAddLineItem={onAddLineItem}
       />
 

@@ -524,6 +524,13 @@ describe("DocumentEditScreen", () => {
     expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
   });
 
+  it("does not render a capture-more-notes affordance on review", async () => {
+    renderScreen();
+
+    expect(await screen.findByRole("button", { name: /add line item/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /capture more notes/i })).not.toBeInTheDocument();
+  });
+
   it("does not show the capture-details alert icon for transcript-only details", async () => {
     renderScreen({
       document: makeQuote({
@@ -547,10 +554,10 @@ describe("DocumentEditScreen", () => {
           hidden_details: {
             items: [
               {
-                id: "append-1",
-                kind: "append_suggestion",
-                field: "notes",
-                reason: "append_capture",
+                id: "unresolved-1",
+                kind: "unresolved_segment",
+                field: null,
+                reason: "leftover_classification",
                 text: "Add gate latch note",
               },
             ],
@@ -569,14 +576,14 @@ describe("DocumentEditScreen", () => {
           hidden_details: {
             items: [
               {
-                id: "append-1",
-                kind: "append_suggestion",
-                field: "discount",
-                reason: "append_capture",
+                id: "unresolved-1",
+                kind: "unresolved_segment",
+                field: null,
+                reason: "typed_conflict",
                 text: "discount 25",
               },
               {
-                id: "unresolved-1",
+                id: "unresolved-2",
                 kind: "unresolved_segment",
                 field: null,
                 reason: "typed_conflict",
@@ -613,10 +620,10 @@ describe("DocumentEditScreen", () => {
           hidden_details: {
             items: [
               {
-                id: "append-1",
-                kind: "append_suggestion",
-                field: "notes",
-                reason: "append_capture",
+                id: "unresolved-1",
+                kind: "unresolved_segment",
+                field: null,
+                reason: "leftover_classification",
                 text: "Add gate latch note",
               },
             ],
@@ -632,7 +639,7 @@ describe("DocumentEditScreen", () => {
     expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
 
     fireEvent.click(await screen.findByRole("button", { name: /capture details/i }));
-    expect(window.localStorage.getItem("stima_capture_details_fingerprint:doc-1")).toBe("append-1");
+    expect(window.localStorage.getItem("stima_capture_details_fingerprint:doc-1")).toBe("unresolved-1");
     fireEvent.click(screen.getByRole("button", { name: /^close$/i }));
 
     fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
@@ -648,7 +655,7 @@ describe("DocumentEditScreen", () => {
 
     await waitFor(() => {
       expect(mockedQuoteService.updateExtractionReviewMetadata).toHaveBeenCalledWith("doc-1", {
-        dismiss_hidden_item: "append-1",
+        dismiss_hidden_item: "unresolved-1",
       });
     });
 
@@ -668,10 +675,10 @@ describe("DocumentEditScreen", () => {
         hidden_details: {
           items: [
             {
-              id: "append-2",
-              kind: "append_suggestion",
-              field: "notes",
-              reason: "append_capture",
+              id: "unresolved-2",
+              kind: "unresolved_segment",
+              field: null,
+              reason: "leftover_classification",
               text: "Add gate latch note",
             },
           ],

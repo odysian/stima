@@ -2,7 +2,7 @@ import type { ExtractionReviewHiddenDetails, HiddenItemState } from "@/features/
 
 export interface CaptureDetailsActionableItem {
   id: string;
-  kind: "append_suggestion" | "unresolved_segment";
+  kind: "unresolved_segment";
   field: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
   reason: string | null;
   text: string;

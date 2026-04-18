@@ -6,8 +6,6 @@ interface ReviewLineItemsSectionProps {
   lineItems: LineItemDraftWithFlags[];
   isInteractionLocked: boolean;
   onEditLineItem: (index: number) => void;
-  onCaptureMoreNotes?: () => void;
-  showCaptureMoreNotes?: boolean;
   onAddLineItem: () => void;
 }
 
@@ -15,8 +13,6 @@ export function ReviewLineItemsSection({
   lineItems,
   isInteractionLocked,
   onEditLineItem,
-  onCaptureMoreNotes,
-  showCaptureMoreNotes = true,
   onAddLineItem,
 }: ReviewLineItemsSectionProps): React.ReactElement {
   const hasReachedLineItemLimit = lineItems.length >= DOCUMENT_LINE_ITEMS_MAX_ITEMS;
@@ -55,7 +51,7 @@ export function ReviewLineItemsSection({
         )}
       </div>
 
-      <div className={`grid gap-3 ${showCaptureMoreNotes ? "sm:grid-cols-2" : "sm:grid-cols-1"}`}>
+      <div className="grid gap-3 sm:grid-cols-1">
         <button
           type="button"
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
@@ -65,18 +61,6 @@ export function ReviewLineItemsSection({
           <span className="material-symbols-outlined text-base">add</span>
           Add Line Item
         </button>
-
-        {showCaptureMoreNotes ? (
-          <button
-            type="button"
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isInteractionLocked}
-            onClick={() => onCaptureMoreNotes?.()}
-          >
-            <span className="material-symbols-outlined text-base">mic</span>
-            Capture More Notes
-          </button>
-        ) : null}
       </div>
 
       {hasReachedLineItemLimit ? (

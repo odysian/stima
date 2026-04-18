@@ -377,6 +377,19 @@ async def test_extract_combined_sync_passes_initial_mode_to_extraction_integrati
     assert recorded_modes == ["initial"]
 
 
+async def test_append_extraction_endpoint_is_removed(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        f"/api/quotes/{uuid4()}/append-extraction",
+        files=[("notes", (None, "add one more item"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
+
+
 async def test_extract_combined_falls_back_to_sync_when_no_arq_pool_is_available(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -819,23 +832,27 @@ async def test_extract_combined_rate_limit_returns_429(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(app.state.limiter, "enabled", True)
-    csrf_token = await _register_and_login(client, _credentials())
+    monkeypatch.setenv("QUOTE_COMBINED_EXTRACT_RATE_LIMIT", "1/hour")
+    get_settings.cache_clear()
+    try:
+        csrf_token = await _register_and_login(client, _credentials())
 
-    for index in range(10):
         response = await client.post(
             "/api/quotes/extract",
-            files=[("notes", (None, f"note {index}"))],
+            files=[("notes", (None, "note 1"))],
             headers={"X-CSRF-Token": csrf_token},
         )
         assert response.status_code == 200
 
-    response = await client.post(
-        "/api/quotes/extract",
-        files=[("notes", (None, "rate limited request"))],
-        headers={"X-CSRF-Token": csrf_token},
-    )
+        response = await client.post(
+            "/api/quotes/extract",
+            files=[("notes", (None, "rate limited request"))],
+            headers={"X-CSRF-Token": csrf_token},
+        )
 
-    assert response.status_code == 429
+        assert response.status_code == 429
+    finally:
+        get_settings.cache_clear()
 
 
 async def test_extract_combined_rejects_when_async_job_limit_is_exhausted(

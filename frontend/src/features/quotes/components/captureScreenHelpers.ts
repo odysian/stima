@@ -22,26 +22,13 @@ export function getExtractionStages(hasClips: boolean, hasNotes: boolean): strin
 
 export function getExtractionHelperCopy(hasClips: boolean, hasNotes: boolean): string | null {
   if (hasClips && hasNotes) {
-    return "Extraction saves one draft from your recording and notes. You can capture more notes later from review.";
+    return "Extraction saves one draft from your recording and notes for manual review.";
   }
   if (hasClips) {
-    return "Extraction saves your recording as a draft checkpoint. You can capture more notes later from review.";
+    return "Extraction saves your recording as a draft for manual review.";
   }
   if (hasNotes) {
-    return "Extraction saves your notes as a draft checkpoint. You can capture more notes later from review.";
-  }
-  return null;
-}
-
-export function getAppendHelperCopy(hasClips: boolean, hasNotes: boolean): string | null {
-  if (hasClips && hasNotes) {
-    return "Append mode merges these recordings and notes into your existing quote.";
-  }
-  if (hasClips) {
-    return "Append mode merges these recordings into your existing quote.";
-  }
-  if (hasNotes) {
-    return "Append mode merges these notes into your existing quote.";
+    return "Extraction saves your notes as a draft for manual review.";
   }
   return null;
 }

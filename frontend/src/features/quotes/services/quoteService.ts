@@ -99,13 +99,6 @@ async function extract(params: { clips?: Blob[]; notes?: string; customerId?: st
   return submitExtraction("/api/quotes/extract", params);
 }
 
-async function appendExtraction(
-  quoteId: string,
-  params: { clips?: Blob[]; notes?: string },
-): Promise<QuoteExtractResponse> {
-  return submitExtraction(`/api/quotes/${quoteId}/append-extraction`, params);
-}
-
 function createManualDraft(params?: { customerId?: string }): Promise<Quote> {
   return request<Quote>("/api/quotes/manual-draft", {
     method: "POST",
@@ -205,7 +198,6 @@ function convertToInvoice(id: string): Promise<Invoice> {
 
 export const quoteService = {
   extract,
-  appendExtraction,
   createManualDraft,
   convertNotes,
   createQuote,

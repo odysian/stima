@@ -41,7 +41,6 @@ interface DocumentEditScreenViewProps {
   onDocumentTypeChange: (nextType: "quote" | "invoice") => void;
   onDueDateChange: (nextDueDate: string) => void;
   onOpenAssignment: () => void;
-  onAddVoiceNote: () => void;
   onTitleChange: (nextTitle: string) => void;
   onEditLineItem: (lineItemIndex: number) => void;
   onAddLineItem: () => void;
@@ -100,7 +99,6 @@ export function DocumentEditScreenView({
   onDocumentTypeChange,
   onDueDateChange,
   onOpenAssignment,
-  onAddVoiceNote,
   onTitleChange,
   onEditLineItem,
   onAddLineItem,
@@ -161,7 +159,6 @@ export function DocumentEditScreenView({
         onDocumentTypeChange={onDocumentTypeChange}
         onDueDateChange={onDueDateChange}
         onRequestAssignment={onOpenAssignment}
-        onAddVoiceNote={onAddVoiceNote}
         onTitleChange={onTitleChange}
         onEditLineItem={onEditLineItem}
         onAddLineItem={onAddLineItem}

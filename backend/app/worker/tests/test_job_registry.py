@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from decimal import Decimal
 from hashlib import sha256
 from uuid import UUID, uuid4
 
@@ -15,7 +14,6 @@ from app.features.quotes.models import Document
 from app.features.quotes.schemas import (
     ExtractionMode,
     ExtractionResult,
-    ExtractionSuggestion,
     LineItemExtractedV2,
     PreparedCaptureInput,
     PricingHints,
@@ -99,132 +97,30 @@ async def test_extraction_job_accepts_legacy_enqueued_payload_without_source_met
     assert legacy_input.raw_transcript is None  # nosec B101 - pytest assertion
 
 
-async def test_extraction_job_passes_append_mode_to_integration_for_append_jobs(
+async def test_extraction_job_rejects_removed_append_mode(
     db_session: AsyncSession,
 ) -> None:
     user = await _seed_user(db_session)
     repository = JobRepository(db_session)
-    create_record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
     await db_session.commit()
 
-    await extraction_job(
-        _worker_context(
-            db_session,
-            extraction_integration=_SuccessfulSeededLineItemExtractionIntegration(),
-        ),
-        str(create_record.id),
-        transcript="initial quote transcript",
-        source_type="text",
-        capture_detail="notes",
-        extraction_mode="initial",
-    )
+    with pytest.raises(NonRetryableJobError, match="valid extraction_mode"):
+        await extraction_job(
+            _worker_context(
+                db_session,
+                extraction_integration=_SuccessfulExtractionIntegration(),
+            ),
+            str(record.id),
+            transcript="legacy append mode payload",
+            source_type="text",
+            capture_detail="notes",
+            extraction_mode="append",
+        )
 
-    created_job = await _load_job_record(db_session, create_record.id)
-    assert created_job is not None  # nosec B101 - pytest assertion
-    assert created_job.document_id is not None  # nosec B101 - pytest assertion
-
-    append_record = await repository.create(
-        user_id=user.id,
-        job_type=JobType.EXTRACTION,
-        document_id=created_job.document_id,
-    )
-    await db_session.commit()
-
-    capture_integration = _CaptureInputExtractionIntegration()
-    await extraction_job(
-        _worker_context(
-            db_session,
-            extraction_integration=capture_integration,
-        ),
-        str(append_record.id),
-        transcript="append note for quote",
-        source_type="text",
-        capture_detail="notes",
-        append_to_quote=True,
-        extraction_mode="append",
-    )
-
-    refreshed_append_job = await _load_job_record(db_session, append_record.id)
-    assert refreshed_append_job is not None  # nosec B101 - pytest assertion
-    assert refreshed_append_job.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
-    assert capture_integration.received_modes == ["append"]  # nosec B101 - pytest assertion
-
-
-async def test_append_job_applies_against_current_quote_state_so_user_edits_win(
-    db_session: AsyncSession,
-) -> None:
-    user = await _seed_user(db_session)
-    repository = JobRepository(db_session)
-    create_record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
-    await db_session.commit()
-
-    await extraction_job(
-        _worker_context(
-            db_session,
-            extraction_integration=_SuccessfulSeededLineItemExtractionIntegration(),
-        ),
-        str(create_record.id),
-        transcript="initial quote transcript",
-        source_type="text",
-        capture_detail="notes",
-        extraction_mode="initial",
-    )
-
-    created_job = await _load_job_record(db_session, create_record.id)
-    assert created_job is not None  # nosec B101 - pytest assertion
-    assert created_job.document_id is not None  # nosec B101 - pytest assertion
-    quote = await db_session.get(Document, created_job.document_id)
-    assert quote is not None  # nosec B101 - pytest assertion
-    quote.notes = "User edited notes while append was running"
-    quote.total_amount = Decimal("100")
-    quote.tax_rate = Decimal("0.09")
-    await db_session.commit()
-
-    append_record = await repository.create(
-        user_id=user.id,
-        job_type=JobType.EXTRACTION,
-        document_id=created_job.document_id,
-    )
-    await db_session.commit()
-
-    await extraction_job(
-        _worker_context(
-            db_session,
-            extraction_integration=_AppendCandidateExtractionIntegration(),
-        ),
-        str(append_record.id),
-        transcript="append note for quote",
-        source_type="text",
-        capture_detail="notes",
-        append_to_quote=True,
-        extraction_mode="append",
-    )
-
-    db_session.expire_all()
-    refreshed_quote = await db_session.get(Document, created_job.document_id)
-    assert refreshed_quote is not None  # nosec B101 - pytest assertion
-    assert refreshed_quote.notes == "User edited notes while append was running"  # nosec B101 - pytest assertion
-    assert refreshed_quote.tax_rate is not None  # nosec B101 - pytest assertion
-    assert float(refreshed_quote.tax_rate) == 0.09  # nosec B101 - pytest assertion
-    metadata_payload = refreshed_quote.extraction_review_metadata or {}
-    hidden_details = metadata_payload.get("hidden_details", {})
-    assert isinstance(hidden_details, dict)  # nosec B101 - pytest assertion
-    hidden_items = hidden_details.get("items", [])
-    assert isinstance(hidden_items, list)  # nosec B101 - pytest assertion
-    assert any(
-        isinstance(item, dict)
-        and item.get("kind") == "append_suggestion"
-        and item.get("field") == "notes"
-        and item.get("text") == "Append note candidate"
-        for item in hidden_items
-    )  # nosec B101 - pytest assertion
-    assert any(
-        isinstance(item, dict)
-        and item.get("kind") == "append_suggestion"
-        and item.get("field") == "tax_rate"
-        and item.get("text") == "Tax rate 0.07"
-        for item in hidden_items
-    )  # nosec B101 - pytest assertion
+    refreshed = await _load_job_record(db_session, record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.status == JobStatus.TERMINAL  # nosec B101 - pytest assertion
 
 
 async def test_extraction_job_marks_terminal_when_draft_persistence_fails(
@@ -522,27 +418,6 @@ class _CaptureInputExtractionIntegration:
             transcript=transcript,
             line_items=[],
             pricing_hints=PricingHints(),
-        )
-
-
-class _AppendCandidateExtractionIntegration:
-    async def extract(
-        self,
-        notes: PreparedCaptureInput | str,
-        *,
-        mode: ExtractionMode = "initial",
-    ) -> ExtractionResult:
-        del mode
-        transcript = _capture_transcript(notes)
-        return ExtractionResult(
-            transcript=transcript,
-            line_items=[],
-            pricing_hints=PricingHints(tax_rate=0.07),
-            customer_notes_suggestion=ExtractionSuggestion(
-                text="Append note candidate",
-                confidence="medium",
-                source="leftover_classification",
-            ),
         )
 
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useBeforeUnload, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { profileService } from "@/features/profile/services/profileService";
@@ -45,7 +45,6 @@ export function DocumentEditScreen(): React.ReactElement {
   const [isAssigningCustomer, setIsAssigningCustomer] = useState(false);
   const [hasAppliedReseedFromLocation, setHasAppliedReseedFromLocation] = useState(false);
   const [lineItemSheetState, setLineItemSheetState] = useState<ReviewLineItemSheetState | null>(null);
-  const isAddVoiceNoteInFlightRef = useRef(false);
   const locationState = useMemo(() => readReviewLocationState(location.state), [location.state]);
   const requiresCustomerAssignment = useMemo(() => {
     if (!document || isInvoiceDocument(document)) {
@@ -228,45 +227,6 @@ export function DocumentEditScreen(): React.ReactElement {
   const lineItemSheetInitialItem = lineItemSheetState
     ? resolveLineItemSheetInitialItem(activeDraft, lineItemSheetState, EMPTY_LINE_ITEM)
     : EMPTY_LINE_ITEM;
-  async function tryAutoSaveDraft(): Promise<void> {
-    if (activeDraft.docType !== "quote") {
-      return;
-    }
-    const validationMessage = buildSaveValidationMessage({
-      draft: activeDraft,
-      lineItemsForSubmit,
-      hasInvalidLineItems,
-    });
-    if (validationMessage) {
-      return;
-    }
-    try {
-      await persistDocumentDraft({
-        document: activeDocument,
-        documentId,
-        draft: activeDraft,
-        lineItemsForSubmit,
-      });
-    } catch {
-      // Best-effort autosave should never block append-capture navigation.
-    }
-  }
-
-  async function handleAddVoiceNote(): Promise<void> {
-    if (isAddVoiceNoteInFlightRef.current) {
-      return;
-    }
-    isAddVoiceNoteInFlightRef.current = true;
-    try {
-      await tryAutoSaveDraft();
-      navigate(`/quotes/${documentId}/review/append-capture`, {
-        state: { launchOrigin: `/documents/${documentId}/edit` },
-      });
-    } finally {
-      isAddVoiceNoteInFlightRef.current = false;
-    }
-  }
-
   async function saveDraft(nextAction: "save" | "continue"): Promise<void> {
     setSaveError(null);
     setToastMessage(null);
@@ -380,9 +340,6 @@ export function DocumentEditScreen(): React.ReactElement {
         setDraft((currentDraft) => ({ ...currentDraft, dueDate: nextDueDate }));
       }}
       onOpenAssignment={() => setIsAssignmentSheetOpen(true)}
-      onAddVoiceNote={() => {
-        void handleAddVoiceNote();
-      }}
       onTitleChange={(nextTitle) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, title: nextTitle })); }}
       onEditLineItem={(lineItemIndex) => {
         if (isInteractionLocked || !activeDraft.lineItems[lineItemIndex]) {

@@ -16,7 +16,6 @@ from app.features.jobs.service import JobService
 from app.features.quotes.creation import QuoteCreationService
 from app.features.quotes.deletion import QuoteDeletionService
 from app.features.quotes.errors import QuoteServiceError
-from app.features.quotes.extraction_append import QuoteExtractionAppendService
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.mutation import QuoteMutationService
 from app.features.quotes.outcomes import QuoteOutcomeService
@@ -154,29 +153,6 @@ class QuoteRepositoryProtocol(Protocol):
 
     async def invalidate_pdf_artifact(self, document: Document) -> str | None: ...
 
-    async def append_extraction(
-        self,
-        *,
-        document: Document,
-        transcript: str,
-        total_amount: float | None,
-        update_total_amount: bool,
-        notes: str | None,
-        update_notes: bool,
-        tax_rate: float | None,
-        update_tax_rate: bool,
-        discount_type: str | None,
-        update_discount_type: bool,
-        discount_value: float | None,
-        update_discount_value: bool,
-        deposit_amount: float | None,
-        update_deposit_amount: bool,
-        line_items: list[LineItemDraft],
-        extraction_tier: str | None = None,
-        extraction_degraded_reason_code: str | None = None,
-        extraction_review_metadata: dict[str, Any] | None = None,
-    ) -> Document: ...
-
     async def update_extraction_review_metadata(
         self,
         *,
@@ -227,10 +203,6 @@ class QuoteService:
             repository=repository,
             delete_obsolete_artifact=self._delete_obsolete_artifact,
             ensure_quote_customer_assigned=ensure_quote_customer_assigned,
-        )
-        self._extraction_append_service = QuoteExtractionAppendService(
-            repository=repository,
-            delete_obsolete_artifact=self._delete_obsolete_artifact,
         )
         self._deletion_service = QuoteDeletionService(repository=repository)
         self._outcome_service = QuoteOutcomeService(repository=repository)
@@ -283,34 +255,6 @@ class QuoteService:
         return await self._creation_service.create_manual_draft(
             user_id=user_id,
             customer_id=customer_id,
-        )
-
-    async def ensure_quote_appendable(
-        self,
-        *,
-        user_id: UUID,
-        quote_id: UUID,
-    ) -> Document:
-        """Return one owned quote that can accept append extraction updates."""
-        return await self._extraction_append_service.ensure_quote_appendable(
-            user_id=user_id,
-            quote_id=quote_id,
-        )
-
-    async def append_extraction_to_quote(
-        self,
-        *,
-        user_id: UUID,
-        quote_id: UUID,
-        extraction_result: ExtractionResult,
-        commit: bool = True,
-    ) -> tuple[Document, ExtractionResult]:
-        """Delegate append extraction lifecycle behavior to the append slice."""
-        return await self._extraction_append_service.append_extraction_to_quote(
-            user_id=user_id,
-            quote_id=quote_id,
-            extraction_result=extraction_result,
-            commit=commit,
         )
 
     async def list_quotes(

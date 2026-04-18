@@ -112,36 +112,6 @@ describe("quoteService.extract", () => {
     expect(formData.get("customer_id")).toBeNull();
   });
 
-  it("posts append extraction to the quote-specific endpoint", async () => {
-    mockedRequestWithMetadata.mockResolvedValue({
-      status: 200,
-      data: {
-        quote_id: "quote-22",
-        ...extractionPayload,
-        transcript: "append transcript",
-      },
-    });
-
-    const result = await quoteService.appendExtraction("quote-22", {
-      notes: "add one more item",
-    });
-
-    expect(result).toEqual({
-      type: "sync",
-      quoteId: "quote-22",
-      result: {
-        ...extractionPayload,
-        transcript: "append transcript",
-      },
-    });
-
-    const [path, options] = mockedRequestWithMetadata.mock.calls[0] ?? [];
-    expect(path).toBe("/api/quotes/quote-22/append-extraction");
-    const formData = options?.body as FormData;
-    expect(formData.get("notes")).toBe("add one more item");
-    expect(formData.get("customer_id")).toBeNull();
-  });
-
   it("creates manual draft with customer payload when customerId is provided", async () => {
     mockedRequest.mockResolvedValue({
       id: "quote-manual-1",

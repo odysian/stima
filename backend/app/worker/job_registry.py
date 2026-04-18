@@ -88,7 +88,6 @@ async def extraction_job(
     source_type: str = "text",
     capture_detail: str | None = None,
     customer_id: str | None = None,
-    append_to_quote: bool = False,
 ) -> None:
     """Run durable quote extraction against prepared capture input."""
     parsed_job_id = UUID(job_id)
@@ -101,10 +100,6 @@ async def extraction_job(
         source_type=source_type,
         capture_detail=capture_detail,
     )
-    resolved_extraction_mode = _resolve_worker_extraction_mode(
-        extraction_mode=extraction_mode,
-        append_to_quote=append_to_quote,
-    )
     try:
         await process_job(
             ctx,
@@ -115,7 +110,9 @@ async def extraction_job(
             handler=lambda: _extract_quote_data(
                 ctx,
                 resolved_capture_input,
-                extraction_mode=resolved_extraction_mode,
+                extraction_mode=_resolve_worker_extraction_mode(
+                    extraction_mode=extraction_mode,
+                ),
                 job_id=parsed_job_id,
             ),
             on_success=lambda runtime, result: _store_extraction_result(
@@ -125,7 +122,6 @@ async def extraction_job(
                 source_type=source_type,
                 capture_detail=resolved_capture_detail,
                 customer_id=customer_id,
-                append_to_quote=append_to_quote,
             ),
         )
     except Retry:
@@ -505,7 +501,7 @@ def _validate_extraction_source_type(source_type: str) -> Literal["text", "voice
 
 
 def _validate_extraction_mode(extraction_mode: str) -> ExtractionMode:
-    if extraction_mode not in {"initial", "append"}:
+    if extraction_mode != "initial":
         raise NonRetryableJobError("Extraction job missing valid extraction_mode")
     return cast(ExtractionMode, extraction_mode)
 
@@ -528,11 +524,10 @@ def _resolve_worker_capture_detail(*, source_type: str, capture_detail: str | No
 def _resolve_worker_extraction_mode(
     *,
     extraction_mode: str | None,
-    append_to_quote: bool,
 ) -> ExtractionMode:
     normalized_mode = (extraction_mode or "").strip().lower()
     if not normalized_mode:
-        return "append" if append_to_quote else "initial"
+        return "initial"
     return _validate_extraction_mode(normalized_mode)
 
 
@@ -570,7 +565,6 @@ async def _store_extraction_result(
     source_type: str,
     capture_detail: str,
     customer_id: str | None,
-    append_to_quote: bool,
 ) -> None:
     async with runtime.session_maker() as session:
         repository = JobRepository(session)
@@ -579,69 +573,15 @@ async def _store_extraction_result(
             raise NonRetryableJobError(f"Job {job_id} does not exist")
 
         quote_id = job_record.document_id
+        if quote_id is not None:
+            raise NonRetryableJobError(
+                "Extraction jobs targeting existing quotes are no longer supported",
+                terminal_reason=TERMINAL_ERROR_MISSING_DOCUMENT_ID,
+            )
         resolved_customer_id = _parse_optional_uuid(customer_id)
         created_new_quote = False
         result_payload = result
-        if append_to_quote:
-            if quote_id is None:
-                raise NonRetryableJobError(
-                    "Extraction append job missing required document_id",
-                    terminal_reason=TERMINAL_ERROR_MISSING_DOCUMENT_ID,
-                )
-            try:
-                quote, merged_result = await QuoteService(
-                    repository=QuoteRepository(session),
-                    pdf_integration=_UnusedWorkerPdfIntegration(),
-                    storage_service=_UnusedWorkerStorageService(),
-                ).append_extraction_to_quote(
-                    user_id=job_record.user_id,
-                    quote_id=quote_id,
-                    extraction_result=result,
-                    commit=False,
-                )
-            except QuoteServiceError as exc:
-                await session.rollback()
-                logger.warning(
-                    "Extraction append persistence failed for job %s",
-                    job_id,
-                    exc_info=True,
-                )
-                log_security_event(
-                    "quotes.extract_persist_failed",
-                    outcome="failure",
-                    level=logging.ERROR,
-                    reason="draft_persistence_failed",
-                    job_name=EXTRACTION_JOB_NAME,
-                    job_id=str(job_id),
-                    error_class=type(exc).__name__,
-                )
-                raise NonRetryableJobError(
-                    TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
-                    terminal_reason=TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
-                ) from exc
-            except Exception as exc:  # noqa: BLE001
-                await session.rollback()
-                logger.warning(
-                    "Extraction append persistence failed for job %s",
-                    job_id,
-                    exc_info=True,
-                )
-                log_security_event(
-                    "quotes.extract_persist_failed",
-                    outcome="failure",
-                    level=logging.ERROR,
-                    reason="draft_persistence_failed",
-                    job_name=EXTRACTION_JOB_NAME,
-                    job_id=str(job_id),
-                    error_class=type(exc).__name__,
-                )
-                raise NonRetryableJobError(
-                    TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
-                    terminal_reason=TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED,
-                ) from exc
-            resolved_customer_id = quote.customer_id
-            result_payload = merged_result
-        elif quote_id is None:
+        if quote_id is None:
             try:
                 quote = await QuoteService(
                     repository=QuoteRepository(session),
@@ -719,14 +659,6 @@ async def _store_extraction_result(
             customer_id=resolved_customer_id,
             capture_detail=capture_detail,
             extraction_result=result_payload,
-        )
-    elif append_to_quote:
-        log_event(
-            "quote_append_extracted",
-            user_id=job_record.user_id,
-            quote_id=quote_id,
-            customer_id=resolved_customer_id,
-            detail=capture_detail,
         )
 
 
