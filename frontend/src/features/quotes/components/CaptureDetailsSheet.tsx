@@ -33,20 +33,18 @@ function formatPricingField(
 }
 
 function buildActionableLabel(item: {
-  kind: "append_suggestion" | "unresolved_segment";
+  kind: "unresolved_segment";
   field: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
   reason: string | null;
 }): string {
-  if (item.kind === "append_suggestion") {
-    const pricingField = formatPricingField(item.field === "notes" ? null : item.field);
-    return item.field === "notes"
-      ? "Notes suggestion"
-      : `Pricing suggestion${pricingField ? ` (${pricingField})` : ""}`;
+  const pricingField = formatPricingField(item.field === "notes" ? null : item.field);
+  if (item.field === "notes") {
+    return "Unresolved note";
   }
-  if (item.kind === "unresolved_segment") {
-    return (item.reason ?? "leftover_classification").replaceAll("_", " ");
+  if (pricingField) {
+    return `Unresolved ${pricingField}`;
   }
-  return "Capture detail";
+  return (item.reason ?? "leftover_classification").replaceAll("_", " ");
 }
 
 export function CaptureDetailsSheet({

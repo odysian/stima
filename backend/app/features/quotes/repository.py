@@ -307,7 +307,7 @@ class QuoteRepository:
         return result.scalar_one_or_none()
 
     async def get_by_id_for_update(self, quote_id: UUID, user_id: UUID) -> Document | None:
-        """Return one quote row with a write lock for serialized append application."""
+        """Return one quote row with a write lock for serialized mutations."""
         result = await self._session.execute(
             select(Document)
             .where(
@@ -732,67 +732,6 @@ class QuoteRepository:
 
         if replace_line_items and line_items is not None:
             await self._replace_line_items(document.id, line_items)
-
-        await self._session.flush()
-        await self._session.refresh(document)
-        await self._session.refresh(document, attribute_names=["line_items"])
-        return document
-
-    async def append_extraction(
-        self,
-        *,
-        document: Document,
-        transcript: str,
-        total_amount: float | None,
-        update_total_amount: bool,
-        notes: str | None,
-        update_notes: bool,
-        tax_rate: float | None,
-        update_tax_rate: bool,
-        discount_type: str | None,
-        update_discount_type: bool,
-        discount_value: float | None,
-        update_discount_value: bool,
-        deposit_amount: float | None,
-        update_deposit_amount: bool,
-        line_items: list[LineItemDraft],
-        extraction_tier: str | None = None,
-        extraction_degraded_reason_code: str | None = None,
-        extraction_review_metadata: dict[str, Any] | None = None,
-    ) -> Document:
-        """Append extracted line items while preserving existing rows and order."""
-        document.transcript = transcript
-        if update_total_amount:
-            document.total_amount = _to_decimal(total_amount)
-        if update_notes:
-            document.notes = notes
-        if update_tax_rate:
-            document.tax_rate = _to_decimal(tax_rate)
-        if update_discount_type:
-            document.discount_type = discount_type
-        if update_discount_value:
-            document.discount_value = _to_decimal(discount_value)
-        if update_deposit_amount:
-            document.deposit_amount = _to_decimal(deposit_amount)
-        document.extraction_tier = extraction_tier
-        document.extraction_degraded_reason_code = extraction_degraded_reason_code
-        if extraction_review_metadata is not None:
-            document.extraction_review_metadata = extraction_review_metadata
-
-        next_sort_order = len(document.line_items)
-        for index, item in enumerate(line_items):
-            self._session.add(
-                LineItem(
-                    document_id=document.id,
-                    description=item.description,
-                    details=item.details,
-                    price=_to_decimal(item.price),
-                    price_status=item.price_status,
-                    flagged=item.flagged,
-                    flag_reason=item.flag_reason,
-                    sort_order=next_sort_order + index,
-                )
-            )
 
         await self._session.flush()
         await self._session.refresh(document)

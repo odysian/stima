@@ -235,7 +235,6 @@ async def _run_extraction_job(
     source_type: str,
     capture_detail: str,
     customer_id: str | None = None,
-    append_to_quote: bool = False,
     extraction_mode: str | None = None,
     transcript: str = "mulch the front beds",
     prepared_capture_input: PreparedCaptureInput | dict[str, object] | None = None,
@@ -256,7 +255,7 @@ async def _run_extraction_job(
         retry_jitter_seconds=DEFAULT_RETRY_JITTER_SECONDS,
     )
     resolved_extraction_integration = extraction_integration or _MockExtractionIntegration()
-    resolved_extraction_mode = extraction_mode or ("append" if append_to_quote else "initial")
+    resolved_extraction_mode = extraction_mode or "initial"
     await extraction_job(
         {
             "job_try": job_try,
@@ -271,7 +270,6 @@ async def _run_extraction_job(
         source_type=source_type,
         capture_detail=capture_detail,
         customer_id=customer_id,
-        append_to_quote=append_to_quote,
     )
 
 

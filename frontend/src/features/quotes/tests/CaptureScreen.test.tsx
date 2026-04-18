@@ -48,7 +48,6 @@ vi.mock("@/features/quotes/hooks/useQuoteDraft", () => ({
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
     extract: vi.fn(),
-    appendExtraction: vi.fn(),
     createManualDraft: vi.fn(),
     convertNotes: vi.fn(),
     createQuote: vi.fn(),
@@ -234,7 +233,6 @@ beforeEach(() => {
   });
   mockVoiceCapture();
   mockedQuoteService.extract.mockResolvedValue({ type: "sync", quoteId: "quote-1", result: extractionFixture });
-  mockedQuoteService.appendExtraction.mockReset();
   mockedQuoteService.getQuote.mockResolvedValue(quoteDetailFixture);
   mockedQuoteService.createManualDraft.mockResolvedValue({
     id: "quote-manual-1",
@@ -308,18 +306,6 @@ describe("CaptureScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides Start Blank affordance in append mode", () => {
-    renderScreen({
-      pathname: "/quotes/quote-1/review/append-capture",
-      customerId: null,
-      quoteId: "quote-1",
-    });
-
-    expect(
-      screen.queryByRole("button", { name: "Or start with a blank document" }),
-    ).not.toBeInTheDocument();
-  });
-
   it("renders recorded clips inside a bounded scroll region", () => {
     mockVoiceCapture({ clips: [clipFixture, { ...clipFixture, id: "clip-2", url: "blob:clip-2" }] });
     renderScreen();
@@ -371,13 +357,13 @@ describe("CaptureScreen", () => {
     });
 
     expect(
-      screen.queryByText(/extraction saves your notes as a draft checkpoint/i),
+      screen.queryByText(/extraction saves your notes as a draft for manual review/i),
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     expect(await screen.findByText("Analyzing notes...")).toBeInTheDocument();
-    expect(screen.getByText(/extraction saves your notes as a draft checkpoint/i)).toBeInTheDocument();
+    expect(screen.getByText(/extraction saves your notes as a draft for manual review/i)).toBeInTheDocument();
   });
 
   it("shows recording state with stop button and elapsed time", () => {
@@ -593,53 +579,6 @@ describe("CaptureScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/documents/quote-manual-home/edit");
   });
 
-  it("submits append extraction from review and requests draft reseed", async () => {
-    mockedQuoteService.appendExtraction.mockResolvedValueOnce({
-      type: "sync",
-      quoteId: "quote-1",
-      result: extractionFixture,
-    });
-    mockedQuoteService.getQuote.mockResolvedValueOnce({
-      ...quoteDetailFixture,
-      extraction_review_metadata: {
-        ...quoteDetailFixture.extraction_review_metadata!,
-        hidden_details: {
-          items: [
-            {
-              id: "append-new-note",
-              kind: "append_suggestion",
-              field: "notes",
-              reason: "append_capture",
-              text: "New note",
-            },
-          ],
-        },
-        hidden_detail_state: {},
-      },
-    });
-    renderScreen({
-      pathname: "/quotes/quote-1/review/append-capture",
-      customerId: null,
-      quoteId: "quote-1",
-    });
-
-    fireEvent.change(screen.getByLabelText(/written description/i), {
-      target: { value: "  add one more cleanup item  " },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /extract more line items/i }));
-
-    await waitFor(() => {
-      expect(mockedQuoteService.appendExtraction).toHaveBeenCalledWith("quote-1", {
-        clips: [],
-        notes: "  add one more cleanup item  ",
-      });
-    });
-    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-1/edit", {
-      state: { reseedDraft: true },
-    });
-    expect(setDraftMock).not.toHaveBeenCalled();
-  });
-
   it("submits home capture without customer context and routes when polling returns quote_id", async () => {
     mockedQuoteService.extract.mockResolvedValueOnce({ type: "async", jobId: "job-home" });
     mockedJobService.getJobStatus.mockResolvedValueOnce(
@@ -782,7 +721,7 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Analyzing notes...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves your notes as a draft checkpoint. You can capture more notes later from review."),
+      screen.getByText("Extraction saves your notes as a draft for manual review."),
     ).toBeInTheDocument();
 
     act(() => {
@@ -816,7 +755,7 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves your recording as a draft checkpoint. You can capture more notes later from review."),
+      screen.getByText("Extraction saves your recording as a draft for manual review."),
     ).toBeInTheDocument();
 
     act(() => {
@@ -859,7 +798,7 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves one draft from your recording and notes. You can capture more notes later from review."),
+      screen.getByText("Extraction saves one draft from your recording and notes for manual review."),
     ).toBeInTheDocument();
 
     act(() => {

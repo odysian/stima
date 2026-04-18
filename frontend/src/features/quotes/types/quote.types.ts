@@ -179,7 +179,7 @@ export interface PricingSeededFieldMetadata {
 export interface ExtractionReviewHiddenDetails {
   items: Array<{
     id: string;
-    kind: "append_suggestion" | "unresolved_segment";
+    kind: "unresolved_segment";
     field?: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
     reason?: string | null;
     text: string;

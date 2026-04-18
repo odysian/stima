@@ -13,7 +13,6 @@ from app.features.quotes.errors import QuoteServiceError
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.review_metadata import (
     apply_hidden_detail_lifecycle_updates,
-    clear_append_suggestions_for_manual_edits,
     normalize_extraction_review_metadata,
 )
 from app.features.quotes.schemas import (
@@ -445,21 +444,9 @@ def _resolve_next_extraction_review_metadata_for_update(
     notes_changed: bool,
     pricing_changed: bool,
 ) -> tuple[ExtractionReviewMetadataV1 | None, bool]:
-    if not notes_changed and not pricing_changed:
-        return None, False
-
-    metadata = normalize_extraction_review_metadata(
-        getattr(quote, "extraction_review_metadata", None),
-        extraction_degraded_reason_code=getattr(quote, "extraction_degraded_reason_code", None),
-    )
-    cleared_metadata = clear_append_suggestions_for_manual_edits(
-        metadata,
-        notes_changed=notes_changed,
-        pricing_changed=pricing_changed,
-    )
-    if cleared_metadata.model_dump(mode="json") == metadata.model_dump(mode="json"):
-        return None, False
-    return cleared_metadata, True
+    del quote, notes_changed, pricing_changed
+    # V3 removes append suggestions, so regular quote edits no longer mutate hidden details.
+    return None, False
 
 
 def _normalized_optional_text(value: str | None) -> str | None:

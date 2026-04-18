@@ -10,7 +10,6 @@ from uuid import uuid4
 from app.features.quotes.schemas import (
     ExtractionResult,
     ExtractionReviewActionableItem,
-    ExtractionReviewAppendSuggestion,
     ExtractionReviewHiddenDetails,
     ExtractionReviewMetadataV1,
     ExtractionReviewState,
@@ -44,7 +43,6 @@ def build_extraction_review_metadata(
     seeded_notes_source: str | None,
     seeded_pricing_fields: set[PricingFieldName],
     existing_metadata: ExtractionReviewMetadataV1 | None = None,
-    append_suggestions: Sequence[ExtractionReviewAppendSuggestion] | None = None,
 ) -> ExtractionReviewMetadataV1:
     """Build or merge sidecar metadata for one extraction persistence write."""
     previous = existing_metadata or ExtractionReviewMetadataV1()
@@ -89,7 +87,6 @@ def build_extraction_review_metadata(
         extraction_result=extraction_result,
         previous_items=previous.hidden_details.items,
         previous_state=previous.hidden_detail_state,
-        append_suggestions=append_suggestions or [],
     )
     hidden_details = ExtractionReviewHiddenDetails(items=next_actionable_items)
     current_hidden_item_ids = {item.id for item in next_actionable_items}
@@ -125,67 +122,6 @@ def _merge_pricing_seed(
     if previous.seeded or seed_now:
         return PricingSeededFieldMetadata(seeded=True, source="explicit_pricing_phrase")
     return PricingSeededFieldMetadata(seeded=False, source=previous.source)
-
-
-def build_append_suggestion(
-    *,
-    kind: Literal["note", "pricing"],
-    raw_text: str,
-    confidence: Literal["medium", "low"],
-    pricing_field: PricingFieldName | None = None,
-) -> ExtractionReviewAppendSuggestion:
-    """Build one deterministic append suggestion payload."""
-    normalized_raw_text = raw_text.strip()
-    suffix = pricing_field if pricing_field is not None else "none"
-    return ExtractionReviewAppendSuggestion(
-        id=build_hidden_item_id("append", kind, suffix, normalized_raw_text),
-        kind=kind,
-        raw_text=normalized_raw_text,
-        confidence=confidence,
-        source="append_capture",
-        pricing_field=pricing_field,
-    )
-
-
-def clear_append_suggestions_for_manual_edits(
-    metadata: ExtractionReviewMetadataV1,
-    *,
-    notes_changed: bool,
-    pricing_changed: bool,
-) -> ExtractionReviewMetadataV1:
-    """Clear related append suggestions/review groups after real manual edits."""
-    if not notes_changed and not pricing_changed:
-        return metadata
-
-    filtered_items = [
-        item
-        for item in metadata.hidden_details.items
-        if not (
-            item.kind == "append_suggestion"
-            and (
-                (notes_changed and item.field == "notes")
-                or (
-                    pricing_changed
-                    and item.field in {"explicit_total", "deposit_amount", "tax_rate", "discount"}
-                )
-            )
-        )
-    ]
-    updated_review_state = metadata.review_state.model_copy(
-        update={
-            "notes_pending": (False if notes_changed else metadata.review_state.notes_pending),
-            "pricing_pending": (
-                False if pricing_changed else metadata.review_state.pricing_pending
-            ),
-        }
-    )
-    updated_hidden_details = ExtractionReviewHiddenDetails(items=filtered_items)
-    return metadata.model_copy(
-        update={
-            "review_state": updated_review_state,
-            "hidden_details": updated_hidden_details,
-        }
-    )
 
 
 def apply_hidden_detail_lifecycle_updates(
@@ -267,7 +203,6 @@ def _build_actionable_items(
     extraction_result: ExtractionResult,
     previous_items: Sequence[ExtractionReviewActionableItem],
     previous_state: Mapping[str, HiddenItemState],
-    append_suggestions: Sequence[ExtractionReviewAppendSuggestion],
 ) -> list[ExtractionReviewActionableItem]:
     previous_by_signature: dict[str, ExtractionReviewActionableItem] = {
         _actionable_signature(item): item for item in previous_items
@@ -282,34 +217,6 @@ def _build_actionable_items(
             reason=segment.source,
             confidence=segment.confidence,
             text=segment.raw_text,
-        )
-        signature = _actionable_signature(candidate)
-        previous = previous_by_signature.get(signature)
-        previous_item_state = previous_state.get(previous.id) if previous is not None else None
-        deduped[signature] = candidate.model_copy(
-            update={
-                "id": (
-                    previous.id
-                    if previous is not None
-                    and (previous_item_state is None or not previous_item_state.dismissed)
-                    else _build_new_occurrence_id()
-                )
-            }
-        )
-
-    for suggestion in append_suggestions:
-        field: PricingFieldName | Literal["notes"]
-        if suggestion.pricing_field is None:
-            field = "notes"
-        else:
-            field = suggestion.pricing_field
-        candidate = ExtractionReviewActionableItem(
-            id="pending",
-            kind="append_suggestion",
-            field=field,
-            reason=suggestion.source,
-            confidence=suggestion.confidence,
-            text=suggestion.raw_text,
         )
         signature = _actionable_signature(candidate)
         previous = previous_by_signature.get(signature)

@@ -135,19 +135,6 @@ async def test_extract_combined_requires_authentication(client: AsyncClient) -> 
     assert response.status_code == 401
 
 
-async def test_append_extraction_requires_authentication(client: AsyncClient) -> None:
-    client.cookies.clear()
-    client.cookies.set(CSRF_COOKIE_NAME, "csrf", path="/")
-
-    response = await client.post(
-        "/api/quotes/00000000-0000-0000-0000-000000000000/append-extraction",
-        files=[("notes", (None, "needs auth"))],
-        headers={"X-CSRF-Token": "csrf"},
-    )
-
-    assert response.status_code == 401
-
-
 async def test_convert_notes_requires_csrf(client: AsyncClient) -> None:
     await _register_and_login(client, _credentials())
 
@@ -166,18 +153,6 @@ async def test_extract_combined_requires_csrf(client: AsyncClient) -> None:
     response = await client.post(
         "/api/quotes/extract",
         files=[("notes", (None, "mulch and edging"))],
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {"detail": "CSRF token missing"}
-
-
-async def test_append_extraction_requires_csrf(client: AsyncClient) -> None:
-    await _register_and_login(client, _credentials())
-
-    response = await client.post(
-        "/api/quotes/00000000-0000-0000-0000-000000000000/append-extraction",
-        files=[("notes", (None, "needs csrf"))],
     )
 
     assert response.status_code == 403

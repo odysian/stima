@@ -413,17 +413,6 @@ class SeededFieldsMetadata(BaseModel):
     pricing: PricingSeededFieldsMetadata = Field(default_factory=PricingSeededFieldsMetadata)
 
 
-class ExtractionReviewAppendSuggestion(BaseModel):
-    """Hidden append suggestion persisted in sidecar metadata."""
-
-    id: str
-    kind: Literal["note", "pricing"]
-    raw_text: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
-    confidence: Literal["medium", "low"]
-    source: Literal["append_capture"] = "append_capture"
-    pricing_field: PricingFieldName | None = None
-
-
 class ExtractionReviewUnresolvedSegment(BaseModel):
     """Hidden unresolved segment persisted in sidecar metadata."""
 
@@ -433,7 +422,7 @@ class ExtractionReviewUnresolvedSegment(BaseModel):
     source: UnresolvedSegmentSource
 
 
-ActionableItemKind = Literal["append_suggestion", "unresolved_segment"]
+ActionableItemKind = Literal["unresolved_segment"]
 ActionableItemField = Literal["notes", "explicit_total", "deposit_amount", "tax_rate", "discount"]
 
 
@@ -472,16 +461,10 @@ def _normalize_legacy_hidden_details_payload(value: object) -> object:
         _coerce_items_list(hidden_details_payload.get("items") if hidden_details_payload else None)
     )
     normalized_items.extend(
-        _normalize_legacy_append_suggestions(
-            hidden_details_payload.get("append_suggestions") if hidden_details_payload else None
-        )
-    )
-    normalized_items.extend(
         _normalize_legacy_unresolved_segments(
             hidden_details_payload.get("unresolved_segments") if hidden_details_payload else None
         )
     )
-    normalized_items.extend(_normalize_legacy_append_suggestions(payload.get("append_suggestions")))
     normalized_items.extend(
         _normalize_legacy_unresolved_segments(payload.get("unresolved_segments"))
     )
@@ -489,7 +472,6 @@ def _normalize_legacy_hidden_details_payload(value: object) -> object:
     if normalized_items:
         payload["hidden_details"] = {"items": normalized_items}
 
-    payload.pop("append_suggestions", None)
     payload.pop("unresolved_segments", None)
     return payload
 
@@ -510,52 +492,13 @@ def _coerce_items_list(value: object) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for candidate in value:
         coerced = _coerce_mapping(candidate)
-        if coerced is not None:
-            items.append(coerced)
+        if coerced is None:
+            continue
+        # Append suggestions were removed in V3; keep only unresolved-segment items.
+        if coerced.get("kind") != "unresolved_segment":
+            continue
+        items.append(coerced)
     return items
-
-
-def _normalize_legacy_append_suggestions(value: object) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    normalized: list[dict[str, Any]] = []
-    for index, candidate in enumerate(value):
-        payload = _coerce_mapping(candidate)
-        if payload is None:
-            continue
-        text = (
-            payload.get("text") if isinstance(payload.get("text"), str) else payload.get("raw_text")
-        )
-        if not isinstance(text, str) or text.strip() == "":
-            continue
-        kind = payload.get("kind") if isinstance(payload.get("kind"), str) else None
-        pricing_field = (
-            payload.get("pricing_field") if isinstance(payload.get("pricing_field"), str) else None
-        )
-        field: str | None
-        if pricing_field in {"explicit_total", "deposit_amount", "tax_rate", "discount"}:
-            field = pricing_field
-        elif kind == "pricing":
-            field = None
-        else:
-            field = "notes"
-        confidence = payload.get("confidence")
-        item_id = payload.get("id") if isinstance(payload.get("id"), str) else None
-        normalized.append(
-            {
-                "id": item_id or f"legacy-append:{index}",
-                "kind": "append_suggestion",
-                "field": field,
-                "reason": (
-                    payload.get("source")
-                    if isinstance(payload.get("source"), str)
-                    else "append_capture"
-                ),
-                "confidence": confidence if confidence in {"medium", "low"} else None,
-                "text": text.strip(),
-            }
-        )
-    return normalized
 
 
 def _normalize_legacy_unresolved_segments(value: object) -> list[dict[str, Any]]:
