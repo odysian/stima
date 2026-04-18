@@ -72,6 +72,27 @@ describe("LineItemRow", () => {
     expect(screen.getByText("Unit phrasing may be ambiguous")).toBeInTheDocument();
   });
 
+  it("renders spoken money correction copy for reserved reason token", () => {
+    render(
+      <LineItemRow
+        rowId="line-item-10a"
+        item={{
+          description: "Mulch",
+          details: "5 yards",
+          price: 450,
+          flagged: true,
+          flagReason: "spoken_money_correction",
+        }}
+        onChange={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Spoken amount was interpreted as dollars instead of cents."),
+    ).toBeInTheDocument();
+  });
+
   it("renders fallback inline warning when flagged without reason", () => {
     render(
       <LineItemRow

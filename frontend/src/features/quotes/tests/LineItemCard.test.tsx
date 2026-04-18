@@ -26,12 +26,16 @@ describe("LineItemCard", () => {
         details="5 yards"
         price={120}
         flagged
+        flagReason="spoken_money_correction"
         onClick={vi.fn()}
       />,
     );
 
     expect(screen.getByRole("button", { name: /brown mulch/i })).toHaveClass("border-warning-accent/20");
     expect(screen.getByText("REVIEW")).toBeInTheDocument();
+    expect(
+      screen.getByText("Spoken amount was interpreted as dollars instead of cents."),
+    ).toBeInTheDocument();
   });
 
   it("renders em dash when price is blank", () => {

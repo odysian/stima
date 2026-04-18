@@ -735,6 +735,74 @@ async def test_extract_combined_clips_only_success(client: AsyncClient) -> None:
     assert payload["line_items"][0]["flag_reason"]
 
 
+async def test_manual_price_edit_clears_spoken_money_correction_flag(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_extract = _MockExtractionIntegration.extract
+
+    async def _extract_with_spoken_money_flag(
+        self,
+        notes: PreparedCaptureInput | str,
+        *,
+        mode: ExtractionMode = "initial",
+    ) -> ExtractionResult:
+        transcript = (
+            notes.transcript.strip() if isinstance(notes, PreparedCaptureInput) else notes.strip()
+        )
+        if transcript != "spoken money correction check":
+            return await original_extract(self, notes, mode=mode)
+        return ExtractionResult(
+            transcript=transcript,
+            line_items=[
+                LineItemExtractedV2(
+                    raw_text="price is four fifty for mulch",
+                    description="Brown mulch",
+                    details="price is four fifty for mulch",
+                    price=450,
+                    flagged=True,
+                    flag_reason="spoken_money_correction",
+                    confidence="medium",
+                )
+            ],
+            pricing_hints=PricingHints(explicit_total=450),
+        )
+
+    monkeypatch.setattr(_MockExtractionIntegration, "extract", _extract_with_spoken_money_flag)
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    extract_response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "spoken money correction check"))],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert extract_response.status_code == 200
+    quote_id = extract_response.json()["quote_id"]
+
+    patch_response = await client.patch(
+        f"/api/quotes/{quote_id}",
+        json={
+            "line_items": [
+                {
+                    "description": "Brown mulch",
+                    "details": "price is four fifty for mulch",
+                    "price": 500,
+                    "flagged": True,
+                    "flag_reason": "spoken_money_correction",
+                }
+            ]
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert patch_response.status_code == 200
+    patched_line_item = patch_response.json()["line_items"][0]
+    assert patched_line_item["price"] == 500
+    assert patched_line_item["flagged"] is False
+    assert patched_line_item["flag_reason"] is None
+
+
 async def test_extract_combined_rejects_empty_clip_with_400(
     client: AsyncClient,
 ) -> None:

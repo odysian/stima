@@ -16,6 +16,7 @@ from app.features.quotes.review_metadata import (
     normalize_extraction_review_metadata,
 )
 from app.features.quotes.schemas import (
+    SPOKEN_MONEY_CORRECTION_FLAG_REASON,
     ExtractionReviewMetadataUpdateRequest,
     ExtractionReviewMetadataV1,
     LineItemDraft,
@@ -153,9 +154,15 @@ class QuoteMutationService:
             has_linked_invoice=has_linked_invoice,
         )
 
-        next_line_items = (
-            data.line_items if "line_items" in data.model_fields_set else quote.line_items
+        updated_line_items = (
+            _clear_spoken_money_flag_on_manual_price_edit(
+                previous_line_items=quote.line_items,
+                next_line_items=data.line_items,
+            )
+            if "line_items" in data.model_fields_set
+            else None
         )
+        next_line_items = updated_line_items if updated_line_items is not None else quote.line_items
         line_items_define_subtotal, derived_line_item_subtotal = (
             derive_document_subtotal_from_line_items(next_line_items)
         )
@@ -273,7 +280,7 @@ class QuoteMutationService:
                 update_deposit_amount="deposit_amount" in data.model_fields_set,
                 notes=data.notes,
                 update_notes="notes" in data.model_fields_set,
-                line_items=data.line_items,
+                line_items=updated_line_items,
                 replace_line_items="line_items" in data.model_fields_set,
                 extraction_review_metadata=(
                     next_extraction_review_metadata.model_dump(mode="json")
@@ -447,6 +454,44 @@ def _resolve_next_extraction_review_metadata_for_update(
     del quote, notes_changed, pricing_changed
     # V3 removes append suggestions, so regular quote edits no longer mutate hidden details.
     return None, False
+
+
+def _clear_spoken_money_flag_on_manual_price_edit(
+    *,
+    previous_line_items: Sequence[object],
+    next_line_items: Sequence[LineItemDraft] | None,
+) -> list[LineItemDraft] | None:
+    if next_line_items is None:
+        return None
+
+    updated_items = list(next_line_items)
+    for index, candidate in enumerate(updated_items):
+        if index >= len(previous_line_items):
+            continue
+
+        previous = previous_line_items[index]
+        previous_flagged = bool(getattr(previous, "flagged", False))
+        previous_reason = cast(str | None, getattr(previous, "flag_reason", None))
+        if not previous_flagged or previous_reason != SPOKEN_MONEY_CORRECTION_FLAG_REASON:
+            continue
+
+        previous_price = document_field_float_or_none(getattr(previous, "price", None))
+        if _prices_materially_equal(previous_price, candidate.price):
+            continue
+
+        updated_items[index] = candidate.model_copy(
+            update={
+                "flagged": False,
+                "flag_reason": None,
+            }
+        )
+    return updated_items
+
+
+def _prices_materially_equal(left: float | None, right: float | None) -> bool:
+    if left is None or right is None:
+        return left is None and right is None
+    return abs(left - right) < 0.01
 
 
 def _normalized_optional_text(value: str | None) -> str | None:
