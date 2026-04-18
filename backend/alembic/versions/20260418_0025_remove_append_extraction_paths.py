@@ -12,6 +12,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "20260418_0025"
@@ -93,6 +94,9 @@ def upgrade() -> None:
                 SET extraction_review_metadata = :metadata
                 WHERE id = :document_id
                 """
+            ).bindparams(
+                sa.bindparam("metadata", type_=postgresql.JSONB),
+                sa.bindparam("document_id", type_=postgresql.UUID(as_uuid=True)),
             ),
             {
                 "metadata": normalized,
