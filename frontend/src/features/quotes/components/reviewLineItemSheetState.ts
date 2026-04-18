@@ -1,4 +1,5 @@
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import { shouldClearSpokenMoneyFlagOnPriceEdit } from "@/features/quotes/utils/lineItemFlags";
 import { syncDraftTotalWithLineItems } from "@/features/quotes/utils/lineItemDraftTotals";
 import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
 
@@ -32,8 +33,22 @@ export function applyLineItemSheetSave<TDraft extends DraftWithLineItems>(
       return draft;
     }
 
+    const previousLineItem = draft.lineItems[sheetState.index];
+    const normalizedNextLineItem = shouldClearSpokenMoneyFlagOnPriceEdit({
+      previousFlagged: previousLineItem?.flagged,
+      previousFlagReason: previousLineItem?.flagReason,
+      previousPrice: previousLineItem?.price ?? null,
+      nextPrice: nextLineItem.price,
+    })
+      ? {
+          ...nextLineItem,
+          flagged: false,
+          flagReason: null,
+        }
+      : nextLineItem;
+
     const nextLineItems = draft.lineItems.map((lineItem, index) =>
-      (index === sheetState.index ? nextLineItem : lineItem));
+      (index === sheetState.index ? normalizedNextLineItem : lineItem));
 
     return {
       ...draft,

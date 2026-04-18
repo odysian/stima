@@ -13,7 +13,10 @@ import pytest
 
 import app.integrations.extraction as extraction_module
 from app.features.quotes.review_metadata import build_hidden_item_id
-from app.features.quotes.schemas import PreparedCaptureInput
+from app.features.quotes.schemas import (
+    SPOKEN_MONEY_CORRECTION_FLAG_REASON,
+    PreparedCaptureInput,
+)
 from app.features.quotes.tests.fixtures.transcripts import TRANSCRIPTS
 from app.integrations.extraction import (
     EXTRACTION_TOOL_SCHEMA,
@@ -982,3 +985,162 @@ async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> 
     assert request_payload["prepared_capture_input"]["source_type"] == "voice+text"
     assert request_payload["prepared_capture_input"]["raw_typed_notes"] == "typed note text"
     assert request_payload["prepared_capture_input"]["raw_transcript"] == "voice transcript text"
+
+
+@pytest.mark.parametrize(
+    ("transcript", "expected_amounts"),
+    [
+        ("price is four fifty", [450.0]),
+        ("for two seventy five", [275.0]),
+        ("fifteen hundred total", [1500.0]),
+        ("arrive at four fifty", []),
+        ("around four thirty", []),
+        ("four fifty-pound bags", []),
+        ("four fifty main street", []),
+        ("four dollars and fifty cents", []),
+    ],
+)
+async def test_spoken_money_parser_filters_to_supported_price_contexts(
+    transcript: str,
+    expected_amounts: list[float],
+) -> None:
+    hints = extraction_module._extract_spoken_money_hints(transcript)  # noqa: SLF001
+    assert [hint.amount for hint in hints] == expected_amounts
+
+
+async def test_extract_includes_spoken_money_hints_in_capture_segments() -> None:
+    transcript = "Price is four fifty for mulch."
+    captured_messages: list[str] = []
+
+    def _factory(kwargs: dict[str, object]) -> _FakeResponse:
+        messages = kwargs["messages"]
+        assert isinstance(messages, list)
+        assert messages
+        first_message = messages[0]
+        assert isinstance(first_message, dict)
+        content = first_message["content"]
+        assert isinstance(content, str)
+        captured_messages.append(content)
+        return _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+
+    integration = ExtractionIntegration(
+        api_key="test",
+        model="test-model",
+        client=_FakeClient(_factory),
+    )
+    await integration.extract(transcript)
+
+    assert captured_messages
+    request_payload = json.loads(captured_messages[0])
+    segment_hints = request_payload["capture_segments"][0]["hints"]["spoken_money_hints"]
+    assert segment_hints == [{"phrase": "four fifty", "amount": 450.0}]
+
+
+async def test_guard_corrects_obvious_spoken_money_cents_hundreds_mismatch() -> None:
+    transcript = "Price is four fifty for front mulch."
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Front mulch",
+                                "details": "price is four fifty for front mulch",
+                                "price": 4.5,
+                            }
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].price == 450
+    assert result.line_items[0].flagged is True
+    assert result.line_items[0].flag_reason == SPOKEN_MONEY_CORRECTION_FLAG_REASON
+
+
+async def test_guard_noops_when_provider_price_already_matches_spoken_hint() -> None:
+    transcript = "Price is four fifty for front mulch."
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Front mulch",
+                                "details": "price is four fifty for front mulch",
+                                "price": 450,
+                            }
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].price == 450
+    assert result.line_items[0].flagged is False
+    assert result.line_items[0].flag_reason is None
+
+
+async def test_guard_applies_at_most_one_correction_per_spoken_hint() -> None:
+    transcript = "Price is four fifty for front mulch."
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Front mulch",
+                                "details": "price is four fifty for front mulch",
+                                "price": 4.5,
+                            },
+                            {
+                                "description": "Side mulch",
+                                "details": "price is four fifty for front mulch",
+                                "price": 4.5,
+                            },
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].price == 450
+    assert result.line_items[0].flag_reason == SPOKEN_MONEY_CORRECTION_FLAG_REASON
+    assert result.line_items[1].price == 4.5
+    assert result.line_items[1].flagged is False

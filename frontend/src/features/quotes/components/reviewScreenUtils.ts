@@ -4,6 +4,7 @@ import type {
   LineItemDraft,
   LineItemDraftWithFlags,
 } from "@/features/quotes/types/quote.types";
+import { resolveLineItemFlagMessage } from "@/features/quotes/utils/lineItemFlags";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
 
 export const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
@@ -79,7 +80,7 @@ export function getReviewMessages(draft: QuoteDraft): string[] {
     }
 
     const lineItemLabel = lineItem.description.trim() || `Line item ${index + 1}`;
-    const reason = lineItem.flagReason?.trim() || "Needs manual review before generating the quote.";
+    const reason = resolveLineItemFlagMessage(lineItem.flagReason);
     return [`${lineItemLabel}: ${reason}`];
   });
 

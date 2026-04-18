@@ -1,8 +1,11 @@
+import { resolveLineItemFlagMessage } from "@/features/quotes/utils/lineItemFlags";
+
 interface LineItemCardProps {
   description: string;
   details: string | null;
   price: number | null;
   flagged?: boolean;
+  flagReason?: string | null;
   disabled?: boolean;
   ariaLabel?: string;
   onClick: () => void;
@@ -13,6 +16,7 @@ export function LineItemCard({
   details,
   price,
   flagged = false,
+  flagReason,
   disabled = false,
   ariaLabel,
   onClick,
@@ -39,9 +43,16 @@ export function LineItemCard({
         </div>
         {details ? <p className="mt-0.5 text-sm text-on-surface-variant">{details}</p> : null}
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <p className="font-bold text-on-surface">{priceLabel}</p>
-        <span className="material-symbols-outlined text-outline">chevron_right</span>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <p className="font-bold text-on-surface">{priceLabel}</p>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </div>
+        {flagged ? (
+          <p className="max-w-[14rem] truncate text-right text-[0.6875rem] font-semibold uppercase tracking-wide text-warning">
+            {resolveLineItemFlagMessage(flagReason)}
+          </p>
+        ) : null}
       </div>
     </button>
   );

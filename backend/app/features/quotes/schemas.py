@@ -29,6 +29,9 @@ def _normalize_optional_title(value: object) -> object:
     return trimmed or None
 
 
+SPOKEN_MONEY_CORRECTION_FLAG_REASON = "spoken_money_correction"
+
+
 class LineItemDraft(BaseModel):
     """Editable line item payload used for quote creation and updates."""
 
@@ -103,6 +106,14 @@ class CaptureSegmentHints(BaseModel):
     looks_like_heading: bool
     looks_like_notes_heading: bool
     looks_like_line_item: bool
+    spoken_money_hints: list[SpokenMoneyHint] = Field(default_factory=list)
+
+
+class SpokenMoneyHint(BaseModel):
+    """High-confidence spoken-money phrase interpreted as a dollar amount."""
+
+    phrase: str = Field(min_length=1, max_length=EXTRACTION_TRANSCRIPT_MAX_CHARS)
+    amount: float = Field(gt=0)
 
 
 class CaptureSegment(BaseModel):

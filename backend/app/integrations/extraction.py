@@ -16,6 +16,7 @@ from anthropic import AsyncAnthropic
 from pydantic import ValidationError
 
 from app.features.quotes.schemas import (
+    SPOKEN_MONEY_CORRECTION_FLAG_REASON,
     AppendExtractionCandidate,
     AppendUnresolvedItem,
     CaptureSegment,
@@ -28,6 +29,7 @@ from app.features.quotes.schemas import (
     PreparedCaptureInput,
     PricingCandidates,
     PricingHints,
+    SpokenMoneyHint,
     UnresolvedItem,
     UnresolvedSegment,
     UnresolvedSegmentSource,
@@ -228,6 +230,101 @@ _BULLET_PREFIX_PATTERN = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
 _HEADING_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9 /\-]{0,40}:\s*$")
 _NOTES_HEADING_PATTERN = re.compile(r"^\s*notes?\s*:\s*$", re.IGNORECASE)
 _PRICE_PATTERN = re.compile(r"\$?\s*(\d+(?:\.\d{1,2})?)")
+_WORD_TOKEN_PATTERN = re.compile(r"[a-z]+(?:'[a-z]+)?")
+
+_SPOKEN_MONEY_ONES: dict[str, int] = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+}
+_SPOKEN_MONEY_TEENS: dict[str, int] = {
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+}
+_SPOKEN_MONEY_TENS: dict[str, int] = {
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+}
+_SPOKEN_MONEY_ADJACENCY_SKIP = frozenset(
+    {
+        "am",
+        "pm",
+        "o'clock",
+        "morning",
+        "afternoon",
+        "pound",
+        "pounds",
+        "gallon",
+        "gallons",
+        "foot",
+        "feet",
+        "inch",
+        "inches",
+        "percent",
+        "street",
+        "st",
+        "ave",
+        "avenue",
+        "road",
+        "rd",
+        "bags",
+        "drums",
+    }
+)
+_SPOKEN_MONEY_TIME_VERBS = frozenset(
+    {
+        "arrive",
+        "arrived",
+        "arriving",
+        "meet",
+        "meets",
+        "meeting",
+        "met",
+        "call",
+        "calls",
+        "called",
+    }
+)
+_SPOKEN_MONEY_CONTEXT_PREPOSITIONS = frozenset({"is", "for", "at"})
+_SPOKEN_MONEY_CONTEXT_KEYWORDS = frozenset(
+    {
+        "price",
+        "priced",
+        "cost",
+        "costs",
+        "charge",
+        "charges",
+        "total",
+        "dollar",
+        "dollars",
+        "buck",
+        "bucks",
+        "quote",
+        "quoted",
+        "amount",
+    }
+)
+_SPOKEN_MONEY_NON_CONTEXT_TENS = frozenset({"thirty", "forty"})
 
 _RETRY_BASE_DELAY_SECONDS = 0.25
 _RETRY_MAX_DELAY_SECONDS = 2.0
@@ -256,6 +353,14 @@ class _ExtractionTierConfig:
     tier: Literal["primary", "fallback"]
     model_id: str
     prompt_variant: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SpokenMoneyHint:
+    phrase: str
+    amount: float
+    start_token_index: int
+    end_token_index: int
 
 
 _LAST_CALL_METADATA_VAR: contextvars.ContextVar[ExtractionCallMetadata | None] = (
@@ -860,6 +965,10 @@ def _build_segment_hints(*, raw_text: str, normalized_text: str) -> CaptureSegme
     price_value = (
         _parse_price_value(explicit_price_match.group(1)) if explicit_price_match else None
     )
+    spoken_money_hints = [
+        SpokenMoneyHint(phrase=hint.phrase, amount=hint.amount)
+        for hint in _extract_spoken_money_hints(normalized_text)
+    ]
     looks_like_heading = _HEADING_PATTERN.match(raw_text) is not None
     looks_like_notes_heading = _NOTES_HEADING_PATTERN.match(raw_text) is not None
     looks_like_line_item = _BULLET_PREFIX_PATTERN.match(raw_text) is not None or (
@@ -871,6 +980,7 @@ def _build_segment_hints(*, raw_text: str, normalized_text: str) -> CaptureSegme
         looks_like_heading=looks_like_heading,
         looks_like_notes_heading=looks_like_notes_heading,
         looks_like_line_item=looks_like_line_item,
+        spoken_money_hints=spoken_money_hints,
     )
 
 
@@ -879,6 +989,151 @@ def _parse_price_value(candidate: str) -> float | None:
         return float(candidate)
     except ValueError:
         return None
+
+
+def _extract_spoken_money_hints(text: str) -> list[_SpokenMoneyHint]:
+    tokens = list(_WORD_TOKEN_PATTERN.finditer(text.casefold()))
+    if not tokens:
+        return []
+
+    words = [token.group(0) for token in tokens]
+    hints: list[_SpokenMoneyHint] = []
+    seen: set[tuple[int, int, float]] = set()
+
+    for start_index in range(len(words)):
+        parsed = _parse_spoken_money_phrase(words, start_index)
+        if parsed is None:
+            continue
+        amount, end_index, is_extreme_shape = parsed
+        if _has_spoken_money_adjacency_skip(
+            words=words,
+            start=start_index,
+            end=end_index,
+        ):
+            continue
+        if _looks_like_time_or_non_money_phrase(
+            words=words,
+            start=start_index,
+            end=end_index,
+        ):
+            continue
+        has_money_context = _has_spoken_money_context(
+            words=words,
+            start=start_index,
+            end=end_index,
+        )
+        if not has_money_context and not is_extreme_shape:
+            continue
+        key = (start_index, end_index, float(amount))
+        if key in seen:
+            continue
+        seen.add(key)
+        hints.append(
+            _SpokenMoneyHint(
+                phrase=" ".join(words[start_index:end_index]),
+                amount=float(amount),
+                start_token_index=start_index,
+                end_token_index=end_index,
+            )
+        )
+    return hints
+
+
+def _parse_spoken_money_phrase(
+    words: list[str],
+    start: int,
+) -> tuple[int, int, bool] | None:
+    if start + 1 >= len(words):
+        return None
+
+    first = words[start]
+    second = words[start + 1]
+
+    if first in _SPOKEN_MONEY_ONES and second in _SPOKEN_MONEY_TENS:
+        amount = (_SPOKEN_MONEY_ONES[first] * 100) + _SPOKEN_MONEY_TENS[second]
+        end = start + 2
+        if end < len(words) and words[end] in _SPOKEN_MONEY_ONES:
+            amount += _SPOKEN_MONEY_ONES[words[end]]
+            end += 1
+        is_extreme_shape = second not in _SPOKEN_MONEY_NON_CONTEXT_TENS
+        return amount, end, is_extreme_shape
+
+    prefix = _parse_spoken_under_hundred(words, start)
+    if prefix is None:
+        return None
+    prefix_value, prefix_consumed = prefix
+    hundred_index = start + prefix_consumed
+    if hundred_index >= len(words) or words[hundred_index] != "hundred":
+        return None
+
+    amount = prefix_value * 100
+    end = hundred_index + 1
+    suffix = _parse_spoken_under_hundred(words, end)
+    if suffix is not None:
+        suffix_value, suffix_consumed = suffix
+        amount += suffix_value
+        end += suffix_consumed
+    return amount, end, True
+
+
+def _parse_spoken_under_hundred(words: list[str], start: int) -> tuple[int, int] | None:
+    if start >= len(words):
+        return None
+    token = words[start]
+    if token in _SPOKEN_MONEY_TEENS:
+        return _SPOKEN_MONEY_TEENS[token], 1
+    if token in _SPOKEN_MONEY_TENS:
+        value = _SPOKEN_MONEY_TENS[token]
+        consumed = 1
+        next_index = start + 1
+        if next_index < len(words) and words[next_index] in _SPOKEN_MONEY_ONES:
+            value += _SPOKEN_MONEY_ONES[words[next_index]]
+            consumed += 1
+        return value, consumed
+    if token in _SPOKEN_MONEY_ONES:
+        return _SPOKEN_MONEY_ONES[token], 1
+    return None
+
+
+def _has_spoken_money_context(*, start: int, end: int, words: list[str]) -> bool:
+    if start > 0 and words[start - 1] in _SPOKEN_MONEY_CONTEXT_PREPOSITIONS:
+        return True
+    if end < len(words) and words[end] in {"total", "dollars", "bucks"}:
+        return True
+
+    context_start = max(0, start - 3)
+    context_end = min(len(words), end + 3)
+    return any(word in _SPOKEN_MONEY_CONTEXT_KEYWORDS for word in words[context_start:context_end])
+
+
+def _has_spoken_money_adjacency_skip(*, start: int, end: int, words: list[str]) -> bool:
+    previous_word = words[start - 1] if start > 0 else None
+    next_word = words[end] if end < len(words) else None
+    next_next_word = words[end + 1] if end + 1 < len(words) else None
+
+    if previous_word in _SPOKEN_MONEY_ADJACENCY_SKIP:
+        return True
+    if next_word in _SPOKEN_MONEY_ADJACENCY_SKIP:
+        return True
+    if next_word == "bucks" and next_next_word == "per":
+        return True
+    if next_next_word in {"street", "st", "avenue", "ave", "road", "rd"}:
+        return True
+    return False
+
+
+def _looks_like_time_or_non_money_phrase(*, start: int, end: int, words: list[str]) -> bool:
+    previous_word = words[start - 1] if start > 0 else None
+    previous_two_word = words[start - 2] if start > 1 else None
+    next_word = words[end] if end < len(words) else None
+
+    if previous_word in {"around", "about"}:
+        return True
+    if next_word in {"am", "pm", "o'clock", "morning", "afternoon"}:
+        return True
+    if previous_word == "at" and previous_two_word in _SPOKEN_MONEY_TIME_VERBS:
+        return True
+    return False
 
 
 def _coerce_initial_candidate_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1285,6 +1540,10 @@ def _apply_semantic_guard_rules(result: ExtractionResult) -> ExtractionResult:
             source="leftover_classification",
         )
 
+    line_items = _apply_spoken_money_correction_guard(
+        line_items=line_items,
+        transcript=result.transcript,
+    )
     line_items = _flag_line_items_with_price_in_description(line_items)
     line_items = _flag_line_items_with_duplicate_details(line_items)
     line_items = _apply_duplicate_line_item_flags(line_items)
@@ -1316,6 +1575,115 @@ def _should_warn_for_total_without_priced_items(result: ExtractionResult) -> boo
         and bool(result.line_items)
         and not any(item.price is not None for item in result.line_items)
     )
+
+
+def _apply_spoken_money_correction_guard(
+    *,
+    line_items: list[LineItemExtractedV2],
+    transcript: str,
+) -> list[LineItemExtractedV2]:
+    if not line_items:
+        return line_items
+
+    spoken_hints = _extract_spoken_money_hints(transcript)
+    if not spoken_hints:
+        return line_items
+
+    updated_items = list(line_items)
+    used_indexes: set[int] = set()
+
+    for hint in spoken_hints:
+        matched_index = _resolve_spoken_money_match_index(
+            line_items=updated_items,
+            hint=hint,
+            used_indexes=used_indexes,
+        )
+        if matched_index is None:
+            log_extraction_trace(
+                _TRACE_EVENT_NAME,
+                stage="semantic_guard",
+                outcome="spoken_money_orphan_hint",
+                spoken_money_phrase=hint.phrase,
+                spoken_money_amount=hint.amount,
+            )
+            continue
+
+        used_indexes.add(matched_index)
+        existing = updated_items[matched_index]
+        if _prices_materially_equal(existing.price, hint.amount):
+            continue
+        if not _looks_like_cents_hundreds_misread(existing.price, hint.amount):
+            continue
+
+        updated_items[matched_index] = existing.model_copy(
+            update={
+                "price": hint.amount,
+                "flagged": True,
+                "flag_reason": SPOKEN_MONEY_CORRECTION_FLAG_REASON,
+            }
+        )
+
+    return updated_items
+
+
+def _resolve_spoken_money_match_index(
+    *,
+    line_items: list[LineItemExtractedV2],
+    hint: _SpokenMoneyHint,
+    used_indexes: set[int],
+) -> int | None:
+    phrase_matches: list[int] = []
+    cents_misread_matches: list[int] = []
+
+    for index, item in enumerate(line_items):
+        if index in used_indexes:
+            continue
+        if _hint_phrase_matches_line_item(item=item, hint_phrase=hint.phrase):
+            phrase_matches.append(index)
+            continue
+        if _looks_like_cents_hundreds_misread(item.price, hint.amount):
+            cents_misread_matches.append(index)
+
+    if phrase_matches:
+        return phrase_matches[0]
+    if len(cents_misread_matches) == 1:
+        return cents_misread_matches[0]
+    return None
+
+
+def _hint_phrase_matches_line_item(
+    *,
+    item: LineItemExtractedV2,
+    hint_phrase: str,
+) -> bool:
+    line_item_text = " ".join(
+        part
+        for part in (
+            item.raw_text,
+            item.description,
+            item.details,
+        )
+        if part
+    )
+    normalized_line_item = _WHITESPACE_PATTERN.sub(" ", line_item_text).strip().casefold()
+    return hint_phrase in normalized_line_item
+
+
+def _looks_like_cents_hundreds_misread(
+    candidate_price: float | None,
+    hint_amount: float,
+) -> bool:
+    if candidate_price is None:
+        return False
+    if hint_amount < 100:
+        return False
+    return abs((candidate_price * 100) - hint_amount) < 0.01
+
+
+def _prices_materially_equal(left: float | None, right: float | None) -> bool:
+    if left is None or right is None:
+        return left is None and right is None
+    return abs(left - right) < 0.01
 
 
 def _apply_duplicate_line_item_flags(

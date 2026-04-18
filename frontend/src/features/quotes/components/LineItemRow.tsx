@@ -1,4 +1,5 @@
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import { resolveLineItemFlagMessage } from "@/features/quotes/utils/lineItemFlags";
 
 interface LineItemRowProps {
   rowId: string;
@@ -25,7 +26,7 @@ export function LineItemRow({
     <div className="rounded-md border border-outline-variant p-4">
       {item.flagged ? (
         <p className="mb-3 rounded-md border border-warning-accent/40 bg-warning-container px-3 py-2 text-sm text-warning">
-          {item.flagReason ?? "This item may need review"}
+          {resolveLineItemFlagMessage(item.flagReason)}
         </p>
       ) : null}
       <div className="grid gap-3 md:grid-cols-[1.3fr_1.3fr_0.8fr_auto] md:items-end">
