@@ -1,13 +1,10 @@
 import type { InvoiceStatus } from "@/features/invoices/types/invoice-status";
 import type { DiscountType } from "@/shared/lib/pricing";
 
-export type PriceStatus = "priced" | "included" | "unknown";
-
 export interface LineItemDraft {
   description: string;
   details: string | null;
   price: number | null;
-  price_status?: PriceStatus;
   flagged?: boolean;
   flag_reason?: string | null;
 }
@@ -20,7 +17,6 @@ export interface LineItemExtracted extends LineItemDraft {
 export interface LineItemDraftWithFlags extends LineItemDraft {
   flagged?: boolean;
   flagReason?: string | null;
-  priceStatus?: PriceStatus;
 }
 
 export type PlacementConfidence = "high" | "medium" | "low";
@@ -91,7 +87,6 @@ export interface LineItem {
   description: string;
   details: string | null;
   price: number | null;
-  price_status?: PriceStatus;
   flagged?: boolean;
   flag_reason?: string | null;
   sort_order: number;

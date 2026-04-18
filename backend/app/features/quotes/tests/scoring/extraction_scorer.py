@@ -60,7 +60,6 @@ class ExtractionQualityCase:
         Literal[
             "adds_visible_scope",
             "withholds_correction",
-            "included_scope",
             "fills_pricing_fields",
             "no_visible_change",
         ]
@@ -311,13 +310,6 @@ def _score_unresolved_items(
 
 
 def _score_pricing_behavior(case: ExtractionQualityCase, result: ExtractionResult) -> float:
-    status_scores: list[float] = []
-    for item in result.line_items:
-        if item.price is None:
-            status_scores.append(1.0 if item.price_status in {"included", "unknown"} else 0.0)
-        else:
-            status_scores.append(1.0 if item.price_status == "priced" else 0.0)
-
     pricing_hints_payload = result.pricing_hints.model_dump(mode="json")
     expected_pricing_scores: list[float] = []
     for field in case.expected_pricing_fields:
@@ -331,8 +323,6 @@ def _score_pricing_behavior(case: ExtractionQualityCase, result: ExtractionResul
         )
 
     dimensions: list[float] = []
-    if status_scores:
-        dimensions.append(_average(status_scores, default=1.0))
     if expected_pricing_scores:
         dimensions.append(_average(expected_pricing_scores, default=1.0))
     dimensions.append(total_alignment_score)
@@ -351,9 +341,6 @@ def _score_append_outcome(case: ExtractionQualityCase, result: ExtractionResult)
     has_transcript_conflict = any(
         segment.source == "transcript_conflict" for segment in result.unresolved_segments
     )
-    has_included_scope = any(
-        item.price is None and item.price_status == "included" for item in result.line_items
-    )
     has_pricing_fields = any(
         value is not None for value in result.pricing_hints.model_dump(mode="json").values()
     )
@@ -362,8 +349,6 @@ def _score_append_outcome(case: ExtractionQualityCase, result: ExtractionResult)
         return 1.0 if has_visible_items else 0.0
     if expected == "withholds_correction":
         return 1.0 if (not has_visible_items and has_transcript_conflict) else 0.0
-    if expected == "included_scope":
-        return 1.0 if has_included_scope else 0.0
     if expected == "fills_pricing_fields":
         return 1.0 if has_pricing_fields else 0.0
     if expected == "no_visible_change":

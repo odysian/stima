@@ -40,7 +40,6 @@ interface ReviewFormContentProps {
       description: string;
       details: string | null;
       price: number | null;
-      priceStatus?: "priced" | "included" | "unknown";
       flagged?: boolean;
       flagReason?: string | null;
     }>;

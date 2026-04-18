@@ -139,7 +139,6 @@ async def test_create_extracted_draft_prefers_line_item_subtotal_over_conflictin
                 description="Mulch",
                 details="5 yards",
                 price=120,
-                price_status="priced",
                 confidence="medium",
             ),
             LineItemExtractedV2(
@@ -147,7 +146,6 @@ async def test_create_extracted_draft_prefers_line_item_subtotal_over_conflictin
                 description="Cleanup",
                 details="Included / no charge",
                 price=None,
-                price_status="included",
                 confidence="medium",
             ),
         ],

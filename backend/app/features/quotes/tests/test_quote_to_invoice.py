@@ -436,7 +436,6 @@ async def test_convert_quote_to_invoice_rejects_duplicates_and_patch_preserves_s
             "details": "Touch-up and cleanup",
             "id": patched_invoice["line_items"][0]["id"],
             "price": 90.0,
-            "price_status": "priced",
             "flagged": False,
             "flag_reason": None,
             "sort_order": 0,

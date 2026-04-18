@@ -1,7 +1,6 @@
 import { formatCurrency } from "@/shared/lib/formatters";
 
 import type { LineItem } from "@/features/quotes/types/quote.types";
-import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 
 interface QuoteLineItemsSectionProps {
   lineItems: LineItem[];
@@ -22,12 +21,6 @@ export function QuoteLineItemsSection({
       </div>
       <ul className="space-y-2">
         {lineItems.map((item) => {
-          const resolvedPriceStatus = resolvePriceStatus({
-            price: item.price,
-            priceStatus: item.price_status,
-            description: item.description,
-            details: item.details,
-          });
           return (
             <li
               key={item.id}
@@ -43,10 +36,8 @@ export function QuoteLineItemsSection({
                   </p>
                 ) : null}
               </div>
-              <p className={`ml-4 shrink-0 font-bold ${resolvedPriceStatus === "included" ? "text-success" : "text-on-surface"}`}>
-                {resolvedPriceStatus === "priced" && item.price !== null
-                  ? formatCurrency(item.price)
-                  : (resolvedPriceStatus === "included" ? "Included" : "TBD")}
+              <p className="ml-4 shrink-0 font-bold text-on-surface">
+                {item.price !== null ? formatCurrency(item.price) : "—"}
               </p>
             </li>
           );

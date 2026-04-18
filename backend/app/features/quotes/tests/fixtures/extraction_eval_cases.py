@@ -80,7 +80,6 @@ class ExtractionEvalCase:
     expect_degraded_reason_code: str | None = None
     expect_line_item_count_min: int | None = None
     expect_line_item_count_max: int | None = None
-    expect_line_item_price_statuses: tuple[Literal["priced", "included", "unknown"], ...] = ()
     expect_pricing_hints: dict[str, float | str | None] | None = None
     expect_unresolved_segment_sources: tuple[_UNRESOLVED_SEGMENT_SOURCE, ...] = ()
     expect_customer_notes_source: _UNRESOLVED_SEGMENT_SOURCE | None = None
@@ -114,13 +113,11 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Rear garage floodlights",
                             "details": "Install 2 units",
                             "price": 360,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Porch switch replacement",
                             "details": None,
                             "price": 75,
-                            "price_status": "priced",
                         },
                     ],
                     "notes_candidate": None,
@@ -157,13 +154,11 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Replace porch lights",
                             "details": "Two fixtures",
                             "price": 120,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Tighten loose railing",
                             "details": None,
                             "price": 45,
-                            "price_status": "priced",
                         },
                     ],
                     "notes_candidate": None,
@@ -195,19 +190,16 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Brown mulch",
                             "details": "5 yards",
                             "price": 225,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Edge front beds",
                             "details": None,
                             "price": 80,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Flush drip line",
                             "details": None,
                             "price": 60,
-                            "price_status": "priced",
                         },
                     ],
                     "notes_candidate": None,
@@ -240,19 +232,16 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Brown mulch",
                             "details": "5 yards",
                             "price": 225,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Edge front beds",
                             "details": None,
                             "price": 80,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Flush drip line",
                             "details": None,
                             "price": 60,
-                            "price_status": "priced",
                         },
                     ],
                     "notes_candidate": None,
@@ -287,19 +276,16 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Brown mulch",
                             "details": "5 yards",
                             "price": 225,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Edge front beds",
                             "details": None,
                             "price": 80,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Flush drip line",
                             "details": None,
                             "price": 60,
-                            "price_status": "priced",
                         },
                     ],
                     "notes_candidate": "Typed follow-up conflicts with transcript scope.",
@@ -348,13 +334,11 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Patio sealing",
                             "details": None,
                             "price": 260,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Drainage line cleanout",
                             "details": None,
                             "price": 180,
-                            "price_status": "priced",
                         },
                     ],
                     "notes_candidate": None,
@@ -389,7 +373,7 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         ),
     ),
     ExtractionEvalCase(
-        name="initial_conflicting_total_with_unknown_price_status",
+        name="initial_conflicting_total_with_unknown_prices",
         extraction_mode="initial",
         transcript=(
             "Paint fence and replace gate latch. Pricing is unclear per line item but customer "
@@ -405,13 +389,11 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Paint fence",
                             "details": None,
                             "price": None,
-                            "price_status": "unknown",
                         },
                         {
                             "description": "Replace gate latch",
                             "details": None,
                             "price": None,
-                            "price_status": "unknown",
                         },
                     ],
                     "notes_candidate": None,
@@ -426,7 +408,6 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
         expect_extraction_tier="primary",
         expect_line_item_count_min=2,
         expect_line_item_count_max=2,
-        expect_line_item_price_statuses=("unknown", "unknown"),
         expect_pricing_hints={"explicit_total": 225},
         expect_unresolved_segment_sources=("leftover_classification",),
         expect_repair_attempted=False,
@@ -448,13 +429,11 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Patio sealing",
                             "details": None,
                             "price": 260,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Drainage line cleanout",
                             "details": None,
                             "price": 180,
-                            "price_status": "priced",
                         },
                     ],
                     "notes_candidate": (
@@ -509,7 +488,6 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Trim shrubs",
                             "details": "Front beds",
                             "price": 125,
-                            "price_status": "priced",
                         }
                     ],
                     "notes_candidate": None,
@@ -607,13 +585,11 @@ EXTRACTION_EVAL_CASES: tuple[ExtractionEvalCase, ...] = (
                             "description": "Clean gutters",
                             "details": "Front",
                             "price": 150,
-                            "price_status": "priced",
                         },
                         {
                             "description": "Clean gutters",
                             "details": "Back",
                             "price": 150,
-                            "price_status": "priced",
                         },
                     ],
                     "notes_candidate": None,

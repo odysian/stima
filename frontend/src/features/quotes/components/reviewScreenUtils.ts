@@ -5,7 +5,6 @@ import type {
   LineItemDraftWithFlags,
 } from "@/features/quotes/types/quote.types";
 import { normalizeOptionalTitle } from "@/features/quotes/utils/normalizeOptionalTitle";
-import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 
 export const EMPTY_LINE_ITEM: LineItemDraftWithFlags = {
   description: "",
@@ -20,12 +19,6 @@ export function normalizeLineItem(item: LineItemDraftWithFlags): LineItemDraftWi
     description: item.description.trim(),
     details,
     price: item.price,
-    priceStatus: resolvePriceStatus({
-      price: item.price,
-      priceStatus: item.priceStatus,
-      description: item.description,
-      details,
-    }),
     flagged: item.flagged,
     flagReason: item.flagReason,
   };
@@ -52,7 +45,6 @@ export function buildLineItemSubmitState(lineItems: LineItemDraftWithFlags[]): {
       description: lineItem.description,
       details: lineItem.details,
       price: lineItem.price,
-      price_status: lineItem.priceStatus,
       flagged: lineItem.flagged,
       flag_reason: lineItem.flagReason ?? null,
     }));
@@ -75,7 +67,6 @@ export function mapExtractedLineItems(extraction: ExtractionResult): LineItemDra
     description: lineItem.description,
     details: lineItem.details,
     price: lineItem.price,
-    priceStatus: lineItem.price_status,
     flagged: lineItem.flagged,
     flagReason: lineItem.flag_reason,
   }));
@@ -107,8 +98,8 @@ export function getWarningMessages(
   return [
     ...reviewMessages,
     documentType === "quote"
-      ? "Line items without prices will render as \"TBD\" when the quote is shared."
-      : "Line items without prices will render as \"TBD\" when the invoice is created.",
+      ? "Line items without prices will render as \"—\" when the quote is shared."
+      : "Line items without prices will render as \"—\" when the invoice is created.",
   ];
 }
 

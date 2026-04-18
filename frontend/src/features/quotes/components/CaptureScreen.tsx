@@ -109,7 +109,6 @@ export function CaptureScreen(): React.ReactElement {
         description: lineItem.description,
         details: lineItem.details,
         price: lineItem.price,
-        priceStatus: lineItem.price_status,
         flagged: lineItem.flagged,
         flagReason: lineItem.flag_reason,
       })),

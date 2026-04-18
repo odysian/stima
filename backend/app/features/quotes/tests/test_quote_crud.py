@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.quotes.models import Document, LineItem, QuoteStatus
@@ -192,7 +192,7 @@ async def test_quote_crud_happy_path_with_ordering_and_line_item_replacement(
     assert patched["notes"] == "Updated note"
 
 
-async def test_quote_detail_price_status_round_trip(
+async def test_quote_detail_omits_price_status_in_line_item_payloads(
     client: AsyncClient,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -209,13 +209,11 @@ async def test_quote_detail_price_status_round_trip(
                     "description": "Cleanup labor",
                     "details": "Included / no charge",
                     "price": None,
-                    "price_status": "included",
                 },
                 {
                     "description": "Optional edging",
                     "details": "Need to confirm price onsite",
                     "price": None,
-                    "price_status": "unknown",
                 },
             ],
             "total_amount": 120,
@@ -226,25 +224,16 @@ async def test_quote_detail_price_status_round_trip(
     )
     assert create_response.status_code == 201
     payload = create_response.json()
-    assert [item["price_status"] for item in payload["line_items"]] == [
-        "priced",
-        "included",
-        "unknown",
-    ]
+    assert all("price_status" not in item for item in payload["line_items"])
 
     detail_response = await client.get(f"/api/quotes/{payload['id']}")
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
-    assert [item["price_status"] for item in detail_payload["line_items"]] == [
-        "priced",
-        "included",
-        "unknown",
-    ]
+    assert all("price_status" not in item for item in detail_payload["line_items"])
 
 
-async def test_quote_detail_normalizes_pre_v25_rows_with_null_price_status(
+async def test_quote_detail_blank_prices_remain_readable_without_price_status(
     client: AsyncClient,
-    db_session: AsyncSession,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -266,23 +255,16 @@ async def test_quote_detail_normalizes_pre_v25_rows_with_null_price_status(
     )
     assert create_response.status_code == 201
     quote_id = UUID(create_response.json()["id"])
-
-    await db_session.execute(
-        update(LineItem).where(LineItem.document_id == quote_id).values(price_status=None)
-    )
-    await db_session.commit()
-
     detail_response = await client.get(f"/api/quotes/{quote_id}")
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
-    assert [item["price_status"] for item in detail_payload["line_items"]] == [
-        "priced",
-        "included",
-        "unknown",
-    ]
+    assert all("price_status" not in item for item in detail_payload["line_items"])
+    assert detail_payload["line_items"][0]["price"] == 120
+    assert detail_payload["line_items"][1]["price"] is None
+    assert detail_payload["line_items"][2]["price"] is None
 
 
-async def test_create_quote_uses_priced_and_included_rows_as_subtotal_authority(
+async def test_create_quote_uses_priced_and_blank_rows_as_subtotal_authority(
     client: AsyncClient,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -298,13 +280,11 @@ async def test_create_quote_uses_priced_and_included_rows_as_subtotal_authority(
                     "description": "Mulch",
                     "details": "5 yards",
                     "price": 120,
-                    "price_status": "priced",
                 },
                 {
                     "description": "Cleanup",
                     "details": "Included / no charge",
                     "price": None,
-                    "price_status": "included",
                 },
             ],
             "total_amount": None,
@@ -319,7 +299,7 @@ async def test_create_quote_uses_priced_and_included_rows_as_subtotal_authority(
     assert payload["total_amount"] == 120
 
 
-async def test_create_quote_with_unknown_price_rows_leaves_total_empty_without_explicit_total(
+async def test_create_quote_with_blank_price_rows_ignores_blanks_for_total(
     client: AsyncClient,
 ) -> None:
     csrf_token = await _register_and_login(client, _credentials())
@@ -335,13 +315,11 @@ async def test_create_quote_with_unknown_price_rows_leaves_total_empty_without_e
                     "description": "Mulch",
                     "details": "5 yards",
                     "price": 120,
-                    "price_status": "priced",
                 },
                 {
                     "description": "Edging",
                     "details": "Need to confirm price onsite",
                     "price": None,
-                    "price_status": "unknown",
                 },
             ],
             "total_amount": None,
@@ -353,7 +331,7 @@ async def test_create_quote_with_unknown_price_rows_leaves_total_empty_without_e
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["total_amount"] is None
+    assert payload["total_amount"] == 120
 
 
 async def test_get_quote_returns_404_for_nonexistent_id(client: AsyncClient) -> None:
@@ -663,7 +641,6 @@ async def test_update_quote_replaces_line_items_when_provided(
             "description": "Premium mulch refresh",
             "details": "6 yards",
             "price": 180.0,
-            "price_status": "priced",
             "flagged": False,
             "flag_reason": None,
             "sort_order": 0,

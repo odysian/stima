@@ -172,7 +172,6 @@ class LineItem(Base):
     description: Mapped[str] = mapped_column(sa.Text, nullable=False)
     details: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     price: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
-    price_status: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     flagged: Mapped[bool] = mapped_column(
         sa.Boolean,
         nullable=False,

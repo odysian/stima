@@ -1,5 +1,4 @@
 import type { DiscountType } from "@/shared/lib/pricing";
-import type { PriceStatus } from "@/features/quotes/types/quote.types";
 
 export type PublicQuoteStatus = "shared" | "viewed" | "approved" | "declined";
 export type PublicInvoiceStatus = "sent";
@@ -8,7 +7,6 @@ export interface PublicDocumentLineItem {
   description: string;
   details: string | null;
   price: number | null;
-  price_status?: PriceStatus;
 }
 
 interface PublicDocumentBase {

@@ -142,7 +142,6 @@ class QuoteCreationService:
                 description=item.description,
                 details=item.details,
                 price=item.price,
-                price_status=item.price_status,
                 flagged=item.flagged,
                 flag_reason=item.flag_reason,
             )

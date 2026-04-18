@@ -8,11 +8,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.features.quotes.price_status import (
-    LineItemPriceStatus,
-    resolve_line_item_price_status,
-    resolve_line_item_price_status_with_fallback,
-)
 from app.shared.input_limits import (
     AUDIO_TRANSCRIPT_MAX_CHARS,
     DOCUMENT_LINE_ITEMS_MAX_ITEMS,
@@ -34,70 +29,14 @@ def _normalize_optional_title(value: object) -> object:
     return trimmed or None
 
 
-def _normalize_line_item_price_status_payload(value: object) -> object:
-    if not isinstance(value, dict):
-        return value
-    payload = dict(value)
-    payload["price_status"] = resolve_line_item_price_status(
-        price=payload.get("price"),
-        price_status=(
-            payload.get("price_status") if isinstance(payload.get("price_status"), str) else None
-        ),
-        description=(
-            payload.get("description") if isinstance(payload.get("description"), str) else None
-        ),
-        details=payload.get("details") if isinstance(payload.get("details"), str) else None,
-    )
-    return payload
-
-
-def _normalize_line_item_price_status_for_response(value: object) -> object:
-    payload: dict[str, Any] | None = None
-    if isinstance(value, dict):
-        payload = dict(value)
-    else:
-        fields = (
-            "id",
-            "description",
-            "details",
-            "price",
-            "price_status",
-            "flagged",
-            "flag_reason",
-            "sort_order",
-        )
-        extracted = {field: getattr(value, field) for field in fields if hasattr(value, field)}
-        if extracted:
-            payload = extracted
-    if payload is None:
-        return value
-
-    payload["price_status"] = resolve_line_item_price_status_with_fallback(
-        price=payload.get("price"),
-        price_status=(
-            payload.get("price_status") if isinstance(payload.get("price_status"), str) else None
-        ),
-        description=(
-            payload.get("description") if isinstance(payload.get("description"), str) else None
-        ),
-        details=payload.get("details") if isinstance(payload.get("details"), str) else None,
-    )
-    return payload
-
-
 class LineItemDraft(BaseModel):
     """Editable line item payload used for quote creation and updates."""
 
     description: str = Field(min_length=1, max_length=LINE_ITEM_DESCRIPTION_MAX_CHARS)
     details: str | None = Field(default=None, max_length=LINE_ITEM_DETAILS_MAX_CHARS)
     price: float | None = None
-    price_status: LineItemPriceStatus | None = None
     flagged: bool = False
     flag_reason: str | None = None
-
-    _normalize_price_status = model_validator(mode="before")(
-        _normalize_line_item_price_status_payload
-    )
 
 
 class LineItemExtracted(LineItemDraft):
@@ -697,14 +636,9 @@ class LineItemResponse(BaseModel):
     description: str
     details: str | None
     price: float | None
-    price_status: LineItemPriceStatus
     flagged: bool = False
     flag_reason: str | None = None
     sort_order: int
-
-    _normalize_price_status = model_validator(mode="before")(
-        _normalize_line_item_price_status_for_response
-    )
 
 
 class PublicLineItemResponse(BaseModel):
@@ -715,11 +649,6 @@ class PublicLineItemResponse(BaseModel):
     description: str
     details: str | None
     price: float | None
-    price_status: LineItemPriceStatus
-
-    _normalize_price_status = model_validator(mode="before")(
-        _normalize_line_item_price_status_for_response
-    )
 
 
 class QuoteListItemResponse(BaseModel):
