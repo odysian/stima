@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
@@ -14,10 +13,6 @@ _ZERO = Decimal("0")
 _ONE = Decimal("1")
 _HUNDRED = Decimal("100")
 _MONEY_QUANTIZER = Decimal("0.01")
-_INCLUDED_NO_CHARGE_PATTERN = re.compile(
-    r"\b(included|no[\s-]?charge|n/?c|complimentary|at no cost)\b",
-    flags=re.IGNORECASE,
-)
 
 
 class PricingValidationError(Exception):
@@ -392,49 +387,13 @@ def _derive_line_item_subtotal_decimal(
 
     priced_values: list[Decimal] = []
     for line_item in substantive_items:
-        status = _resolve_line_item_price_status_for_pricing(line_item)
-        if status == "unknown":
-            return False, None
-        if status == "priced":
-            price = to_decimal(getattr(line_item, "price", None))
-            if price is None:
-                return False, None
+        price = to_decimal(getattr(line_item, "price", None))
+        if price is not None:
             priced_values.append(price)
 
     if not priced_values:
         return True, None
     return True, _quantize_money(sum(priced_values, start=_ZERO))
-
-
-def _resolve_line_item_price_status_for_pricing(
-    line_item: object,
-) -> Literal["priced", "included", "unknown"]:
-    price = getattr(line_item, "price", None)
-    has_price = price is not None
-    raw_status = getattr(line_item, "price_status", None)
-    if isinstance(raw_status, str):
-        normalized = raw_status.strip().casefold()
-        if normalized == "priced":
-            return "priced" if has_price else "unknown"
-        if normalized == "included":
-            return "included" if not has_price else "priced"
-        if normalized == "unknown":
-            return "unknown" if not has_price else "priced"
-
-    if has_price:
-        return "priced"
-    description = getattr(line_item, "description", None)
-    details = getattr(line_item, "details", None)
-    if _has_included_no_charge_language(description, details):
-        return "included"
-    return "unknown"
-
-
-def _has_included_no_charge_language(*parts: object) -> bool:
-    for part in parts:
-        if isinstance(part, str) and _INCLUDED_NO_CHARGE_PATTERN.search(part):
-            return True
-    return False
 
 
 def _validate_discount_fields(

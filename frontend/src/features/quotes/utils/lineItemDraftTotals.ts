@@ -1,5 +1,4 @@
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
-import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 import { resolveLineItemSum } from "@/shared/lib/pricing";
 
 interface DraftLineItemTotalsState {
@@ -41,16 +40,7 @@ export function resolveLineItemAuthoritativeSubtotal(
 
   const pricedValues: number[] = [];
   for (const lineItem of substantiveLineItems) {
-    const priceStatus = resolvePriceStatus({
-      price: lineItem.price,
-      priceStatus: lineItem.priceStatus,
-      description: lineItem.description,
-      details: lineItem.details,
-    });
-    if (priceStatus === "unknown") {
-      return { definesSubtotal: false, subtotal: null };
-    }
-    if (priceStatus === "priced" && lineItem.price !== null) {
+    if (lineItem.price !== null) {
       pricedValues.push(lineItem.price);
     }
   }

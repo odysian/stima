@@ -61,15 +61,14 @@ def test_calculate_breakdown_from_persisted_recovers_percent_discount_subtotal()
     assert breakdown.balance_due == Decimal("126.00")
 
 
-def test_derive_document_subtotal_from_line_items_priced_and_included_rows() -> None:
+def test_derive_document_subtotal_from_line_items_priced_and_blank_rows() -> None:
     defines_subtotal, subtotal = derive_document_subtotal_from_line_items(
         [
-            _line_item("Mulch", price=120.0, price_status="priced"),
+            _line_item("Mulch", price=120.0),
             _line_item(
                 "Cleanup",
                 details="Included / no charge",
                 price=None,
-                price_status="included",
             ),
         ]
     )
@@ -78,37 +77,34 @@ def test_derive_document_subtotal_from_line_items_priced_and_included_rows() -> 
     assert subtotal == 120.0
 
 
-def test_derive_document_subtotal_from_line_items_priced_and_unknown_rows() -> None:
+def test_derive_document_subtotal_from_line_items_priced_and_unpriced_rows() -> None:
     defines_subtotal, subtotal = derive_document_subtotal_from_line_items(
         [
-            _line_item("Mulch", price=120.0, price_status="priced"),
+            _line_item("Mulch", price=120.0),
             _line_item(
                 "Edging",
                 details="Need price confirmation",
                 price=None,
-                price_status="unknown",
             ),
         ]
     )
 
-    assert defines_subtotal is False
-    assert subtotal is None
+    assert defines_subtotal is True
+    assert subtotal == 120.0
 
 
-def test_derive_document_subtotal_from_line_items_all_included_rows() -> None:
+def test_derive_document_subtotal_from_line_items_all_unpriced_rows() -> None:
     defines_subtotal, subtotal = derive_document_subtotal_from_line_items(
         [
             _line_item(
                 "Cleanup",
                 details="Included / no charge",
                 price=None,
-                price_status="included",
             ),
             _line_item(
                 "Debris hauling",
                 details="Complimentary",
                 price=None,
-                price_status="included",
             ),
         ]
     )
@@ -117,25 +113,23 @@ def test_derive_document_subtotal_from_line_items_all_included_rows() -> None:
     assert subtotal is None
 
 
-def test_derive_document_subtotal_from_line_items_all_unknown_rows() -> None:
+def test_derive_document_subtotal_from_line_items_blank_details_rows() -> None:
     defines_subtotal, subtotal = derive_document_subtotal_from_line_items(
         [
             _line_item(
                 "Cleanup",
                 details="Need to confirm scope",
                 price=None,
-                price_status="unknown",
             ),
             _line_item(
                 "Edging",
                 details="Estimate pending",
                 price=None,
-                price_status="unknown",
             ),
         ]
     )
 
-    assert defines_subtotal is False
+    assert defines_subtotal is True
     assert subtotal is None
 
 
@@ -151,11 +145,9 @@ def _line_item(
     *,
     details: str | None = None,
     price: float | None,
-    price_status: str | None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         description=description,
         details=details,
         price=price,
-        price_status=price_status,
     )

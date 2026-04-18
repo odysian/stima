@@ -6,7 +6,6 @@ import {
   publicService,
 } from "@/features/public/services/publicService";
 import type { PublicDocument } from "@/features/public/types/public.types";
-import { resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
 import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
@@ -279,12 +278,6 @@ export function PublicQuotePage(): React.ReactElement {
               </div>
               <ul className="mt-4 space-y-3">
                 {documentData.line_items.map((item, index) => {
-                  const resolvedPriceStatus = resolvePriceStatus({
-                    price: item.price,
-                    priceStatus: item.price_status,
-                    description: item.description,
-                    details: item.details,
-                  });
                   return (
                     <li
                       key={`${index}-${item.description}-${item.details ?? "none"}`}
@@ -301,10 +294,8 @@ export function PublicQuotePage(): React.ReactElement {
                             </p>
                           ) : null}
                         </div>
-                        <p className={`shrink-0 text-sm font-semibold ${resolvedPriceStatus === "included" ? "text-success" : ""}`}>
-                          {resolvedPriceStatus === "priced" && item.price !== null
-                            ? formatCurrency(item.price)
-                            : (resolvedPriceStatus === "included" ? "Included" : "TBD")}
+                        <p className="shrink-0 text-sm font-semibold">
+                          {item.price !== null ? formatCurrency(item.price) : "—"}
                         </p>
                       </div>
                     </li>

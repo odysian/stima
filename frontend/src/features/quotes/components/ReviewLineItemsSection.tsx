@@ -37,7 +37,6 @@ export function ReviewLineItemsSection({
                 description={displayDescription}
                 details={lineItem.details}
                 price={lineItem.price}
-                priceStatus={lineItem.priceStatus}
                 flagged={lineItem.flagged}
                 disabled={isInteractionLocked}
                 onClick={() => onEditLineItem(index)}

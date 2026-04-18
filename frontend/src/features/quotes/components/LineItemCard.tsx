@@ -1,11 +1,7 @@
-import type { PriceStatus } from "@/features/quotes/types/quote.types";
-import { getPriceStatusLabel, resolvePriceStatus } from "@/features/quotes/utils/priceStatus";
-
 interface LineItemCardProps {
   description: string;
   details: string | null;
   price: number | null;
-  priceStatus?: PriceStatus | null;
   flagged?: boolean;
   disabled?: boolean;
   ariaLabel?: string;
@@ -16,14 +12,12 @@ export function LineItemCard({
   description,
   details,
   price,
-  priceStatus,
   flagged = false,
   disabled = false,
   ariaLabel,
   onClick,
 }: LineItemCardProps): React.ReactElement {
-  const resolvedStatus = resolvePriceStatus({ price, priceStatus, description, details });
-  const priceLabel = getPriceStatusLabel({ price, priceStatus: resolvedStatus, description, details });
+  const priceLabel = price !== null ? `$${price.toFixed(2)}` : "—";
   return (
     <button
       type="button"
@@ -46,15 +40,7 @@ export function LineItemCard({
         {details ? <p className="mt-0.5 text-sm text-on-surface-variant">{details}</p> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <p
-          className={`font-bold ${
-            resolvedStatus === "included"
-              ? "text-success"
-              : "text-on-surface"
-          }`}
-        >
-          {priceLabel}
-        </p>
+        <p className="font-bold text-on-surface">{priceLabel}</p>
         <span className="material-symbols-outlined text-outline">chevron_right</span>
       </div>
     </button>

@@ -89,7 +89,6 @@ def _make_context(
                 description="Leaf cleanup",
                 details=line_item_details,
                 price=line_item_price,
-                price_status="priced" if line_item_price is not None else "unknown",
             )
         ],
         created_at=created_at,
@@ -156,11 +155,11 @@ def test_render_shows_em_dash_for_null_line_item_and_total_prices(
     rendered_html = captured_html[0]
     assert "$0.00" not in rendered_html
     assert "$None" not in rendered_html
-    assert rendered_html.count("&mdash;") == 1
+    assert rendered_html.count("&mdash;") == 2
     assert re.search(
         (
             r"<td>\s*<span class=\"line-item-description\">Leaf cleanup</span>\s*</td>\s*"
-            r"<td class=\"price-col\">\s*TBD\s*</td>"
+            r"<td class=\"price-col\">\s*&mdash;\s*</td>"
         ),
         rendered_html,
         re.DOTALL,
@@ -920,7 +919,7 @@ def test_render_handles_sparse_quote_without_blank_placeholders(
     assert 'class="line-item-details"' not in rendered_html
     assert "CUSTOMER SIGNATURE" in rendered_html
     assert "ACCEPTED BY" not in rendered_html.upper()
-    assert rendered_html.count("&mdash;") == 1
+    assert rendered_html.count("&mdash;") == 2
 
 
 def test_render_handles_denser_quote_layout_without_placeholder_regressions(
@@ -949,7 +948,6 @@ def test_render_handles_denser_quote_layout_without_placeholder_regressions(
                     description=f"Line item {index}",
                     details="Detailed scope line",
                     price=Decimal("130.00"),
-                    price_status="priced",
                 )
                 for index in range(1, 7)
             ],

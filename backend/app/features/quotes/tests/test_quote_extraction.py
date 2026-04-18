@@ -188,7 +188,7 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     assert payload["line_items"]
 
 
-async def test_extract_combined_persists_included_price_status_from_provider(
+async def test_extract_combined_keeps_null_price_rows_without_price_status_contract(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -213,7 +213,6 @@ async def test_extract_combined_persists_included_price_status_from_provider(
                     description="Cleanup labor",
                     details="Included / no charge",
                     price=None,
-                    price_status="included",
                     confidence="medium",
                 )
             ],
@@ -233,22 +232,22 @@ async def test_extract_combined_persists_included_price_status_from_provider(
     assert response.status_code == 200
     payload = response.json()
     assert payload["line_items"][0]["price"] is None
-    assert payload["line_items"][0]["price_status"] == "included"
+    assert "price_status" not in payload["line_items"][0]
 
     detail_response = await client.get(f"/api/quotes/{payload['quote_id']}")
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
     assert detail_payload["line_items"][0]["price"] is None
-    assert detail_payload["line_items"][0]["price_status"] == "included"
+    assert "price_status" not in detail_payload["line_items"][0]
 
 
-async def test_extract_combined_preserves_mixed_price_status_rows_across_reload(
+async def test_extract_combined_preserves_mixed_priced_and_blank_rows_across_reload(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     original_extract = _MockExtractionIntegration.extract
 
-    async def _extract_mixed_price_status_rows(
+    async def _extract_mixed_price_rows(
         self,
         notes: PreparedCaptureInput | str,
         *,
@@ -267,7 +266,6 @@ async def test_extract_combined_preserves_mixed_price_status_rows_across_reload(
                     description="Mulch",
                     details="3 yards",
                     price=120,
-                    price_status="priced",
                     confidence="medium",
                 ),
                 LineItemExtractedV2(
@@ -275,7 +273,6 @@ async def test_extract_combined_preserves_mixed_price_status_rows_across_reload(
                     description="Cleanup",
                     details="Included / no charge",
                     price=None,
-                    price_status="included",
                     confidence="medium",
                 ),
                 LineItemExtractedV2(
@@ -283,14 +280,13 @@ async def test_extract_combined_preserves_mixed_price_status_rows_across_reload(
                     description="Edging",
                     details="Need exact material cost",
                     price=None,
-                    price_status="unknown",
                     confidence="low",
                 ),
             ],
             pricing_hints=PricingHints(explicit_total=180),
         )
 
-    monkeypatch.setattr(_MockExtractionIntegration, "extract", _extract_mixed_price_status_rows)
+    monkeypatch.setattr(_MockExtractionIntegration, "extract", _extract_mixed_price_rows)
     csrf_token = await _register_and_login(client, _credentials())
     app.state.arq_pool = None
 
@@ -302,25 +298,19 @@ async def test_extract_combined_preserves_mixed_price_status_rows_across_reload(
 
     assert response.status_code == 200
     payload = response.json()
-    assert [item["price_status"] for item in payload["line_items"]] == [
-        "priced",
-        "included",
-        "unknown",
-    ]
+    assert all("price_status" not in item for item in payload["line_items"])
+    assert payload["line_items"][0]["price"] == 120
     assert payload["line_items"][2]["price"] is None
 
     quote_id = payload["quote_id"]
     detail_response = await client.get(f"/api/quotes/{quote_id}")
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
-    assert [item["price_status"] for item in detail_payload["line_items"]] == [
-        "priced",
-        "included",
-        "unknown",
-    ]
+    assert all("price_status" not in item for item in detail_payload["line_items"])
+    assert detail_payload["line_items"][0]["price"] == 120
     assert detail_payload["line_items"][2]["price"] is None
-    assert detail_payload["total_amount"] == 180
-    assert detail_payload["extraction_review_metadata"]["review_state"]["pricing_pending"] is True
+    assert detail_payload["total_amount"] == 120
+    assert detail_payload["extraction_review_metadata"]["review_state"]["pricing_pending"] is False
 
     patch_response = await client.patch(
         f"/api/quotes/{quote_id}",
@@ -329,22 +319,15 @@ async def test_extract_combined_preserves_mixed_price_status_rows_across_reload(
     )
     assert patch_response.status_code == 200
     patched_payload = patch_response.json()
-    assert [item["price_status"] for item in patched_payload["line_items"]] == [
-        "priced",
-        "included",
-        "unknown",
-    ]
+    assert all("price_status" not in item for item in patched_payload["line_items"])
 
     reloaded_detail_response = await client.get(f"/api/quotes/{quote_id}")
     assert reloaded_detail_response.status_code == 200
     reloaded_detail_payload = reloaded_detail_response.json()
-    assert [item["price_status"] for item in reloaded_detail_payload["line_items"]] == [
-        "priced",
-        "included",
-        "unknown",
-    ]
+    assert all("price_status" not in item for item in reloaded_detail_payload["line_items"])
+    assert reloaded_detail_payload["line_items"][0]["price"] == 120
     assert reloaded_detail_payload["line_items"][2]["price"] is None
-    assert reloaded_detail_payload["total_amount"] == 180
+    assert reloaded_detail_payload["total_amount"] == 120
 
 
 async def test_extract_combined_sync_passes_initial_mode_to_extraction_integration(

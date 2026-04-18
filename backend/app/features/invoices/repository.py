@@ -23,10 +23,6 @@ from app.features.customers.models import Customer
 from app.features.event_logs.models import EventLog
 from app.features.jobs.models import JobRecord, JobStatus
 from app.features.quotes.models import Document, LineItem, QuoteStatus
-from app.features.quotes.price_status import (
-    LineItemPriceStatus,
-    resolve_line_item_price_status_with_fallback,
-)
 from app.features.quotes.repository import QuoteRenderContext, QuoteRenderLineItem
 from app.features.quotes.schemas import LineItemDraft
 from app.shared.pricing import (
@@ -722,7 +718,6 @@ class InvoiceRepository:
                     description=item.description,
                     details=item.details,
                     price=_to_decimal(item.price),
-                    price_status=item.price_status,
                     sort_order=index,
                 )
             )
@@ -792,7 +787,6 @@ def _build_render_context(
                 description=line_item.description,
                 details=line_item.details,
                 price=line_item.price,
-                price_status=_resolve_line_item_price_status_for_render(line_item),
             )
             for line_item in document.line_items
         ],
@@ -818,12 +812,3 @@ def _format_document_date(value: date | None, timezone: str | None) -> str | Non
         return None
     del timezone
     return value.strftime("%b %d, %Y")
-
-
-def _resolve_line_item_price_status_for_render(line_item: LineItem) -> LineItemPriceStatus:
-    return resolve_line_item_price_status_with_fallback(
-        price=line_item.price,
-        price_status=line_item.price_status,
-        description=line_item.description,
-        details=line_item.details,
-    )

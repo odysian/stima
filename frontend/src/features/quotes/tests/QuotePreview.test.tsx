@@ -782,7 +782,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText("$59.00")).toBeInTheDocument();
   });
 
-  it("renders quote line items with details and TBD for missing prices", async () => {
+  it("renders quote line items with details and em dash for missing prices", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({
         total_amount: 300,
@@ -813,7 +813,7 @@ describe("QuotePreview", () => {
     expect(screen.getByText("5 yards")).toBeInTheDocument();
     expect(within(screen.getByRole("list")).getByText("$120.00")).toBeInTheDocument();
     expect(screen.getByText("Edge front beds")).toBeInTheDocument();
-    expect(screen.getByText("TBD")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("wraps long unbroken line-item description and details in quote preview", async () => {

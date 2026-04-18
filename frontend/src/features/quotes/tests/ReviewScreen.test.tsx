@@ -294,7 +294,7 @@ afterEach(() => {
 });
 
 describe("DocumentEditScreen", () => {
-  it("preserves included invoice line-item status when hydrating edit draft", () => {
+  it("hydrates invoice line items without legacy price-status fields", () => {
     const invoice = makeInvoice({
       line_items: [
         {
@@ -302,14 +302,19 @@ describe("DocumentEditScreen", () => {
           description: "Permit fee",
           details: "Included in project scope",
           price: null,
-          price_status: "included",
           sort_order: 0,
         },
       ],
     });
 
     const draft = mapInvoiceToEditDraft(invoice);
-    expect(draft.lineItems[0]?.priceStatus).toBe("included");
+    expect(draft.lineItems[0]).toEqual(
+      expect.objectContaining({
+        description: "Permit fee",
+        details: "Included in project scope",
+        price: null,
+      }),
+    );
   });
 
   it("hydrates priced + included quote rows with an authoritative subtotal", () => {
@@ -321,7 +326,6 @@ describe("DocumentEditScreen", () => {
           description: "Mulch",
           details: "3 yards",
           price: 120,
-          price_status: "priced",
           sort_order: 0,
         },
         {
@@ -329,7 +333,6 @@ describe("DocumentEditScreen", () => {
           description: "Cleanup",
           details: "Included in project scope",
           price: null,
-          price_status: "included",
           sort_order: 1,
         },
       ],
@@ -339,7 +342,7 @@ describe("DocumentEditScreen", () => {
     expect(draft.total).toBe(120);
   });
 
-  it("keeps quote subtotal null when unknown rows are present and no backend total exists", () => {
+  it("derives quote subtotal from priced rows when blank-price rows are present", () => {
     const quote = makeQuote({
       total_amount: null,
       line_items: [
@@ -348,7 +351,6 @@ describe("DocumentEditScreen", () => {
           description: "Mulch",
           details: "3 yards",
           price: 120,
-          price_status: "priced",
           sort_order: 0,
         },
         {
@@ -356,14 +358,13 @@ describe("DocumentEditScreen", () => {
           description: "Edging",
           details: "Need to confirm exact material cost",
           price: null,
-          price_status: "unknown",
           sort_order: 1,
         },
       ],
     });
 
     const draft = mapQuoteToEditDraft(quote);
-    expect(draft.total).toBeNull();
+    expect(draft.total).toBe(120);
   });
 
   it("keeps quote subtotal null when all rows are unknown or included", () => {
@@ -375,7 +376,6 @@ describe("DocumentEditScreen", () => {
           description: "Edging",
           details: "Need to confirm exact material cost",
           price: null,
-          price_status: "unknown",
           sort_order: 0,
         },
       ],
@@ -388,7 +388,6 @@ describe("DocumentEditScreen", () => {
           description: "Cleanup",
           details: "Included in project scope",
           price: null,
-          price_status: "included",
           sort_order: 0,
         },
       ],
@@ -715,7 +714,7 @@ describe("DocumentEditScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/invoices/doc-1", { replace: true });
   });
 
-  it("keeps total_amount null and preserves null-price statuses when saving without pricing edits", async () => {
+  it("derives total_amount from priced rows when saving without pricing edits", async () => {
     renderScreen({
       document: makeQuote({
         total_amount: null,
@@ -725,7 +724,6 @@ describe("DocumentEditScreen", () => {
             description: "Mulch",
             details: "3 yards",
             price: 120,
-            price_status: "priced",
             sort_order: 0,
           },
           {
@@ -733,7 +731,6 @@ describe("DocumentEditScreen", () => {
             description: "Cleanup",
             details: "Included / no charge",
             price: null,
-            price_status: "included",
             sort_order: 1,
           },
           {
@@ -741,7 +738,6 @@ describe("DocumentEditScreen", () => {
             description: "Edging",
             details: "Need to confirm exact material cost",
             price: null,
-            price_status: "unknown",
             sort_order: 2,
           },
         ],
@@ -752,17 +748,15 @@ describe("DocumentEditScreen", () => {
 
     await waitFor(() => {
       expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
-        total_amount: null,
+        total_amount: 120,
         line_items: expect.arrayContaining([
           expect.objectContaining({
             description: "Cleanup",
             price: null,
-            price_status: "included",
           }),
           expect.objectContaining({
             description: "Edging",
             price: null,
-            price_status: "unknown",
           }),
         ]),
       }));

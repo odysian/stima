@@ -33,7 +33,6 @@ export function buildDraftSnapshot(
       description: string;
       details: string | null;
       price: number | null;
-      priceStatus?: "priced" | "included" | "unknown";
     }[];
     total: number | null;
     taxRate: number | null;
@@ -55,7 +54,6 @@ export function buildDraftSnapshot(
       description: lineItem.description,
       details: lineItem.details,
       price: lineItem.price,
-      price_status: lineItem.priceStatus,
     }));
 
   return {
