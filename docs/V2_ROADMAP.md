@@ -1,7 +1,9 @@
-# Stima V2 Roadmap
+# Stima V2 Roadmap 
 
 **Version:** 0.1 — March 2026
 **Status:** Parked — features prioritized by pilot data, not pre-planned. This document captures ideas validated during V1 planning but is not an active build queue.
+
+Replaced by docs/V2.1_ROADMAP.md
 **Assumes:** V1 is complete and live with real users
 **Reference:** `docs/PRODUCT.md` for strategic context
 
