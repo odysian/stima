@@ -12,7 +12,6 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { formatDate } from "@/shared/lib/formatters";
-import { Card } from "@/ui/Card";
 import { Eyebrow } from "@/ui/Eyebrow";
 import { QuoteListRow } from "@/ui/QuoteListRow";
 import type { StatusPillVariant } from "@/ui/StatusPill";
@@ -167,15 +166,6 @@ export function QuoteList(): React.ReactElement {
     [invoiceLoadError, invoices, isLoadingInvoices],
   );
 
-  const activeCount = useMemo(
-    () => quotes.filter((q) => q.status === "ready" || q.status === "shared").length,
-    [quotes],
-  );
-  const pendingCount = useMemo(
-    () => quotes.filter((q) => q.status === "draft").length,
-    [quotes],
-  );
-
   const isLoading = documentMode === "quotes" ? isLoadingQuotes : isLoadingInvoices;
   const loadError = documentMode === "quotes" ? quoteLoadError : invoiceLoadError;
   const filteredRows = documentMode === "quotes" ? filteredQuotes : filteredInvoices;
@@ -259,23 +249,6 @@ export function QuoteList(): React.ReactElement {
     <main className="min-h-screen bg-background pb-24">
       <ScreenHeader title={headerTitle} subtitle={headerSubtitle} layout="top-level" />
       <section className="mx-auto w-full max-w-3xl pb-2 pt-20">
-        {documentMode === "quotes" && !isLoadingQuotes && !quoteLoadError ? (
-          <div className="mb-4 grid grid-cols-2 gap-3 px-4">
-            <Card accent="primary">
-              <Eyebrow>Active</Eyebrow>
-              <p className="mt-2.5 font-headline text-[2rem] font-bold leading-none tracking-[-0.02em] text-on-surface">
-                {String(activeCount).padStart(2, "0")}
-              </p>
-            </Card>
-            <Card accent="warn">
-              <Eyebrow>Pending review</Eyebrow>
-              <p className="mt-2.5 font-headline text-[2rem] font-bold leading-none tracking-[-0.02em] text-on-surface">
-                {String(pendingCount).padStart(2, "0")}
-              </p>
-            </Card>
-          </div>
-        ) : null}
-
         <div className="mb-4 px-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div

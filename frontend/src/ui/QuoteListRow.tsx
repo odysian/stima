@@ -1,4 +1,3 @@
-import { statusBadgeBaseClasses } from "@/shared/components/StatusBadge";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { StatusPill } from "@/ui/StatusPill";
 import type { StatusPillVariant } from "@/ui/StatusPill";
@@ -14,11 +13,13 @@ interface QuoteListRowProps {
   onClick: () => void;
 }
 
+const pillBase = "text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full";
+
 const baseRowClasses =
-  "w-full cursor-pointer rounded-xl bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+  "w-full cursor-pointer rounded-[var(--radius-document)] bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const draftRowClasses =
-  "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} shrink-0 whitespace-nowrap bg-warning-container text-warning`;
+  "glass-surface w-full cursor-pointer rounded-[var(--radius-document)] border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+const needsCustomerPillClasses = `${pillBase} shrink-0 whitespace-nowrap bg-warning-container text-warning`;
 
 export function QuoteListRow({
   customerLabel,
@@ -45,9 +46,9 @@ export function QuoteListRow({
           <p className="text-sm text-on-surface-variant">{titleLabel}</p>
         ) : null}
         <div className="flex items-center gap-3">
-          <p className="text-sm text-on-surface-variant">{docAndDate}</p>
+          <p className="text-xs text-on-surface-variant">{docAndDate}</p>
           {needsCustomerAssignment ? (
-            <span className={`${needsCustomerBadgeClasses} ml-auto`}>Needs customer</span>
+            <span className={`${needsCustomerPillClasses} ml-auto`}>Needs customer</span>
           ) : (
             <span className="ml-auto">
               <StatusPill variant={status} />

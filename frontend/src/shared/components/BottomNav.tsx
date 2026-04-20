@@ -43,7 +43,7 @@ export function BottomNav({ active }: BottomNavProps): React.ReactElement {
           >
             <span
               className={`flex items-center justify-center rounded-full px-4 py-1 transition-colors ${
-                isActive ? "bg-primary/10" : ""
+                isActive ? "bg-primary/20" : ""
               }`}
             >
               <span className={`material-symbols-outlined ${isActive ? "material-symbols-filled" : ""}`}>
