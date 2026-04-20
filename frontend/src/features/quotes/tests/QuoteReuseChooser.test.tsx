@@ -1,0 +1,137 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { QuoteReuseChooser } from "@/features/quotes/components/QuoteReuseChooser";
+import { quoteService } from "@/features/quotes/services/quoteService";
+
+vi.mock("@/features/quotes/services/quoteService", () => ({
+  quoteService: {
+    listReuseCandidates: vi.fn(),
+    duplicateQuote: vi.fn(),
+  },
+}));
+
+const mockedQuoteService = vi.mocked(quoteService);
+
+function makeReuseCandidate() {
+  return {
+    id: "quote-1",
+    title: "Backyard Refresh",
+    doc_number: "Q-001",
+    customer_id: "cust-1",
+    customer_name: "Evergreen Landscaping",
+    total_amount: 750,
+    created_at: "2026-03-25T00:00:00.000Z",
+    status: "shared" as const,
+    line_item_previews: [
+      { description: "Design plan", price: 120 },
+      { description: "Material staging", price: 240 },
+      { description: "Install edging", price: 310 },
+    ],
+    line_item_count: 4,
+    more_line_item_count: 1,
+  };
+}
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("QuoteReuseChooser", () => {
+  it("renders reuse candidates with preview rows and overflow count", async () => {
+    mockedQuoteService.listReuseCandidates.mockResolvedValueOnce([makeReuseCandidate()]);
+
+    render(
+      <QuoteReuseChooser
+        open
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: /backyard refresh/i })).toBeInTheDocument();
+    expect(screen.getByText("Evergreen Landscaping")).toBeInTheDocument();
+    expect(screen.getByText(/Q-001\s*·\s*Mar 25, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("Design plan")).toBeInTheDocument();
+    expect(screen.getByText("+1 more items")).toBeInTheDocument();
+    expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
+      customer_id: undefined,
+      q: undefined,
+    });
+  });
+
+  it("passes customer scope and search query to reuse-candidates API", async () => {
+    mockedQuoteService.listReuseCandidates.mockResolvedValue([]);
+
+    render(
+      <QuoteReuseChooser
+        open
+        customerId="cust-1"
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
+        customer_id: "cust-1",
+        q: undefined,
+      });
+    });
+
+    fireEvent.change(screen.getByLabelText("Search existing quotes"), {
+      target: { value: "evergreen" },
+    });
+
+    await waitFor(() => {
+      expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
+        customer_id: "cust-1",
+        q: "evergreen",
+      });
+    });
+  });
+
+  it("duplicates the selected quote and reports the new id", async () => {
+    const onQuoteDuplicated = vi.fn();
+    mockedQuoteService.listReuseCandidates.mockResolvedValueOnce([makeReuseCandidate()]);
+    mockedQuoteService.duplicateQuote.mockResolvedValueOnce({
+      id: "quote-2",
+      customer_id: "cust-1",
+      doc_type: "quote",
+      doc_number: "Q-002",
+      title: "Backyard Refresh",
+      status: "draft",
+      source_type: "text",
+      transcript: "",
+      total_amount: 750,
+      tax_rate: null,
+      discount_type: null,
+      discount_value: null,
+      deposit_amount: null,
+      notes: null,
+      shared_at: null,
+      share_token: null,
+      line_items: [],
+      created_at: "2026-03-26T00:00:00.000Z",
+      updated_at: "2026-03-26T00:00:00.000Z",
+    });
+
+    render(
+      <QuoteReuseChooser
+        open
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={onQuoteDuplicated}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /backyard refresh/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.duplicateQuote).toHaveBeenCalledWith("quote-1");
+    });
+    expect(onQuoteDuplicated).toHaveBeenCalledWith("quote-2");
+  });
+});

@@ -37,13 +37,23 @@ vi.mock("@/features/customers/services/customerService", () => ({
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
     extract: vi.fn(),
+    createManualDraft: vi.fn(),
     convertNotes: vi.fn(),
     createQuote: vi.fn(),
     listQuotes: vi.fn(),
+    listReuseCandidates: vi.fn(),
+    duplicateQuote: vi.fn(),
     getQuote: vi.fn(),
     updateQuote: vi.fn(),
+    updateExtractionReviewMetadata: vi.fn(),
+    deleteQuote: vi.fn(),
     generatePdf: vi.fn(),
     shareQuote: vi.fn(),
+    revokeShare: vi.fn(),
+    sendQuoteEmail: vi.fn(),
+    markQuoteWon: vi.fn(),
+    markQuoteLost: vi.fn(),
+    convertToInvoice: vi.fn(),
   },
 }));
 
@@ -322,15 +332,73 @@ describe("CustomerDetailScreen", () => {
     expect(screen.getAllByText("—")).toHaveLength(3);
   });
 
-  it("navigates to quote capture for this customer", async () => {
+  it("opens create entry sheet and starts a customer-scoped new quote", async () => {
     renderScreen();
     await screen.findByText("Q-001");
 
     fireEvent.click(screen.getByRole("button", { name: /create document/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create new" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/capture/cust-1", {
       state: { launchOrigin: "/customers/cust-1" },
     });
+  });
+
+  it("duplicates from existing quotes scoped to this customer", async () => {
+    mockedQuoteService.listReuseCandidates.mockResolvedValueOnce([
+      {
+        id: "quote-source-1",
+        title: "Fence Repair",
+        doc_number: "Q-021",
+        customer_id: "cust-1",
+        customer_name: "Alice Johnson",
+        total_amount: 220,
+        created_at: "2026-03-25T00:00:00.000Z",
+        status: "ready",
+        line_item_previews: [{ description: "Fence panel", price: 220 }],
+        line_item_count: 1,
+        more_line_item_count: 0,
+      },
+    ]);
+    mockedQuoteService.duplicateQuote.mockResolvedValueOnce({
+      id: "quote-duplicate-1",
+      customer_id: "cust-1",
+      doc_type: "quote",
+      doc_number: "Q-022",
+      title: "Fence Repair",
+      status: "draft",
+      source_type: "text",
+      transcript: "",
+      total_amount: 220,
+      tax_rate: null,
+      discount_type: null,
+      discount_value: null,
+      deposit_amount: null,
+      notes: null,
+      shared_at: null,
+      share_token: null,
+      line_items: [],
+      created_at: "2026-03-26T00:00:00.000Z",
+      updated_at: "2026-03-26T00:00:00.000Z",
+    });
+
+    renderScreen();
+    await screen.findByText("Q-001");
+
+    fireEvent.click(screen.getByRole("button", { name: /create document/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create from existing" }));
+    fireEvent.click(await screen.findByRole("button", { name: /fence repair/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
+        customer_id: "cust-1",
+        q: undefined,
+      });
+    });
+    await waitFor(() => {
+      expect(mockedQuoteService.duplicateQuote).toHaveBeenCalledWith("quote-source-1");
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-duplicate-1/edit");
   });
 
   it("renders quote history filtered to this customer and opens preview on click", async () => {

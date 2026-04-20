@@ -224,6 +224,25 @@ export interface QuoteListItem {
   created_at: string;
 }
 
+export interface QuoteReuseLineItemPreview {
+  description: string;
+  price: number | null;
+}
+
+export interface QuoteReuseCandidate {
+  id: string;
+  title: string | null;
+  doc_number: string;
+  customer_id: string | null;
+  customer_name: string | null;
+  total_amount: number | null;
+  created_at: string;
+  status: QuoteStatus;
+  line_item_previews: QuoteReuseLineItemPreview[];
+  line_item_count: number;
+  more_line_item_count: number;
+}
+
 export interface QuoteCreateRequest {
   customer_id: string;
   title: string | null;
