@@ -70,7 +70,7 @@ describe("LineItemCard", () => {
     expect(onEditMock).toHaveBeenCalledTimes(1);
   });
 
-  it("shows overflow actions for edit and delete", () => {
+  it("hides drag, chevron, and overflow affordances in default mode", () => {
     render(
       <LineItemCard
         description="Brown mulch"
@@ -81,8 +81,47 @@ describe("LineItemCard", () => {
       />,
     );
 
+    expect(screen.queryByRole("button", { name: /reorder line item brown mulch/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /line item actions for brown mulch/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("chevron_right")).not.toBeInTheDocument();
+  });
+
+  it("shows reorder affordances and blocks row editing while in reorder mode", () => {
+    const onEditMock = vi.fn();
+    render(
+      <LineItemCard
+        description="Brown mulch"
+        details="5 yards"
+        price={120}
+        ariaLabel="Edit line item Brown mulch"
+        isReorderMode
+        onEdit={onEditMock}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const editRowButton = screen.getByRole("button", { name: /edit line item brown mulch/i });
+    expect(editRowButton).toBeDisabled();
+    expect(screen.getByRole("button", { name: /reorder line item brown mulch/i })).toBeInTheDocument();
+
+    fireEvent.click(editRowButton);
+    expect(onEditMock).not.toHaveBeenCalled();
+  });
+
+  it("shows delete overflow action while in reorder mode", () => {
+    render(
+      <LineItemCard
+        description="Brown mulch"
+        details="5 yards"
+        price={120}
+        isReorderMode
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
     fireEvent.click(screen.getByRole("button", { name: /line item actions for brown mulch/i }));
-    expect(screen.getByRole("menuitem", { name: /edit/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /delete/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /edit/i })).not.toBeInTheDocument();
   });
 });
