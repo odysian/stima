@@ -288,8 +288,8 @@ class QuoteCreationService:
                 description=line_item.description,
                 details=line_item.details,
                 price=document_field_float_or_none(line_item.price),
-                flagged=line_item.flagged,
-                flag_reason=line_item.flag_reason,
+                flagged=False,
+                flag_reason=None,
             )
             for line_item in source_quote.line_items
         ]

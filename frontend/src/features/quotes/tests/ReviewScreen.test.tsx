@@ -818,6 +818,44 @@ describe("DocumentEditScreen", () => {
     });
   });
 
+  it("omits transcript from quote updates when draft transcript is empty or whitespace", async () => {
+    renderScreen({
+      document: makeQuote({
+        transcript: "   \n\t  ",
+      }),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = mockedQuoteService.updateQuote.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(payload).toBeDefined();
+    expect(payload).not.toHaveProperty("transcript");
+  });
+
+  it("keeps transcript in quote updates when draft transcript has non-whitespace content", async () => {
+    renderScreen({
+      document: makeQuote({
+        transcript: "  Captured transcript text.  ",
+      }),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = mockedQuoteService.updateQuote.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(payload).toBeDefined();
+    expect(payload).toMatchObject({
+      transcript: "  Captured transcript text.  ",
+    });
+  });
+
   it("saves invoice edits through invoice endpoint when document starts as invoice", async () => {
     renderScreen({ document: makeInvoice() });
 
