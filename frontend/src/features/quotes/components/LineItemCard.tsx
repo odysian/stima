@@ -1,7 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { resolveLineItemFlagMessage } from "@/features/quotes/utils/lineItemFlags";
-import { OverflowMenu, type OverflowMenuItem } from "@/shared/components/OverflowMenu";
 
 interface LineItemCardProps {
   description: string;
@@ -15,7 +14,6 @@ interface LineItemCardProps {
   isReorderMode?: boolean;
   ariaLabel?: string;
   onEdit: () => void;
-  onDelete: () => void;
   onDragHandlePointerDown?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   dragHandleAriaLabel?: string;
 }
@@ -32,7 +30,6 @@ export function LineItemCard({
   isReorderMode = false,
   ariaLabel,
   onEdit,
-  onDelete,
   onDragHandlePointerDown,
   dragHandleAriaLabel,
 }: LineItemCardProps): React.ReactElement {
@@ -40,17 +37,7 @@ export function LineItemCard({
   const priceLabel = price !== null ? `$${price.toFixed(2)}` : "—";
   const flagMessage = flagged ? resolveLineItemFlagMessage(flagReason) : null;
   const showDragHandle = isReorderMode;
-  const showOverflowMenu = isReorderMode;
   const canEditRow = !disabled && !isReorderMode;
-  const overflowItems: OverflowMenuItem[] = showOverflowMenu ? [
-    {
-      label: "Delete",
-      icon: "delete",
-      tone: "destructive",
-      disabled,
-      onSelect: onDelete,
-    },
-  ] : [];
 
   return (
     <div
@@ -114,10 +101,6 @@ export function LineItemCard({
           <p className="font-bold text-on-surface">{priceLabel}</p>
         </div>
       </button>
-
-      {showOverflowMenu ? (
-        <OverflowMenu items={overflowItems} triggerLabel={`Line item actions for ${lineItemLabel}`} />
-      ) : null}
     </div>
   );
 }

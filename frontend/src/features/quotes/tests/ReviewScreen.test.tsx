@@ -530,7 +530,7 @@ describe("DocumentEditScreen", () => {
     expect(screen.queryByRole("button", { name: /capture more notes/i })).not.toBeInTheDocument();
   });
 
-  it("shows delete overflow only in reorder mode and requires delete confirmation", async () => {
+  it("removes row overflow in both list modes and deletes via sheet trash with confirmation", async () => {
     renderScreen({
       document: makeQuote({
         line_items: [
@@ -558,22 +558,27 @@ describe("DocumentEditScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reorder" }));
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit line item 1: brown mulch/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /line item actions for brown mulch/i })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /line item actions for brown mulch/i }));
-    expect(screen.getByRole("menuitem", { name: /delete/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /edit/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.click(screen.getByRole("button", { name: /edit line item 1: brown mulch/i }));
 
-    fireEvent.click(screen.getByRole("menuitem", { name: /delete/i }));
-    expect(screen.getByRole("dialog", { name: /delete this line item\?/i })).toBeInTheDocument();
+    const editSheet = screen.getByRole("dialog", { name: /edit line item/i });
+    expect(editSheet).toBeInTheDocument();
+    fireEvent.click(within(editSheet).getByRole("button", { name: /delete line item/i }));
+    const deleteConfirmDialog = screen.getByRole("dialog", { name: /delete this line item\?/i });
+    expect(deleteConfirmDialog).toBeInTheDocument();
     expect(document.querySelectorAll("[data-line-item-index]").length).toBe(2);
 
     fireEvent.click(screen.getByRole("button", { name: /keep line item/i }));
     expect(screen.queryByRole("dialog", { name: /delete this line item\?/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /edit line item 1: brown mulch/i })).toBeDisabled();
+    expect(screen.getByRole("dialog", { name: /edit line item/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /line item actions for brown mulch/i }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /delete/i }));
-    fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
+    fireEvent.click(within(editSheet).getByRole("button", { name: /delete line item/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /delete this line item\?/i }))
+        .getByRole("button", { name: /delete line item/i }),
+    );
 
     expect(document.querySelectorAll("[data-line-item-index]").length).toBe(1);
     expect(screen.getByText("Cleanup labor")).toBeInTheDocument();

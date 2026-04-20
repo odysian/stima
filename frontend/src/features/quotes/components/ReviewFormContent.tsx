@@ -74,7 +74,6 @@ interface ReviewFormContentProps {
   onRequestAssignment: () => void;
   onTitleChange: (nextTitle: string) => void;
   onEditLineItem: (lineItemIndex: number) => void;
-  onRequestDeleteLineItem: (lineItemIndex: number) => void;
   onReorderLineItems: (sourceIndex: number, targetIndex: number) => void;
   onAddLineItem: () => void;
   onTotalChange: (nextTotal: number | null) => void;
@@ -113,7 +112,6 @@ export function ReviewFormContent({
   onRequestAssignment,
   onTitleChange,
   onEditLineItem,
-  onRequestDeleteLineItem,
   onReorderLineItems,
   onAddLineItem,
   onTotalChange,
@@ -266,7 +264,6 @@ export function ReviewFormContent({
         lineItems={draft.lineItems}
         isInteractionLocked={isInteractionLocked}
         onEditLineItem={onEditLineItem}
-        onRequestDeleteLineItem={onRequestDeleteLineItem}
         onReorderLineItems={onReorderLineItems}
         onAddLineItem={onAddLineItem}
       />
