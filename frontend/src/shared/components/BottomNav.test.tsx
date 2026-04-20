@@ -34,7 +34,7 @@ describe("BottomNav", () => {
 
     expect(screen.getByRole("navigation")).toHaveClass(
       "glass-surface-strong",
-      "glass-shadow-top",
+      "glass-shadow-bottom",
       "border-outline-variant/20",
     );
     expect(screen.getByRole("button", { name: /customers/i })).toHaveClass("text-primary");
