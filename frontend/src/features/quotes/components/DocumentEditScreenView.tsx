@@ -42,7 +42,6 @@ interface DocumentEditScreenViewProps {
   onOpenAssignment: () => void;
   onTitleChange: (nextTitle: string) => void;
   onEditLineItem: (lineItemIndex: number) => void;
-  onRequestDeleteLineItem: (lineItemIndex: number) => void;
   onReorderLineItems: (sourceIndex: number, targetIndex: number) => void;
   onAddLineItem: () => void;
   onTotalChange: (nextTotal: number | null) => void;
@@ -59,6 +58,7 @@ interface DocumentEditScreenViewProps {
   onAssignCustomer: (customerId: string) => Promise<void>;
   onCloseLineItemSheet: () => void;
   onSaveLineItem: (nextLineItem: LineItemDraftWithFlags) => void;
+  onRequestDeleteLineItemFromSheet: () => void;
   showLineItemDeleteConfirm: boolean;
   lineItemDeleteDescription: string;
   onConfirmDeleteLineItem: () => void;
@@ -105,7 +105,6 @@ export function DocumentEditScreenView({
   onOpenAssignment,
   onTitleChange,
   onEditLineItem,
-  onRequestDeleteLineItem,
   onReorderLineItems,
   onAddLineItem,
   onTotalChange,
@@ -122,6 +121,7 @@ export function DocumentEditScreenView({
   onAssignCustomer,
   onCloseLineItemSheet,
   onSaveLineItem,
+  onRequestDeleteLineItemFromSheet,
   showLineItemDeleteConfirm,
   lineItemDeleteDescription,
   onConfirmDeleteLineItem,
@@ -169,7 +169,6 @@ export function DocumentEditScreenView({
         onRequestAssignment={onOpenAssignment}
         onTitleChange={onTitleChange}
         onEditLineItem={onEditLineItem}
-        onRequestDeleteLineItem={onRequestDeleteLineItem}
         onReorderLineItems={onReorderLineItems}
         onAddLineItem={onAddLineItem}
         onTotalChange={onTotalChange}
@@ -201,6 +200,7 @@ export function DocumentEditScreenView({
         lineItemSheetInitialItem={lineItemSheetInitialItem}
         onCloseLineItemSheet={onCloseLineItemSheet}
         onSaveLineItem={onSaveLineItem}
+        onRequestDeleteLineItemFromSheet={onRequestDeleteLineItemFromSheet}
         showLineItemDeleteConfirm={showLineItemDeleteConfirm}
         lineItemDeleteDescription={lineItemDeleteDescription}
         onConfirmDeleteLineItem={onConfirmDeleteLineItem}

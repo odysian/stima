@@ -348,12 +348,6 @@ export function DocumentEditScreen(): React.ReactElement {
         }
         setLineItemSheetState({ mode: "edit", index: lineItemIndex });
       }}
-      onRequestDeleteLineItem={(lineItemIndex) => {
-        if (isInteractionLocked || !activeDraft.lineItems[lineItemIndex]) {
-          return;
-        }
-        setPendingLineItemDeleteIndex(lineItemIndex);
-      }}
       onReorderLineItems={(sourceIndex, targetIndex) => {
         if (isInteractionLocked || sourceIndex === targetIndex) {
           return;
@@ -399,6 +393,18 @@ export function DocumentEditScreen(): React.ReactElement {
         setDraft((currentDraft) => applyLineItemSheetSave(currentDraft, nextSheetState, nextLineItem));
         setLineItemSheetState(null);
       }}
+      onRequestDeleteLineItemFromSheet={() => {
+        const nextSheetState = lineItemSheetState;
+        if (
+          isInteractionLocked
+          || !nextSheetState
+          || nextSheetState.mode !== "edit"
+          || !activeDraft.lineItems[nextSheetState.index]
+        ) {
+          return;
+        }
+        setPendingLineItemDeleteIndex(nextSheetState.index);
+      }}
       showLineItemDeleteConfirm={pendingLineItemDeleteIndex !== null}
       lineItemDeleteDescription={pendingLineItemDeleteIndex !== null
         ? (activeDraft.lineItems[pendingLineItemDeleteIndex]?.description.trim() || "Untitled line item")
@@ -410,6 +416,10 @@ export function DocumentEditScreen(): React.ReactElement {
         }
         setToastMessage(null);
         setDraft((currentDraft) => applyLineItemSheetDelete(currentDraft, { mode: "edit", index: lineItemIndex }));
+        setLineItemSheetState((currentState) =>
+          currentState?.mode === "edit" && currentState.index === lineItemIndex
+            ? null
+            : currentState);
         setPendingLineItemDeleteIndex(null);
       }}
       onCancelDeleteLineItem={() => setPendingLineItemDeleteIndex(null)}

@@ -14,6 +14,7 @@ interface DocumentEditOverlaysProps {
   lineItemSheetInitialItem: LineItemDraftWithFlags;
   onCloseLineItemSheet: () => void;
   onSaveLineItem: (nextLineItem: LineItemDraftWithFlags) => void;
+  onRequestDeleteLineItemFromSheet: () => void;
   showLineItemDeleteConfirm: boolean;
   lineItemDeleteDescription: string;
   onConfirmDeleteLineItem: () => void;
@@ -37,6 +38,7 @@ export function DocumentEditOverlays({
   lineItemSheetInitialItem,
   onCloseLineItemSheet,
   onSaveLineItem,
+  onRequestDeleteLineItemFromSheet,
   showLineItemDeleteConfirm,
   lineItemDeleteDescription,
   onConfirmDeleteLineItem,
@@ -79,6 +81,7 @@ export function DocumentEditOverlays({
           initialLineItem={lineItemSheetInitialItem}
           onClose={onCloseLineItemSheet}
           onSave={onSaveLineItem}
+          onRequestDelete={lineItemSheetState.mode === "edit" ? onRequestDeleteLineItemFromSheet : undefined}
         />
       ) : null}
 

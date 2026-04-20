@@ -8,7 +8,6 @@ interface ReviewLineItemsSectionProps {
   lineItems: LineItemDraftWithFlags[];
   isInteractionLocked: boolean;
   onEditLineItem: (index: number) => void;
-  onRequestDeleteLineItem: (index: number) => void;
   onReorderLineItems: (sourceIndex: number, targetIndex: number) => void;
   onAddLineItem: () => void;
 }
@@ -17,7 +16,6 @@ export function ReviewLineItemsSection({
   lineItems,
   isInteractionLocked,
   onEditLineItem,
-  onRequestDeleteLineItem,
   onReorderLineItems,
   onAddLineItem,
 }: ReviewLineItemsSectionProps): React.ReactElement {
@@ -173,7 +171,6 @@ export function ReviewLineItemsSection({
                     }
                     onEditLineItem(index);
                   }}
-                  onDelete={() => onRequestDeleteLineItem(index)}
                   onDragHandlePointerDown={(event) => handleDragHandlePointerDown(index, event)}
                 />
               </div>

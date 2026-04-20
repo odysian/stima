@@ -11,7 +11,6 @@ describe("LineItemCard", () => {
         details="5 yards"
         price={120}
         onEdit={vi.fn()}
-        onDelete={vi.fn()}
       />,
     );
 
@@ -29,7 +28,6 @@ describe("LineItemCard", () => {
         flagged
         flagReason="spoken_money_correction"
         onEdit={vi.fn()}
-        onDelete={vi.fn()}
       />,
     );
 
@@ -46,7 +44,6 @@ describe("LineItemCard", () => {
         details="No separate charge"
         price={null}
         onEdit={vi.fn()}
-        onDelete={vi.fn()}
       />,
     );
 
@@ -62,7 +59,6 @@ describe("LineItemCard", () => {
         price={120}
         ariaLabel="Edit line item Brown mulch"
         onEdit={onEditMock}
-        onDelete={vi.fn()}
       />,
     );
 
@@ -77,7 +73,6 @@ describe("LineItemCard", () => {
         details="5 yards"
         price={120}
         onEdit={vi.fn()}
-        onDelete={vi.fn()}
       />,
     );
 
@@ -96,7 +91,6 @@ describe("LineItemCard", () => {
         ariaLabel="Edit line item Brown mulch"
         isReorderMode
         onEdit={onEditMock}
-        onDelete={vi.fn()}
       />,
     );
 
@@ -108,7 +102,7 @@ describe("LineItemCard", () => {
     expect(onEditMock).not.toHaveBeenCalled();
   });
 
-  it("shows delete overflow action while in reorder mode", () => {
+  it("does not render row overflow trigger while in reorder mode", () => {
     render(
       <LineItemCard
         description="Brown mulch"
@@ -116,12 +110,9 @@ describe("LineItemCard", () => {
         price={120}
         isReorderMode
         onEdit={vi.fn()}
-        onDelete={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /line item actions for brown mulch/i }));
-    expect(screen.getByRole("menuitem", { name: /delete/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /edit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /line item actions for brown mulch/i })).not.toBeInTheDocument();
   });
 });

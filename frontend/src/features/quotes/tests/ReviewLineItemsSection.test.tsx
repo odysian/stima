@@ -23,7 +23,6 @@ function renderSection(options?: { isInteractionLocked?: boolean; onEditLineItem
       lineItems={SAMPLE_LINE_ITEMS}
       isInteractionLocked={options?.isInteractionLocked ?? false}
       onEditLineItem={options?.onEditLineItem ?? vi.fn()}
-      onRequestDeleteLineItem={vi.fn()}
       onReorderLineItems={vi.fn()}
       onAddLineItem={vi.fn()}
     />,
@@ -43,7 +42,7 @@ describe("ReviewLineItemsSection", () => {
     expect(onEditLineItem).toHaveBeenCalledWith(0);
   });
 
-  it("switches to Done mode, shows drag handles, and blocks row edit taps", () => {
+  it("switches to Done mode, shows drag handles, hides row overflow, and blocks row edit taps", () => {
     const onEditLineItem = vi.fn();
     renderSection({ onEditLineItem });
 
@@ -51,7 +50,7 @@ describe("ReviewLineItemsSection", () => {
 
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reorder line item 1: brown mulch/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /line item actions for brown mulch/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /line item actions for brown mulch/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit line item 1: brown mulch/i })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: /edit line item 1: brown mulch/i }));

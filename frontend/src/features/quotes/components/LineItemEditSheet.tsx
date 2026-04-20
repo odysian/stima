@@ -14,6 +14,7 @@ interface LineItemEditSheetProps {
   initialLineItem: LineItemDraftWithFlags;
   onClose: () => void;
   onSave: (nextLineItem: LineItemDraftWithFlags) => void;
+  onRequestDelete?: () => void;
 }
 
 interface ParsedPrice {
@@ -41,6 +42,7 @@ export function LineItemEditSheet({
   initialLineItem,
   onClose,
   onSave,
+  onRequestDelete,
 }: LineItemEditSheetProps): React.ReactElement {
   const descriptionInputRef = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState(initialLineItem.description);
@@ -51,7 +53,7 @@ export function LineItemEditSheet({
   const [formError, setFormError] = useState<string | null>(null);
   const title = mode === "edit" ? "Edit Line Item" : "Add Line Item";
 
-  function handleSave(): void {
+  function dismissWithAutosave(): void {
     const trimmedDescription = description.trim();
     if (trimmedDescription.length === 0) {
       setFormError("Description is required.");
@@ -71,10 +73,18 @@ export function LineItemEditSheet({
       details: details.trim().length > 0 ? details.trim() : null,
       price: parsedPrice.value,
     });
+    onClose();
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          dismissWithAutosave();
+        }
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay
           data-testid="line-item-edit-sheet-overlay"
@@ -88,9 +98,21 @@ export function LineItemEditSheet({
               descriptionInputRef.current?.focus();
             }}
           >
-            <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
-              {title}
-            </Dialog.Title>
+            <div className="flex items-start justify-between gap-4">
+              <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
+                {title}
+              </Dialog.Title>
+              {mode === "edit" && onRequestDelete ? (
+                <button
+                  type="button"
+                  aria-label="Delete line item"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-error/30 bg-error-container/40 text-error transition-colors hover:bg-error-container/60"
+                  onClick={onRequestDelete}
+                >
+                  <span className="material-symbols-outlined text-[1.125rem] leading-none">delete</span>
+                </button>
+              ) : null}
+            </div>
             <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
               Update details now. Changes stay local until you save the review draft.
             </Dialog.Description>
@@ -111,7 +133,12 @@ export function LineItemEditSheet({
                   type="text"
                   maxLength={LINE_ITEM_DESCRIPTION_MAX_CHARS}
                   value={description}
-                  onChange={(event) => setDescription(event.target.value)}
+                  onChange={(event) => {
+                    setDescription(event.target.value);
+                    if (formError) {
+                      setFormError(null);
+                    }
+                  }}
                   className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </section>
@@ -125,10 +152,15 @@ export function LineItemEditSheet({
                 </div>
                 <textarea
                   id="line-item-sheet-details"
-                  rows={3}
+                  rows={2}
                   maxLength={LINE_ITEM_DETAILS_MAX_CHARS}
                   value={details}
-                  onChange={(event) => setDetails(event.target.value)}
+                  onChange={(event) => {
+                    setDetails(event.target.value);
+                    if (formError) {
+                      setFormError(null);
+                    }
+                  }}
                   className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
                 />
               </section>
@@ -143,27 +175,15 @@ export function LineItemEditSheet({
                   inputMode="decimal"
                   placeholder="$ 0.00"
                   value={priceInput}
-                  onChange={(event) => setPriceInput(event.target.value)}
+                  onChange={(event) => {
+                    setPriceInput(event.target.value);
+                    if (formError) {
+                      setFormError(null);
+                    }
+                  }}
                   className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </section>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-3">
-              <button
-                type="button"
-                className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold forest-gradient text-on-primary transition-all active:scale-[0.98]"
-                onClick={handleSave}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
-                onClick={onClose}
-              >
-                Cancel
-              </button>
             </div>
           </Dialog.Content>
         </div>

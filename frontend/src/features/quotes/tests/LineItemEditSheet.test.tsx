@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,7 +17,7 @@ function makeLineItem(overrides: Partial<LineItemDraftWithFlags> = {}): LineItem
 }
 
 describe("LineItemEditSheet", () => {
-  it("renders edit mode with current values and focuses description", () => {
+  it("renders edit mode values, focuses description, and shows top-right trash", () => {
     render(
       <LineItemEditSheet
         open
@@ -25,18 +25,20 @@ describe("LineItemEditSheet", () => {
         initialLineItem={makeLineItem()}
         onClose={vi.fn()}
         onSave={vi.fn()}
+        onRequestDelete={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("dialog", { name: /edit line item/i })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: /edit line item/i });
+    expect(dialog).toBeInTheDocument();
     expect(screen.getByLabelText(/description/i)).toHaveValue("Brown mulch");
     expect(screen.getByLabelText(/details/i)).toHaveValue("5 yards");
     expect(screen.getByLabelText(/price/i)).toHaveValue("120");
     expect(screen.getByLabelText(/description/i)).toHaveFocus();
-    expect(screen.queryByRole("button", { name: /delete line item/i })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /delete line item/i })).toBeInTheDocument();
   });
 
-  it("renders add mode with empty fields", () => {
+  it("renders add mode without sheet trash", () => {
     render(
       <LineItemEditSheet
         open
@@ -47,76 +49,17 @@ describe("LineItemEditSheet", () => {
       />,
     );
 
-    expect(screen.getByRole("dialog", { name: /add line item/i })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: /add line item/i });
+    expect(dialog).toBeInTheDocument();
     expect(screen.getByLabelText(/description/i)).toHaveValue("");
     expect(screen.getByLabelText(/details/i)).toHaveValue("");
     expect(screen.getByLabelText(/price/i)).toHaveValue("");
-    expect(screen.queryByRole("button", { name: /delete line item/i })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /delete line item/i })).not.toBeInTheDocument();
   });
 
-  it("validates required description and blocks save", () => {
-    const onSave = vi.fn();
-
-    render(
-      <LineItemEditSheet
-        open
-        mode="edit"
-        initialLineItem={makeLineItem()}
-        onClose={vi.fn()}
-        onSave={onSave}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "   " } });
-    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
-
-    expect(screen.getByRole("alert")).toHaveTextContent("Description is required.");
-    expect(onSave).not.toHaveBeenCalled();
-  });
-
-  it("saves with nullable price and trimmed values", () => {
-    const onSave = vi.fn();
-
-    render(
-      <LineItemEditSheet
-        open
-        mode="edit"
-        initialLineItem={makeLineItem()}
-        onClose={vi.fn()}
-        onSave={onSave}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: " Premium mulch " } });
-    fireEvent.change(screen.getByLabelText(/details/i), { target: { value: " 6 yards " } });
-    fireEvent.change(screen.getByLabelText(/price/i), { target: { value: " " } });
-    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
-
-    expect(onSave).toHaveBeenCalledWith({
-      description: "Premium mulch",
-      details: "6 yards",
-      price: null,
-      flagged: true,
-      flagReason: "Needs review",
-    });
-  });
-
-  it("does not render an included/no-charge checkbox", () => {
-    render(
-      <LineItemEditSheet
-        open
-        mode="edit"
-        initialLineItem={makeLineItem()}
-        onClose={vi.fn()}
-        onSave={vi.fn()}
-      />,
-    );
-
-    expect(screen.queryByLabelText(/included \/ no-charge item/i)).not.toBeInTheDocument();
-  });
-
-  it("dismisses via cancel, escape, and backdrop", async () => {
+  it("blocks dismiss with a validation error when description is blank", async () => {
     const user = userEvent.setup();
+    const onSave = vi.fn();
     const onClose = vi.fn();
 
     render(
@@ -125,18 +68,75 @@ describe("LineItemEditSheet", () => {
         mode="edit"
         initialLineItem={makeLineItem()}
         onClose={onClose}
-        onSave={vi.fn()}
+        onSave={onSave}
+        onRequestDelete={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
-    fireEvent.keyDown(screen.getByLabelText(/description/i), { key: "Escape" });
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "   " } });
     await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
 
-    expect(onClose).toHaveBeenCalledTimes(3);
+    expect(screen.getByRole("alert")).toHaveTextContent("Description is required.");
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("uses decimal input mode for price entry", () => {
+  it("blocks dismiss with a validation error when price is invalid", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem()}
+        onClose={onClose}
+        onSave={onSave}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/price/i), { target: { value: "12x" } });
+    await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid number for price.");
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("autosaves trimmed values on valid dismiss", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem()}
+        onClose={onClose}
+        onSave={onSave}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: " Premium mulch " } });
+    fireEvent.change(screen.getByLabelText(/details/i), { target: { value: " 6 yards " } });
+    fireEvent.change(screen.getByLabelText(/price/i), { target: { value: " " } });
+    await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
+
+    expect(onSave).toHaveBeenCalledWith({
+      description: "Premium mulch",
+      details: "6 yards",
+      price: null,
+      flagged: true,
+      flagReason: "Needs review",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps decimal input mode and 2-row details field", () => {
     render(
       <LineItemEditSheet
         open
@@ -144,9 +144,29 @@ describe("LineItemEditSheet", () => {
         initialLineItem={makeLineItem()}
         onClose={vi.fn()}
         onSave={vi.fn()}
+        onRequestDelete={vi.fn()}
       />,
     );
 
     expect(screen.getByLabelText(/price/i)).toHaveAttribute("inputmode", "decimal");
+    expect(screen.getByLabelText(/details/i)).toHaveAttribute("rows", "2");
+  });
+
+  it("fires delete callback from top-right trash action", () => {
+    const onRequestDelete = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem()}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onRequestDelete={onRequestDelete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
+    expect(onRequestDelete).toHaveBeenCalledTimes(1);
   });
 });
