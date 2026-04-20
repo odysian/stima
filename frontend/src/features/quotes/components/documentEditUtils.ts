@@ -81,7 +81,6 @@ export async function persistDocumentDraft(options: {
 
   const payload: QuoteUpdateRequest = {
     title: normalizeOptionalTitle(draft.title),
-    transcript: draft.transcript ?? "",
     line_items: lineItemsForSubmit,
     total_amount: draft.total,
     tax_rate: draft.taxRate,
@@ -90,6 +89,9 @@ export async function persistDocumentDraft(options: {
     deposit_amount: draft.depositAmount,
     notes: draft.notes.trim().length > 0 ? draft.notes.trim() : null,
     doc_type: draft.docType,
+    ...(draft.transcript.trim().length > 0
+      ? { transcript: draft.transcript }
+      : {}),
     ...(draft.docType === "invoice" && draft.dueDate.trim().length > 0
       ? { due_date: draft.dueDate }
       : {}),

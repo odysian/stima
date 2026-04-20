@@ -148,6 +148,7 @@ async def test_duplicate_quote_copies_fields_and_resets_state(
     assert duplicate_payload["shared_at"] is None
     assert duplicate_payload["share_token"] is None
 
+    assert any(item["flagged"] is True for item in patched_source_payload["line_items"])
     assert len(duplicate_payload["line_items"]) == len(patched_source_payload["line_items"])
     for duplicate_item, source_item in zip(
         duplicate_payload["line_items"],
@@ -158,8 +159,8 @@ async def test_duplicate_quote_copies_fields_and_resets_state(
         assert duplicate_item["description"] == source_item["description"]
         assert duplicate_item["details"] == source_item["details"]
         assert duplicate_item["price"] == source_item["price"]
-        assert duplicate_item["flagged"] == source_item["flagged"]
-        assert duplicate_item["flag_reason"] == source_item["flag_reason"]
+        assert duplicate_item["flagged"] is False
+        assert duplicate_item["flag_reason"] is None
         assert duplicate_item["sort_order"] == source_item["sort_order"]
 
     source_detail_response = await client.get(f"/api/quotes/{source_quote_id}")
@@ -189,6 +190,8 @@ async def test_duplicate_quote_copies_fields_and_resets_state(
         "pricing_pending": False,
     }
     assert duplicate_detail["extraction_review_metadata"]["hidden_details"] == {"items": []}
+    assert all(item["flagged"] is False for item in duplicate_detail["line_items"])
+    assert all(item["flag_reason"] is None for item in duplicate_detail["line_items"])
 
     duplicate_document = await db_session.get(Document, UUID(duplicate_payload["id"]))
     assert duplicate_document is not None
