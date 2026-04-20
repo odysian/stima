@@ -813,6 +813,13 @@ describe("DocumentEditScreen", () => {
     expect(navigateMock).toHaveBeenCalledWith("/quotes/doc-1/preview", { replace: true });
   });
 
+  it("keeps back navigation and removes the top-right exit action", async () => {
+    renderScreen();
+
+    expect(await screen.findByRole("button", { name: /back to quotes/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /exit to home/i })).not.toBeInTheDocument();
+  });
+
   it("uses unsaved-change confirmation before navigating back", async () => {
     const { clearDraftMock } = renderScreen();
 

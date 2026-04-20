@@ -114,9 +114,11 @@ export function getSendEmailErrorMessage(error: unknown): string {
 
 interface BuildOverflowItemsArgs {
   hasQuote: boolean;
+  hasLinkedInvoice: boolean;
   hasActiveShare: boolean;
   actionState: QuotePreviewActionState;
   isBusy: boolean;
+  onConvertToInvoice: () => void;
   onRevokeShareRequest: () => void;
   onDeleteRequest: () => void;
   onMarkWonRequest: () => void;
@@ -125,9 +127,11 @@ interface BuildOverflowItemsArgs {
 
 export function buildOverflowItems({
   hasQuote,
+  hasLinkedInvoice,
   hasActiveShare,
   actionState,
   isBusy,
+  onConvertToInvoice,
   onRevokeShareRequest,
   onDeleteRequest,
   onMarkWonRequest,
@@ -215,6 +219,15 @@ export function buildOverflowItems({
       tone: "destructive",
       disabled: isBusy,
       onSelect: onRevokeShareRequest,
+    });
+  }
+
+  if (!hasLinkedInvoice) {
+    items.unshift({
+      label: "Convert to Invoice",
+      icon: "receipt_long",
+      disabled: isBusy,
+      onSelect: onConvertToInvoice,
     });
   }
 
