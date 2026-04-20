@@ -662,6 +662,33 @@ class PublicLineItemResponse(BaseModel):
     price: float | None
 
 
+class QuoteReuseLineItemPreviewResponse(BaseModel):
+    """Line-item preview payload shown in quote reuse candidate cards."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    description: str
+    price: float | None
+
+
+class QuoteReuseCandidateResponse(BaseModel):
+    """Serializable quote reuse candidate returned by chooser-specific listing."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str | None
+    doc_number: str
+    customer_id: UUID | None
+    customer_name: str | None
+    total_amount: float | None
+    created_at: datetime
+    status: str
+    line_item_previews: list[QuoteReuseLineItemPreviewResponse]
+    line_item_count: int
+    more_line_item_count: int
+
+
 class QuoteListItemResponse(BaseModel):
     """Serializable quote summary payload returned by the quote list endpoint."""
 

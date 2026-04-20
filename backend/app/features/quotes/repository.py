@@ -9,7 +9,7 @@ from typing import Any, cast
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
@@ -117,6 +117,31 @@ class QuoteListItemSummary:
     requires_customer_assignment: bool
     can_reassign_customer: bool
     created_at: datetime
+
+
+@dataclass(slots=True)
+class QuoteReuseLineItemPreview:
+    """Minimal line item preview payload for quote reuse cards."""
+
+    description: str
+    price: Decimal | None
+
+
+@dataclass(slots=True)
+class QuoteReuseCandidateSummary:
+    """Quote summary payload tailored for reuse candidate selection."""
+
+    id: UUID
+    title: str | None
+    doc_number: str
+    customer_id: UUID | None
+    customer_name: str | None
+    total_amount: Decimal | None
+    created_at: datetime
+    status: str
+    line_item_previews: list[QuoteReuseLineItemPreview]
+    line_item_count: int
+    more_line_item_count: int
 
 
 @dataclass(slots=True)
@@ -287,6 +312,102 @@ class QuoteRepository:
             )
             for row in result
         ]
+
+    async def list_reuse_candidates(
+        self,
+        user_id: UUID,
+        *,
+        customer_id: UUID | None = None,
+        q: str | None = None,
+    ) -> list[QuoteReuseCandidateSummary]:
+        """Return quote summaries with capped line-item previews for reuse pickers."""
+        statement = (
+            select(
+                Document.id,
+                Document.title,
+                Document.doc_number,
+                Document.customer_id,
+                Customer.name.label("customer_name"),
+                Document.total_amount,
+                Document.created_at,
+                Document.status,
+            )
+            .outerjoin(Customer, Customer.id == Document.customer_id)
+            .where(
+                Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
+            )
+            .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
+        )
+        if customer_id is not None:
+            statement = statement.where(Document.customer_id == customer_id)
+
+        normalized_query = (q or "").strip()
+        if normalized_query:
+            like_pattern = f"%{normalized_query}%"
+            statement = statement.where(
+                or_(
+                    Customer.name.ilike(like_pattern),
+                    Document.title.ilike(like_pattern),
+                    Document.doc_number.ilike(like_pattern),
+                )
+            )
+
+        result = await self._session.execute(statement)
+        quote_rows = result.all()
+        if not quote_rows:
+            return []
+
+        quote_ids = [row.id for row in quote_rows]
+        line_item_result = await self._session.execute(
+            select(
+                LineItem.document_id,
+                LineItem.description,
+                LineItem.price,
+            )
+            .where(LineItem.document_id.in_(quote_ids))
+            .order_by(
+                LineItem.document_id.asc(),
+                LineItem.sort_order.asc(),
+                LineItem.created_at.asc(),
+            )
+        )
+
+        line_item_count_by_quote: dict[UUID, int] = {}
+        previews_by_quote: dict[UUID, list[QuoteReuseLineItemPreview]] = {}
+        for line_item_row in line_item_result:
+            quote_id = line_item_row.document_id
+            line_item_count_by_quote[quote_id] = line_item_count_by_quote.get(quote_id, 0) + 1
+            previews = previews_by_quote.setdefault(quote_id, [])
+            if len(previews) < 3:
+                previews.append(
+                    QuoteReuseLineItemPreview(
+                        description=line_item_row.description,
+                        price=line_item_row.price,
+                    )
+                )
+
+        candidates: list[QuoteReuseCandidateSummary] = []
+        for row in quote_rows:
+            previews = previews_by_quote.get(row.id, [])
+            line_item_count = line_item_count_by_quote.get(row.id, 0)
+            status = row.status.value if isinstance(row.status, QuoteStatus) else str(row.status)
+            candidates.append(
+                QuoteReuseCandidateSummary(
+                    id=row.id,
+                    title=row.title,
+                    doc_number=row.doc_number,
+                    customer_id=row.customer_id,
+                    customer_name=row.customer_name,
+                    total_amount=row.total_amount,
+                    created_at=row.created_at,
+                    status=status,
+                    line_item_previews=previews,
+                    line_item_count=line_item_count,
+                    more_line_item_count=max(line_item_count - len(previews), 0),
+                )
+            )
+        return candidates
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None:
         """Return one quote owned by a user, including line items."""

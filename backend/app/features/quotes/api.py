@@ -58,6 +58,7 @@ from app.features.quotes.schemas import (
     QuoteDetailResponse,
     QuoteListItemResponse,
     QuoteResponse,
+    QuoteReuseCandidateResponse,
     QuoteUpdateRequest,
 )
 from app.features.quotes.service import QuoteService, QuoteServiceError
@@ -412,6 +413,22 @@ async def list_quotes(
     """List quotes for the authenticated user."""
     quotes = await quote_service.list_quotes(user, customer_id=customer_id)
     return [QuoteListItemResponse.model_validate(quote) for quote in quotes]
+
+
+@router.get("/reuse-candidates", response_model=list[QuoteReuseCandidateResponse])
+async def list_quote_reuse_candidates(
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+    customer_id: Annotated[UUID | None, Query()] = None,
+    q: Annotated[str | None, Query()] = None,
+) -> list[QuoteReuseCandidateResponse]:
+    """List quote reuse candidates with capped line-item previews."""
+    candidates = await quote_service.list_quote_reuse_candidates(
+        user,
+        customer_id=customer_id,
+        q=q,
+    )
+    return [QuoteReuseCandidateResponse.model_validate(candidate) for candidate in candidates]
 
 
 @router.get("/{quote_id}", response_model=QuoteDetailResponse)
