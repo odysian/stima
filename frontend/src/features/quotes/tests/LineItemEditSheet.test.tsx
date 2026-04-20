@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { LineItemEditSheet } from "@/features/quotes/components/LineItemEditSheet";
+import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 
 function makeLineItem(overrides: Partial<LineItemDraftWithFlags> = {}): LineItemDraftWithFlags {
@@ -12,6 +13,18 @@ function makeLineItem(overrides: Partial<LineItemDraftWithFlags> = {}): LineItem
     price: 120,
     flagged: true,
     flagReason: "Needs review",
+    ...overrides,
+  };
+}
+
+function makeCatalogItem(overrides: Partial<LineItemCatalogItem> = {}): LineItemCatalogItem {
+  return {
+    id: "catalog-1",
+    title: "Brown mulch",
+    details: "5 yards",
+    defaultPrice: 120,
+    createdAt: "2026-04-20T00:00:00.000Z",
+    updatedAt: "2026-04-20T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -170,9 +183,106 @@ describe("LineItemEditSheet", () => {
     expect(onRequestDelete).toHaveBeenCalledTimes(1);
   });
 
-  it("saves to catalog using normalized manual values", async () => {
+  it("successful save shows filled bookmark icon and item in catalog tab list in same open", async () => {
     const user = userEvent.setup();
-    const onSaveToCatalog = vi.fn().mockResolvedValue(undefined);
+    const onSaveToCatalog = vi.fn().mockResolvedValue(
+      makeCatalogItem({
+        title: "Garden edging",
+        details: "Around driveway",
+        defaultPrice: 95.5,
+      }),
+    );
+    const onLoadCatalogItems = vi.fn().mockResolvedValue([]);
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem()}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onSaveToCatalog={onSaveToCatalog}
+        onLoadCatalogItems={onLoadCatalogItems}
+      />,
+    );
+
+    const bookmarkButton = screen.getByRole("button", { name: /save to catalog/i });
+    expect(within(bookmarkButton).getByText("bookmark_add")).toBeInTheDocument();
+    expect(within(bookmarkButton).queryByText(/^save$/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "  Garden edging  " } });
+    fireEvent.change(screen.getByLabelText(/details/i), { target: { value: "  Around driveway  " } });
+    fireEvent.change(screen.getByLabelText(/price/i), { target: { value: "95.5" } });
+
+    await user.click(bookmarkButton);
+
+    await waitFor(() => {
+      expect(onSaveToCatalog).toHaveBeenCalledWith({
+        title: "Garden edging",
+        details: "Around driveway",
+        defaultPrice: 95.5,
+      });
+    });
+    expect(within(bookmarkButton).getByText("bookmark")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /catalog/i }));
+    await waitFor(() => {
+      expect(onLoadCatalogItems).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText("Garden edging")).toBeInTheDocument();
+  });
+
+  it("clicking filled bookmark deletes saved item and resets icon/list state", async () => {
+    const user = userEvent.setup();
+    const createdItem = makeCatalogItem({
+      id: "catalog-9",
+      title: "Garden edging",
+      details: "Around driveway",
+      defaultPrice: 95.5,
+    });
+    const onSaveToCatalog = vi.fn().mockResolvedValue(createdItem);
+    const onDeleteFromCatalog = vi.fn().mockResolvedValue(undefined);
+    const onLoadCatalogItems = vi.fn().mockResolvedValue([]);
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem()}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onSaveToCatalog={onSaveToCatalog}
+        onDeleteFromCatalog={onDeleteFromCatalog}
+        onLoadCatalogItems={onLoadCatalogItems}
+      />,
+    );
+
+    const bookmarkButton = screen.getByRole("button", { name: /save to catalog/i });
+    await user.click(bookmarkButton);
+    await waitFor(() => {
+      expect(onSaveToCatalog).toHaveBeenCalledTimes(1);
+    });
+    expect(within(bookmarkButton).getByText("bookmark")).toBeInTheDocument();
+
+    await user.click(bookmarkButton);
+    await waitFor(() => {
+      expect(onDeleteFromCatalog).toHaveBeenCalledWith("catalog-9");
+    });
+    expect(within(bookmarkButton).getByText("bookmark_add")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /catalog/i }));
+    await waitFor(() => {
+      expect(onLoadCatalogItems).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.queryByText("Garden edging")).not.toBeInTheDocument();
+  });
+
+  it("editing a field after save resets bookmark icon without deleting", async () => {
+    const user = userEvent.setup();
+    const onSaveToCatalog = vi.fn().mockResolvedValue(
+      makeCatalogItem({ id: "catalog-2", title: "Garden edging", defaultPrice: 95.5 }),
+    );
+    const onDeleteFromCatalog = vi.fn().mockResolvedValue(undefined);
 
     render(
       <LineItemEditSheet
@@ -182,23 +292,22 @@ describe("LineItemEditSheet", () => {
         onClose={vi.fn()}
         onSave={vi.fn()}
         onSaveToCatalog={onSaveToCatalog}
+        onDeleteFromCatalog={onDeleteFromCatalog}
         onRequestDelete={vi.fn()}
       />,
     );
 
-    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "  Garden edging  " } });
-    fireEvent.change(screen.getByLabelText(/details/i), { target: { value: "  Around driveway  " } });
-    fireEvent.change(screen.getByLabelText(/price/i), { target: { value: "95.5" } });
-
-    await user.click(screen.getByRole("button", { name: /save to catalog/i }));
-
+    const bookmarkButton = screen.getByRole("button", { name: /save to catalog/i });
+    await user.click(bookmarkButton);
     await waitFor(() => {
-      expect(onSaveToCatalog).toHaveBeenCalledWith({
-        title: "Garden edging",
-        details: "Around driveway",
-        defaultPrice: 95.5,
-      });
+      expect(onSaveToCatalog).toHaveBeenCalledTimes(1);
     });
+    expect(within(bookmarkButton).getByText("bookmark")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "Updated description" } });
+
+    expect(within(bookmarkButton).getByText("bookmark_add")).toBeInTheDocument();
+    expect(onDeleteFromCatalog).not.toHaveBeenCalled();
   });
 
   it("shows a sheet-level error when save-to-catalog fails", async () => {
@@ -247,7 +356,7 @@ describe("LineItemEditSheet", () => {
         initialLineItem={makeLineItem({ description: "", details: null, price: null })}
         onClose={onClose}
         onSave={onSave}
-        onSaveToCatalog={vi.fn().mockResolvedValue(undefined)}
+        onSaveToCatalog={vi.fn().mockResolvedValue(makeCatalogItem())}
         onLoadCatalogItems={onLoadCatalogItems}
       />,
     );
@@ -270,5 +379,27 @@ describe("LineItemEditSheet", () => {
       flagReason: null,
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides save-to-catalog bookmark button on catalog tab", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem({ description: "", details: null, price: null })}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onSaveToCatalog={vi.fn().mockResolvedValue(makeCatalogItem())}
+        onLoadCatalogItems={vi.fn().mockResolvedValue([])}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /save to catalog/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /catalog/i }));
+
+    expect(screen.queryByRole("button", { name: /save to catalog/i })).not.toBeInTheDocument();
   });
 });

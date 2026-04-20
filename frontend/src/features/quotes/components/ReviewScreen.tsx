@@ -395,9 +395,11 @@ export function DocumentEditScreen(): React.ReactElement {
         setLineItemSheetState(null);
       }}
       onSaveLineItemToCatalog={async (lineItem) => {
-        await lineItemCatalogService.createItem(lineItem);
+        const createdItem = await lineItemCatalogService.createItem(lineItem);
         setToastMessage("Saved to line item catalog.");
+        return createdItem;
       }}
+      onDeleteLineItemFromCatalog={async (itemId) => lineItemCatalogService.deleteItem(itemId)}
       onLoadLineItemCatalogItems={async () => lineItemCatalogService.listItems()}
       onRequestDeleteLineItemFromSheet={() => {
         const nextSheetState = lineItemSheetState;

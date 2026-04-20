@@ -19,7 +19,8 @@ interface DocumentEditOverlaysProps {
     title: string;
     details: string | null;
     defaultPrice: number | null;
-  }) => Promise<void>;
+  }) => Promise<LineItemCatalogItem>;
+  onDeleteLineItemFromCatalog: (id: string) => Promise<void>;
   onLoadLineItemCatalogItems: () => Promise<LineItemCatalogItem[]>;
   onRequestDeleteLineItemFromSheet: () => void;
   showLineItemDeleteConfirm: boolean;
@@ -46,6 +47,7 @@ export function DocumentEditOverlays({
   onCloseLineItemSheet,
   onSaveLineItem,
   onSaveLineItemToCatalog,
+  onDeleteLineItemFromCatalog,
   onLoadLineItemCatalogItems,
   onRequestDeleteLineItemFromSheet,
   showLineItemDeleteConfirm,
@@ -91,6 +93,7 @@ export function DocumentEditOverlays({
           onClose={onCloseLineItemSheet}
           onSave={onSaveLineItem}
           onSaveToCatalog={onSaveLineItemToCatalog}
+          onDeleteFromCatalog={onDeleteLineItemFromCatalog}
           onLoadCatalogItems={onLoadLineItemCatalogItems}
           onRequestDelete={lineItemSheetState.mode === "edit" ? onRequestDeleteLineItemFromSheet : undefined}
         />

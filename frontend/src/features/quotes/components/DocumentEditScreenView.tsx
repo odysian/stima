@@ -63,7 +63,8 @@ interface DocumentEditScreenViewProps {
     title: string;
     details: string | null;
     defaultPrice: number | null;
-  }) => Promise<void>;
+  }) => Promise<LineItemCatalogItem>;
+  onDeleteLineItemFromCatalog: (id: string) => Promise<void>;
   onLoadLineItemCatalogItems: () => Promise<LineItemCatalogItem[]>;
   onRequestDeleteLineItemFromSheet: () => void;
   showLineItemDeleteConfirm: boolean;
@@ -129,6 +130,7 @@ export function DocumentEditScreenView({
   onCloseLineItemSheet,
   onSaveLineItem,
   onSaveLineItemToCatalog,
+  onDeleteLineItemFromCatalog,
   onLoadLineItemCatalogItems,
   onRequestDeleteLineItemFromSheet,
   showLineItemDeleteConfirm,
@@ -210,6 +212,7 @@ export function DocumentEditScreenView({
         onCloseLineItemSheet={onCloseLineItemSheet}
         onSaveLineItem={onSaveLineItem}
         onSaveLineItemToCatalog={onSaveLineItemToCatalog}
+        onDeleteLineItemFromCatalog={onDeleteLineItemFromCatalog}
         onLoadLineItemCatalogItems={onLoadLineItemCatalogItems}
         onRequestDeleteLineItemFromSheet={onRequestDeleteLineItemFromSheet}
         showLineItemDeleteConfirm={showLineItemDeleteConfirm}

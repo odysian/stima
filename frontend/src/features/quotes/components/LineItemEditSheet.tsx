@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import { LineItemCatalogTabPanel } from "@/features/quotes/components/LineItemCatalogTabPanel";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   LINE_ITEM_DESCRIPTION_MAX_CHARS,
@@ -19,7 +20,8 @@ interface LineItemEditSheetProps {
     title: string;
     details: string | null;
     defaultPrice: number | null;
-  }) => Promise<void>;
+  }) => Promise<LineItemCatalogItem>;
+  onDeleteFromCatalog?: (id: string) => Promise<void>;
   onLoadCatalogItems?: () => Promise<LineItemCatalogItem[]>;
   onRequestDelete?: () => void;
 }
@@ -47,13 +49,6 @@ function parsePrice(value: string): ParsedPrice {
   return { value: parsed, valid: true };
 }
 
-function formatCatalogPrice(value: number | null): string {
-  if (value === null) {
-    return "No default price";
-  }
-  return `$${value.toFixed(2)}`;
-}
-
 export function LineItemEditSheet({
   open,
   mode,
@@ -61,6 +56,7 @@ export function LineItemEditSheet({
   onClose,
   onSave,
   onSaveToCatalog,
+  onDeleteFromCatalog,
   onLoadCatalogItems,
   onRequestDelete,
 }: LineItemEditSheetProps): React.ReactElement {
@@ -75,9 +71,13 @@ export function LineItemEditSheet({
   const [catalogItems, setCatalogItems] = useState<LineItemCatalogItem[]>([]);
   const [catalogLoadState, setCatalogLoadState] = useState<CatalogLoadState>("idle");
   const [catalogLoadError, setCatalogLoadError] = useState<string | null>(null);
-  const [isSavingToCatalog, setIsSavingToCatalog] = useState(false);
+  const [savedCatalogItem, setSavedCatalogItem] = useState<LineItemCatalogItem | null>(null);
+  const [isCatalogMutationInFlight, setIsCatalogMutationInFlight] = useState(false);
   const title = mode === "edit" ? "Edit Line Item" : "Add Line Item";
   const showManualFields = mode === "edit" || activeAddTab === "manual";
+  const canSaveToCatalog = showManualFields && savedCatalogItem === null;
+  const canDeleteSavedCatalogItem = savedCatalogItem !== null;
+  const bookmarkIcon = canDeleteSavedCatalogItem ? "bookmark" : "bookmark_add";
 
   useEffect(() => {
     if (mode !== "add") {
@@ -99,7 +99,11 @@ export function LineItemEditSheet({
     setCatalogLoadError(null);
     try {
       const items = await onLoadCatalogItems();
-      setCatalogItems(items);
+      setCatalogItems((currentItems) => {
+        const loadedIds = new Set(items.map((item) => item.id));
+        const localOnlyItems = currentItems.filter((item) => !loadedIds.has(item.id));
+        return [...localOnlyItems, ...items];
+      });
       setCatalogLoadState("loaded");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load catalog items";
@@ -146,7 +150,7 @@ export function LineItemEditSheet({
   }
 
   async function saveToCatalog(): Promise<void> {
-    if (!onSaveToCatalog || !showManualFields || isSavingToCatalog) {
+    if (!onSaveToCatalog || !canSaveToCatalog || isCatalogMutationInFlight) {
       return;
     }
 
@@ -155,19 +159,44 @@ export function LineItemEditSheet({
       return;
     }
 
-    setIsSavingToCatalog(true);
+    setIsCatalogMutationInFlight(true);
     try {
-      await onSaveToCatalog({
+      const createdItem = await onSaveToCatalog({
         title: parsedLineItem.description,
         details: parsedLineItem.details ?? null,
         defaultPrice: parsedLineItem.price,
       });
+      setSavedCatalogItem(createdItem);
+      setCatalogItems((currentItems) => [
+        createdItem,
+        ...currentItems.filter((item) => item.id !== createdItem.id),
+      ]);
       setFormError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save line item to catalog";
       setFormError(message);
     } finally {
-      setIsSavingToCatalog(false);
+      setIsCatalogMutationInFlight(false);
+    }
+  }
+
+  async function unsaveFromCatalog(): Promise<void> {
+    if (!savedCatalogItem || !onDeleteFromCatalog || isCatalogMutationInFlight) {
+      return;
+    }
+
+    setIsCatalogMutationInFlight(true);
+    try {
+      await onDeleteFromCatalog(savedCatalogItem.id);
+      setCatalogItems((currentItems) =>
+        currentItems.filter((item) => item.id !== savedCatalogItem.id));
+      setSavedCatalogItem(null);
+      setFormError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to remove line item from catalog";
+      setFormError(message);
+    } finally {
+      setIsCatalogMutationInFlight(false);
     }
   }
 
@@ -200,6 +229,7 @@ export function LineItemEditSheet({
         <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0">
           <Dialog.Content
             className="modal-shadow pointer-events-auto w-full max-w-md rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6"
+            aria-describedby={showManualFields ? undefined : "line-item-sheet-catalog-description"}
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               if (showManualFields) {
@@ -212,18 +242,26 @@ export function LineItemEditSheet({
                 {title}
               </Dialog.Title>
               <div className="flex items-center gap-2">
-                {onSaveToCatalog ? (
+                {onSaveToCatalog && showManualFields ? (
                   <button
                     type="button"
                     aria-label="Save to catalog"
-                    className="inline-flex min-h-10 items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-3 text-xs font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={isSavingToCatalog || !showManualFields}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isCatalogMutationInFlight || (!canSaveToCatalog && !canDeleteSavedCatalogItem)}
                     onClick={() => {
+                      if (savedCatalogItem) {
+                        void unsaveFromCatalog();
+                        return;
+                      }
                       void saveToCatalog();
                     }}
                   >
-                    <span className="material-symbols-outlined text-base leading-none">bookmark_add</span>
-                    {isSavingToCatalog ? "Saving" : "Save"}
+                    <span
+                      className="material-symbols-outlined text-base leading-none"
+                      style={canDeleteSavedCatalogItem ? { fontVariationSettings: '"FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24' } : undefined}
+                    >
+                      {bookmarkIcon}
+                    </span>
                   </button>
                 ) : null}
                 {mode === "edit" && onRequestDelete ? (
@@ -238,11 +276,14 @@ export function LineItemEditSheet({
                 ) : null}
               </div>
             </div>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
-              {showManualFields
-                ? "Update details now. Changes stay local until you save the review draft."
-                : "Choose a saved catalog item to insert into this draft."}
-            </Dialog.Description>
+            {!showManualFields ? (
+              <Dialog.Description
+                id="line-item-sheet-catalog-description"
+                className="mt-2 text-sm leading-6 text-on-surface-variant"
+              >
+                Pick a catalog item to insert.
+              </Dialog.Description>
+            ) : null}
 
             <div className="mt-4 space-y-4">
               {formError ? <FeedbackMessage variant="error">{formError}</FeedbackMessage> : null}
@@ -310,6 +351,9 @@ export function LineItemEditSheet({
                       value={description}
                       onChange={(event) => {
                         setDescription(event.target.value);
+                        if (savedCatalogItem) {
+                          setSavedCatalogItem(null);
+                        }
                         if (formError) {
                           setFormError(null);
                         }
@@ -332,6 +376,9 @@ export function LineItemEditSheet({
                       value={details}
                       onChange={(event) => {
                         setDetails(event.target.value);
+                        if (savedCatalogItem) {
+                          setSavedCatalogItem(null);
+                        }
                         if (formError) {
                           setFormError(null);
                         }
@@ -352,6 +399,9 @@ export function LineItemEditSheet({
                       value={priceInput}
                       onChange={(event) => {
                         setPriceInput(event.target.value);
+                        if (savedCatalogItem) {
+                          setSavedCatalogItem(null);
+                        }
                         if (formError) {
                           setFormError(null);
                         }
@@ -361,65 +411,16 @@ export function LineItemEditSheet({
                   </section>
                 </div>
               ) : (
-                <div
-                  id="line-item-tabpanel-catalog"
-                  role={mode === "add" ? "tabpanel" : undefined}
-                  className="space-y-2"
-                >
-                  {catalogLoadState === "loading" ? (
-                    <p role="status" className="text-sm text-on-surface-variant">Loading catalog items...</p>
-                  ) : null}
-
-                  {catalogLoadState === "error" && catalogLoadError ? (
-                    <div className="space-y-2">
-                      <FeedbackMessage variant="error">{catalogLoadError}</FeedbackMessage>
-                      <button
-                        type="button"
-                        className="inline-flex min-h-9 items-center rounded-lg border border-outline-variant/40 px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
-                        onClick={() => {
-                          setCatalogLoadState("idle");
-                          void loadCatalogItems();
-                        }}
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {catalogLoadState === "loaded" && catalogItems.length === 0 ? (
-                    <p className="rounded-lg bg-surface-container-high p-4 text-sm text-on-surface-variant">
-                      No catalog items yet. Save one from the Manual tab or from another line item.
-                    </p>
-                  ) : null}
-
-                  {catalogLoadState === "loaded" && catalogItems.length > 0 ? (
-                    <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                      {catalogItems.map((item) => (
-                        <li
-                          key={item.id}
-                          className="rounded-lg border border-outline-variant/20 bg-surface-container-high p-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-on-surface">{item.title}</p>
-                              <p className="text-xs text-on-surface-variant">{formatCatalogPrice(item.defaultPrice)}</p>
-                              {item.details ? (
-                                <p className="mt-1 text-sm text-on-surface-variant">{item.details}</p>
-                              ) : null}
-                            </div>
-                            <button
-                              type="button"
-                              className="inline-flex min-h-9 shrink-0 items-center rounded-lg border border-primary/40 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
-                              onClick={() => handleInsertCatalogItem(item)}
-                            >
-                              Insert
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
+                <LineItemCatalogTabPanel
+                  loadState={catalogLoadState}
+                  loadError={catalogLoadError}
+                  items={catalogItems}
+                  onRetry={() => {
+                    setCatalogLoadState("idle");
+                    void loadCatalogItems();
+                  }}
+                  onInsertItem={handleInsertCatalogItem}
+                />
               )}
             </div>
           </Dialog.Content>
