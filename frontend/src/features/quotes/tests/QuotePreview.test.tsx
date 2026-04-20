@@ -285,7 +285,7 @@ describe("QuotePreview", () => {
     },
   );
 
-  it.each(["ready", "shared", "viewed", "approved", "declined"] as const)(
+  it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
     "shows convert to invoice for %s quotes without a linked invoice",
     async (status) => {
       mockedQuoteService.getQuote.mockResolvedValueOnce(
@@ -295,12 +295,12 @@ describe("QuotePreview", () => {
       renderScreen();
 
       await screen.findByRole("heading", { name: "Test Customer" });
-      expect(screen.getByRole("button", { name: /convert to invoice/i })).toBeInTheDocument();
-      expect(screen.getByText("No invoice yet")).toBeInTheDocument();
+      await openOverflowMenu();
+      expect(screen.getByRole("menuitem", { name: /convert to invoice/i })).toBeInTheDocument();
     },
   );
 
-  it("demotes draft convert-to-invoice UI below the quote actions", async () => {
+  it("does not render an empty linked-invoice card when no linked invoice exists", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({ status: "draft", share_token: null }),
     );
@@ -308,30 +308,8 @@ describe("QuotePreview", () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Test Customer" });
-    const generatePdfButton = screen.getByRole("button", { name: /generate pdf/i });
-    const convertButton = screen.getByRole("button", { name: /convert to invoice/i });
-
-    expect(generatePdfButton.compareDocumentPosition(convertButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(generatePdfButton).toHaveClass("forest-gradient");
-    expect(convertButton).not.toHaveClass("forest-gradient");
-    expect(convertButton).toHaveClass("border");
-    expect(screen.getByText("No invoice yet")).toBeInTheDocument();
-    expect(screen.queryByText(/fine-tune the due date before sharing/i)).not.toBeInTheDocument();
-  });
-
-  it("keeps convert to invoice secondary when the quote is ready", async () => {
-    mockedQuoteService.getQuote.mockResolvedValueOnce(
-      makeQuoteDetail({ status: "ready", share_token: "share-token-1" }),
-    );
-
-    renderScreen();
-
-    await screen.findByRole("heading", { name: "Test Customer" });
-    const convertButton = screen.getByRole("button", { name: /convert to invoice/i });
-
-    expect(convertButton).not.toHaveClass("forest-gradient");
-    expect(convertButton).toHaveClass("border");
-    expect(screen.queryByText(/fine-tune the due date before sharing/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("No invoice yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("Linked Invoice")).not.toBeInTheDocument();
   });
 
   it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
@@ -355,12 +333,38 @@ describe("QuotePreview", () => {
       renderScreen();
 
       await screen.findByRole("heading", { name: "Test Customer" });
-      expect(screen.getByText("I-001")).toBeInTheDocument();
-      expect(screen.getByText("Sent")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /open invoice/i })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /convert to invoice/i })).not.toBeInTheDocument();
+      const linkedInvoiceRow = screen.getByRole("button", { name: /open linked invoice i-001/i });
+      expect(within(linkedInvoiceRow).getByText("I-001")).toBeInTheDocument();
+      expect(within(linkedInvoiceRow).getByText("Sent")).toBeInTheDocument();
+      expect(within(linkedInvoiceRow).getByText(/Due/i)).toBeInTheDocument();
+      expect(within(linkedInvoiceRow).getByText(/\$120\.00/)).toBeInTheDocument();
+      expect(within(linkedInvoiceRow).queryByText(/Created/i)).not.toBeInTheDocument();
+      await openOverflowMenu();
+      expect(screen.queryByRole("menuitem", { name: /convert to invoice/i })).not.toBeInTheDocument();
     },
   );
+
+  it("opens invoice detail when the linked-invoice row is tapped", async () => {
+    mockedQuoteService.getQuote.mockResolvedValueOnce(
+      makeQuoteDetail({
+        status: "ready",
+        share_token: "share-token-1",
+        linked_invoice: {
+          id: "invoice-1",
+          doc_number: "I-001",
+          status: "sent",
+          due_date: "2026-04-19",
+          total_amount: 120,
+          created_at: "2026-03-20T00:00:00.000Z",
+        },
+      }),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /open linked invoice i-001/i }));
+    expect(await screen.findByText("Invoice Detail Screen")).toBeInTheDocument();
+  });
 
   it("converts a draft quote to an invoice and navigates to the invoice detail screen", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
@@ -369,7 +373,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /convert to invoice/i }));
+    await screen.findByRole("heading", { name: "Test Customer" });
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /convert to invoice/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.convertToInvoice).toHaveBeenCalledWith("quote-1");
@@ -402,7 +408,9 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /convert to invoice/i }));
+    await screen.findByRole("heading", { name: "Test Customer" });
+    await openOverflowMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /convert to invoice/i }));
 
     await waitFor(() => {
       expect(mockedQuoteService.convertToInvoice).toHaveBeenCalledWith("quote-1");

@@ -5,7 +5,6 @@ import { isInvoiceDocument } from "@/features/quotes/components/documentEditUtil
 import type { ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { type DocumentEditDraft, type PersistedEditableDocument } from "@/features/quotes/hooks/usePersistedReview";
 import type { ExtractionReviewHiddenDetails, ExtractionTier, HiddenItemState, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
-import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
 interface DocumentEditScreenViewProps {
@@ -142,7 +141,6 @@ export function DocumentEditScreenView({
         subtitle={document.doc_number}
         backLabel={backLabel}
         onBack={() => onRequestNavigation({ to: backTarget, replace: true })}
-        onExitHome={() => onRequestNavigation({ to: HOME_ROUTE, replace: true })}
       />
 
       <ReviewFormContent

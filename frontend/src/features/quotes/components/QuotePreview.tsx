@@ -56,7 +56,6 @@ export function QuotePreview(): React.ReactElement {
   const requiresCustomerAssignment = quote
     ? (quote.requires_customer_assignment ?? quote.customer_id === null)
     : false;
-  const showDraftInvoicePromptBelowActions = Boolean(quote && actionState === "draft" && !quote.linked_invoice);
   const {
     invoiceError,
     isConvertingInvoice,
@@ -135,9 +134,13 @@ export function QuotePreview(): React.ReactElement {
 
   const overflowItems = buildOverflowItems({
     hasQuote: Boolean(quote),
+    hasLinkedInvoice: Boolean(quote?.linked_invoice),
     hasActiveShare: Boolean(quote?.has_active_share),
     actionState,
     isBusy,
+    onConvertToInvoice: () => {
+      void onConvertToInvoice();
+    },
     onRevokeShareRequest: () => setShowRevokeShareConfirm(true),
     onDeleteRequest: () => setShowDeleteConfirm(true),
     onMarkWonRequest: () => setShowMarkWonConfirm(true),
@@ -210,11 +213,9 @@ export function QuotePreview(): React.ReactElement {
                 clientContact={clientContact}
               />
             ) : null}
-            {quote && !showDraftInvoicePromptBelowActions ? (
+            {quote?.linked_invoice ? (
               <LinkedInvoiceCard
                 linkedInvoice={quote.linked_invoice}
-                isConverting={isConvertingInvoice}
-                onConvert={onConvertToInvoice}
                 onOpenInvoice={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
               />
             ) : null}
@@ -240,16 +241,6 @@ export function QuotePreview(): React.ReactElement {
               outcomeError={outcomeError}
               shareMessage={shareMessage}
             />
-
-            {quote && showDraftInvoicePromptBelowActions ? (
-              <LinkedInvoiceCard
-                linkedInvoice={quote.linked_invoice}
-                isConverting={isConvertingInvoice}
-                onConvert={onConvertToInvoice}
-                onOpenInvoice={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
-                lowEmphasis
-              />
-            ) : null}
 
             {deleteError ? (
               <div className="mx-4 mt-3">
