@@ -25,6 +25,7 @@ from app.features.quotes.repository import (
     QuoteDetailRow,
     QuoteListItemSummary,
     QuoteRenderContext,
+    QuoteReuseCandidateSummary,
     QuoteViewTransition,
 )
 from app.features.quotes.schemas import (
@@ -53,6 +54,13 @@ class QuoteRepositoryProtocol(Protocol):
         user_id: UUID,
         customer_id: UUID | None = None,
     ) -> list[QuoteListItemSummary]: ...
+    async def list_reuse_candidates(
+        self,
+        user_id: UUID,
+        *,
+        customer_id: UUID | None = None,
+        q: str | None = None,
+    ) -> list[QuoteReuseCandidateSummary]: ...
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
     async def get_by_id_for_update(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
@@ -273,6 +281,20 @@ class QuoteService:
         return await self._repository.list_by_user(
             _resolve_user_id(user),
             customer_id=customer_id,
+        )
+
+    async def list_quote_reuse_candidates(
+        self,
+        user: User,
+        *,
+        customer_id: UUID | None = None,
+        q: str | None = None,
+    ) -> list[QuoteReuseCandidateSummary]:
+        """List quote reuse candidates with capped line-item previews."""
+        return await self._repository.list_reuse_candidates(
+            _resolve_user_id(user),
+            customer_id=customer_id,
+            q=q,
         )
 
     async def get_quote(self, user: User, quote_id: UUID) -> Document:
