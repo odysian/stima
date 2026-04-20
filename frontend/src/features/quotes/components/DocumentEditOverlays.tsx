@@ -2,6 +2,7 @@ import { LineItemEditSheet } from "@/features/quotes/components/LineItemEditShee
 import { ReviewCustomerAssignmentSheet } from "@/features/quotes/components/ReviewCustomerAssignmentSheet";
 import type { ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Toast } from "@/shared/components/Toast";
 
@@ -14,6 +15,13 @@ interface DocumentEditOverlaysProps {
   lineItemSheetInitialItem: LineItemDraftWithFlags;
   onCloseLineItemSheet: () => void;
   onSaveLineItem: (nextLineItem: LineItemDraftWithFlags) => void;
+  onSaveLineItemToCatalog: (lineItem: {
+    title: string;
+    details: string | null;
+    defaultPrice: number | null;
+  }) => Promise<LineItemCatalogItem>;
+  onDeleteLineItemFromCatalog: (id: string) => Promise<void>;
+  onLoadLineItemCatalogItems: () => Promise<LineItemCatalogItem[]>;
   onRequestDeleteLineItemFromSheet: () => void;
   showLineItemDeleteConfirm: boolean;
   lineItemDeleteDescription: string;
@@ -38,6 +46,9 @@ export function DocumentEditOverlays({
   lineItemSheetInitialItem,
   onCloseLineItemSheet,
   onSaveLineItem,
+  onSaveLineItemToCatalog,
+  onDeleteLineItemFromCatalog,
+  onLoadLineItemCatalogItems,
   onRequestDeleteLineItemFromSheet,
   showLineItemDeleteConfirm,
   lineItemDeleteDescription,
@@ -81,6 +92,9 @@ export function DocumentEditOverlays({
           initialLineItem={lineItemSheetInitialItem}
           onClose={onCloseLineItemSheet}
           onSave={onSaveLineItem}
+          onSaveToCatalog={onSaveLineItemToCatalog}
+          onDeleteFromCatalog={onDeleteLineItemFromCatalog}
+          onLoadCatalogItems={onLoadLineItemCatalogItems}
           onRequestDelete={lineItemSheetState.mode === "edit" ? onRequestDeleteLineItemFromSheet : undefined}
         />
       ) : null}

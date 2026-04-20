@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useBeforeUnload, useLocation, useNavigate, useParams } from "react-router-dom";
 
+import { lineItemCatalogService } from "@/features/line-item-catalog/services/lineItemCatalogService";
 import { profileService } from "@/features/profile/services/profileService";
 import { DocumentEditScreenView } from "@/features/quotes/components/DocumentEditScreenView";
 import { buildDefaultInvoiceDueDate, buildDocumentSnapshotKey, buildSaveValidationMessage, isInvoiceDocument, persistDocumentDraft } from "@/features/quotes/components/documentEditUtils";
@@ -393,6 +394,13 @@ export function DocumentEditScreen(): React.ReactElement {
         setDraft((currentDraft) => applyLineItemSheetSave(currentDraft, nextSheetState, nextLineItem));
         setLineItemSheetState(null);
       }}
+      onSaveLineItemToCatalog={async (lineItem) => {
+        const createdItem = await lineItemCatalogService.createItem(lineItem);
+        setToastMessage("Saved to line item catalog.");
+        return createdItem;
+      }}
+      onDeleteLineItemFromCatalog={async (itemId) => lineItemCatalogService.deleteItem(itemId)}
+      onLoadLineItemCatalogItems={async () => lineItemCatalogService.listItems()}
       onRequestDeleteLineItemFromSheet={() => {
         const nextSheetState = lineItemSheetState;
         if (
