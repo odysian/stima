@@ -70,7 +70,105 @@ describe("LineItemEditSheet", () => {
     expect(within(dialog).queryByRole("button", { name: /delete line item/i })).not.toBeInTheDocument();
   });
 
-  it("blocks dismiss with a validation error when description is blank", async () => {
+  it("add mode dismisses on backdrop tap with empty fields without validation", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem({ description: "", details: null, price: null })}
+        onClose={onClose}
+        onSave={onSave}
+      />,
+    );
+
+    await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("add mode dismisses on backdrop tap with partial fields without validation", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem({ description: "", details: null, price: null })}
+        onClose={onClose}
+        onSave={onSave}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "Mulch refresh" } });
+    await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("add mode add button validates blank description", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem({ description: "", details: null, price: null })}
+        onClose={onClose}
+        onSave={onSave}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /add line item/i }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Description is required.");
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("add mode add button saves valid manual fields and closes", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem({ description: "", details: null, price: null })}
+        onClose={onClose}
+        onSave={onSave}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "  Fresh mulch  " } });
+    fireEvent.change(screen.getByLabelText(/details/i), { target: { value: "  Front beds  " } });
+    fireEvent.change(screen.getByLabelText(/price/i), { target: { value: "95.5" } });
+
+    await user.click(screen.getByRole("button", { name: /add line item/i }));
+
+    expect(onSave).toHaveBeenCalledWith({
+      description: "Fresh mulch",
+      details: "Front beds",
+      price: 95.5,
+      flagged: true,
+      flagReason: "Needs review",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("edit mode backdrop dismiss still validates blank description", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     const onClose = vi.fn();

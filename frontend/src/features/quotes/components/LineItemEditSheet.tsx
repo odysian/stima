@@ -135,7 +135,7 @@ export function LineItemEditSheet({
   }
 
   function dismissWithAutosave(): void {
-    if (!showManualFields) {
+    if (mode === "add") {
       onClose();
       return;
     }
@@ -145,6 +145,13 @@ export function LineItemEditSheet({
       return;
     }
 
+    onSave(parsedLineItem);
+    onClose();
+  }
+
+  function addLineItemAndClose(): void {
+    const parsedLineItem = parseManualLineItem();
+    if (!parsedLineItem) return;
     onSave(parsedLineItem);
     onClose();
   }
@@ -262,6 +269,16 @@ export function LineItemEditSheet({
                     >
                       {bookmarkIcon}
                     </span>
+                  </button>
+                ) : null}
+                {mode === "add" && showManualFields ? (
+                  <button
+                    type="button"
+                    aria-label="Add line item"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-primary transition-colors hover:bg-primary/10"
+                    onClick={addLineItemAndClose}
+                  >
+                    <span className="material-symbols-outlined text-base leading-none">check</span>
                   </button>
                 ) : null}
                 {mode === "edit" && onRequestDelete ? (
