@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
@@ -22,8 +22,18 @@ export function ReviewLineItemsSection({
   onAddLineItem,
 }: ReviewLineItemsSectionProps): React.ReactElement {
   const hasReachedLineItemLimit = lineItems.length >= DOCUMENT_LINE_ITEMS_MAX_ITEMS;
+  const [isReorderMode, setIsReorderMode] = useState(false);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [settlingIndex, setSettlingIndex] = useState<number | null>(null);
   const draggingIndexRef = useRef<number | null>(null);
+  const settleTimeoutRef = useRef<number | null>(null);
+  const isReorderModeActive = isReorderMode && !isInteractionLocked;
+
+  useEffect(() => () => {
+    if (settleTimeoutRef.current !== null) {
+      window.clearTimeout(settleTimeoutRef.current);
+    }
+  }, []);
 
   function resolveRowIndexFromPoint(clientX: number, clientY: number): number | null {
     const row = document
@@ -43,16 +53,30 @@ export function ReviewLineItemsSection({
     return parsedIndex;
   }
 
-  function clearDragState(): void {
+  function clearDragState(options?: { settle?: boolean }): void {
+    const draggedIndex = draggingIndexRef.current;
     draggingIndexRef.current = null;
     setDraggingIndex(null);
+    if (settleTimeoutRef.current !== null) {
+      window.clearTimeout(settleTimeoutRef.current);
+      settleTimeoutRef.current = null;
+    }
+    if (options?.settle && draggedIndex !== null) {
+      setSettlingIndex(draggedIndex);
+      settleTimeoutRef.current = window.setTimeout(() => {
+        setSettlingIndex(null);
+        settleTimeoutRef.current = null;
+      }, 180);
+      return;
+    }
+    setSettlingIndex(null);
   }
 
   function handleDragHandlePointerDown(
     index: number,
     event: React.PointerEvent<HTMLButtonElement>,
   ): void {
-    if (isInteractionLocked) {
+    if (isInteractionLocked || !isReorderModeActive) {
       return;
     }
 
@@ -86,7 +110,7 @@ export function ReviewLineItemsSection({
       handleElement.removeEventListener("pointerup", stopPointerTracking);
       handleElement.removeEventListener("pointercancel", stopPointerTracking);
       handleElement.removeEventListener("lostpointercapture", stopPointerTracking);
-      clearDragState();
+      clearDragState({ settle: true });
     }
 
     handleElement.addEventListener("pointermove", handlePointerMove);
@@ -99,17 +123,38 @@ export function ReviewLineItemsSection({
     <section className="space-y-3">
       <div className="flex items-end justify-between">
         <h2 className="font-headline text-xl font-bold tracking-tight text-primary">Line Items</h2>
-        <span className="text-[0.6875rem] uppercase tracking-widest text-outline">
-          {lineItems.length} ITEMS
-        </span>
+        <button
+          type="button"
+          disabled={isInteractionLocked || (!isReorderModeActive && lineItems.length < 2)}
+          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide transition-colors ${
+            isReorderModeActive
+              ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15"
+              : "border-outline-variant/40 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low"
+          } disabled:cursor-not-allowed disabled:opacity-60`}
+          onClick={() => {
+            clearDragState();
+            setIsReorderMode((currentMode) => !currentMode);
+          }}
+        >
+          {isReorderModeActive ? "Done" : "Reorder"}
+        </button>
       </div>
 
       <div className="space-y-2.5">
         {lineItems.length > 0 ? (
           lineItems.map((lineItem, index) => {
             const displayDescription = lineItem.description || "Untitled line item";
+            const isDraggingRow = draggingIndex === index;
             return (
-              <div key={`review-line-item-${index}`} data-line-item-index={index}>
+              <div
+                key={`review-line-item-${index}`}
+                data-line-item-index={index}
+                className={`transition-transform duration-150 ease-out ${
+                  isReorderModeActive && draggingIndex !== null && !isDraggingRow
+                    ? (index < draggingIndex ? "-translate-y-1" : "translate-y-1")
+                    : ""
+                }`}
+              >
                 <LineItemCard
                   ariaLabel={`Edit line item ${index + 1}: ${displayDescription}`}
                   dragHandleAriaLabel={`Reorder line item ${index + 1}: ${displayDescription}`}
@@ -119,8 +164,15 @@ export function ReviewLineItemsSection({
                   flagged={lineItem.flagged}
                   flagReason={lineItem.flagReason}
                   disabled={isInteractionLocked}
-                  isDragging={draggingIndex === index}
-                  onEdit={() => onEditLineItem(index)}
+                  isReorderMode={isReorderModeActive}
+                  isDragging={isDraggingRow}
+                  isDropSettling={settlingIndex === index}
+                  onEdit={() => {
+                    if (isReorderModeActive) {
+                      return;
+                    }
+                    onEditLineItem(index);
+                  }}
                   onDelete={() => onRequestDeleteLineItem(index)}
                   onDragHandlePointerDown={(event) => handleDragHandlePointerDown(index, event)}
                 />
@@ -138,7 +190,7 @@ export function ReviewLineItemsSection({
         <button
           type="button"
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isInteractionLocked || hasReachedLineItemLimit}
+          disabled={isInteractionLocked || hasReachedLineItemLimit || isReorderModeActive}
           onClick={onAddLineItem}
         >
           <span className="material-symbols-outlined text-base">add</span>

@@ -11,6 +11,8 @@ interface LineItemCardProps {
   flagReason?: string | null;
   disabled?: boolean;
   isDragging?: boolean;
+  isDropSettling?: boolean;
+  isReorderMode?: boolean;
   ariaLabel?: string;
   onEdit: () => void;
   onDelete: () => void;
@@ -26,6 +28,8 @@ export function LineItemCard({
   flagReason,
   disabled = false,
   isDragging = false,
+  isDropSettling = false,
+  isReorderMode = false,
   ariaLabel,
   onEdit,
   onDelete,
@@ -35,13 +39,10 @@ export function LineItemCard({
   const lineItemLabel = description.trim() || "Untitled line item";
   const priceLabel = price !== null ? `$${price.toFixed(2)}` : "—";
   const flagMessage = flagged ? resolveLineItemFlagMessage(flagReason) : null;
-  const overflowItems: OverflowMenuItem[] = [
-    {
-      label: "Edit",
-      icon: "edit",
-      disabled,
-      onSelect: onEdit,
-    },
+  const showDragHandle = isReorderMode;
+  const showOverflowMenu = isReorderMode;
+  const canEditRow = !disabled && !isReorderMode;
+  const overflowItems: OverflowMenuItem[] = showOverflowMenu ? [
     {
       label: "Delete",
       icon: "delete",
@@ -49,31 +50,43 @@ export function LineItemCard({
       disabled,
       onSelect: onDelete,
     },
-  ];
+  ] : [];
 
   return (
     <div
-      className={`flex w-full items-start gap-3 rounded-xl bg-surface-container-lowest p-3 ghost-shadow transition-all ${
+      className={`flex w-full items-start gap-3 rounded-xl bg-surface-container-lowest p-3 ghost-shadow ${
         flagged ? "border border-warning-accent/20" : ""
       } ${
-        isDragging ? "ring-2 ring-primary/30" : ""
+        isReorderMode
+          ? "transition-[transform,box-shadow,background-color] duration-150 ease-out"
+          : "transition-colors"
+      } ${
+        isDragging
+          ? "-translate-y-0.5 scale-[1.01] bg-surface-container-low ring-2 ring-primary/35"
+          : ""
+      } ${
+        isDropSettling ? "ring-2 ring-primary/20" : ""
       }`}
     >
-      <button
-        type="button"
-        aria-label={dragHandleAriaLabel ?? `Reorder line item ${lineItemLabel}`}
-        disabled={disabled}
-        className="mt-1 inline-flex h-9 w-9 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-full border border-outline-variant/30 text-outline transition-colors hover:bg-surface-container-low active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-60"
-        onPointerDown={onDragHandlePointerDown}
-      >
-        <span className="material-symbols-outlined text-[1.125rem] leading-none">drag_indicator</span>
-      </button>
+      {showDragHandle ? (
+        <button
+          type="button"
+          aria-label={dragHandleAriaLabel ?? `Reorder line item ${lineItemLabel}`}
+          disabled={disabled}
+          className="mt-1 inline-flex h-9 w-9 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-full border border-outline-variant/30 text-outline transition-colors hover:bg-surface-container-low active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-60"
+          onPointerDown={onDragHandlePointerDown}
+        >
+          <span className="material-symbols-outlined text-[1.125rem] leading-none">drag_indicator</span>
+        </button>
+      ) : null}
 
       <button
         type="button"
         aria-label={ariaLabel}
-        disabled={disabled}
-        className="flex min-w-0 flex-1 cursor-pointer items-start justify-between gap-3 rounded-lg p-1 text-left transition-colors hover:bg-surface-container-low/70 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!canEditRow}
+        className={`flex min-w-0 flex-1 items-start justify-between gap-3 rounded-lg p-1 text-left transition-colors ${
+          canEditRow ? "cursor-pointer hover:bg-surface-container-low/70" : "cursor-default"
+        } disabled:opacity-60`}
         onClick={onEdit}
       >
         <div className="min-w-0 flex-1">
@@ -97,13 +110,14 @@ export function LineItemCard({
           ) : null}
         </div>
 
-        <div className="mt-0.5 flex shrink-0 items-center gap-2">
+        <div className="mt-0.5 flex shrink-0 items-center">
           <p className="font-bold text-on-surface">{priceLabel}</p>
-          <span className="material-symbols-outlined text-outline">chevron_right</span>
         </div>
       </button>
 
-      <OverflowMenu items={overflowItems} triggerLabel={`Line item actions for ${lineItemLabel}`} />
+      {showOverflowMenu ? (
+        <OverflowMenu items={overflowItems} triggerLabel={`Line item actions for ${lineItemLabel}`} />
+      ) : null}
     </div>
   );
 }
