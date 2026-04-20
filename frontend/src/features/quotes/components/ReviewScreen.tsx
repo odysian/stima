@@ -395,14 +395,8 @@ export function DocumentEditScreen(): React.ReactElement {
         setLineItemSheetState(null);
       }}
       onSaveLineItemToCatalog={async (lineItem) => {
-        try {
-          await lineItemCatalogService.createItem(lineItem);
-          setSaveError(null);
-          setToastMessage("Saved to line item catalog.");
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Unable to save line item to catalog";
-          setSaveError(message);
-        }
+        await lineItemCatalogService.createItem(lineItem);
+        setToastMessage("Saved to line item catalog.");
       }}
       onLoadLineItemCatalogItems={async () => lineItemCatalogService.listItems()}
       onRequestDeleteLineItemFromSheet={() => {

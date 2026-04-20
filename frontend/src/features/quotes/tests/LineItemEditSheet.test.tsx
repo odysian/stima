@@ -201,6 +201,30 @@ describe("LineItemEditSheet", () => {
     });
   });
 
+  it("shows a sheet-level error when save-to-catalog fails", async () => {
+    const user = userEvent.setup();
+    const onSaveToCatalog = vi.fn().mockRejectedValue(new Error("Unable to save line item to catalog"));
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem()}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onSaveToCatalog={onSaveToCatalog}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /save to catalog/i }));
+
+    await waitFor(() => {
+      expect(onSaveToCatalog).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Unable to save line item to catalog");
+  });
+
   it("loads catalog tab lazily and inserts a catalog item into the add flow", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
