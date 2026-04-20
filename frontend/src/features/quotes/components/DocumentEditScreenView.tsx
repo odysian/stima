@@ -5,6 +5,7 @@ import { isInvoiceDocument } from "@/features/quotes/components/documentEditUtil
 import type { ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { type DocumentEditDraft, type PersistedEditableDocument } from "@/features/quotes/hooks/usePersistedReview";
 import type { ExtractionReviewHiddenDetails, ExtractionTier, HiddenItemState, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
 interface DocumentEditScreenViewProps {
@@ -58,6 +59,12 @@ interface DocumentEditScreenViewProps {
   onAssignCustomer: (customerId: string) => Promise<void>;
   onCloseLineItemSheet: () => void;
   onSaveLineItem: (nextLineItem: LineItemDraftWithFlags) => void;
+  onSaveLineItemToCatalog: (lineItem: {
+    title: string;
+    details: string | null;
+    defaultPrice: number | null;
+  }) => Promise<void>;
+  onLoadLineItemCatalogItems: () => Promise<LineItemCatalogItem[]>;
   onRequestDeleteLineItemFromSheet: () => void;
   showLineItemDeleteConfirm: boolean;
   lineItemDeleteDescription: string;
@@ -121,6 +128,8 @@ export function DocumentEditScreenView({
   onAssignCustomer,
   onCloseLineItemSheet,
   onSaveLineItem,
+  onSaveLineItemToCatalog,
+  onLoadLineItemCatalogItems,
   onRequestDeleteLineItemFromSheet,
   showLineItemDeleteConfirm,
   lineItemDeleteDescription,
@@ -200,6 +209,8 @@ export function DocumentEditScreenView({
         lineItemSheetInitialItem={lineItemSheetInitialItem}
         onCloseLineItemSheet={onCloseLineItemSheet}
         onSaveLineItem={onSaveLineItem}
+        onSaveLineItemToCatalog={onSaveLineItemToCatalog}
+        onLoadLineItemCatalogItems={onLoadLineItemCatalogItems}
         onRequestDeleteLineItemFromSheet={onRequestDeleteLineItemFromSheet}
         showLineItemDeleteConfirm={showLineItemDeleteConfirm}
         lineItemDeleteDescription={lineItemDeleteDescription}

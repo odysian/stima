@@ -19,6 +19,7 @@ import { InvoiceDetailScreen } from "@/features/invoices/components/InvoiceDetai
 import { LandingPage } from "@/features/marketing/components/LandingPage";
 import { PublicQuotePage } from "@/features/public/components/PublicQuotePage";
 import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
+import { LineItemCatalogSettingsScreen } from "@/features/line-item-catalog/components/LineItemCatalogSettingsScreen";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { DocumentEditScreen } from "@/features/quotes/components/ReviewScreen";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
@@ -130,6 +131,7 @@ export default function App(): React.ReactElement {
         <Route path="/customers/new" element={<CustomerCreateScreen />} />
         <Route path="/customers/:id" element={<CustomerDetailScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
+        <Route path="/settings/line-item-catalog" element={<LineItemCatalogSettingsScreen />} />
         <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
         <Route path="/invoices/:id/edit" element={<InvoiceEditRedirect />} />
         <Route path="/invoices/:id/edit/line-items/:lineItemIndex/edit" element={<InvoiceEditRedirect />} />

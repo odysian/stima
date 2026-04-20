@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getTimezoneOptions } from "@/features/profile/lib/timezones";
 import { profileService } from "@/features/profile/services/profileService";
+import { SettingsCatalogShortcutCard } from "@/features/settings/components/SettingsCatalogShortcutCard";
 import {
   TRADE_TYPES,
   type ProfileResponse,
@@ -28,6 +30,7 @@ const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = 
 ];
 
 export function SettingsScreen(): React.ReactElement {
+  const navigate = useNavigate();
   const { logout, refreshUser } = useAuth();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const logoPreviewSrc = `${import.meta.env.VITE_API_URL ?? ""}/api/profile/logo`;
@@ -372,6 +375,10 @@ export function SettingsScreen(): React.ReactElement {
                 </div>
               </div>
             </section>
+
+            <SettingsCatalogShortcutCard
+              onOpenLineItemCatalog={() => navigate("/settings/line-item-catalog")}
+            />
 
             <section className="rounded-xl bg-surface-container-low p-4">
               <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">

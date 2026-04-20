@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -168,5 +168,83 @@ describe("LineItemEditSheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /delete line item/i }));
     expect(onRequestDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves to catalog using normalized manual values", async () => {
+    const user = userEvent.setup();
+    const onSaveToCatalog = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem()}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onSaveToCatalog={onSaveToCatalog}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "  Garden edging  " } });
+    fireEvent.change(screen.getByLabelText(/details/i), { target: { value: "  Around driveway  " } });
+    fireEvent.change(screen.getByLabelText(/price/i), { target: { value: "95.5" } });
+
+    await user.click(screen.getByRole("button", { name: /save to catalog/i }));
+
+    await waitFor(() => {
+      expect(onSaveToCatalog).toHaveBeenCalledWith({
+        title: "Garden edging",
+        details: "Around driveway",
+        defaultPrice: 95.5,
+      });
+    });
+  });
+
+  it("loads catalog tab lazily and inserts a catalog item into the add flow", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const onLoadCatalogItems = vi.fn().mockResolvedValue([
+      {
+        id: "catalog-1",
+        title: "Spring Cleanup",
+        details: "Blow out beds",
+        defaultPrice: 180,
+        createdAt: "2026-04-20T00:00:00.000Z",
+        updatedAt: "2026-04-20T00:00:00.000Z",
+      },
+    ]);
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem({ description: "", details: null, price: null })}
+        onClose={onClose}
+        onSave={onSave}
+        onSaveToCatalog={vi.fn().mockResolvedValue(undefined)}
+        onLoadCatalogItems={onLoadCatalogItems}
+      />,
+    );
+
+    expect(onLoadCatalogItems).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("tab", { name: /catalog/i }));
+    await waitFor(() => {
+      expect(onLoadCatalogItems).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText("Spring Cleanup")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /insert/i }));
+
+    expect(onSave).toHaveBeenCalledWith({
+      description: "Spring Cleanup",
+      details: "Blow out beds",
+      price: 180,
+      flagged: false,
+      flagReason: null,
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
