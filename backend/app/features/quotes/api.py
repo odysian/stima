@@ -228,6 +228,32 @@ async def create_manual_draft(
 
 
 @router.post(
+    "/{quote_id}/duplicate",
+    response_model=QuoteResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+async def duplicate_quote(
+    quote_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> QuoteResponse:
+    """Duplicate one quote into a new manual-style draft for the authenticated user."""
+    try:
+        quote = await quote_service.duplicate_quote(user, quote_id)
+    except QuoteServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    log_event(
+        "quote.created",
+        user_id=user.id,
+        quote_id=quote.id,
+        customer_id=quote.customer_id,
+    )
+    return QuoteResponse.model_validate(quote)
+
+
+@router.post(
     "/extract",
     response_model=PersistedExtractionResponse | JobRecordResponse,
     dependencies=[Depends(require_csrf)],

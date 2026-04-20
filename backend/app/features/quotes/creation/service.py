@@ -36,6 +36,7 @@ class QuoteCreationRepositoryProtocol(Protocol):
     """Repository behavior required by quote creation orchestration."""
 
     async def customer_exists_for_user(self, *, user_id: UUID, customer_id: UUID) -> bool: ...
+    async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
 
     async def create(
         self,
@@ -266,6 +267,63 @@ class QuoteCreationService:
             await self._repository.rollback()
             raise QuoteServiceError(
                 detail="Unable to save manual draft right now. Please try again.",
+                status_code=503,
+            ) from exc
+
+        return quote
+
+    async def duplicate_quote(
+        self,
+        *,
+        user_id: UUID,
+        quote_id: UUID,
+    ) -> Document:
+        """Duplicate one user-owned quote into a new manual-style draft quote."""
+        source_quote = await self._repository.get_by_id(quote_id, user_id)
+        if source_quote is None:
+            raise QuoteServiceError(detail="Not found", status_code=404)
+
+        copied_line_items = [
+            LineItemDraft(
+                description=line_item.description,
+                details=line_item.details,
+                price=document_field_float_or_none(line_item.price),
+                flagged=line_item.flagged,
+                flag_reason=line_item.flag_reason,
+            )
+            for line_item in source_quote.line_items
+        ]
+
+        try:
+            quote = await self._create_quote_document(
+                user_id=user_id,
+                customer_id=source_quote.customer_id,
+                title=source_quote.title,
+                transcript="",
+                line_items=copied_line_items,
+                total_amount=document_field_float_or_none(source_quote.total_amount),
+                tax_rate=document_field_float_or_none(source_quote.tax_rate),
+                discount_type=source_quote.discount_type,
+                discount_value=document_field_float_or_none(source_quote.discount_value),
+                deposit_amount=document_field_float_or_none(source_quote.deposit_amount),
+                notes=source_quote.notes,
+                source_type="text",
+            )
+        except QuoteServiceError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            await self._repository.rollback()
+            raise QuoteServiceError(
+                detail="Unable to duplicate quote right now. Please try again.",
+                status_code=503,
+            ) from exc
+
+        try:
+            await self._repository.commit()
+        except Exception as exc:  # noqa: BLE001
+            await self._repository.rollback()
+            raise QuoteServiceError(
+                detail="Unable to duplicate quote right now. Please try again.",
                 status_code=503,
             ) from exc
 

@@ -51,6 +51,7 @@ _reset_rate_limiter = quotes_test_module._reset_rate_limiter
             {"notes": "updated"},
         ),
         ("delete", "/api/quotes/00000000-0000-0000-0000-000000000000", None),
+        ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/duplicate", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/pdf", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/share", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/send-email", None),
@@ -227,6 +228,17 @@ async def test_delete_quote_requires_csrf(client: AsyncClient) -> None:
     quote_id = create_response.json()["id"]
 
     response = await client.delete(f"/api/quotes/{quote_id}")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
+async def test_duplicate_quote_requires_csrf(client: AsyncClient) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    response = await client.post(f"/api/quotes/{quote['id']}/duplicate")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "CSRF token missing"}

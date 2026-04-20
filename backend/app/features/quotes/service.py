@@ -257,6 +257,13 @@ class QuoteService:
             customer_id=customer_id,
         )
 
+    async def duplicate_quote(self, user: User, quote_id: UUID) -> Document:
+        """Duplicate one user-owned quote into a new draft quote."""
+        return await self._creation_service.duplicate_quote(
+            user_id=_resolve_user_id(user),
+            quote_id=quote_id,
+        )
+
     async def list_quotes(
         self,
         user: User,
