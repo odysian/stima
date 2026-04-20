@@ -30,6 +30,8 @@ from app.features.invoices.repository import InvoiceRepository
 from app.features.invoices.service import InvoiceService
 from app.features.jobs.repository import JobRepository
 from app.features.jobs.service import JobService
+from app.features.line_item_catalog.repository import LineItemCatalogRepository
+from app.features.line_item_catalog.service import LineItemCatalogService
 from app.features.profile.repository import ProfileRepository
 from app.features.profile.service import ProfileService
 from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
@@ -144,6 +146,13 @@ def get_customer_service(
         pdf_artifact_repository=PdfArtifactRepository(db),
         storage_service=storage_service,
     )
+
+
+def get_line_item_catalog_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LineItemCatalogService:
+    """Build a request-scoped line-item catalog service wired to the DB session."""
+    return LineItemCatalogService(repository=LineItemCatalogRepository(db))
 
 
 def get_quote_service(

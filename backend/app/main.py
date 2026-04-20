@@ -26,6 +26,7 @@ from app.features.customers.api import router as customer_router
 from app.features.invoices.api import router as invoice_router
 from app.features.jobs.api import router as jobs_router
 from app.features.jobs.reaper import run_stale_extraction_job_reaper
+from app.features.line_item_catalog.api import router as line_item_catalog_router
 from app.features.profile.api import router as profile_router
 from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
@@ -155,6 +156,11 @@ def create_app() -> FastAPI:
     app.include_router(profile_router, prefix="/api", dependencies=[Depends(bind_request_context)])
     app.include_router(
         customer_router,
+        prefix="/api",
+        dependencies=[Depends(bind_request_context)],
+    )
+    app.include_router(
+        line_item_catalog_router,
         prefix="/api",
         dependencies=[Depends(bind_request_context)],
     )

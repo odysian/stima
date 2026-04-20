@@ -20,7 +20,7 @@ backend-static-verify: ## Run backend boundaries, lint, type checks, and securit
 		.venv/bin/ruff check . --cache-dir .ruff_cache && \
 		.venv/bin/ruff format --check . && \
 		.venv/bin/mypy . --cache-dir .mypy_cache && \
-		.venv/bin/bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/invoices/tests,app/features/profile/tests,app/features/quotes/tests,app/shared/tests
+		.venv/bin/bandit -r app/ -x app/core/tests,app/features/auth/tests,app/features/customers/tests,app/features/invoices/tests,app/features/line_item_catalog/tests,app/features/profile/tests,app/features/quotes/tests,app/shared/tests
 
 backend-test-verify: ## Run backend pytest suite (excluding live/eval markers)
 	@test -x backend/.venv/bin/pytest || (echo "Missing backend/.venv. Run: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" && exit 1)
