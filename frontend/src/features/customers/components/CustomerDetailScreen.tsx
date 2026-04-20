@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerDeleteConfirmModal } from "@/features/customers/components/CustomerDeleteConfirmModal";
 import { CustomerInfoForm } from "@/features/customers/components/CustomerInfoForm";
@@ -8,11 +7,9 @@ import { CustomerDetailLoadingSkeleton } from "@/features/customers/components/C
 import { InvoiceHistoryList } from "@/features/customers/components/InvoiceHistoryList";
 import { QuoteHistoryList } from "@/features/customers/components/QuoteHistoryList";
 import { customerService } from "@/features/customers/services/customerService";
-import type {
-  Customer,
-  CustomerUpdateRequest,
-} from "@/features/customers/types/customer.types";
+import type { Customer, CustomerUpdateRequest } from "@/features/customers/types/customer.types";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
+import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
 import { createCaptureLocationState } from "@/features/quotes/utils/workflowNavigation";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -38,7 +35,6 @@ function getCustomerDraftValues(nextCustomer: Customer): {
     address: nextCustomer.address ?? "",
   };
 }
-
 export function CustomerDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -84,7 +80,6 @@ export function CustomerDetailScreen(): React.ReactElement {
     if (!customer) {
       return;
     }
-
     populateDraftFields(customer);
     setSaveError(null);
     setSaveSuccess(null);
@@ -183,7 +178,6 @@ export function CustomerDetailScreen(): React.ReactElement {
 
   async function onSaveChanges(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-
     if (!id) {
       setSaveError("Missing customer id.");
       return;
@@ -264,7 +258,6 @@ export function CustomerDetailScreen(): React.ReactElement {
     if (!value) {
       return fallback;
     }
-
     const trimmedValue = value.trim();
     return trimmedValue || fallback;
   }
@@ -272,6 +265,21 @@ export function CustomerDetailScreen(): React.ReactElement {
   const activeHistoryCount = historyMode === "quotes" ? customerQuotes.length : customerInvoices.length;
   const activeHistoryCountLabel = `${activeHistoryCount} ${activeHistoryCount === 1 ? "ITEM" : "ITEMS"}`;
   const deleteConfirmationMatches = customer ? deleteConfirmationName === customer.name : false;
+  const quoteCreateFlow = useQuoteCreateFlow({
+    customerId: customer?.id,
+    timezone: user?.timezone,
+    entrySheetTitle: "Create document",
+    entrySheetDescription: "Create a new quote or duplicate an existing quote.",
+    onCreateNew: () => {
+      if (!customer) {
+        return;
+      }
+      navigate(`/quotes/capture/${customer.id}`, {
+        state: createCaptureLocationState(`/customers/${customer.id}`),
+      });
+    },
+    onQuoteDuplicated: (quoteId) => navigate(`/documents/${quoteId}/edit`),
+  });
 
   return (
     <main className="min-h-screen bg-background pb-24">
@@ -280,18 +288,15 @@ export function CustomerDetailScreen(): React.ReactElement {
         backLabel="Back to customers"
         onBack={() => navigate("/customers")}
       />
-
       <section className="mx-auto w-full max-w-3xl space-y-4 px-4 pt-20">
         {isLoading ? (
           <div role="status" aria-label="Loading customer" className="space-y-4">
             <CustomerDetailLoadingSkeleton />
           </div>
         ) : null}
-
         {loadError ? (
           <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
         ) : null}
-
         {!isLoading && !loadError && customer ? (
           <>
             {!isEditing ? (
@@ -329,9 +334,7 @@ export function CustomerDetailScreen(): React.ReactElement {
                       type="button"
                       variant="primary"
                       className="flex-1"
-                      onClick={() => navigate(`/quotes/capture/${customer.id}`, {
-                        state: createCaptureLocationState(`/customers/${customer.id}`),
-                      })}
+                      onClick={quoteCreateFlow.openCreateEntry}
                     >
                       Create Document
                     </Button>
@@ -368,7 +371,6 @@ export function CustomerDetailScreen(): React.ReactElement {
                 saveError={saveError}
               />
             )}
-
             <section>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div
@@ -426,7 +428,7 @@ export function CustomerDetailScreen(): React.ReactElement {
           </>
         ) : null}
       </section>
-
+      {quoteCreateFlow.dialogs}
       {isDeleteConfirmOpen && customer ? (
         <CustomerDeleteConfirmModal
           customerName={customer.name}
@@ -441,7 +443,6 @@ export function CustomerDetailScreen(): React.ReactElement {
           onCancel={closeDeleteConfirmation}
         />
       ) : null}
-
       <BottomNav active="customers" />
       <Toast message={saveSuccess} onDismiss={() => setSaveSuccess(null)} />
     </main>

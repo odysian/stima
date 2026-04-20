@@ -21,13 +21,24 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
+    extract: vi.fn(),
+    createManualDraft: vi.fn(),
     convertNotes: vi.fn(),
     createQuote: vi.fn(),
     listQuotes: vi.fn(),
+    listReuseCandidates: vi.fn(),
+    duplicateQuote: vi.fn(),
     getQuote: vi.fn(),
     updateQuote: vi.fn(),
+    updateExtractionReviewMetadata: vi.fn(),
+    deleteQuote: vi.fn(),
     generatePdf: vi.fn(),
     shareQuote: vi.fn(),
+    revokeShare: vi.fn(),
+    sendQuoteEmail: vi.fn(),
+    markQuoteWon: vi.fn(),
+    markQuoteLost: vi.fn(),
+    convertToInvoice: vi.fn(),
   },
 }));
 
@@ -475,15 +486,71 @@ describe("QuoteList", () => {
     expect(within(screen.getByRole("navigation")).getByRole("button", { name: /quotes/i })).toHaveClass("text-primary");
   });
 
-  it("navigates to new quote when FAB is clicked", async () => {
+  it("opens create entry sheet and starts a new quote from the create action", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
     await screen.findByText(/Q-001/);
 
     fireEvent.click(screen.getByRole("button", { name: "New quote" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create new" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/quotes/capture");
+  });
+
+  it("duplicates a selected quote from chooser and navigates to document edit", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+    mockedQuoteService.listReuseCandidates.mockResolvedValueOnce([
+      {
+        id: "quote-source-1",
+        title: "Spring Cleanup",
+        doc_number: "Q-099",
+        customer_id: "cust-1",
+        customer_name: "Alice Johnson",
+        total_amount: 320,
+        created_at: "2026-03-25T00:00:00.000Z",
+        status: "ready",
+        line_item_previews: [
+          { description: "Mulch", price: 120 },
+          { description: "Edge trim", price: 200 },
+        ],
+        line_item_count: 2,
+        more_line_item_count: 0,
+      },
+    ]);
+    mockedQuoteService.duplicateQuote.mockResolvedValueOnce({
+      id: "quote-duplicated-1",
+      customer_id: "cust-1",
+      doc_type: "quote",
+      doc_number: "Q-100",
+      title: "Spring Cleanup",
+      status: "draft",
+      source_type: "text",
+      transcript: "",
+      total_amount: 320,
+      tax_rate: null,
+      discount_type: null,
+      discount_value: null,
+      deposit_amount: null,
+      notes: null,
+      shared_at: null,
+      share_token: null,
+      line_items: [],
+      created_at: "2026-03-26T00:00:00.000Z",
+      updated_at: "2026-03-26T00:00:00.000Z",
+    });
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    fireEvent.click(screen.getByRole("button", { name: "New quote" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create from existing" }));
+    fireEvent.click(await screen.findByRole("button", { name: /spring cleanup/i }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.duplicateQuote).toHaveBeenCalledWith("quote-source-1");
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/documents/quote-duplicated-1/edit");
   });
 
   it("renders invoice empty state when no invoices are returned", async () => {

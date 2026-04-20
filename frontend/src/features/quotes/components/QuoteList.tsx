@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
+import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -37,7 +37,6 @@ interface DocumentRowsSectionProps {
   rows: DocumentRow[];
   onRowClick: (row: DocumentRow) => void;
 }
-
 const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const draftRowClasses = "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} shrink-0 whitespace-nowrap bg-warning-container text-warning`;
@@ -103,7 +102,6 @@ function matchesSearch(
   if (!normalizedSearchQuery) {
     return true;
   }
-
   return (
     (item.customer_name ?? "").toLowerCase().includes(normalizedSearchQuery)
     || item.doc_number.toLowerCase().includes(normalizedSearchQuery)
@@ -203,7 +201,6 @@ export function QuoteList(): React.ReactElement {
     if (!isSearchOpen) {
       return;
     }
-
     const inputElement = document.getElementById("document-search");
     if (inputElement instanceof HTMLInputElement) {
       inputElement.focus();
@@ -211,9 +208,10 @@ export function QuoteList(): React.ReactElement {
   }, [isSearchOpen]);
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const filteredQuotes = useMemo(() => {
-    return quotes.filter((quote) => matchesSearch(quote, normalizedSearchQuery));
-  }, [normalizedSearchQuery, quotes]);
+  const filteredQuotes = useMemo(
+    () => quotes.filter((quote) => matchesSearch(quote, normalizedSearchQuery)),
+    [normalizedSearchQuery, quotes],
+  );
 
   const filteredInvoices = useMemo(
     () => invoices.filter((invoice) => matchesSearch(invoice, normalizedSearchQuery)),
@@ -302,6 +300,11 @@ export function QuoteList(): React.ReactElement {
     })),
     [filteredInvoices, timezone],
   );
+  const quoteCreateFlow = useQuoteCreateFlow({
+    timezone,
+    onCreateNew: () => navigate("/quotes/capture"),
+    onQuoteDuplicated: (quoteId) => navigate(`/documents/${quoteId}/edit`),
+  });
 
   return (
     <main className="min-h-screen bg-background pb-24">
@@ -436,10 +439,11 @@ export function QuoteList(): React.ReactElement {
         type="button"
         aria-label="New quote"
         className="fixed bottom-20 right-4 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
-        onClick={() => navigate("/quotes/capture")}
+        onClick={quoteCreateFlow.openCreateEntry}
       >
         <span className="material-symbols-outlined">description</span>
       </button>
+      {quoteCreateFlow.dialogs}
       <BottomNav active="quotes" />
     </main>
   );

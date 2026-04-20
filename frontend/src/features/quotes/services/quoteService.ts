@@ -9,6 +9,7 @@ import type {
   QuoteCreateRequest,
   QuoteExtractResponse,
   QuoteListItem,
+  QuoteReuseCandidate,
   QuoteUpdateRequest,
 } from "@/features/quotes/types/quote.types";
 import { buildIdempotencyKey } from "@/shared/lib/idempotency";
@@ -118,8 +119,26 @@ function listQuotes(params?: { customer_id?: string }): Promise<QuoteListItem[]>
   return request<QuoteListItem[]>(`/api/quotes${query}`);
 }
 
+function listReuseCandidates(params?: { customer_id?: string; q?: string }): Promise<QuoteReuseCandidate[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.customer_id) {
+    queryParams.set("customer_id", params.customer_id);
+  }
+  if (params?.q?.trim()) {
+    queryParams.set("q", params.q.trim());
+  }
+  const query = queryParams.toString();
+  return request<QuoteReuseCandidate[]>(`/api/quotes/reuse-candidates${query ? `?${query}` : ""}`);
+}
+
 function getQuote(id: string): Promise<QuoteDetail> {
   return request<QuoteDetail>(`/api/quotes/${id}`);
+}
+
+function duplicateQuote(id: string): Promise<Quote> {
+  return request<Quote>(`/api/quotes/${id}/duplicate`, {
+    method: "POST",
+  });
 }
 
 function updateQuote(id: string, data: QuoteUpdateRequest): Promise<Quote> {
@@ -202,6 +221,8 @@ export const quoteService = {
   convertNotes,
   createQuote,
   listQuotes,
+  listReuseCandidates,
+  duplicateQuote,
   getQuote,
   updateQuote,
   updateExtractionReviewMetadata,
