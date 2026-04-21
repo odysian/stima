@@ -212,10 +212,6 @@ export function DocumentEditScreen(): React.ReactElement {
     lineItemsForSubmit,
     lineItemSum,
   } = buildLineItemSubmitState(activeDraft.lineItems);
-  const notesReviewPending = activeDraft.docType === "quote"
-    && Boolean(extractionReviewMetadata?.review_state.notes_pending);
-  const pricingReviewPending = activeDraft.docType === "quote"
-    && Boolean(extractionReviewMetadata?.review_state.pricing_pending);
 
   const isInteractionLocked = submitAction !== null || isAssigningCustomer;
   const lineItemSheetInitialItem = lineItemSheetState
@@ -293,8 +289,6 @@ export function DocumentEditScreen(): React.ReactElement {
       requiresCustomerAssignment={requiresCustomerAssignment}
       canReassignCustomer={canReassignCustomer}
       isInteractionLocked={isInteractionLocked}
-      notesReviewPending={notesReviewPending}
-      pricingReviewPending={pricingReviewPending}
       extractionTier={!isInvoiceDocument(activeDocument) ? activeDocument.extraction_tier : null}
       extractionDegradedReasonCode={!isInvoiceDocument(activeDocument) ? activeDocument.extraction_degraded_reason_code : null}
       hiddenDetails={extractionReviewMetadata?.hidden_details}

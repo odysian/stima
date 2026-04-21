@@ -19,8 +19,6 @@ interface DocumentEditScreenViewProps {
   requiresCustomerAssignment: boolean;
   canReassignCustomer: boolean;
   isInteractionLocked: boolean;
-  notesReviewPending: boolean;
-  pricingReviewPending: boolean;
   extractionTier: ExtractionTier | null;
   extractionDegradedReasonCode: string | null;
   hiddenDetails?: ExtractionReviewHiddenDetails;
@@ -85,8 +83,6 @@ export function DocumentEditScreenView({
   requiresCustomerAssignment,
   canReassignCustomer,
   isInteractionLocked,
-  notesReviewPending,
-  pricingReviewPending,
   extractionTier,
   extractionDegradedReasonCode,
   hiddenDetails,
@@ -156,8 +152,6 @@ export function DocumentEditScreenView({
         requiresCustomerAssignment={requiresCustomerAssignment}
         canReassignCustomer={canReassignCustomer}
         isInteractionLocked={isInteractionLocked}
-        notesReviewPending={notesReviewPending}
-        pricingReviewPending={pricingReviewPending}
         extractionTier={extractionTier}
         extractionDegradedReasonCode={extractionDegradedReasonCode}
         hiddenDetails={hiddenDetails}

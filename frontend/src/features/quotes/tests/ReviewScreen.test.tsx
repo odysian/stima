@@ -419,7 +419,7 @@ describe("DocumentEditScreen", () => {
     expect(screen.queryByRole("button", { name: /continue to preview/i })).not.toBeInTheDocument();
   });
 
-  it("shows grouped review markers from sidecar review_state", async () => {
+  it("does not show grouped review markers from sidecar review_state", async () => {
     renderScreen({
       document: makeQuote({
         extraction_review_metadata: {
@@ -432,8 +432,9 @@ describe("DocumentEditScreen", () => {
       }),
     });
 
-    expect(await screen.findByText("Pricing Pending Review")).toBeInTheDocument();
-    expect(screen.getByText("Notes Pending Review")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /continue to preview/i })).toBeInTheDocument();
+    expect(screen.queryByText("Pricing Pending Review")).not.toBeInTheDocument();
+    expect(screen.queryByText("Notes Pending Review")).not.toBeInTheDocument();
   });
 
   it("shows the high-severity review marker when extraction is degraded with no line items", async () => {
