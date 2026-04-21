@@ -65,6 +65,37 @@ describe("reviewLineItemSheetState", () => {
     });
   });
 
+  it("keeps a manually dismissed review flag cleared when price is unchanged", () => {
+    const nextDraft = applyLineItemSheetSave(
+      {
+        lineItems: [
+          {
+            description: "Mulch",
+            details: "front beds",
+            price: 450,
+            flagged: true,
+            flagReason: "spoken_money_correction",
+          },
+        ],
+        total: 450,
+      },
+      { mode: "edit", index: 0 },
+      {
+        description: "Mulch",
+        details: "front beds",
+        price: 450,
+        flagged: false,
+        flagReason: null,
+      },
+    );
+
+    expect(nextDraft.lineItems[0]).toMatchObject({
+      price: 450,
+      flagged: false,
+      flagReason: null,
+    });
+  });
+
   it("reorders line items in local draft order", () => {
     const nextDraft = applyLineItemReorder(
       {
