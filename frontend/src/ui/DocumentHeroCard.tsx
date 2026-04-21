@@ -18,11 +18,9 @@ interface DocumentHeroCardProps {
   lineItemPrices: Array<number | null>;
   dueDate?: string | null;
   linkedDocument?: {
-    eyebrowLabel: string;
-    description?: string;
-    actionLabel?: string;
+    actionLabel: string;
     actionAriaLabel?: string;
-    onClick?: () => void;
+    onClick: () => void;
   } | null;
 }
 
@@ -55,58 +53,48 @@ export function DocumentHeroCard({
   return (
     <div className="mt-4 px-4 pb-6">
       <section className="ghost-shadow rounded-[var(--radius-document)] border-l-4 border-primary bg-surface-container-lowest p-4">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4">
           <div className="min-w-0">
             <Eyebrow>CLIENT</Eyebrow>
-          </div>
-
-          <div className="justify-self-end text-right">
-            <p className="font-headline text-[1.625rem] font-bold leading-none tracking-[0.12em] text-on-surface sm:text-[1.75rem]">
-              {documentLabel}
-            </p>
-          </div>
-
-          <div className="min-w-0">
-            <p className="font-bold text-on-surface">{clientName}</p>
+            <p className="mt-0.5 font-bold text-on-surface">{clientName}</p>
             <p className="mt-1 text-sm text-on-surface-variant">{clientContact}</p>
 
             {linkedDocument ? (
-              <div className="mt-4">
-                <Eyebrow>{linkedDocument.eyebrowLabel}</Eyebrow>
-                {linkedDocument.description ? (
-                  <p className="mt-2 text-sm text-on-surface-variant">{linkedDocument.description}</p>
-                ) : null}
-                {linkedDocument.actionLabel && linkedDocument.onClick ? (
-                  <button
-                    type="button"
-                    className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary"
-                    aria-label={linkedDocument.actionAriaLabel ?? linkedDocument.actionLabel}
-                    onClick={linkedDocument.onClick}
-                  >
-                    {linkedDocument.actionLabel}
-                    <span className="material-symbols-outlined text-base">arrow_forward</span>
-                  </button>
-                ) : null}
-              </div>
+              <button
+                type="button"
+                className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary"
+                aria-label={linkedDocument.actionAriaLabel ?? linkedDocument.actionLabel}
+                onClick={linkedDocument.onClick}
+              >
+                {linkedDocument.actionLabel}
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </button>
             ) : null}
           </div>
 
           <div className="self-end justify-self-end text-right">
-            <Eyebrow>
-              {pricingBreakdown.hasPricingBreakdown ? "TOTAL" : "TOTAL AMOUNT"}
-            </Eyebrow>
+            <p className="font-headline text-[1.625rem] font-bold leading-none tracking-[0.12em] text-on-surface sm:text-[1.75rem]">
+              {documentLabel}
+            </p>
+            <div className="mt-2">
+              <StatusPill variant={status} />
+            </div>
+
+            <div className="mt-4">
+              <Eyebrow>
+                {pricingBreakdown.hasPricingBreakdown ? "TOTAL" : "TOTAL AMOUNT"}
+              </Eyebrow>
+            </div>
             <p className="mt-1 font-headline text-2xl font-bold text-primary">
               {formatCurrency(totalAmount)}
             </p>
+
             {documentLabel === "INVOICE" ? (
               <div className="mt-4">
                 <Eyebrow>DUE DATE</Eyebrow>
                 <p className="mt-2 text-sm text-on-surface">{dueDateLabel}</p>
               </div>
             ) : null}
-            <div className="mt-3">
-              <StatusPill variant={status} />
-            </div>
           </div>
         </div>
 

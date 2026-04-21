@@ -309,7 +309,7 @@ describe("QuotePreview", () => {
 
     await screen.findByRole("heading", { name: "Quote Preview" });
     expect(screen.queryByText("No invoice yet")).not.toBeInTheDocument();
-    expect(screen.queryByText("LINKED INVOICE")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open linked invoice/i })).not.toBeInTheDocument();
   });
 
   it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
@@ -333,8 +333,7 @@ describe("QuotePreview", () => {
       renderScreen();
 
       await screen.findByRole("heading", { name: "Quote Preview" });
-      expect(screen.getByText("LINKED INVOICE")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /open invoice i-001/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /open linked invoice i-001/i })).toBeInTheDocument();
       expect(screen.queryByText("Sent")).not.toBeInTheDocument();
       await openOverflowMenu();
       expect(screen.queryByRole("menuitem", { name: /convert to invoice/i })).not.toBeInTheDocument();
@@ -359,7 +358,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /open invoice i-001/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /open linked invoice i-001/i }));
     expect(await screen.findByText("Invoice Detail Screen")).toBeInTheDocument();
   });
 

@@ -205,9 +205,9 @@ describe("InvoiceDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "Invoice Preview" })).toBeInTheDocument();
-    expect(screen.getByText(/created on mar 20, 2026/i)).toBeInTheDocument();
+    expect(screen.queryByText(/created on /i)).not.toBeInTheDocument();
     expect(screen.queryByText(/created from quote/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /open quote q-001/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open linked quote q-001/i })).toBeInTheDocument();
     const utilities = screen.getByRole("group", { name: /invoice utilities/i });
     expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
     expect(within(utilities).queryByRole("button", { name: /back to q-001/i })).not.toBeInTheDocument();
@@ -230,9 +230,9 @@ describe("InvoiceDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByRole("heading", { name: "Invoice Preview" })).toBeInTheDocument();
-    expect(screen.getByText(/created on mar 20, 2026/i)).toBeInTheDocument();
+    expect(screen.queryByText(/created on /i)).not.toBeInTheDocument();
     expect(screen.queryByText(/created from quote/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /open quote/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open linked quote/i })).not.toBeInTheDocument();
   });
 
   it("keeps sent invoices editable by leaving the edit action available", async () => {
@@ -487,15 +487,15 @@ describe("InvoiceDetailScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the client card before the invoice status card", async () => {
+  it("renders the client card before the open linked quote action", async () => {
     renderScreen();
 
     await screen.findByRole("heading", { name: "Invoice Preview" });
 
     const clientHeading = screen.getByText("CLIENT");
-    const statusHeading = screen.getByText("INVOICE STATUS");
+    const linkedQuoteAction = screen.getByRole("button", { name: /open linked quote q-001/i });
 
-    expect(clientHeading.compareDocumentPosition(statusHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(clientHeading.compareDocumentPosition(linkedQuoteAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("hides customer notes when the invoice notes are blank", async () => {

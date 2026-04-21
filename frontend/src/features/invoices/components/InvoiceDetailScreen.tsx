@@ -25,7 +25,6 @@ import { OverflowMenu } from "@/shared/components/OverflowMenu";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { DocumentHeroCard } from "@/ui/DocumentHeroCard";
 import { Eyebrow } from "@/ui/Eyebrow";
-import { formatDate } from "@/shared/lib/formatters";
 import { canNavigateBack } from "@/shared/lib/navigation";
 
 export function InvoiceDetailScreen(): React.ReactElement {
@@ -191,17 +190,13 @@ export function InvoiceDetailScreen(): React.ReactElement {
               clientName={invoice.customer.name}
               clientContact={clientContact}
               dueDate={invoice.due_date}
-              linkedDocument={{
-                eyebrowLabel: "INVOICE STATUS",
-                description: `Created on ${formatDate(invoice.created_at)}`,
-                actionLabel: hasSourceQuote ? "Open quote" : undefined,
-                actionAriaLabel: hasSourceQuote && invoice.source_quote_number
-                  ? `Open quote ${invoice.source_quote_number}`
-                  : undefined,
-                onClick: hasSourceQuote
-                  ? () => navigate(`/quotes/${invoice.source_document_id}/preview`)
-                  : undefined,
-              }}
+              linkedDocument={hasSourceQuote ? {
+                actionLabel: "Open linked quote",
+                actionAriaLabel: invoice.source_quote_number
+                  ? `Open linked quote ${invoice.source_quote_number}`
+                  : "Open linked quote",
+                onClick: () => navigate(`/quotes/${invoice.source_document_id}/preview`),
+              } : null}
             />
             <QuoteLineItemsSection lineItems={invoice.line_items} />
 

@@ -214,9 +214,8 @@ export function QuotePreview(): React.ReactElement {
                 clientName={clientName}
                 clientContact={clientContact}
                 linkedDocument={linkedInvoice ? {
-                  eyebrowLabel: "LINKED INVOICE",
-                  actionLabel: "Open Invoice",
-                  actionAriaLabel: `Open invoice ${linkedInvoice.doc_number}`,
+                  actionLabel: "Open linked invoice",
+                  actionAriaLabel: `Open linked invoice ${linkedInvoice.doc_number}`,
                   onClick: () => navigate(`/invoices/${linkedInvoice.id}`),
                 } : null}
               />
