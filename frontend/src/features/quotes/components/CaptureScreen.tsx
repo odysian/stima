@@ -6,12 +6,10 @@ import {
   EXTRACTION_MAX_POLLS,
   EXTRACTION_POLL_INTERVAL_MS,
   EXTRACTION_STAGE_DELAY_MS,
-  getExtractionHelperCopy,
   getExtractionStages,
 } from "@/features/quotes/components/captureScreenHelpers";
 import { CaptureInputPanel } from "@/features/quotes/components/CaptureInputPanel";
 import {
-  HOME_ROUTE,
   resolveCaptureLaunchOrigin,
 } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
@@ -55,7 +53,6 @@ export function CaptureScreen(): React.ReactElement {
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
-  const extractionHelperCopy = getExtractionHelperCopy(hasClips, hasNotes);
   const launchOrigin = resolveCaptureLaunchOrigin({
     customerId,
     locationState: location.state,
@@ -287,10 +284,6 @@ export function CaptureScreen(): React.ReactElement {
     requestExit(launchOrigin);
   }
 
-  function onExitHome(): void {
-    requestExit(HOME_ROUTE);
-  }
-
   function onStartBlankClick(): void {
     if (hasUnsavedWork()) {
       setPendingExitTarget(START_BLANK_GUARD_TARGET);
@@ -310,12 +303,11 @@ export function CaptureScreen(): React.ReactElement {
         subtitle="Describe the job and we'll extract the line items"
         backLabel="Go back"
         onBack={onBack}
-        onExitHome={onExitHome}
       />
 
       <section className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4 pb-36 pt-20">
         {!isSupported ? (
-          <p className="mb-4 rounded-lg border border-warning-accent/40 bg-warning-container p-3 text-sm text-warning">
+          <p className="ghost-shadow mb-4 rounded-[var(--radius-document)] border-l-4 border-warning-accent bg-warning-container p-4 text-sm text-warning">
             Voice capture is not supported in this browser. You can still type
             notes and extract line items.
           </p>
@@ -345,13 +337,8 @@ export function CaptureScreen(): React.ReactElement {
       <ScreenFooter>
         <div className="mx-auto w-full max-w-2xl">
           {extractionStage ? (
-            <p className="mb-2 text-center text-sm text-on-surface-variant">
+            <p className="mb-2 text-center text-sm font-medium text-on-surface-variant">
               {extractionStage}
-            </p>
-          ) : null}
-          {extractionStage && extractionHelperCopy ? (
-            <p className="mb-3 text-center text-xs text-on-surface-variant">
-              {extractionHelperCopy}
             </p>
           ) : null}
           <Button

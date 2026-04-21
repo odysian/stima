@@ -635,7 +635,7 @@ describe("DocumentEditScreen", () => {
     });
   });
 
-  it("does not show the capture-details alert icon for transcript-only details", async () => {
+  it("uses neutral styling for capture-details trigger when there are no actionable items", async () => {
     renderScreen({
       document: makeQuote({
         extraction_review_metadata: {
@@ -646,8 +646,9 @@ describe("DocumentEditScreen", () => {
         },
       }),
     });
-    expect(await screen.findByRole("button", { name: /capture details/i })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Capture details need review")).not.toBeInTheDocument();
+    const trigger = await screen.findByRole("button", { name: /capture details/i });
+    expect(trigger).toHaveClass("bg-surface-container-lowest", "text-on-surface");
+    expect(trigger).not.toHaveClass("bg-warning-container", "text-warning");
   });
 
   it("renders capture details only in the header trailing area", async () => {
@@ -677,7 +678,7 @@ describe("DocumentEditScreen", () => {
     expect(screen.queryByRole("button", { name: /capture details/i })).not.toBeInTheDocument();
   });
 
-  it("shows the capture-details alert icon when hidden actionable items exist", async () => {
+  it("uses amber styling for capture-details trigger when hidden actionable items exist", async () => {
     renderScreen({
       document: makeQuote({
         extraction_review_metadata: {
@@ -696,7 +697,8 @@ describe("DocumentEditScreen", () => {
         },
       }),
     });
-    expect(await screen.findByLabelText("Capture details need review")).toBeInTheDocument();
+    const trigger = await screen.findByRole("button", { name: /capture details/i });
+    expect(trigger).toHaveClass("bg-warning-container", "text-warning");
   });
 
   it("hides the capture-details trigger when only non-overflow unresolved reasons exist", async () => {

@@ -347,7 +347,7 @@ describe("CaptureScreen", () => {
     expect(screen.getByRole("button", { name: /extract line items/i })).toBeEnabled();
   });
 
-  it("shows extraction helper copy only while extraction is active", async () => {
+  it("shows extraction stage text without helper subtext while extraction is active", async () => {
     const extractDeferred = new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>(() => {});
     mockedQuoteService.extract.mockReturnValueOnce(extractDeferred);
     renderScreen();
@@ -363,7 +363,9 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     expect(await screen.findByText("Analyzing notes...")).toBeInTheDocument();
-    expect(screen.getByText(/extraction saves your notes as a draft for manual review/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/extraction saves your notes as a draft for manual review/i),
+    ).not.toBeInTheDocument();
   });
 
   it("shows recording state with stop button and elapsed time", () => {
@@ -402,6 +404,12 @@ describe("CaptureScreen", () => {
         "Voice capture is not supported in this browser. You can still type notes and extract line items.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("does not render an exit-to-home button in the capture header", () => {
+    renderScreen();
+
+    expect(screen.queryByRole("button", { name: /exit to home/i })).not.toBeInTheDocument();
   });
 
   it("shows a leave confirmation when navigating back with unsaved clips", () => {
@@ -458,18 +466,6 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Leave" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/customers/cust-1", { replace: true });
-  });
-
-  it("shows the same leave confirmation when exiting home with unsaved work", () => {
-    renderScreen();
-
-    fireEvent.change(screen.getByLabelText(/written description/i), {
-      target: { value: "Install sod in backyard" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /exit to home/i }));
-
-    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
-    expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
   it("submits extraction with customer context and routes to persisted review id", async () => {
@@ -721,8 +717,8 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Analyzing notes...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves your notes as a draft for manual review."),
-    ).toBeInTheDocument();
+      screen.queryByText("Extraction saves your notes as a draft for manual review."),
+    ).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2500);
@@ -755,8 +751,8 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves your recording as a draft for manual review."),
-    ).toBeInTheDocument();
+      screen.queryByText("Extraction saves your recording as a draft for manual review."),
+    ).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2500);
@@ -798,8 +794,8 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves one draft from your recording and notes for manual review."),
-    ).toBeInTheDocument();
+      screen.queryByText("Extraction saves one draft from your recording and notes for manual review."),
+    ).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2500);
