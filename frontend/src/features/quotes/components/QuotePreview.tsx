@@ -2,8 +2,6 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
-import { LinkedInvoiceCard } from "@/features/quotes/components/LinkedInvoiceCard";
 import { QuotePreviewHeaderActions } from "@/features/quotes/components/QuotePreviewHeaderActions";
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { QuotePreviewActions } from "@/features/quotes/components/QuotePreviewActions";
@@ -25,6 +23,7 @@ import { DetailPageSkeleton } from "@/shared/components/DetailPageSkeleton";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { canNavigateBack } from "@/shared/lib/navigation";
+import { DocumentHeroCard } from "@/ui/DocumentHeroCard";
 
 export function QuotePreview(): React.ReactElement {
   const navigate = useNavigate();
@@ -48,7 +47,10 @@ export function QuotePreview(): React.ReactElement {
   const customerEmail = readOptionalQuoteText(quote, "customer_email");
   const openPdfUrl = quote?.pdf_artifact.download_url ?? null;
   const quoteTitle = readOptionalQuoteText(quote, "title");
-  const customerNameForHeader = readOptionalQuoteText(quote, "customer_name");
+  const linkedInvoice = quote?.linked_invoice ?? null;
+  const headerSubtitle = quote
+    ? (quoteTitle ? `${quote.doc_number} · ${quoteTitle}` : quote.doc_number)
+    : undefined;
   const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
   const clientContact = readOptionalQuoteText(quote, "customer_phone") ?? readOptionalQuoteText(quote, "customer_email") ?? "No contact details";
   const extractionDegradedCopy = resolveExtractionDegradedCopy(quote);
@@ -164,12 +166,11 @@ export function QuotePreview(): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader
-        title={quoteTitle ?? customerNameForHeader ?? quote?.doc_number ?? "Quote Preview"}
-        subtitle={quoteTitle || customerNameForHeader ? quote?.doc_number : undefined}
+        title="Quote Preview"
+        subtitle={headerSubtitle}
         onBack={handleBack}
         trailing={quote ? (
           <QuotePreviewHeaderActions
-            status={quote.status}
             canEdit={canEdit}
             onEdit={() =>
               navigate(`/documents/${id}/edit`, {
@@ -201,8 +202,9 @@ export function QuotePreview(): React.ReactElement {
               </div>
             ) : null}
             {quote ? (
-              <QuoteDetailsCard
+              <DocumentHeroCard
                 documentLabel="QUOTE"
+                status={quote.status}
                 totalAmount={quote.total_amount}
                 taxRate={quote.tax_rate}
                 discountType={quote.discount_type}
@@ -211,12 +213,12 @@ export function QuotePreview(): React.ReactElement {
                 lineItemPrices={quote.line_items.map((lineItem) => lineItem.price)}
                 clientName={clientName}
                 clientContact={clientContact}
-              />
-            ) : null}
-            {quote?.linked_invoice ? (
-              <LinkedInvoiceCard
-                linkedInvoice={quote.linked_invoice}
-                onOpenInvoice={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
+                linkedDocument={linkedInvoice ? {
+                  actionLabel: "Open linked invoice",
+                  actionAriaLabel: `Open linked invoice ${linkedInvoice.doc_number}`,
+                  onClick: () => navigate(`/invoices/${linkedInvoice.id}`),
+                  alignToBottom: true,
+                } : null}
               />
             ) : null}
             {quote ? <QuoteLineItemsSection lineItems={quote.line_items} /> : null}
