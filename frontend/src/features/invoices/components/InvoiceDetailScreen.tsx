@@ -24,7 +24,8 @@ import {
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { OverflowMenu } from "@/shared/components/OverflowMenu";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { StatusBadge } from "@/shared/components/StatusBadge";
+import { Eyebrow } from "@/ui/Eyebrow";
+import { StatusPill } from "@/ui/StatusPill";
 import { formatDate } from "@/shared/lib/formatters";
 import { canNavigateBack } from "@/shared/lib/navigation";
 
@@ -122,12 +123,12 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
   const outcomeBanner = invoice?.status === "paid"
     ? {
-      className: "mx-4 mt-4 rounded-lg border border-success/30 bg-success-container p-4 text-sm text-success",
+      className: "mx-4 mt-4 rounded-[var(--radius-document)] border border-success/30 bg-success-container p-4 text-sm text-success",
       message: "This invoice is marked as paid.",
     }
     : invoice?.status === "void"
       ? {
-        className: "mx-4 mt-4 rounded-lg border border-outline/40 bg-surface-container-low p-4 text-sm text-on-surface-variant",
+        className: "mx-4 mt-4 rounded-[var(--radius-document)] border border-outline/40 bg-surface-container-low p-4 text-sm text-on-surface-variant",
         message: "This invoice is marked as void.",
       }
       : null;
@@ -140,7 +141,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
         onBack={handleBack}
         trailing={invoice ? (
           <div className="flex items-center gap-2">
-            <StatusBadge variant={invoice.status} />
+            <StatusPill variant={invoice.status} />
             {canEdit ? (
               <button
                 type="button"
@@ -189,13 +190,11 @@ export function InvoiceDetailScreen(): React.ReactElement {
               clientContact={clientContact}
             />
 
-            <section className="mt-4 px-4">
-              <div className="ghost-shadow rounded-lg border border-outline/40 bg-surface-container-lowest p-4">
-                <div className="flex items-start justify-between gap-3">
+            <section className="mt-3 px-4">
+              <div className="ghost-shadow rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-4">
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                      Invoice Status
-                    </p>
+                    <Eyebrow>Invoice Status</Eyebrow>
                     <p className="mt-2 text-sm text-on-surface-variant">
                       {hasSourceQuote
                         ? `Created from quote ${invoice.source_quote_number} on ${formatDate(invoice.created_at)}`
@@ -213,28 +212,21 @@ export function InvoiceDetailScreen(): React.ReactElement {
                       </button>
                     ) : null}
                   </div>
+                  <div className="shrink-0 text-right">
+                    <Eyebrow>Due Date</Eyebrow>
+                    <p className="mt-2 text-sm text-on-surface">
+                      {invoice.due_date ? formatDate(`${invoice.due_date}T00:00:00.000Z`) : "No due date"}
+                    </p>
+                  </div>
                 </div>
               </div>
             </section>
             <QuoteLineItemsSection lineItems={invoice.line_items} />
 
-            <section className="px-4 pb-2">
-              <div className="rounded-lg bg-surface-container-low p-4">
-                <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                  Due Date
-                </p>
-                <p className="mt-3 text-sm text-on-surface">
-                  {invoice.due_date ? formatDate(`${invoice.due_date}T00:00:00.000Z`) : "No due date"}
-                </p>
-              </div>
-            </section>
-
             {shouldRenderNotes ? (
-              <section className="px-4 pb-2">
-                <div className="rounded-lg bg-surface-container-low p-4">
-                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                    Customer Notes
-                  </p>
+              <section className="mt-3 px-4">
+                <div className="ghost-shadow rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-4">
+                  <Eyebrow>Customer Notes</Eyebrow>
                   <p className="mt-3 whitespace-pre-wrap text-sm text-on-surface-variant">
                     {invoice.notes}
                   </p>

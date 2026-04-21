@@ -1,5 +1,6 @@
 import type { LinkedInvoiceSummary } from "@/features/quotes/types/quote.types";
-import { StatusBadge } from "@/shared/components/StatusBadge";
+import { Eyebrow } from "@/ui/Eyebrow";
+import { StatusPill } from "@/ui/StatusPill";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 interface LinkedInvoiceCardProps {
@@ -27,12 +28,10 @@ export function LinkedInvoiceCard({
         type="button"
         onClick={() => onOpenInvoice(linkedInvoice.id)}
         aria-label={`Open linked invoice ${linkedInvoice.doc_number}`}
-        className="ghost-shadow flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-left transition-all hover:bg-surface-container-low active:scale-[0.99]"
+        className="ghost-shadow flex w-full cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-left transition-all hover:bg-surface-container-low active:scale-[0.99]"
       >
         <div className="min-w-0">
-          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-            Linked Invoice
-          </p>
+          <Eyebrow>Linked Invoice</Eyebrow>
           <p className="mt-1.5 font-semibold text-on-surface">
             {linkedInvoice.doc_number}
           </p>
@@ -41,7 +40,7 @@ export function LinkedInvoiceCard({
           </p>
         </div>
         <div className="flex items-center gap-2 pl-2">
-          <StatusBadge variant={linkedInvoice.status} />
+          <StatusPill variant={linkedInvoice.status} />
           <span className="material-symbols-outlined text-on-surface-variant">arrow_forward</span>
         </div>
       </button>

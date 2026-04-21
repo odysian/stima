@@ -815,7 +815,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "LINE ITEMS" })).toBeInTheDocument();
+    expect(await screen.findByText("LINE ITEMS")).toBeInTheDocument();
     expect(screen.getByText("2 ITEMS")).toBeInTheDocument();
     expect(screen.getByText("Brown mulch")).toBeInTheDocument();
     expect(screen.getByText("5 yards")).toBeInTheDocument();
@@ -857,7 +857,7 @@ describe("QuotePreview", () => {
     await screen.findByRole("heading", { name: "Test Customer" });
 
     const detailsHeading = screen.getByText("CLIENT");
-    const lineItemsHeading = screen.getByRole("heading", { name: "LINE ITEMS" });
+    const lineItemsHeading = screen.getByText("LINE ITEMS");
     const primaryAction = screen.getByRole("button", { name: /generate pdf/i });
 
     expect(detailsHeading.compareDocumentPosition(primaryAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

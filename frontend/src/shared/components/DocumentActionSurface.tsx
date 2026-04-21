@@ -8,8 +8,8 @@ const utilityGridClassNames = {
 } as const;
 
 export const documentActionPrimaryButtonClassName = "min-h-14 w-full gap-2 text-center";
-export const documentActionPrimaryLinkClassName = "forest-gradient inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
-export const documentActionUtilityButtonClassName = "inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+export const documentActionPrimaryLinkClassName = "forest-gradient inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-document)] px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
+export const documentActionUtilityButtonClassName = "inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-document)] border border-outline px-4 py-4 text-center text-sm font-semibold text-on-surface transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
 
 interface DocumentActionSurfaceProps {
   sectionLabel: string;
@@ -47,7 +47,7 @@ export function DocumentActionSurface({
   return (
     <>
       <section className="mt-4 px-4" aria-label={sectionLabel}>
-        <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+        <div className="ghost-shadow rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-4">
           {primaryAction}
 
           {shouldRenderUtilities ? (
