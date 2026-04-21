@@ -6,7 +6,6 @@ import {
   EXTRACTION_MAX_POLLS,
   EXTRACTION_POLL_INTERVAL_MS,
   EXTRACTION_STAGE_DELAY_MS,
-  getExtractionHelperCopy,
   getExtractionStages,
 } from "@/features/quotes/components/captureScreenHelpers";
 import { CaptureInputPanel } from "@/features/quotes/components/CaptureInputPanel";
@@ -54,7 +53,6 @@ export function CaptureScreen(): React.ReactElement {
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
-  const extractionHelperCopy = getExtractionHelperCopy(hasClips, hasNotes);
   const launchOrigin = resolveCaptureLaunchOrigin({
     customerId,
     locationState: location.state,
@@ -341,11 +339,6 @@ export function CaptureScreen(): React.ReactElement {
           {extractionStage ? (
             <p className="mb-2 text-center text-sm font-medium text-on-surface-variant">
               {extractionStage}
-            </p>
-          ) : null}
-          {extractionStage && extractionHelperCopy ? (
-            <p className="mb-3 text-center text-xs leading-relaxed text-on-surface-variant">
-              {extractionHelperCopy}
             </p>
           ) : null}
           <Button

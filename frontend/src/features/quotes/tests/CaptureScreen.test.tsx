@@ -347,7 +347,7 @@ describe("CaptureScreen", () => {
     expect(screen.getByRole("button", { name: /extract line items/i })).toBeEnabled();
   });
 
-  it("shows extraction helper copy only while extraction is active", async () => {
+  it("shows extraction stage text without helper subtext while extraction is active", async () => {
     const extractDeferred = new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>(() => {});
     mockedQuoteService.extract.mockReturnValueOnce(extractDeferred);
     renderScreen();
@@ -363,7 +363,9 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
     expect(await screen.findByText("Analyzing notes...")).toBeInTheDocument();
-    expect(screen.getByText(/extraction saves your notes as a draft for manual review/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/extraction saves your notes as a draft for manual review/i),
+    ).not.toBeInTheDocument();
   });
 
   it("shows recording state with stop button and elapsed time", () => {
@@ -715,8 +717,8 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Analyzing notes...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves your notes as a draft for manual review."),
-    ).toBeInTheDocument();
+      screen.queryByText("Extraction saves your notes as a draft for manual review."),
+    ).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2500);
@@ -749,8 +751,8 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves your recording as a draft for manual review."),
-    ).toBeInTheDocument();
+      screen.queryByText("Extraction saves your recording as a draft for manual review."),
+    ).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2500);
@@ -792,8 +794,8 @@ describe("CaptureScreen", () => {
 
     expect(screen.getByText("Uploading audio...")).toBeInTheDocument();
     expect(
-      screen.getByText("Extraction saves one draft from your recording and notes for manual review."),
-    ).toBeInTheDocument();
+      screen.queryByText("Extraction saves one draft from your recording and notes for manual review."),
+    ).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(2500);

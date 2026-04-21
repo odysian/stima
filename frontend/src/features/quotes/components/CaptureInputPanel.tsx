@@ -121,7 +121,7 @@ export function CaptureInputPanel({
       </section>
 
       {isRecording ? (
-        <div className="mt-auto flex flex-col items-center gap-3 pt-4 sm:pt-6">
+        <div className="mt-auto mb-2 flex flex-col items-center gap-3 pt-4 sm:pt-6">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-secondary" />
             <p className="text-sm font-medium text-secondary">
@@ -137,7 +137,7 @@ export function CaptureInputPanel({
           </button>
         </div>
       ) : (
-        <div className="mt-auto flex flex-col items-center gap-3 pt-4 sm:pt-6">
+        <div className="mt-auto mb-2 flex flex-col items-center gap-3 pt-4 sm:pt-6">
           <p className="text-xs uppercase tracking-widest text-outline">
             TAP TO START
           </p>
