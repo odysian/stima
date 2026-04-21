@@ -31,7 +31,6 @@ interface ParsedPrice {
 }
 type AddLineItemTab = "manual" | "catalog";
 type CatalogLoadState = "idle" | "loading" | "loaded" | "error";
-
 function parsePrice(value: string): ParsedPrice {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
@@ -61,6 +60,8 @@ export function LineItemEditSheet({
   const [priceInput, setPriceInput] = useState(
     initialLineItem.price == null ? "" : initialLineItem.price.toString(),
   );
+  const [lineItemFlagged, setLineItemFlagged] = useState(Boolean(initialLineItem.flagged));
+  const [lineItemFlagReason, setLineItemFlagReason] = useState(initialLineItem.flagReason ?? null);
   const [formError, setFormError] = useState<string | null>(null);
   const [activeAddTab, setActiveAddTab] = useState<AddLineItemTab>("manual");
   const [catalogItems, setCatalogItems] = useState<LineItemCatalogItem[]>([]);
@@ -73,10 +74,9 @@ export function LineItemEditSheet({
   const canSaveToCatalog = showManualFields && savedCatalogItem === null;
   const canDeleteSavedCatalogItem = savedCatalogItem !== null;
   const bookmarkIcon = canDeleteSavedCatalogItem ? "bookmark" : "bookmark_add";
-  const reviewExplanation = mode === "edit" && initialLineItem.flagged
-    ? resolveLineItemReviewExplanation(initialLineItem.flagReason)
+  const reviewExplanation = mode === "edit" && lineItemFlagged
+    ? resolveLineItemReviewExplanation(lineItemFlagReason)
     : null;
-
   useEffect(() => {
     if (mode !== "add") {
       return;
@@ -92,7 +92,6 @@ export function LineItemEditSheet({
     ) {
       return;
     }
-
     setCatalogLoadState("loading");
     setCatalogLoadError(null);
     try {
@@ -109,61 +108,53 @@ export function LineItemEditSheet({
       setCatalogLoadState("error");
     }
   }
-
   function parseManualLineItem(): LineItemDraftWithFlags | null {
     const trimmedDescription = description.trim();
     if (trimmedDescription.length === 0) {
       setFormError("Description is required.");
       return null;
     }
-
     const parsedPrice = parsePrice(priceInput);
     if (!parsedPrice.valid) {
       setFormError("Enter a valid number for price.");
       return null;
     }
-
     setFormError(null);
     return {
       ...initialLineItem,
       description: trimmedDescription,
       details: details.trim().length > 0 ? details.trim() : null,
       price: parsedPrice.value,
+      flagged: lineItemFlagged,
+      flagReason: lineItemFlagReason,
     };
   }
-
   function dismissWithAutosave(): void {
     if (mode === "add") {
       onClose();
       return;
     }
-
     const parsedLineItem = parseManualLineItem();
     if (!parsedLineItem) {
       return;
     }
-
     onSave(parsedLineItem);
     onClose();
   }
-
   function addLineItemAndClose(): void {
     const parsedLineItem = parseManualLineItem();
     if (!parsedLineItem) return;
     onSave(parsedLineItem);
     onClose();
   }
-
   async function saveToCatalog(): Promise<void> {
     if (!onSaveToCatalog || !canSaveToCatalog || isCatalogMutationInFlight) {
       return;
     }
-
     const parsedLineItem = parseManualLineItem();
     if (!parsedLineItem) {
       return;
     }
-
     setIsCatalogMutationInFlight(true);
     try {
       const createdItem = await onSaveToCatalog({
@@ -184,12 +175,10 @@ export function LineItemEditSheet({
       setIsCatalogMutationInFlight(false);
     }
   }
-
   async function unsaveFromCatalog(): Promise<void> {
     if (!savedCatalogItem || !onDeleteFromCatalog || isCatalogMutationInFlight) {
       return;
     }
-
     setIsCatalogMutationInFlight(true);
     try {
       await onDeleteFromCatalog(savedCatalogItem.id);
@@ -204,7 +193,6 @@ export function LineItemEditSheet({
       setIsCatalogMutationInFlight(false);
     }
   }
-
   function handleInsertCatalogItem(item: LineItemCatalogItem): void {
     setFormError(null);
     onSave({
@@ -216,7 +204,6 @@ export function LineItemEditSheet({
     });
     onClose();
   }
-
   return (
     <Dialog.Root
       open={open}
@@ -305,6 +292,16 @@ export function LineItemEditSheet({
                 <div className="rounded-lg border-l-4 border-warning-accent bg-warning-container/50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wide text-warning">Review needed</p>
                   <p className="mt-1 text-sm leading-6 text-warning">{reviewExplanation}</p>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex items-center justify-center rounded-md border border-warning-accent/50 bg-warning-container px-2.5 py-1.5 text-xs font-bold uppercase tracking-wide text-warning transition-colors hover:bg-warning-container/80"
+                    onClick={() => {
+                      setLineItemFlagged(false);
+                      setLineItemFlagReason(null);
+                    }}
+                  >
+                    Dismiss
+                  </button>
                 </div>
               ) : null}
               {mode === "add" ? (

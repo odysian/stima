@@ -84,6 +84,71 @@ describe("LineItemEditSheet", () => {
     expect(screen.queryByText("Review needed")).not.toBeInTheDocument();
   });
 
+  it("dismisses the review banner and clears flag fields on save", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem({ flagReason: "spoken_money_correction" })}
+        onClose={onClose}
+        onSave={onSave}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/details/i), { target: { value: " 6 yards " } });
+    await user.click(screen.getByRole("button", { name: /^dismiss$/i }));
+    await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
+
+    expect(onSave).toHaveBeenCalledWith({
+      description: "Brown mulch",
+      details: "6 yards",
+      price: 120,
+      flagged: false,
+      flagReason: null,
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Review needed")).not.toBeInTheDocument();
+  });
+
+  it("keeps a dismissed review state after validation errors until save succeeds", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem({ flagReason: "spoken_money_correction" })}
+        onClose={onClose}
+        onSave={onSave}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^dismiss$/i }));
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "   " } });
+    await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Description is required.");
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "Brown mulch" } });
+    await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      flagged: false,
+      flagReason: null,
+    }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("renders add mode without sheet trash", () => {
     render(
       <LineItemEditSheet

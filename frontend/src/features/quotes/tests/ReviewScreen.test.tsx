@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -581,6 +582,57 @@ describe("DocumentEditScreen", () => {
     expect(document.querySelectorAll("[data-line-item-index]").length).toBe(1);
     expect(screen.getByText("Cleanup labor")).toBeInTheDocument();
     expect(screen.queryByText("No line items on this quote yet.")).not.toBeInTheDocument();
+  });
+
+  it("persists line-item review dismiss from the edit sheet", async () => {
+    const user = userEvent.setup();
+
+    renderScreen({
+      document: makeQuote({
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            flagged: true,
+            flag_reason: "spoken_money_correction",
+            sort_order: 0,
+          },
+        ],
+      }),
+    });
+
+    const editLineItemButton = await screen.findByRole("button", { name: /edit line item 1: brown mulch/i });
+    const lineItemRow = editLineItemButton.closest("[data-line-item-index]");
+    expect(lineItemRow).not.toBeNull();
+    expect(within(lineItemRow as HTMLElement).getByText("REVIEW")).toBeInTheDocument();
+
+    await user.click(editLineItemButton);
+    const editSheet = screen.getByRole("dialog", { name: /edit line item/i });
+    await user.click(within(editSheet).getByRole("button", { name: /^dismiss$/i }));
+    await user.click(screen.getByTestId("line-item-edit-sheet-overlay"));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /edit line item/i })).not.toBeInTheDocument();
+    });
+
+    const updatedLineItemButton = await screen.findByRole("button", { name: /edit line item 1: brown mulch/i });
+    const updatedLineItemRow = updatedLineItemButton.closest("[data-line-item-index]");
+    expect(updatedLineItemRow).not.toBeNull();
+    expect(within(updatedLineItemRow as HTMLElement).queryByText("REVIEW")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /continue to preview/i }));
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
+        line_items: expect.arrayContaining([
+          expect.objectContaining({
+            description: "Brown mulch",
+            flagged: false,
+            flag_reason: null,
+          }),
+        ]),
+      }));
+    });
   });
 
   it("does not show the capture-details alert icon for transcript-only details", async () => {
