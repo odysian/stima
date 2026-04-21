@@ -8,7 +8,7 @@ describe("Button", () => {
     render(<Button className="w-full">Create quote</Button>);
 
     const button = screen.getByRole("button", { name: "Create quote" });
-    expect(button).toHaveClass("forest-gradient", "text-on-primary", "rounded-lg", "w-full");
+    expect(button).toHaveClass("forest-gradient", "text-on-primary", "rounded-[var(--radius-document)]", "w-full");
   });
 
   it("renders destructive variant styles", () => {

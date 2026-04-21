@@ -29,7 +29,7 @@ export function ReviewActionFooter({
           <Button
             type="button"
             variant="primary"
-            className="w-full !rounded-[var(--radius-document)] sm:flex-1"
+            className="w-full sm:flex-1"
             disabled={isContinueDisabled}
             isLoading={isContinuing}
             onClick={onPrimaryAction}

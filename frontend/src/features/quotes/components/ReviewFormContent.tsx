@@ -123,7 +123,7 @@ export function ReviewFormContent({
       onSubmit={(event) => event.preventDefault()}
     >
       {locationNotice ? (
-        <section className="rounded-[var(--radius-document)] border border-warning-accent/40 bg-warning-container p-4 text-sm text-warning">
+        <section className="ghost-shadow rounded-[var(--radius-document)] border-l-4 border-warning-accent bg-warning-container p-4 text-sm text-warning backdrop-blur-md">
           {locationNotice}
         </section>
       ) : null}
@@ -265,7 +265,7 @@ export function ReviewFormContent({
 
       <section className="space-y-2">
         <label htmlFor="quote-review-notes">
-          <Eyebrow className="text-outline-variant">CUSTOMER NOTES</Eyebrow>
+          <Eyebrow>CUSTOMER NOTES</Eyebrow>
         </label>
         <textarea
           id="quote-review-notes"

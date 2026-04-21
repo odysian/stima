@@ -68,7 +68,7 @@ export function Banner({
           <button
             type="button"
             aria-label={dismissLabel}
-            className={["inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors", style.body].join(" ")}
+            className={["inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-current/10", style.body].join(" ")}
             onClick={onDismiss}
           >
             <span className="material-symbols-outlined text-base">close</span>

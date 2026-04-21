@@ -90,7 +90,7 @@ export function TotalAmountSection({
               const parsedValue = Number(rawValue);
               onTotalChange(Number.isFinite(parsedValue) ? parsedValue : null);
             }}
-            className="w-full rounded-[var(--radius-document)] border-2 border-primary bg-surface-container-high py-3 pl-10 pr-12 font-headline text-3xl font-bold tracking-tight text-on-surface outline-none transition-all focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-[var(--radius-document)] border-2 border-primary bg-surface-container-high py-3 pl-10 pr-12 font-headline text-3xl font-bold tracking-tight text-primary outline-none transition-all focus:ring-2 focus:ring-primary/20"
           />
         </div>
       </div>
@@ -123,7 +123,7 @@ export function TotalAmountSection({
               </p>
             </div>
             <span className="material-symbols-outlined text-on-surface-variant">
-              {isOptionalPricingOpen ? "expand_more" : "chevron_right"}
+              {isOptionalPricingOpen ? "expand_less" : "expand_more"}
             </span>
           </button>
         )}
@@ -131,12 +131,13 @@ export function TotalAmountSection({
         {shouldShowOptionalPricingPanel ? (
           <div
             id="optional-pricing-panel"
-            className="mt-4 space-y-3 rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-lowest/60 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+            className="mt-4 space-y-3 rounded-[var(--radius-document)] bg-surface-container-lowest/60 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
           >
             <section className="rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-high/60 p-3">
-              <label className="flex items-center gap-3 text-sm text-on-surface">
+              <label className={`flex select-none items-center gap-3 text-sm text-on-surface ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
+                  className="peer sr-only"
                   checked={isDiscountEnabled}
                   disabled={disabled}
                   onChange={(event) => {
@@ -153,6 +154,7 @@ export function TotalAmountSection({
                     onDiscountValueChange(null);
                   }}
                 />
+                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
                 <span className="font-semibold">Discount</span>
               </label>
               {isDiscountEnabled ? (
@@ -188,9 +190,10 @@ export function TotalAmountSection({
             </section>
 
             <section className="rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-high/60 p-3">
-              <label className="flex items-center gap-3 text-sm text-on-surface">
+              <label className={`flex select-none items-center gap-3 text-sm text-on-surface ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
+                  className="peer sr-only"
                   checked={isTaxEnabled}
                   disabled={disabled}
                   onChange={(event) => {
@@ -203,6 +206,7 @@ export function TotalAmountSection({
                     onTaxRateChange(null);
                   }}
                 />
+                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
                 <span className="font-semibold">Tax</span>
               </label>
               {isTaxEnabled ? (
@@ -225,9 +229,10 @@ export function TotalAmountSection({
             </section>
 
             <section className="rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-high/60 p-3">
-              <label className="flex items-center gap-3 text-sm text-on-surface">
+              <label className={`flex select-none items-center gap-3 text-sm text-on-surface ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
+                  className="peer sr-only"
                   checked={isDepositEnabled}
                   disabled={disabled}
                   onChange={(event) => {
@@ -242,6 +247,7 @@ export function TotalAmountSection({
                     onDepositAmountChange(null);
                   }}
                 />
+                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
                 <span className="font-semibold">Deposit</span>
               </label>
               {isDepositEnabled ? (
