@@ -30,8 +30,3 @@ export function hasUndismissedCaptureDetailsItems(
 ): boolean {
   return items.some((item) => !hiddenDetailState?.[item.id]?.dismissed);
 }
-
-export function buildCaptureDetailsFingerprint(items: CaptureDetailsActionableItem[]): string {
-  const ids = Array.from(new Set(items.map((item) => item.id))).sort();
-  return ids.join("|");
-}

@@ -5,7 +5,6 @@ import { lineItemCatalogService } from "@/features/line-item-catalog/services/li
 import { profileService } from "@/features/profile/services/profileService";
 import { DocumentEditScreenView } from "@/features/quotes/components/DocumentEditScreenView";
 import { buildDefaultInvoiceDueDate, buildDocumentSnapshotKey, buildSaveValidationMessage, isInvoiceDocument, persistDocumentDraft } from "@/features/quotes/components/documentEditUtils";
-import { useCaptureDetailsWarning } from "@/features/quotes/hooks/useCaptureDetailsWarning";
 import { useHiddenDetailLifecycle } from "@/features/quotes/hooks/useHiddenDetailLifecycle";
 import { applyLineItemReorder, applyLineItemSheetDelete, applyLineItemSheetSave, resolveLineItemSheetInitialItem, type ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { buildLineItemSubmitState, EMPTY_LINE_ITEM } from "@/features/quotes/components/reviewScreenUtils";
@@ -35,7 +34,6 @@ export function DocumentEditScreen(): React.ReactElement {
   const [submitAction, setSubmitAction] = useState<"save" | "continue" | null>(null);
   const [isAssignmentSheetOpen, setIsAssignmentSheetOpen] = useState(false);
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
-  const [continueWarningReason, setContinueWarningReason] = useState<"review" | "capture-details" | null>(null);
   const [pendingNavigationTarget, setPendingNavigationTarget] = useState<{
     to: string;
     replace?: boolean;
@@ -95,12 +93,6 @@ export function DocumentEditScreen(): React.ReactElement {
     ? document.extraction_review_metadata
     : undefined;
   const hiddenDetailState = extractionReviewMetadata?.hidden_detail_state;
-  const { shouldWarnOnContinue, markCaptureDetailsOpened } = useCaptureDetailsWarning({
-    documentId,
-    isQuoteDocument: draft?.docType === "quote",
-    hiddenDetails: extractionReviewMetadata?.hidden_details,
-    hiddenDetailState,
-  });
   useEffect(() => {
     if (!id) {
       return;
@@ -316,7 +308,6 @@ export function DocumentEditScreen(): React.ReactElement {
       lineItemSheetInitialItem={lineItemSheetInitialItem}
       toastMessage={toastMessage}
       showLeaveWarning={showLeaveWarning}
-      continueWarningReason={continueWarningReason}
       isSavingDraft={submitAction === "save"}
       isContinuing={submitAction === "continue"}
       onRequestNavigation={requestNavigation}
@@ -369,19 +360,8 @@ export function DocumentEditScreen(): React.ReactElement {
       onDepositAmountChange={(nextDepositAmount) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, depositAmount: nextDepositAmount })); }}
       onNotesChange={(nextNotes) => { setToastMessage(null); setDraft((currentDraft) => ({ ...currentDraft, notes: nextNotes })); }}
       onDismissHiddenItem={dismissHiddenItem}
-      onCaptureDetailsOpen={markCaptureDetailsOpened}
       onSaveDraft={() => { void saveDraft("save"); }}
-      onPrimaryAction={() => {
-        if (activeDraft.docType === "quote" && (notesReviewPending || pricingReviewPending)) {
-          setContinueWarningReason("review");
-          return;
-        }
-        if (shouldWarnOnContinue) {
-          setContinueWarningReason("capture-details");
-          return;
-        }
-        void saveDraft("continue");
-      }}
+      onPrimaryAction={() => { void saveDraft("continue"); }}
       onCloseAssignment={() => setIsAssignmentSheetOpen(false)}
       onAssignCustomer={handleAssignCustomer}
       onCloseLineItemSheet={() => setLineItemSheetState(null)}
@@ -434,11 +414,6 @@ export function DocumentEditScreen(): React.ReactElement {
       onDismissToast={() => setToastMessage(null)}
       onLeaveConfirm={handleLeaveConfirm}
       onLeaveCancel={handleLeaveCancel}
-      onContinueConfirm={() => {
-        setContinueWarningReason(null);
-        void saveDraft("continue");
-      }}
-      onContinueCancel={() => setContinueWarningReason(null)}
     />
   );
 }
