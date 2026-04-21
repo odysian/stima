@@ -1,31 +1,45 @@
-import { Eyebrow } from "@/ui/Eyebrow";
+import type { DiscountType } from "@/shared/lib/pricing";
 import { PricingRow } from "@/shared/components/PricingRow";
-import { formatCurrency } from "@/shared/lib/formatters";
-import { calculatePricingFromPersisted, resolveLineItemSum, type DiscountType } from "@/shared/lib/pricing";
+import { formatCurrency, formatDate } from "@/shared/lib/formatters";
+import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
+import { Eyebrow } from "@/ui/Eyebrow";
+import { StatusPill, type StatusPillVariant } from "@/ui/StatusPill";
 
-interface QuoteDetailsCardProps {
+interface DocumentHeroCardProps {
   documentLabel: "QUOTE" | "INVOICE";
+  status: StatusPillVariant;
+  clientName: string;
+  clientContact: string;
   totalAmount: number | null;
   taxRate: number | null;
   discountType: DiscountType | null;
   discountValue: number | null;
   depositAmount: number | null;
   lineItemPrices: Array<number | null>;
-  clientName: string;
-  clientContact: string;
+  dueDate?: string | null;
+  linkedDocument?: {
+    eyebrowLabel: string;
+    description?: string;
+    actionLabel?: string;
+    actionAriaLabel?: string;
+    onClick?: () => void;
+  } | null;
 }
 
-export function QuoteDetailsCard({
+export function DocumentHeroCard({
   documentLabel,
+  status,
+  clientName,
+  clientContact,
   totalAmount,
   taxRate,
   discountType,
   discountValue,
   depositAmount,
   lineItemPrices,
-  clientName,
-  clientContact,
-}: QuoteDetailsCardProps): React.ReactElement {
+  dueDate,
+  linkedDocument = null,
+}: DocumentHeroCardProps): React.ReactElement {
   const pricingBreakdown = calculatePricingFromPersisted(
     {
       totalAmount,
@@ -36,6 +50,7 @@ export function QuoteDetailsCard({
     },
     resolveLineItemSum(lineItemPrices),
   );
+  const dueDateLabel = dueDate ? formatDate(`${dueDate}T00:00:00.000Z`) : "No due date";
 
   return (
     <div className="mt-4 px-4 pb-6">
@@ -54,6 +69,26 @@ export function QuoteDetailsCard({
           <div className="min-w-0">
             <p className="font-bold text-on-surface">{clientName}</p>
             <p className="mt-1 text-sm text-on-surface-variant">{clientContact}</p>
+
+            {linkedDocument ? (
+              <div className="mt-4">
+                <Eyebrow>{linkedDocument.eyebrowLabel}</Eyebrow>
+                {linkedDocument.description ? (
+                  <p className="mt-2 text-sm text-on-surface-variant">{linkedDocument.description}</p>
+                ) : null}
+                {linkedDocument.actionLabel && linkedDocument.onClick ? (
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary"
+                    aria-label={linkedDocument.actionAriaLabel ?? linkedDocument.actionLabel}
+                    onClick={linkedDocument.onClick}
+                  >
+                    {linkedDocument.actionLabel}
+                    <span className="material-symbols-outlined text-base">arrow_forward</span>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="self-end justify-self-end text-right">
@@ -63,6 +98,15 @@ export function QuoteDetailsCard({
             <p className="mt-1 font-headline text-2xl font-bold text-primary">
               {formatCurrency(totalAmount)}
             </p>
+            {documentLabel === "INVOICE" ? (
+              <div className="mt-4">
+                <Eyebrow>DUE DATE</Eyebrow>
+                <p className="mt-2 text-sm text-on-surface">{dueDateLabel}</p>
+              </div>
+            ) : null}
+            <div className="mt-3">
+              <StatusPill variant={status} />
+            </div>
           </div>
         </div>
 

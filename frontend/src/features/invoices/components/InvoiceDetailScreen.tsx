@@ -4,7 +4,6 @@ import { useInvoiceDetailActions } from "@/features/invoices/hooks/useInvoiceDet
 import { useInvoiceDetail } from "@/features/invoices/hooks/useInvoiceDetail";
 import { buildInvoiceOutcomeOverflowItems } from "@/features/invoices/components/invoiceDetail.helpers";
 import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
-import { QuoteDetailsCard } from "@/features/quotes/components/QuoteDetailsCard";
 import { QuoteLineItemsSection } from "@/features/quotes/components/QuoteLineItemsSection";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
@@ -24,8 +23,8 @@ import {
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { OverflowMenu } from "@/shared/components/OverflowMenu";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { DocumentHeroCard } from "@/ui/DocumentHeroCard";
 import { Eyebrow } from "@/ui/Eyebrow";
-import { StatusPill } from "@/ui/StatusPill";
 import { formatDate } from "@/shared/lib/formatters";
 import { canNavigateBack } from "@/shared/lib/navigation";
 
@@ -83,6 +82,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
   const clientContact = invoice?.customer.phone?.trim()
     || invoice?.customer.email?.trim()
     || "No contact details";
+  const headerSubtitle = invoice
+    ? (invoice.title ? `${invoice.doc_number} · ${invoice.title}` : invoice.doc_number)
+    : undefined;
   const isPdfBusy = isGeneratingPdf || invoice?.pdf_artifact.status === "pending";
   const isOutcomeBusy = isMarkingPaid || isMarkingVoid;
   const isBusy = isPdfBusy || isSharing || isRevokingShare || isSendingEmail || isOutcomeBusy;
@@ -136,12 +138,11 @@ export function InvoiceDetailScreen(): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader
-        title={invoice?.title ?? invoice?.doc_number ?? "Invoice"}
-        subtitle={invoice?.title ? invoice.doc_number : undefined}
+        title="Invoice Preview"
+        subtitle={headerSubtitle}
         onBack={handleBack}
         trailing={invoice ? (
           <div className="flex items-center gap-2">
-            <StatusPill variant={invoice.status} />
             {canEdit ? (
               <button
                 type="button"
@@ -178,8 +179,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
               </div>
             ) : null}
 
-            <QuoteDetailsCard
+            <DocumentHeroCard
               documentLabel="INVOICE"
+              status={invoice.status}
               totalAmount={invoice.total_amount}
               taxRate={invoice.tax_rate}
               discountType={invoice.discount_type}
@@ -188,39 +190,19 @@ export function InvoiceDetailScreen(): React.ReactElement {
               lineItemPrices={invoice.line_items.map((lineItem) => lineItem.price)}
               clientName={invoice.customer.name}
               clientContact={clientContact}
+              dueDate={invoice.due_date}
+              linkedDocument={{
+                eyebrowLabel: "INVOICE STATUS",
+                description: `Created on ${formatDate(invoice.created_at)}`,
+                actionLabel: hasSourceQuote ? "Open quote" : undefined,
+                actionAriaLabel: hasSourceQuote && invoice.source_quote_number
+                  ? `Open quote ${invoice.source_quote_number}`
+                  : undefined,
+                onClick: hasSourceQuote
+                  ? () => navigate(`/quotes/${invoice.source_document_id}/preview`)
+                  : undefined,
+              }}
             />
-
-            <section className="mt-3 px-4">
-              <div className="ghost-shadow rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <Eyebrow>Invoice Status</Eyebrow>
-                    <p className="mt-2 text-sm text-on-surface-variant">
-                      {hasSourceQuote
-                        ? `Created from quote ${invoice.source_quote_number} on ${formatDate(invoice.created_at)}`
-                        : `Created on ${formatDate(invoice.created_at)}`}
-                    </p>
-                    {hasSourceQuote ? (
-                      <button
-                        type="button"
-                        className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary"
-                        aria-label={`Open quote ${invoice.source_quote_number}`}
-                        onClick={() => navigate(`/quotes/${invoice.source_document_id}/preview`)}
-                      >
-                        Open quote
-                        <span className="material-symbols-outlined text-base">arrow_forward</span>
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <Eyebrow>Due Date</Eyebrow>
-                    <p className="mt-2 text-sm text-on-surface">
-                      {invoice.due_date ? formatDate(`${invoice.due_date}T00:00:00.000Z`) : "No due date"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
             <QuoteLineItemsSection lineItems={invoice.line_items} />
 
             {shouldRenderNotes ? (

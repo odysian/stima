@@ -204,8 +204,9 @@ describe("InvoiceDetailScreen", () => {
   it("loads the invoice detail, shows the source quote link, and exposes edit", async () => {
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
-    expect(screen.getByText(/created from quote q-001/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Invoice Preview" })).toBeInTheDocument();
+    expect(screen.getByText(/created on mar 20, 2026/i)).toBeInTheDocument();
+    expect(screen.queryByText(/created from quote/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /open quote q-001/i })).toBeInTheDocument();
     const utilities = screen.getByRole("group", { name: /invoice utilities/i });
     expect(within(utilities).getByRole("button", { name: /copy link/i })).toBeInTheDocument();
@@ -228,7 +229,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Invoice Preview" })).toBeInTheDocument();
     expect(screen.getByText(/created on mar 20, 2026/i)).toBeInTheDocument();
     expect(screen.queryByText(/created from quote/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /open quote/i })).not.toBeInTheDocument();
@@ -245,7 +246,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Invoice Preview" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit invoice/i })).toBeInTheDocument();
     expect(screen.queryByText(/sent invoices are read-only/i)).not.toBeInTheDocument();
   });
@@ -299,7 +300,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await screen.findByRole("heading", { name: "Invoice Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /revoke link/i }));
 
@@ -336,7 +337,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await screen.findByRole("heading", { name: "Invoice Preview" });
     await openOverflowMenu();
 
     expect(screen.getByRole("menuitem", { name: /mark as paid/i })).toBeInTheDocument();
@@ -448,7 +449,7 @@ describe("InvoiceDetailScreen", () => {
   it("hides the email action for draft invoices", async () => {
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Spring cleanup" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Invoice Preview" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /send email/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /resend email/i })).not.toBeInTheDocument();
   });
@@ -456,7 +457,7 @@ describe("InvoiceDetailScreen", () => {
   it("keeps the utility row single-column when email actions are unavailable", async () => {
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await screen.findByRole("heading", { name: "Invoice Preview" });
 
     const utilities = screen.getByRole("group", { name: /invoice utilities/i });
     expect(utilities).toHaveClass("grid-cols-1");
@@ -489,10 +490,10 @@ describe("InvoiceDetailScreen", () => {
   it("renders the client card before the invoice status card", async () => {
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await screen.findByRole("heading", { name: "Invoice Preview" });
 
     const clientHeading = screen.getByText("CLIENT");
-    const statusHeading = screen.getByText("Invoice Status");
+    const statusHeading = screen.getByText("INVOICE STATUS");
 
     expect(clientHeading.compareDocumentPosition(statusHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -506,7 +507,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await screen.findByRole("heading", { name: "Invoice Preview" });
     expect(screen.queryByText("Customer Notes")).not.toBeInTheDocument();
     expect(screen.queryByText("No customer notes")).not.toBeInTheDocument();
   });
@@ -525,7 +526,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await screen.findByRole("heading", { name: "Invoice Preview" });
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
   });
 
@@ -720,7 +721,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await screen.findByRole("heading", { name: "Invoice Preview" });
 
     await waitFor(() => {
       expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-pdf-invoice-1");
@@ -765,7 +766,7 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring cleanup" });
+    await screen.findByRole("heading", { name: "Invoice Preview" });
 
     await waitFor(() => {
       expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-pdf-invoice-1");

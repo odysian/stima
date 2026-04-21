@@ -225,14 +225,14 @@ afterEach(() => {
 });
 
 describe("QuotePreview", () => {
-  it("fetches quote on mount, uses customer name as the header title, and renders header actions", async () => {
+  it("fetches quote on mount with fixed header title and renders header actions", async () => {
     renderScreen();
 
     await waitFor(() => {
       expect(mockedQuoteService.getQuote).toHaveBeenCalledWith("quote-1");
     });
 
-    expect(await screen.findByRole("heading", { name: "Test Customer" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Quote Preview" })).toBeInTheDocument();
     expect(screen.getByText("Q-001")).toBeInTheDocument();
     expect(screen.getAllByText("Draft")).toHaveLength(1);
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
@@ -277,7 +277,7 @@ describe("QuotePreview", () => {
 
       renderScreen();
 
-      await screen.findByRole("heading", { name: "Test Customer" });
+      await screen.findByRole("heading", { name: "Quote Preview" });
       expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
@@ -294,26 +294,26 @@ describe("QuotePreview", () => {
 
       renderScreen();
 
-      await screen.findByRole("heading", { name: "Test Customer" });
+      await screen.findByRole("heading", { name: "Quote Preview" });
       await openOverflowMenu();
       expect(screen.getByRole("menuitem", { name: /convert to invoice/i })).toBeInTheDocument();
     },
   );
 
-  it("does not render an empty linked-invoice card when no linked invoice exists", async () => {
+  it("does not render a linked-invoice section when no linked invoice exists", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({ status: "draft", share_token: null }),
     );
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     expect(screen.queryByText("No invoice yet")).not.toBeInTheDocument();
-    expect(screen.queryByText("Linked Invoice")).not.toBeInTheDocument();
+    expect(screen.queryByText("LINKED INVOICE")).not.toBeInTheDocument();
   });
 
   it.each(["draft", "ready", "shared", "viewed", "approved", "declined"] as const)(
-    "shows the linked invoice summary when a %s quote already has one",
+    "shows the open-invoice action when a %s quote already has one",
     async (status) => {
       mockedQuoteService.getQuote.mockResolvedValueOnce(
         makeQuoteDetail({
@@ -332,13 +332,10 @@ describe("QuotePreview", () => {
 
       renderScreen();
 
-      await screen.findByRole("heading", { name: "Test Customer" });
-      const linkedInvoiceRow = screen.getByRole("button", { name: /open linked invoice i-001/i });
-      expect(within(linkedInvoiceRow).getByText("I-001")).toBeInTheDocument();
-      expect(within(linkedInvoiceRow).getByText("Sent")).toBeInTheDocument();
-      expect(within(linkedInvoiceRow).getByText(/Due/i)).toBeInTheDocument();
-      expect(within(linkedInvoiceRow).getByText(/\$120\.00/)).toBeInTheDocument();
-      expect(within(linkedInvoiceRow).queryByText(/Created/i)).not.toBeInTheDocument();
+      await screen.findByRole("heading", { name: "Quote Preview" });
+      expect(screen.getByText("LINKED INVOICE")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /open invoice i-001/i })).toBeInTheDocument();
+      expect(screen.queryByText("Sent")).not.toBeInTheDocument();
       await openOverflowMenu();
       expect(screen.queryByRole("menuitem", { name: /convert to invoice/i })).not.toBeInTheDocument();
     },
@@ -362,7 +359,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /open linked invoice i-001/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /open invoice i-001/i }));
     expect(await screen.findByText("Invoice Detail Screen")).toBeInTheDocument();
   });
 
@@ -373,7 +370,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /convert to invoice/i }));
 
@@ -408,7 +405,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /convert to invoice/i }));
 
@@ -435,7 +432,7 @@ describe("QuotePreview", () => {
 
       renderScreen();
 
-      await screen.findByRole("heading", { name: "Test Customer" });
+      await screen.findByRole("heading", { name: "Quote Preview" });
       expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /resend email/i })).toBeInTheDocument();
@@ -469,7 +466,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /revoke link/i }));
 
@@ -508,7 +505,7 @@ describe("QuotePreview", () => {
 
       renderScreen();
 
-      await screen.findByRole("heading", { name: "Test Customer" });
+      await screen.findByRole("heading", { name: "Quote Preview" });
       expect(screen.queryByLabelText(/quote status/i)).not.toBeInTheDocument();
     },
   );
@@ -523,7 +520,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /open pdf/i })).not.toBeInTheDocument();
     const utilities = screen.getByRole("group", { name: /quote utilities/i });
@@ -532,18 +529,18 @@ describe("QuotePreview", () => {
     expect(screen.queryByLabelText(/quote status/i)).not.toBeInTheDocument();
   });
 
-  it("renders quote title as the primary header when present", async () => {
+  it("renders doc number and title in the subtitle when title is present", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({ title: "Front Yard Refresh" }),
     );
 
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Front Yard Refresh" })).toBeInTheDocument();
-    expect(screen.getAllByText("Q-001").length).toBeGreaterThan(0);
+    expect(await screen.findByRole("heading", { name: "Quote Preview" })).toBeInTheDocument();
+    expect(screen.getByText("Q-001 · Front Yard Refresh")).toBeInTheDocument();
   });
 
-  it("falls back to customer name for the header title and keeps doc number as subtitle", async () => {
+  it("renders doc number as the subtitle when title is missing", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({
         title: null,
@@ -553,7 +550,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Explicit Customer" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Quote Preview" })).toBeInTheDocument();
     expect(screen.getByText("Q-001")).toBeInTheDocument();
   });
 
@@ -571,7 +568,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     expect(screen.getByRole("link", { name: /open pdf/i })).toHaveAttribute(
       "href",
       "/api/quotes/quote-1/pdf",
@@ -588,7 +585,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /mark as won/i }));
 
@@ -623,7 +620,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /mark as lost/i }));
 
@@ -664,7 +661,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     await waitFor(() => {
@@ -689,7 +686,7 @@ describe("QuotePreview", () => {
   it("navigates to the canonical review route from the header action", async () => {
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /edit quote/i }));
 
     expect(await screen.findByText("Document Edit Screen")).toBeInTheDocument();
@@ -738,7 +735,7 @@ describe("QuotePreview", () => {
     renderScreen();
 
     expect(await screen.findByText("$245.50")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Q-001" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Quote Preview" })).toBeInTheDocument();
     expect(screen.getAllByText("cust-1")).toHaveLength(1);
     expect(screen.getByText("No contact details")).toBeInTheDocument();
   });
@@ -753,7 +750,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     expect(screen.getByText("+1-555-0199")).toBeInTheDocument();
     expect(screen.queryByText("customer@example.com")).not.toBeInTheDocument();
   });
@@ -854,7 +851,7 @@ describe("QuotePreview", () => {
   it("keeps details and line items above the primary action area", async () => {
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
 
     const detailsHeading = screen.getByText("CLIENT");
     const lineItemsHeading = screen.getByText("LINE ITEMS");
@@ -887,7 +884,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     expect(screen.queryByRole("button", { name: /send email/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /copy link/i })).not.toBeInTheDocument();
 
@@ -931,7 +928,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
 
     await waitFor(() => {
       expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-pdf-quote-1");
@@ -978,7 +975,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
 
     await waitFor(() => {
       expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-pdf-quote-1");
@@ -994,7 +991,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     await waitFor(() => {
@@ -1013,7 +1010,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /generate pdf/i }));
 
     expect(screen.getByRole("status")).toHaveTextContent("Generating PDF preview. This can take a few moments.");
@@ -1076,7 +1073,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Preserved Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(
       within(screen.getByRole("group", { name: /quote utilities/i })).getByRole("button", {
         name: /send email/i,
@@ -1090,7 +1087,7 @@ describe("QuotePreview", () => {
     await waitFor(() => {
       expect(mockedQuoteService.sendQuoteEmail).toHaveBeenCalledWith("quote-1");
     });
-    expect(await screen.findAllByText("Preserved Customer")).toHaveLength(2);
+    expect(await screen.findAllByText("Preserved Customer")).toHaveLength(1);
     expect(screen.getByText(/\+1-555-0199/i)).toBeInTheDocument();
     expect(screen.queryByText(/preserved@example.com/i)).not.toBeInTheDocument();
   });
@@ -1108,7 +1105,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     await waitFor(() => {
@@ -1141,7 +1138,7 @@ describe("QuotePreview", () => {
     try {
       renderScreen();
 
-      await screen.findByRole("heading", { name: "Test Customer" });
+      await screen.findByRole("heading", { name: "Quote Preview" });
       fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
       await waitFor(() => {
@@ -1185,7 +1182,7 @@ describe("QuotePreview", () => {
     try {
       renderScreen();
 
-      await screen.findByRole("heading", { name: "Test Customer" });
+      await screen.findByRole("heading", { name: "Quote Preview" });
       fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
       await waitFor(() => {
@@ -1222,7 +1219,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     expect(screen.getByRole("status")).toHaveTextContent("Copying share link...");
@@ -1250,7 +1247,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     await waitFor(() => {
@@ -1273,7 +1270,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     expect(await screen.findByLabelText("Share URL")).toHaveValue(
@@ -1296,7 +1293,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /copy link/i }));
 
     expect(await screen.findByText("Clipboard denied")).toBeInTheDocument();
@@ -1324,7 +1321,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(
       within(screen.getByRole("group", { name: /quote utilities/i })).getByRole("button", {
         name: /send email/i,
@@ -1350,7 +1347,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     expect(screen.getByRole("button", { name: /send email/i })).toBeDisabled();
     expect(screen.getByText(/add a customer email to send this quote via email/i)).toBeInTheDocument();
   });
@@ -1380,7 +1377,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(
       within(screen.getByRole("group", { name: /quote utilities/i })).getByRole("button", {
         name: /send email/i,
@@ -1398,7 +1395,7 @@ describe("QuotePreview", () => {
   it("shows a confirmation modal and deletes the quote before navigating home", async () => {
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /delete quote/i }));
 
@@ -1416,7 +1413,7 @@ describe("QuotePreview", () => {
   it("closes the delete confirmation modal without deleting when kept", async () => {
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /delete quote/i }));
 
@@ -1435,7 +1432,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     await openOverflowMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /delete quote/i }));
     fireEvent.click(
@@ -1455,7 +1452,7 @@ describe("QuotePreview", () => {
     window.history.replaceState({ idx: 0 }, "");
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
 
     expect(await screen.findByText("Quote List Screen")).toBeInTheDocument();
@@ -1468,7 +1465,7 @@ describe("QuotePreview", () => {
       initialIndex: 1,
     });
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
 
     expect(await screen.findByText("Quote List Screen")).toBeInTheDocument();
@@ -1481,7 +1478,7 @@ describe("QuotePreview", () => {
 
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Test Customer" });
+    await screen.findByRole("heading", { name: "Quote Preview" });
     expect(screen.getByRole("button", { name: /generate pdf/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /send email/i })).not.toBeInTheDocument();
   });

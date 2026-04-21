@@ -1,25 +1,19 @@
 import type { OverflowMenuItem } from "@/shared/components/OverflowMenu";
 import { OverflowMenu } from "@/shared/components/OverflowMenu";
-import { StatusPill } from "@/ui/StatusPill";
-
-import type { QuoteStatus } from "@/features/quotes/types/quote.types";
 
 interface QuotePreviewHeaderActionsProps {
-  status: QuoteStatus;
   canEdit: boolean;
   onEdit: () => void;
   overflowItems: OverflowMenuItem[];
 }
 
 export function QuotePreviewHeaderActions({
-  status,
   canEdit,
   onEdit,
   overflowItems,
 }: QuotePreviewHeaderActionsProps): React.ReactElement {
   return (
     <div className="flex items-center gap-2">
-      <StatusPill variant={status} />
       {canEdit ? (
         <button
           type="button"
