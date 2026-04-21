@@ -1,7 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-import { resolveLineItemFlagMessage } from "@/features/quotes/utils/lineItemFlags";
-
 interface LineItemCardProps {
   description: string;
   details: string | null;
@@ -23,7 +21,6 @@ export function LineItemCard({
   details,
   price,
   flagged = false,
-  flagReason,
   disabled = false,
   isDragging = false,
   isDropSettling = false,
@@ -35,7 +32,6 @@ export function LineItemCard({
 }: LineItemCardProps): React.ReactElement {
   const lineItemLabel = description.trim() || "Untitled line item";
   const priceLabel = price !== null ? `$${price.toFixed(2)}` : "—";
-  const flagMessage = flagged ? resolveLineItemFlagMessage(flagReason) : null;
   const showDragHandle = isReorderMode;
   const canEditRow = !disabled && !isReorderMode;
 
@@ -88,15 +84,6 @@ export function LineItemCard({
             ) : null}
           </div>
           {details ? <p className="mt-0.5 text-sm text-on-surface-variant">{details}</p> : null}
-          {flagMessage ? (
-            <p
-              title={flagMessage}
-              className="mt-1 inline-flex max-w-full items-center gap-1 text-xs text-warning"
-            >
-              <span className="material-symbols-outlined text-[0.95rem] leading-none">info</span>
-              <span className="truncate">{flagMessage}</span>
-            </p>
-          ) : null}
         </div>
 
         <div className="mt-0.5 flex shrink-0 items-center">

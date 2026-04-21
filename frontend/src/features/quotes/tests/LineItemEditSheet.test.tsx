@@ -51,6 +51,39 @@ describe("LineItemEditSheet", () => {
     expect(within(dialog).getByRole("button", { name: /delete line item/i })).toBeInTheDocument();
   });
 
+  it("shows spoken-money review explanation for flagged edit items", () => {
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem({ flagReason: "spoken_money_correction" })}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Review needed")).toBeInTheDocument();
+    expect(
+      screen.getByText("Voice capture may have interpreted cents as dollars. Confirm the amount and update the price if needed."),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show review explanation for unflagged items", () => {
+    render(
+      <LineItemEditSheet
+        open
+        mode="edit"
+        initialLineItem={makeLineItem({ flagged: false, flagReason: null })}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("Review needed")).not.toBeInTheDocument();
+  });
+
   it("renders add mode without sheet trash", () => {
     render(
       <LineItemEditSheet
