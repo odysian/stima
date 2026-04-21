@@ -1,3 +1,4 @@
+import { Eyebrow } from "@/ui/Eyebrow";
 import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum, type DiscountType } from "@/shared/lib/pricing";
@@ -38,10 +39,10 @@ export function QuoteDetailsCard({
 
   return (
     <div className="mt-4 px-4 pb-6">
-      <section className="ghost-shadow rounded-lg border-l-4 border-primary bg-surface-container-lowest p-4">
+      <section className="ghost-shadow rounded-[var(--radius-document)] border-l-4 border-primary bg-surface-container-lowest p-4">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3">
           <div className="min-w-0">
-            <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">CLIENT</h2>
+            <Eyebrow>CLIENT</Eyebrow>
           </div>
 
           <div className="justify-self-end text-right">
@@ -56,9 +57,9 @@ export function QuoteDetailsCard({
           </div>
 
           <div className="self-end justify-self-end text-right">
-            <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+            <Eyebrow>
               {pricingBreakdown.hasPricingBreakdown ? "TOTAL" : "TOTAL AMOUNT"}
-            </h2>
+            </Eyebrow>
             <p className="mt-1 font-headline text-2xl font-bold text-primary">
               {formatCurrency(totalAmount)}
             </p>

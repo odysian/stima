@@ -1,6 +1,6 @@
 import type { OverflowMenuItem } from "@/shared/components/OverflowMenu";
 import { OverflowMenu } from "@/shared/components/OverflowMenu";
-import { StatusBadge } from "@/shared/components/StatusBadge";
+import { StatusPill } from "@/ui/StatusPill";
 
 import type { QuoteStatus } from "@/features/quotes/types/quote.types";
 
@@ -19,7 +19,7 @@ export function QuotePreviewHeaderActions({
 }: QuotePreviewHeaderActionsProps): React.ReactElement {
   return (
     <div className="flex items-center gap-2">
-      <StatusBadge variant={status} />
+      <StatusPill variant={status} />
       {canEdit ? (
         <button
           type="button"

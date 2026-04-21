@@ -196,7 +196,7 @@ export function QuotePreview(): React.ReactElement {
         {!isLoadingQuote && !loadError ? (
           <>
             {quote && extractionDegradedCopy ? (
-              <div className="mx-4 mt-4 rounded-lg border border-warning-accent/40 bg-warning-container p-4 text-sm text-warning">
+              <div className="mx-4 mt-4 rounded-[var(--radius-document)] border border-warning-accent/40 bg-warning-container p-4 text-sm text-warning">
                 {extractionDegradedCopy}
               </div>
             ) : null}

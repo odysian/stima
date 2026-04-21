@@ -47,7 +47,7 @@ export function DocumentActionSurface({
   return (
     <>
       <section className="mt-4 px-4" aria-label={sectionLabel}>
-        <div className="ghost-shadow rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+        <div className="ghost-shadow rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-4">
           {primaryAction}
 
           {shouldRenderUtilities ? (
