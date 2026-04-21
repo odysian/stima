@@ -4,6 +4,7 @@ import {
   MAX_AUDIO_CLIPS_PER_REQUEST,
   NOTE_INPUT_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 interface CaptureInputPanelProps {
   clips: VoiceClip[];
@@ -38,18 +39,16 @@ export function CaptureInputPanel({
 }: CaptureInputPanelProps): React.ReactElement {
   return (
     <>
-      <section className="mb-6">
+      <section className="mb-4 rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-low p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-headline text-sm font-semibold uppercase tracking-wide text-on-surface">
-            RECORDED CLIPS
-          </h2>
-          <span className="rounded-sm bg-surface-container-low px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+          <Eyebrow className="text-on-surface">RECORDED CLIPS</Eyebrow>
+          <span className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
             {clips.length} CLIPS
           </span>
         </div>
 
         {clips.length === 0 ? (
-          <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 bg-surface-container-lowest p-4">
+          <div className="ghost-shadow flex h-28 flex-col items-center justify-center gap-2 rounded-[var(--radius-document)] border-2 border-dashed border-outline-variant/30 bg-surface-container-lowest p-4">
             <span className="material-symbols-outlined text-4xl text-outline">
               mic_off
             </span>
@@ -65,7 +64,7 @@ export function CaptureInputPanel({
               return (
                 <div
                   key={clip.id}
-                  className="flex items-center justify-between rounded-lg bg-surface-container-lowest p-3 ghost-shadow"
+                  className="ghost-shadow flex items-center justify-between rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-lowest p-3"
                 >
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-outline">
@@ -93,12 +92,12 @@ export function CaptureInputPanel({
         )}
       </section>
 
-      <section className="mb-4">
+      <section className="mb-4 rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-low p-4">
         <label
           htmlFor="capture-written-description"
-          className="mb-3 block font-headline text-sm font-semibold uppercase tracking-wide text-on-surface"
+          className="mb-3 block"
         >
-          WRITTEN DESCRIPTION
+          <Eyebrow className="text-on-surface">WRITTEN DESCRIPTION</Eyebrow>
         </label>
         <textarea
           id="capture-written-description"
@@ -107,7 +106,7 @@ export function CaptureInputPanel({
           value={notes}
           onChange={(event) => onNotesChange(event.target.value)}
           placeholder="Add any typed details here..."
-          className="w-full resize-none rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
+          className="w-full resize-none rounded-[var(--radius-document)] border border-outline-variant/25 bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
         />
         {onStartBlank ? (
           <button

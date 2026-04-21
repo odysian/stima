@@ -404,6 +404,12 @@ describe("CaptureScreen", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not render an exit-to-home button in the capture header", () => {
+    renderScreen();
+
+    expect(screen.queryByRole("button", { name: /exit to home/i })).not.toBeInTheDocument();
+  });
+
   it("shows a leave confirmation when navigating back with unsaved clips", () => {
     mockVoiceCapture({ clips: [clipFixture] });
     renderScreen();
@@ -458,18 +464,6 @@ describe("CaptureScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Leave" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/customers/cust-1", { replace: true });
-  });
-
-  it("shows the same leave confirmation when exiting home with unsaved work", () => {
-    renderScreen();
-
-    fireEvent.change(screen.getByLabelText(/written description/i), {
-      target: { value: "Install sod in backyard" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /exit to home/i }));
-
-    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
-    expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
   it("submits extraction with customer context and routes to persisted review id", async () => {
