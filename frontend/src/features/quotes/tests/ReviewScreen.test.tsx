@@ -699,6 +699,31 @@ describe("DocumentEditScreen", () => {
     expect(await screen.findByLabelText("Capture details need review")).toBeInTheDocument();
   });
 
+  it("hides the capture-details trigger when only non-overflow unresolved reasons exist", async () => {
+    renderScreen({
+      document: makeQuote({
+        transcript: "",
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          hidden_details: {
+            items: [
+              {
+                id: "unresolved-1",
+                kind: "unresolved_segment",
+                field: "notes",
+                reason: "typed_conflict",
+                text: "customer said maybe cedar mulch",
+              },
+            ],
+          },
+        },
+      }),
+    });
+
+    await screen.findByRole("button", { name: /continue to preview/i });
+    expect(screen.queryByRole("button", { name: /capture details/i })).not.toBeInTheDocument();
+  });
+
   it("renders one unified actionable feed plus transcript with dismiss-only actions", async () => {
     renderScreen({
       document: makeQuote({
@@ -710,15 +735,29 @@ describe("DocumentEditScreen", () => {
                 id: "unresolved-1",
                 kind: "unresolved_segment",
                 field: null,
-                reason: "typed_conflict",
-                text: "discount 25",
+                reason: "leftover_classification",
+                text: "trim rose bed maybe",
               },
               {
                 id: "unresolved-2",
                 kind: "unresolved_segment",
+                field: "notes",
+                reason: "leftover_classification",
+                text: "ask for back gate access",
+              },
+              {
+                id: "unresolved-3",
+                kind: "unresolved_segment",
+                field: "explicit_total",
+                reason: "leftover_classification",
+                text: "total could be 390",
+              },
+              {
+                id: "unresolved-4",
+                kind: "unresolved_segment",
                 field: null,
                 reason: "typed_conflict",
-                text: "trim rose bed maybe",
+                text: "conflicting typed note should not surface",
               },
             ],
           },
@@ -736,6 +775,12 @@ describe("DocumentEditScreen", () => {
     expect(screen.queryByText("Unresolved Capture Details")).not.toBeInTheDocument();
     expect(screen.queryByText("AI Review Notes")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /mark reviewed/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Unplaced capture detail")).toBeInTheDocument();
+    expect(screen.getByText("Unresolved note")).toBeInTheDocument();
+    expect(screen.getByText("Unresolved pricing detail")).toBeInTheDocument();
+    expect(screen.queryByText("leftover classification")).not.toBeInTheDocument();
+    expect(screen.queryByText("typed conflict")).not.toBeInTheDocument();
+    expect(screen.queryByText("conflicting typed note should not surface")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /^dismiss$/i }).length).toBeGreaterThan(0);
     expect(screen.getByText("Original capture transcript text.")).toBeInTheDocument();
     const transcriptSection = transcriptHeading.closest("section");
