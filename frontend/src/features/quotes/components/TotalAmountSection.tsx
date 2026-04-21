@@ -154,7 +154,7 @@ export function TotalAmountSection({
                     onDiscountValueChange(null);
                   }}
                 />
-                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
+                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
                 <span className="font-semibold">Discount</span>
               </label>
               {isDiscountEnabled ? (
@@ -206,7 +206,7 @@ export function TotalAmountSection({
                     onTaxRateChange(null);
                   }}
                 />
-                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
+                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
                 <span className="font-semibold">Tax</span>
               </label>
               {isTaxEnabled ? (
@@ -247,7 +247,7 @@ export function TotalAmountSection({
                     onDepositAmountChange(null);
                   }}
                 />
-                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
+                <span className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-outline-variant/40 transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface-container-lowest after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
                 <span className="font-semibold">Deposit</span>
               </label>
               {isDepositEnabled ? (
