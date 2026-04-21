@@ -11,11 +11,14 @@ import { DocumentCardSkeleton } from "@/shared/components/DocumentCardSkeleton";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { StatusBadge, statusBadgeBaseClasses } from "@/shared/components/StatusBadge";
-import { formatCurrency, formatDate } from "@/shared/lib/formatters";
+import { formatDate } from "@/shared/lib/formatters";
+import { Eyebrow } from "@/ui/Eyebrow";
+import { QuoteListRow } from "@/ui/QuoteListRow";
+import type { StatusPillVariant } from "@/ui/StatusPill";
+import { buildInvoiceSubtitle, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
 
 type DocumentMode = "quotes" | "invoices";
-type DocumentStatus = QuoteListItem["status"] | InvoiceListItem["status"];
+type DocumentStatus = StatusPillVariant;
 
 interface DocumentRow {
   id: string;
@@ -37,100 +40,35 @@ interface DocumentRowsSectionProps {
   rows: DocumentRow[];
   onRowClick: (row: DocumentRow) => void;
 }
-const baseRowClasses = "w-full cursor-pointer rounded-xl bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const draftRowClasses = "glass-surface w-full cursor-pointer rounded-xl border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const needsCustomerBadgeClasses = `${statusBadgeBaseClasses} shrink-0 whitespace-nowrap bg-warning-container text-warning`;
+
 const headerIconButtonClasses = "inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95";
 
 function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
   return (
     <section aria-label={label}>
       <div className="mb-2 px-4">
-        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-          {label}
-        </p>
+        <Eyebrow>{label}</Eyebrow>
       </div>
       <div className="mx-4 rounded-xl bg-surface-container-low p-3">
         <ul className="flex flex-col gap-3">
           {rows.map((row) => (
             <li key={row.id}>
-              <button
-                type="button"
+              <QuoteListRow
+                customerLabel={row.customerLabel}
+                titleLabel={row.titleLabel}
+                docAndDate={row.docAndDate}
+                totalAmount={row.totalAmount}
+                status={row.status}
+                isDraft={row.isDraft}
+                needsCustomerAssignment={row.needsCustomerAssignment}
                 onClick={() => onRowClick(row)}
-                className={row.isDraft ? draftRowClasses : baseRowClasses}
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="font-headline font-bold text-on-surface">
-                    {row.customerLabel}
-                  </p>
-                  <p className="font-headline font-bold text-on-surface">
-                    {formatCurrency(row.totalAmount)}
-                  </p>
-                </div>
-                <div className="mt-1 space-y-1">
-                  {row.titleLabel ? (
-                    <p className="text-sm text-on-surface-variant">
-                      {row.titleLabel}
-                    </p>
-                  ) : null}
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm text-on-surface-variant">
-                      {row.docAndDate}
-                    </p>
-                    {row.needsCustomerAssignment ? (
-                      <span className={`${needsCustomerBadgeClasses} ml-auto`}>Needs customer</span>
-                    ) : (
-                      <span className="ml-auto">
-                        <StatusBadge variant={row.status} />
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
+              />
             </li>
           ))}
         </ul>
       </div>
     </section>
   );
-}
-
-function matchesSearch(
-  item: Pick<QuoteListItem, "customer_name" | "doc_number" | "title">,
-  normalizedSearchQuery: string,
-): boolean {
-  if (!normalizedSearchQuery) {
-    return true;
-  }
-  return (
-    (item.customer_name ?? "").toLowerCase().includes(normalizedSearchQuery)
-    || item.doc_number.toLowerCase().includes(normalizedSearchQuery)
-    || (item.title?.toLowerCase() ?? "").includes(normalizedSearchQuery)
-  );
-}
-
-function buildQuoteSubtitle(quotes: QuoteListItem[], isLoading: boolean, loadError: string | null): string | undefined {
-  if (isLoading || loadError) {
-    return undefined;
-  }
-
-  const activeQuoteCount = quotes.filter((quote) => quote.status === "ready" || quote.status === "shared").length;
-  const pendingReviewCount = quotes.filter((quote) => quote.status === "draft").length;
-  return `${activeQuoteCount} active · ${pendingReviewCount} pending`;
-}
-
-function buildInvoiceSubtitle(
-  invoices: InvoiceListItem[],
-  isLoading: boolean,
-  loadError: string | null,
-): string | undefined {
-  if (isLoading || loadError) {
-    return undefined;
-  }
-
-  const activeInvoiceCount = invoices.filter((invoice) => invoice.status === "ready" || invoice.status === "sent").length;
-  const pendingInvoiceCount = invoices.filter((invoice) => invoice.status === "draft").length;
-  return `${activeInvoiceCount} active · ${pendingInvoiceCount} pending`;
 }
 
 export function QuoteList(): React.ReactElement {
@@ -227,6 +165,7 @@ export function QuoteList(): React.ReactElement {
     () => buildInvoiceSubtitle(invoices, isLoadingInvoices, invoiceLoadError),
     [invoiceLoadError, invoices, isLoadingInvoices],
   );
+
   const isLoading = documentMode === "quotes" ? isLoadingQuotes : isLoadingInvoices;
   const loadError = documentMode === "quotes" ? quoteLoadError : invoiceLoadError;
   const filteredRows = documentMode === "quotes" ? filteredQuotes : filteredInvoices;

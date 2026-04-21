@@ -68,6 +68,9 @@
 
 :root {
   color-scheme: light;
+  --radius-document: 0.75rem;
+  --tap-target-min: 44px;
+  --tap-target-fab: 56px;
   --surface-glass: rgb(248 249 255 / 0.8);
   --surface-glass-strong: rgb(248 249 255 / 0.82);
   --overlay-backdrop: rgb(0 0 0 / 0.35);
@@ -262,6 +265,10 @@
 
 .material-symbols-outlined {
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.material-symbols-filled {
+  font-variation-settings: "FILL" 1, "wght" 600, "GRAD" 0, "opsz" 24;
 }
 
 @keyframes shimmer {
