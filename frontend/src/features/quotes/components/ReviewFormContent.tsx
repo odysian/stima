@@ -1,12 +1,8 @@
-import { useState } from "react";
-
-import { CaptureDetailsSheet } from "@/features/quotes/components/CaptureDetailsSheet";
 import { ReviewCustomerRow } from "@/features/quotes/components/ReviewCustomerRow";
 import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewLineItemsSection } from "@/features/quotes/components/ReviewLineItemsSection";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
-import type { ExtractionReviewHiddenDetails, ExtractionTier, HiddenItemState } from "@/features/quotes/types/quote.types";
-import { hasUndismissedCaptureDetailsItems, resolveCaptureDetailsActionableItems } from "@/features/quotes/utils/captureDetails";
+import type { ExtractionTier } from "@/features/quotes/types/quote.types";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   DOCUMENT_NOTES_MAX_CHARS,
@@ -45,11 +41,8 @@ interface ReviewFormContentProps {
   isInteractionLocked: boolean;
   extractionTier: ExtractionTier | null;
   extractionDegradedReasonCode: string | null;
-  hiddenDetails?: ExtractionReviewHiddenDetails;
-  hiddenDetailState?: Record<string, HiddenItemState>;
   lineItemSum: number;
   suggestedTaxRate: number | null;
-  isMutatingHiddenItems: boolean;
   onDocumentTypeChange: (nextType: ReviewDocumentType) => void;
   onDueDateChange: (nextDueDate: string) => void;
   onRequestAssignment: () => void;
@@ -63,7 +56,6 @@ interface ReviewFormContentProps {
   onDiscountValueChange: (nextDiscountValue: number | null) => void;
   onDepositAmountChange: (nextDepositAmount: number | null) => void;
   onNotesChange: (nextNotes: string) => void;
-  onDismissHiddenItem: (itemId: string) => Promise<void>;
 }
 
 export function ReviewFormContent({
@@ -80,11 +72,8 @@ export function ReviewFormContent({
   isInteractionLocked,
   extractionTier,
   extractionDegradedReasonCode,
-  hiddenDetails,
-  hiddenDetailState,
   lineItemSum,
   suggestedTaxRate,
-  isMutatingHiddenItems,
   onDocumentTypeChange,
   onDueDateChange,
   onRequestAssignment,
@@ -98,17 +87,10 @@ export function ReviewFormContent({
   onDiscountValueChange,
   onDepositAmountChange,
   onNotesChange,
-  onDismissHiddenItem,
 }: ReviewFormContentProps): React.ReactElement {
-  const [isCaptureDetailsOpen, setIsCaptureDetailsOpen] = useState(false);
   const showDueDateField = documentType === "invoice";
-  const showQuoteOnlySections = documentType === "quote";
   const showSevereDegradedMarker = extractionTier === "degraded"
     && draft.lineItems.length === 0;
-  const hasHiddenActionableItems = hasUndismissedCaptureDetailsItems(
-    resolveCaptureDetailsActionableItems(hiddenDetails),
-    hiddenDetailState,
-  );
 
   return (
     <form
@@ -188,36 +170,6 @@ export function ReviewFormContent({
         </section>
       ) : null}
 
-      {showQuoteOnlySections ? (
-        <section className="space-y-2">
-          <button
-            type="button"
-            className="inline-flex w-full cursor-pointer items-center justify-between rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-colors hover:bg-surface-container-lowest"
-            onClick={() => {
-              setIsCaptureDetailsOpen(true);
-            }}
-          >
-            <div>
-              <Eyebrow>Capture Details</Eyebrow>
-              <p className="text-sm text-on-surface-variant">
-                Actionable items and transcript.
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-1.5">
-              {hasHiddenActionableItems ? (
-                <span
-                  aria-label="Capture details need review"
-                  className="material-symbols-outlined text-[1.125rem] leading-none text-warning"
-                >
-                  error
-                </span>
-              ) : null}
-              <span className="material-symbols-outlined text-[1rem] leading-none text-outline">chevron_right</span>
-            </div>
-          </button>
-        </section>
-      ) : null}
-
       <ReviewLineItemsSection
         lineItems={draft.lineItems}
         isInteractionLocked={isInteractionLocked}
@@ -257,18 +209,6 @@ export function ReviewFormContent({
           placeholder="Any notes to include for the customer."
         />
       </section>
-
-      {showQuoteOnlySections ? (
-        <CaptureDetailsSheet
-          open={isCaptureDetailsOpen}
-          onClose={() => setIsCaptureDetailsOpen(false)}
-          transcript={draft.transcript ?? ""}
-          hiddenDetails={hiddenDetails}
-          hiddenDetailState={hiddenDetailState}
-          onDismissHiddenItem={onDismissHiddenItem}
-          isMutating={isMutatingHiddenItems}
-        />
-      ) : null}
     </form>
   );
 }
