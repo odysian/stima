@@ -13,40 +13,6 @@ interface CaptureDetailsSheetProps {
   isMutating?: boolean;
 }
 
-function formatPricingField(
-  pricingField: "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null | undefined,
-): string | null {
-  if (!pricingField) {
-    return null;
-  }
-
-  if (pricingField === "explicit_total") {
-    return "total";
-  }
-  if (pricingField === "deposit_amount") {
-    return "deposit";
-  }
-  if (pricingField === "tax_rate") {
-    return "tax";
-  }
-  return "discount";
-}
-
-function buildActionableLabel(item: {
-  kind: "unresolved_segment";
-  field: "notes" | "explicit_total" | "deposit_amount" | "tax_rate" | "discount" | null;
-  reason: string | null;
-}): string {
-  const pricingField = formatPricingField(item.field === "notes" ? null : item.field);
-  if (item.field === "notes") {
-    return "Unresolved note";
-  }
-  if (pricingField) {
-    return `Unresolved ${pricingField}`;
-  }
-  return (item.reason ?? "leftover_classification").replaceAll("_", " ");
-}
-
 export function CaptureDetailsSheet({
   open,
   onClose,
@@ -87,7 +53,7 @@ export function CaptureDetailsSheet({
                         key={item.id}
                         className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
                       >
-                        <p className="font-semibold">{buildActionableLabel(item)}</p>
+                        <p className="font-semibold">{item.label}</p>
                         <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{item.text}</p>
                         <div className="mt-3">
                           <button
