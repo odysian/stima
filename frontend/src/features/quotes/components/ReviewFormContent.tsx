@@ -43,8 +43,6 @@ interface ReviewFormContentProps {
   requiresCustomerAssignment: boolean;
   canReassignCustomer: boolean;
   isInteractionLocked: boolean;
-  notesReviewPending: boolean;
-  pricingReviewPending: boolean;
   extractionTier: ExtractionTier | null;
   extractionDegradedReasonCode: string | null;
   hiddenDetails?: ExtractionReviewHiddenDetails;
@@ -80,8 +78,6 @@ export function ReviewFormContent({
   requiresCustomerAssignment,
   canReassignCustomer,
   isInteractionLocked,
-  notesReviewPending,
-  pricingReviewPending,
   extractionTier,
   extractionDegradedReasonCode,
   hiddenDetails,
@@ -220,20 +216,6 @@ export function ReviewFormContent({
             </div>
           </button>
         </section>
-      ) : null}
-
-      {pricingReviewPending ? (
-        <Banner
-          title="Pricing Pending Review"
-          message="Pricing fields were seeded from capture details. Review totals, tax, discount, and deposit."
-        />
-      ) : null}
-
-      {notesReviewPending ? (
-        <Banner
-          title="Notes Pending Review"
-          message="Notes were seeded from capture details. Review and adjust before continuing."
-        />
       ) : null}
 
       <ReviewLineItemsSection
