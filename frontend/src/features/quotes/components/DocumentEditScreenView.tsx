@@ -1,3 +1,6 @@
+import { useMemo, useState } from "react";
+
+import { CaptureDetailsSheet } from "@/features/quotes/components/CaptureDetailsSheet";
 import { DocumentEditOverlays } from "@/features/quotes/components/DocumentEditOverlays";
 import { ReviewActionFooter } from "@/features/quotes/components/ReviewActionFooter";
 import { ReviewFormContent } from "@/features/quotes/components/ReviewFormContent";
@@ -5,6 +8,7 @@ import { isInvoiceDocument } from "@/features/quotes/components/documentEditUtil
 import type { ReviewLineItemSheetState } from "@/features/quotes/components/reviewLineItemSheetState";
 import { type DocumentEditDraft, type PersistedEditableDocument } from "@/features/quotes/hooks/usePersistedReview";
 import type { ExtractionReviewHiddenDetails, ExtractionTier, HiddenItemState, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import { hasUndismissedCaptureDetailsItems, resolveCaptureDetailsActionableItems } from "@/features/quotes/utils/captureDetails";
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
@@ -131,6 +135,14 @@ export function DocumentEditScreenView({
   onLeaveConfirm,
   onLeaveCancel,
 }: DocumentEditScreenViewProps): React.ReactElement {
+  const [isCaptureDetailsOpen, setIsCaptureDetailsOpen] = useState(false);
+  const hasTranscript = activeDraft.transcript.trim().length > 0;
+  const hasHiddenActionableItems = useMemo(() => hasUndismissedCaptureDetailsItems(
+    resolveCaptureDetailsActionableItems(hiddenDetails),
+    hiddenDetailState,
+  ), [hiddenDetails, hiddenDetailState]);
+  const showCaptureDetailsTrigger = !isInvoiceDocument(document) && (hasTranscript || hasHiddenActionableItems);
+
   return (
     <main className="min-h-screen bg-background pb-28">
       <WorkflowScreenHeader
@@ -138,6 +150,29 @@ export function DocumentEditScreenView({
         subtitle="Confirm line items and pricing"
         backLabel={backLabel}
         onBack={() => onRequestNavigation({ to: backTarget, replace: true })}
+        trailing={showCaptureDetailsTrigger ? (
+          <button
+            type="button"
+            aria-label="Capture details"
+            onClick={() => setIsCaptureDetailsOpen(true)}
+            className={[
+              "inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-semibold uppercase tracking-wide transition-colors",
+              hasHiddenActionableItems
+                ? "border-warning-accent/50 bg-warning-container text-warning hover:bg-warning-container/80"
+                : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low",
+            ].join(" ")}
+          >
+            {hasHiddenActionableItems ? (
+              <span
+                aria-label="Capture details need review"
+                className="material-symbols-outlined text-[1rem] leading-none"
+              >
+                error
+              </span>
+            ) : null}
+            <span>Capture Details</span>
+          </button>
+        ) : null}
       />
 
       <ReviewFormContent
@@ -154,11 +189,8 @@ export function DocumentEditScreenView({
         isInteractionLocked={isInteractionLocked}
         extractionTier={extractionTier}
         extractionDegradedReasonCode={extractionDegradedReasonCode}
-        hiddenDetails={hiddenDetails}
-        hiddenDetailState={hiddenDetailState}
         lineItemSum={lineItemSum}
         suggestedTaxRate={suggestedTaxRate}
-        isMutatingHiddenItems={isMutatingHiddenItems}
         onDocumentTypeChange={onDocumentTypeChange}
         onDueDateChange={onDueDateChange}
         onRequestAssignment={onOpenAssignment}
@@ -172,8 +204,19 @@ export function DocumentEditScreenView({
         onDiscountValueChange={onDiscountValueChange}
         onDepositAmountChange={onDepositAmountChange}
         onNotesChange={onNotesChange}
-        onDismissHiddenItem={onDismissHiddenItem}
       />
+
+      {!isInvoiceDocument(document) ? (
+        <CaptureDetailsSheet
+          open={isCaptureDetailsOpen}
+          onClose={() => setIsCaptureDetailsOpen(false)}
+          transcript={activeDraft.transcript}
+          hiddenDetails={hiddenDetails}
+          hiddenDetailState={hiddenDetailState}
+          onDismissHiddenItem={onDismissHiddenItem}
+          isMutating={isMutatingHiddenItems}
+        />
+      ) : null}
 
       <ReviewActionFooter
         requiresCustomerAssignment={requiresCustomerAssignment}

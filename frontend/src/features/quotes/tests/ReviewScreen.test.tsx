@@ -650,6 +650,33 @@ describe("DocumentEditScreen", () => {
     expect(screen.queryByLabelText("Capture details need review")).not.toBeInTheDocument();
   });
 
+  it("renders capture details only in the header trailing area", async () => {
+    renderScreen();
+
+    const header = await screen.findByRole("banner");
+    const reviewForm = document.getElementById("quote-review-form");
+    expect(reviewForm).not.toBeNull();
+    expect(within(header).getByRole("button", { name: /capture details/i })).toBeInTheDocument();
+    expect(within(reviewForm as HTMLElement).queryByRole("button", { name: /capture details/i })).not.toBeInTheDocument();
+  });
+
+  it("hides the capture-details trigger when transcript and hidden details are both empty", async () => {
+    renderScreen({
+      document: makeQuote({
+        transcript: "",
+        extraction_review_metadata: {
+          ...makeQuote().extraction_review_metadata!,
+          hidden_details: {
+            items: [],
+          },
+        },
+      }),
+    });
+
+    await screen.findByRole("button", { name: /continue to preview/i });
+    expect(screen.queryByRole("button", { name: /capture details/i })).not.toBeInTheDocument();
+  });
+
   it("shows the capture-details alert icon when hidden actionable items exist", async () => {
     renderScreen({
       document: makeQuote({
