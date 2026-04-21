@@ -34,7 +34,6 @@ interface DocumentEditScreenViewProps {
   lineItemSheetInitialItem: LineItemDraftWithFlags;
   toastMessage: string | null;
   showLeaveWarning: boolean;
-  continueWarningReason: "review" | "capture-details" | null;
   isSavingDraft: boolean;
   isContinuing: boolean;
   onRequestNavigation: (target: { to: string; replace?: boolean }) => void;
@@ -52,7 +51,6 @@ interface DocumentEditScreenViewProps {
   onDepositAmountChange: (nextDepositAmount: number | null) => void;
   onNotesChange: (nextNotes: string) => void;
   onDismissHiddenItem: (itemId: string) => Promise<void>;
-  onCaptureDetailsOpen: () => void;
   onSaveDraft: () => void;
   onPrimaryAction: () => void;
   onCloseAssignment: () => void;
@@ -74,8 +72,6 @@ interface DocumentEditScreenViewProps {
   onDismissToast: () => void;
   onLeaveConfirm: () => void;
   onLeaveCancel: () => void;
-  onContinueConfirm: () => void;
-  onContinueCancel: () => void;
 }
 
 export function DocumentEditScreenView({
@@ -104,7 +100,6 @@ export function DocumentEditScreenView({
   lineItemSheetInitialItem,
   toastMessage,
   showLeaveWarning,
-  continueWarningReason,
   isSavingDraft,
   isContinuing,
   onRequestNavigation,
@@ -122,7 +117,6 @@ export function DocumentEditScreenView({
   onDepositAmountChange,
   onNotesChange,
   onDismissHiddenItem,
-  onCaptureDetailsOpen,
   onSaveDraft,
   onPrimaryAction,
   onCloseAssignment,
@@ -140,8 +134,6 @@ export function DocumentEditScreenView({
   onDismissToast,
   onLeaveConfirm,
   onLeaveCancel,
-  onContinueConfirm,
-  onContinueCancel,
 }: DocumentEditScreenViewProps): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-28">
@@ -187,7 +179,6 @@ export function DocumentEditScreenView({
         onDepositAmountChange={onDepositAmountChange}
         onNotesChange={onNotesChange}
         onDismissHiddenItem={onDismissHiddenItem}
-        onCaptureDetailsOpen={onCaptureDetailsOpen}
       />
 
       <ReviewActionFooter
@@ -222,9 +213,6 @@ export function DocumentEditScreenView({
         showLeaveWarning={showLeaveWarning}
         onLeaveConfirm={onLeaveConfirm}
         onLeaveCancel={onLeaveCancel}
-        continueWarningReason={continueWarningReason}
-        onContinueConfirm={onContinueConfirm}
-        onContinueCancel={onContinueCancel}
       />
     </main>
   );

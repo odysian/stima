@@ -66,7 +66,6 @@ interface ReviewFormContentProps {
   onDepositAmountChange: (nextDepositAmount: number | null) => void;
   onNotesChange: (nextNotes: string) => void;
   onDismissHiddenItem: (itemId: string) => Promise<void>;
-  onCaptureDetailsOpen: () => void;
 }
 
 export function ReviewFormContent({
@@ -104,7 +103,6 @@ export function ReviewFormContent({
   onDepositAmountChange,
   onNotesChange,
   onDismissHiddenItem,
-  onCaptureDetailsOpen,
 }: ReviewFormContentProps): React.ReactElement {
   const [isCaptureDetailsOpen, setIsCaptureDetailsOpen] = useState(false);
   const showDueDateField = documentType === "invoice";
@@ -200,7 +198,6 @@ export function ReviewFormContent({
             type="button"
             className="inline-flex w-full cursor-pointer items-center justify-between rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-colors hover:bg-surface-container-lowest"
             onClick={() => {
-              onCaptureDetailsOpen();
               setIsCaptureDetailsOpen(true);
             }}
           >

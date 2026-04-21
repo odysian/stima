@@ -462,7 +462,7 @@ describe("DocumentEditScreen", () => {
     expect(screen.getByText("Extraction degraded and no line items were found. Review capture details before continuing.")).toBeInTheDocument();
   });
 
-  it("gates Continue with a review modal only when visible review markers remain", async () => {
+  it("continues without a review modal when visible review markers remain", async () => {
     renderScreen({
       document: makeQuote({
         extraction_review_metadata: {
@@ -477,14 +477,7 @@ describe("DocumentEditScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
 
-    expect(screen.getByRole("dialog", { name: /review pending extraction markers/i })).toBeInTheDocument();
-    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Review now" }));
-    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue anyway" }));
+    expect(screen.queryByRole("dialog", { name: /review pending extraction markers/i })).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
@@ -493,7 +486,7 @@ describe("DocumentEditScreen", () => {
     });
   });
 
-  it("shows a soft Continue warning when new undismissed Capture Details items exist", async () => {
+  it("continues without a capture-details warning when undismissed items exist", async () => {
     renderScreen({
       document: makeQuote({
         extraction_review_metadata: {
@@ -519,8 +512,12 @@ describe("DocumentEditScreen", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
 
-    expect(screen.getByRole("dialog", { name: /review capture details before continuing/i })).toBeInTheDocument();
-    expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: /review capture details before continuing/i })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
+        doc_type: "quote",
+      }));
+    });
   });
 
   it("does not render a capture-more-notes affordance on review", async () => {
@@ -666,83 +663,32 @@ describe("DocumentEditScreen", () => {
     expect(within(transcriptSection as HTMLElement).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
-  it("updates capture-details fingerprint on open, ignores dismiss-only changes, and re-warns on new occurrences", async () => {
-    const { setDocument } = renderScreen({
+  it("keeps structural invalid line-item blocking on Continue", async () => {
+    renderScreen({
       document: makeQuote({
-        extraction_review_metadata: {
-          ...makeQuote().extraction_review_metadata!,
-          hidden_details: {
-            items: [
-              {
-                id: "unresolved-1",
-                kind: "unresolved_segment",
-                field: null,
-                reason: "leftover_classification",
-                text: "Add gate latch note",
-              },
-            ],
+        line_items: [
+          {
+            id: "line-valid",
+            description: "Mulch",
+            details: "3 yards",
+            price: 120,
+            sort_order: 0,
           },
-          hidden_detail_state: {},
-        },
+          {
+            id: "line-invalid",
+            description: "   ",
+            details: "Need to confirm exact material cost",
+            price: 80,
+            sort_order: 1,
+          },
+        ],
       }),
     });
 
     fireEvent.click(await screen.findByRole("button", { name: /continue to preview/i }));
-    expect(screen.getByRole("dialog", { name: /review capture details before continuing/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /review now/i }));
+
+    expect(await screen.findByText("Each line item with details or price needs a description.")).toBeInTheDocument();
     expect(mockedQuoteService.updateQuote).not.toHaveBeenCalled();
-
-    fireEvent.click(await screen.findByRole("button", { name: /capture details/i }));
-    expect(window.localStorage.getItem("stima_capture_details_fingerprint:doc-1")).toBe("unresolved-1");
-    fireEvent.click(screen.getByRole("button", { name: /^close$/i }));
-
-    fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
-    await waitFor(() => {
-      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
-        doc_type: "quote",
-      }));
-    });
-    mockedQuoteService.updateQuote.mockClear();
-
-    fireEvent.click(await screen.findByRole("button", { name: /capture details/i }));
-    fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
-
-    await waitFor(() => {
-      expect(mockedQuoteService.updateExtractionReviewMetadata).toHaveBeenCalledWith("doc-1", {
-        dismiss_hidden_item: "unresolved-1",
-      });
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /^close$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
-    await waitFor(() => {
-      expect(mockedQuoteService.updateQuote).toHaveBeenCalledWith("doc-1", expect.objectContaining({
-        doc_type: "quote",
-      }));
-    });
-    expect(screen.queryByRole("dialog", { name: /review capture details before continuing/i })).not.toBeInTheDocument();
-    mockedQuoteService.updateQuote.mockClear();
-
-    setDocument(makeQuote({
-      extraction_review_metadata: {
-        ...makeQuote().extraction_review_metadata!,
-        hidden_details: {
-          items: [
-            {
-              id: "unresolved-2",
-              kind: "unresolved_segment",
-              field: null,
-              reason: "leftover_classification",
-              text: "Add gate latch note",
-            },
-          ],
-        },
-        hidden_detail_state: {},
-      },
-    }));
-
-    fireEvent.click(screen.getByRole("button", { name: /continue to preview/i }));
-    expect(screen.getByRole("dialog", { name: /review capture details before continuing/i })).toBeInTheDocument();
   });
 
   it("locks type selector after sharing", async () => {
