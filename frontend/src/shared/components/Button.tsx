@@ -13,9 +13,9 @@ interface ButtonProps {
 
 const variantClasses = {
   primary:
-    "forest-gradient text-on-primary font-semibold py-4 rounded-lg active:scale-[0.98] transition-all",
+    "forest-gradient text-on-primary font-semibold py-4 rounded-[var(--radius-document)] active:scale-[0.98] transition-all",
   destructive:
-    "border border-secondary text-secondary font-semibold py-4 rounded-lg active:scale-[0.98] transition-all",
+    "border border-secondary text-secondary font-semibold py-4 rounded-[var(--radius-document)] active:scale-[0.98] transition-all",
   ghost: "p-2 rounded-full hover:bg-surface-container-low active:scale-95 transition-all",
 } as const;
 

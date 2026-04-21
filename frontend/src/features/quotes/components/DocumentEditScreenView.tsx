@@ -146,10 +146,8 @@ export function DocumentEditScreenView({
   return (
     <main className="min-h-screen bg-background pb-28">
       <WorkflowScreenHeader
-        title={activeDraft.title.trim().length > 0
-          ? activeDraft.title.trim()
-          : document.doc_number ?? (activeDraft.docType === "invoice" ? "Edit Invoice" : "Review Quote")}
-        subtitle={document.doc_number}
+        title="Review & Edit"
+        subtitle="Confirm line items and pricing"
         backLabel={backLabel}
         onBack={() => onRequestNavigation({ to: backTarget, replace: true })}
       />

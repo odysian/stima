@@ -1,3 +1,5 @@
+import { Eyebrow } from "@/ui/Eyebrow";
+
 export type ReviewDocumentType = "quote" | "invoice";
 
 interface ReviewDocumentTypeSelectorProps {
@@ -30,9 +32,7 @@ export function ReviewDocumentTypeSelector({
   return (
     <section className="space-y-2">
       <div>
-        <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-          Document Type
-        </p>
+        <Eyebrow>Document Type</Eyebrow>
       </div>
 
       <div role="radiogroup" aria-label="Document type" className="flex flex-row gap-3">
@@ -48,11 +48,11 @@ export function ReviewDocumentTypeSelector({
               aria-checked={isSelected}
               disabled={isOptionDisabled}
               className={[
-                "w-full cursor-pointer rounded-xl py-3 text-center font-headline text-lg font-bold tracking-tight transition-all",
+                "w-full cursor-pointer py-3 text-center font-headline text-lg font-bold tracking-tight transition-all",
                 "disabled:cursor-not-allowed disabled:opacity-60",
                 isSelected
-                  ? "ghost-shadow bg-surface-container-lowest ring-2 ring-primary/30 text-on-surface"
-                  : "bg-surface-container-low text-on-surface hover:bg-surface-container-lowest",
+                  ? "ghost-shadow rounded-[var(--radius-document)] bg-surface-container-lowest ring-2 ring-primary/30 text-on-surface"
+                  : "rounded-[var(--radius-document)] bg-surface-container-low text-on-surface hover:bg-surface-container-lowest",
               ].join(" ")}
               onClick={() => onChange(option.value)}
             >
