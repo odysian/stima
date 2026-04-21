@@ -155,22 +155,17 @@ export function DocumentEditScreenView({
             type="button"
             aria-label="Capture details"
             onClick={() => setIsCaptureDetailsOpen(true)}
+            data-testid="capture-details-trigger"
             className={[
-              "inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-semibold uppercase tracking-wide transition-colors",
+              "inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border transition-colors",
               hasHiddenActionableItems
                 ? "border-warning-accent/50 bg-warning-container text-warning hover:bg-warning-container/80"
-                : "border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low",
+                : "border-outline-variant/30 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low",
             ].join(" ")}
           >
-            {hasHiddenActionableItems ? (
-              <span
-                aria-label="Capture details need review"
-                className="material-symbols-outlined text-[1rem] leading-none"
-              >
-                error
-              </span>
-            ) : null}
-            <span>Capture Details</span>
+            <span className="material-symbols-outlined text-[1.125rem] leading-none">
+              info
+            </span>
           </button>
         ) : null}
       />
