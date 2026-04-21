@@ -29,7 +29,7 @@ export function ReviewActionFooter({
           <Button
             type="button"
             variant="primary"
-            className="w-full sm:flex-1"
+            className="w-full !rounded-[var(--radius-document)] sm:flex-1"
             disabled={isContinueDisabled}
             isLoading={isContinuing}
             onClick={onPrimaryAction}
@@ -38,7 +38,7 @@ export function ReviewActionFooter({
           </Button>
           <button
             type="button"
-            className="w-full cursor-pointer rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
+            className="w-full cursor-pointer rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-low px-4 py-3 font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
             disabled={isInteractionLocked || isSavingDraft}
             onClick={onSaveDraft}
           >

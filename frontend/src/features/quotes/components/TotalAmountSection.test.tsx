@@ -51,7 +51,7 @@ describe("TotalAmountSection", () => {
     renderSection();
 
     expect(screen.getByRole("spinbutton", { name: /total amount/i })).toHaveClass(
-      "bg-surface-container-lowest",
+      "bg-surface-container-high",
     );
   });
 

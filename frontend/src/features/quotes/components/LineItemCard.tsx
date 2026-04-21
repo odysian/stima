@@ -41,8 +41,8 @@ export function LineItemCard({
 
   return (
     <div
-      className={`flex w-full items-start gap-3 rounded-xl bg-surface-container-lowest p-3 ghost-shadow ${
-        flagged ? "border border-warning-accent/20" : ""
+      className={`flex w-full items-start gap-3 rounded-[var(--radius-document)] bg-surface-container-lowest p-3 ghost-shadow ${
+        flagged ? "border-l-4 border-warning-accent" : ""
       } ${
         isReorderMode
           ? "transition-[transform,box-shadow,background-color] duration-150 ease-out"
@@ -71,7 +71,7 @@ export function LineItemCard({
         type="button"
         aria-label={ariaLabel}
         disabled={!canEditRow}
-        className={`flex min-w-0 flex-1 items-start justify-between gap-3 rounded-lg p-1 text-left transition-colors ${
+        className={`flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[var(--radius-document)] p-1 text-left transition-colors ${
           canEditRow ? "cursor-pointer hover:bg-surface-container-low/70" : "cursor-default"
         } disabled:opacity-60`}
         onClick={onEdit}
@@ -80,7 +80,7 @@ export function LineItemCard({
           <div className="flex items-center gap-2">
             <p className="truncate font-bold text-on-surface">{description}</p>
             {flagged ? (
-              <span className="rounded bg-warning-container px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-warning">
+              <span className="rounded-full bg-warning-container px-2.5 py-1 text-[0.6875rem] font-bold uppercase tracking-wide text-warning">
                 REVIEW
               </span>
             ) : null}
@@ -98,7 +98,7 @@ export function LineItemCard({
         </div>
 
         <div className="mt-0.5 flex shrink-0 items-center">
-          <p className="font-bold text-on-surface">{priceLabel}</p>
+          <p className="font-bold text-primary">{priceLabel}</p>
         </div>
       </button>
     </div>

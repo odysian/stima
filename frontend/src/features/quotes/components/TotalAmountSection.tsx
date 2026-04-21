@@ -3,6 +3,7 @@ import { useState } from "react";
 import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromSubtotal, parseTaxPercentInput, toTaxPercentDisplay, type DiscountType } from "@/shared/lib/pricing";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 interface TotalAmountSectionProps {
   lineItemSum: number;
@@ -57,21 +58,21 @@ export function TotalAmountSection({
   const shouldShowOptionalPricingPanel = hasActiveOptionalPricing || isOptionalPricingOpen;
 
   return (
-    <section className="rounded-lg bg-surface-container-low p-4">
+    <section className="rounded-[var(--radius-document)] bg-surface-container-low p-4">
       <div className="flex items-center justify-between text-sm text-outline">
         <span>Line Item Sum</span>
         <span>{formatCurrency(lineItemSum)}</span>
       </div>
       <div className="mt-4 border-t border-outline-variant/30 pt-4">
-        <label
-          htmlFor="quote-total"
-          className="block text-xs font-bold uppercase tracking-widest text-on-surface"
-        >
-          {hasPricingBreakdown ? "SUBTOTAL" : "TOTAL AMOUNT"}
+        <label htmlFor="quote-total" className="block">
+          <Eyebrow className="text-on-surface">{hasPricingBreakdown ? "SUBTOTAL" : "TOTAL AMOUNT"}</Eyebrow>
         </label>
         <div className="relative mt-2">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
             $
+          </span>
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-base leading-none text-on-surface-variant">
+            <span className="material-symbols-outlined text-base">edit</span>
           </span>
           <input
             id="quote-total"
@@ -89,18 +90,16 @@ export function TotalAmountSection({
               const parsedValue = Number(rawValue);
               onTotalChange(Number.isFinite(parsedValue) ? parsedValue : null);
             }}
-            className="w-full rounded-lg border-2 border-primary bg-surface-container-lowest py-3 pl-10 pr-4 font-headline text-3xl font-bold tracking-tight text-primary outline-none transition-all focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-[var(--radius-document)] border-2 border-primary bg-surface-container-high py-3 pl-10 pr-12 font-headline text-3xl font-bold tracking-tight text-on-surface outline-none transition-all focus:ring-2 focus:ring-primary/20"
           />
         </div>
       </div>
 
       <div className="mt-4 border-t border-outline-variant/30 pt-4">
         {hasActiveOptionalPricing ? (
-          <div className="flex items-center justify-between gap-4 rounded-lg bg-surface-container-lowest px-4 py-3">
+          <div className="flex items-center justify-between gap-4 rounded-[var(--radius-document)] bg-surface-container-lowest px-4 py-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-on-surface">
-                Optional Pricing
-              </p>
+              <Eyebrow className="text-on-surface">Optional Pricing</Eyebrow>
               <p className="mt-1 text-sm text-outline">
                 Tax, discount, and deposit
               </p>
@@ -114,13 +113,11 @@ export function TotalAmountSection({
             type="button"
             aria-expanded={isOptionalPricingOpen}
             aria-controls="optional-pricing-panel"
-            className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-lg bg-surface-container-lowest px-4 py-3 text-left transition-colors hover:bg-surface-container"
+            className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-[var(--radius-document)] bg-surface-container-lowest px-4 py-3 text-left transition-colors hover:bg-surface-container"
             onClick={() => setIsOptionalPricingOpen((current) => !current)}
           >
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-on-surface">
-                Optional Pricing
-              </p>
+              <Eyebrow className="text-on-surface">Optional Pricing</Eyebrow>
               <p className="mt-1 text-sm text-outline">
                 Tax, discount, and deposit
               </p>
@@ -160,7 +157,7 @@ export function TotalAmountSection({
                   value={discountType ?? "fixed"}
                   disabled={disabled}
                   onChange={(event) => onDiscountTypeChange(event.target.value as DiscountType)}
-                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="fixed">Fixed $</option>
                   <option value="percent">Percent %</option>
@@ -174,7 +171,7 @@ export function TotalAmountSection({
                     const nextValue = event.target.value.trim();
                     onDiscountValueChange(nextValue.length > 0 ? Number(nextValue) : null);
                   }}
-                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder={discountType === "percent" ? "10" : "25"}
                 />
               </div>
@@ -206,7 +203,7 @@ export function TotalAmountSection({
                   disabled={disabled}
                   value={toTaxPercentDisplay(taxRate)}
                   onChange={(event) => onTaxRateChange(parseTaxPercentInput(event.target.value))}
-                  className="w-full rounded-lg bg-surface-container-high px-4 py-3 pr-10 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 pr-10 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                   placeholder="8.25"
                 />
                 <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-outline">
@@ -244,7 +241,7 @@ export function TotalAmountSection({
                   const nextValue = event.target.value.trim();
                   onDepositAmountChange(nextValue.length > 0 ? Number(nextValue) : null);
                 }}
-                className="w-full rounded-lg bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="50"
               />
             ) : null}

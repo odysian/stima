@@ -177,7 +177,7 @@ export function ReviewLineItemsSection({
             );
           })
         ) : (
-          <p className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline">
+          <p className="rounded-[var(--radius-document)] bg-surface-container-lowest p-4 text-sm text-outline">
             No line items on this quote yet.
           </p>
         )}
@@ -186,7 +186,7 @@ export function ReviewLineItemsSection({
       <div className="grid gap-3 sm:grid-cols-1">
         <button
           type="button"
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-document)] border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isInteractionLocked || hasReachedLineItemLimit || isReorderModeActive}
           onClick={onAddLineItem}
         >

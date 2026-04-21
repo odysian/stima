@@ -11,25 +11,8 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   DOCUMENT_NOTES_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
-
-interface ReviewPendingMarkerProps {
-  title: string;
-  message: string;
-}
-
-function ReviewPendingMarker({ title, message }: ReviewPendingMarkerProps): React.ReactElement {
-  return (
-    <section className="ghost-shadow rounded-lg border-l-4 border-warning-accent bg-warning-container p-4">
-      <div className="flex items-start gap-3">
-        <span className="material-symbols-outlined text-warning">error</span>
-        <div>
-          <p className="text-[0.6875rem] font-bold uppercase tracking-wider text-warning">{title}</p>
-          <p className="text-sm font-medium leading-snug text-warning">{message}</p>
-        </div>
-      </div>
-    </section>
-  );
-}
+import { Banner } from "@/ui/Banner";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 interface ReviewFormContentProps {
   customerName: string | null;
@@ -140,7 +123,7 @@ export function ReviewFormContent({
       onSubmit={(event) => event.preventDefault()}
     >
       {locationNotice ? (
-        <section className="rounded-lg border border-warning-accent/40 bg-warning-container p-4 text-sm text-warning">
+        <section className="rounded-[var(--radius-document)] border border-warning-accent/40 bg-warning-container p-4 text-sm text-warning">
           {locationNotice}
         </section>
       ) : null}
@@ -154,7 +137,7 @@ export function ReviewFormContent({
       ) : null}
 
       {showSevereDegradedMarker ? (
-        <ReviewPendingMarker
+        <Banner
           title="Review Required"
           message={extractionDegradedReasonCode
             ? "Extraction degraded and no line items were found. Review capture details before continuing."
@@ -163,11 +146,10 @@ export function ReviewFormContent({
       ) : null}
 
       <section className="space-y-2">
-        <label
-          htmlFor="quote-review-title"
-          className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
-        >
+        <label htmlFor="quote-review-title">
+          <Eyebrow>
           {documentType === "invoice" ? "INVOICE TITLE" : "QUOTE TITLE"}
+          </Eyebrow>
         </label>
         <input
           id="quote-review-title"
@@ -176,7 +158,7 @@ export function ReviewFormContent({
           maxLength={120}
           disabled={isInteractionLocked}
           onChange={(event) => onTitleChange(event.target.value)}
-          className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
           placeholder="Front yard refresh (optional)"
         />
       </section>
@@ -198,11 +180,8 @@ export function ReviewFormContent({
 
       {showDueDateField ? (
         <section className="space-y-2">
-          <label
-            htmlFor="document-review-due-date"
-            className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline"
-          >
-            INVOICE DUE DATE
+          <label htmlFor="document-review-due-date">
+            <Eyebrow>INVOICE DUE DATE</Eyebrow>
           </label>
           <input
             id="document-review-due-date"
@@ -210,7 +189,7 @@ export function ReviewFormContent({
             value={draft.dueDate ?? ""}
             disabled={isInteractionLocked}
             onChange={(event) => onDueDateChange(event.target.value)}
-            className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </section>
       ) : null}
@@ -219,14 +198,14 @@ export function ReviewFormContent({
         <section className="space-y-2">
           <button
             type="button"
-            className="inline-flex w-full cursor-pointer items-center justify-between rounded-lg border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-colors hover:bg-surface-container-lowest"
+            className="inline-flex w-full cursor-pointer items-center justify-between rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-left transition-colors hover:bg-surface-container-lowest"
             onClick={() => {
               onCaptureDetailsOpen();
               setIsCaptureDetailsOpen(true);
             }}
           >
             <div>
-              <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">Capture Details</p>
+              <Eyebrow>Capture Details</Eyebrow>
               <p className="text-sm text-on-surface-variant">
                 Actionable items and transcript.
               </p>
@@ -247,14 +226,14 @@ export function ReviewFormContent({
       ) : null}
 
       {pricingReviewPending ? (
-        <ReviewPendingMarker
+        <Banner
           title="Pricing Pending Review"
           message="Pricing fields were seeded from capture details. Review totals, tax, discount, and deposit."
         />
       ) : null}
 
       {notesReviewPending ? (
-        <ReviewPendingMarker
+        <Banner
           title="Notes Pending Review"
           message="Notes were seeded from capture details. Review and adjust before continuing."
         />
@@ -285,11 +264,8 @@ export function ReviewFormContent({
       />
 
       <section className="space-y-2">
-        <label
-          htmlFor="quote-review-notes"
-          className="text-xs font-bold uppercase tracking-wider text-outline-variant"
-        >
-          CUSTOMER NOTES
+        <label htmlFor="quote-review-notes">
+          <Eyebrow className="text-outline-variant">CUSTOMER NOTES</Eyebrow>
         </label>
         <textarea
           id="quote-review-notes"
@@ -298,7 +274,7 @@ export function ReviewFormContent({
           value={draft.notes}
           disabled={isInteractionLocked}
           onChange={(event) => onNotesChange(event.target.value)}
-          className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
+          className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
           placeholder="Any notes to include for the customer."
         />
       </section>
