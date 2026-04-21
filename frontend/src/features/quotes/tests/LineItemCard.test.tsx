@@ -32,9 +32,7 @@ describe("LineItemCard", () => {
     );
 
     expect(screen.getByText("REVIEW")).toBeInTheDocument();
-    expect(
-      screen.getByText("Spoken amount was interpreted as dollars instead of cents."),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Spoken amount was interpreted as dollars instead of cents.")).not.toBeInTheDocument();
   });
 
   it("renders em dash when price is blank", () => {

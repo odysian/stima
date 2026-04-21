@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { LineItemCatalogTabPanel } from "@/features/quotes/components/LineItemCatalogTabPanel";
+import { resolveLineItemReviewExplanation } from "@/features/quotes/utils/lineItemFlags";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   LINE_ITEM_DESCRIPTION_MAX_CHARS,
   LINE_ITEM_DETAILS_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
-
 interface LineItemEditSheetProps {
   open: boolean;
   mode: "add" | "edit";
@@ -30,9 +29,7 @@ interface ParsedPrice {
   value: number | null;
   valid: boolean;
 }
-
 type AddLineItemTab = "manual" | "catalog";
-
 type CatalogLoadState = "idle" | "loading" | "loaded" | "error";
 
 function parsePrice(value: string): ParsedPrice {
@@ -40,12 +37,10 @@ function parsePrice(value: string): ParsedPrice {
   if (trimmed.length === 0) {
     return { value: null, valid: true };
   }
-
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed)) {
     return { value: null, valid: false };
   }
-
   return { value: parsed, valid: true };
 }
 
@@ -78,6 +73,9 @@ export function LineItemEditSheet({
   const canSaveToCatalog = showManualFields && savedCatalogItem === null;
   const canDeleteSavedCatalogItem = savedCatalogItem !== null;
   const bookmarkIcon = canDeleteSavedCatalogItem ? "bookmark" : "bookmark_add";
+  const reviewExplanation = mode === "edit" && initialLineItem.flagged
+    ? resolveLineItemReviewExplanation(initialLineItem.flagReason)
+    : null;
 
   useEffect(() => {
     if (mode !== "add") {
@@ -301,10 +299,14 @@ export function LineItemEditSheet({
                 Pick a catalog item to insert.
               </Dialog.Description>
             ) : null}
-
             <div className="mt-4 space-y-4">
               {formError ? <FeedbackMessage variant="error">{formError}</FeedbackMessage> : null}
-
+              {reviewExplanation ? (
+                <div className="rounded-lg border-l-4 border-warning-accent bg-warning-container/50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-warning">Review needed</p>
+                  <p className="mt-1 text-sm leading-6 text-warning">{reviewExplanation}</p>
+                </div>
+              ) : null}
               {mode === "add" ? (
                 <div
                   role="tablist"
@@ -350,7 +352,6 @@ export function LineItemEditSheet({
                   </button>
                 </div>
               ) : null}
-
               {showManualFields ? (
                 <div id="line-item-tabpanel-manual" role={mode === "add" ? "tabpanel" : undefined} className="space-y-4">
                   <section className="space-y-2">
@@ -378,7 +379,6 @@ export function LineItemEditSheet({
                       className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </section>
-
                   <section className="space-y-2">
                     <div className="flex items-end justify-between">
                       <label htmlFor="line-item-sheet-details" className="font-headline text-sm font-bold text-on-surface">
@@ -403,7 +403,6 @@ export function LineItemEditSheet({
                       className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
                     />
                   </section>
-
                   <section className="space-y-2">
                     <label htmlFor="line-item-sheet-price" className="font-headline text-sm font-bold text-on-surface">
                       Price
