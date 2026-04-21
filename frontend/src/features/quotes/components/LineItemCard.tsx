@@ -73,7 +73,9 @@ export function LineItemCard({
         disabled={!canEditRow}
         className={`flex min-w-0 flex-1 items-start justify-between gap-3 rounded-[var(--radius-document)] p-1 text-left transition-colors ${
           canEditRow ? "cursor-pointer hover:bg-surface-container-low/70" : "cursor-default"
-        } disabled:opacity-60`}
+        } ${
+          !canEditRow && !isDragging ? "opacity-60" : ""
+        }`}
         onClick={onEdit}
       >
         <div className="min-w-0 flex-1">

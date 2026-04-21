@@ -124,10 +124,10 @@ export function ReviewLineItemsSection({
         <button
           type="button"
           disabled={isInteractionLocked || (!isReorderModeActive && lineItems.length < 2)}
-          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide transition-colors ${
+          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
             isReorderModeActive
-              ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15"
-              : "border-outline-variant/40 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low"
+              ? "border-primary/30 bg-primary/15 text-primary ghost-shadow"
+              : "border-outline-variant/35 bg-surface-container-high/80 text-on-surface-variant hover:border-outline-variant/50 hover:bg-surface-container-high"
           } disabled:cursor-not-allowed disabled:opacity-60`}
           onClick={() => {
             clearDragState();
