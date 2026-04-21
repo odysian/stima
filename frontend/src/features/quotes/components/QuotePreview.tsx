@@ -217,6 +217,7 @@ export function QuotePreview(): React.ReactElement {
                   actionLabel: "Open linked invoice",
                   actionAriaLabel: `Open linked invoice ${linkedInvoice.doc_number}`,
                   onClick: () => navigate(`/invoices/${linkedInvoice.id}`),
+                  alignToBottom: true,
                 } : null}
               />
             ) : null}

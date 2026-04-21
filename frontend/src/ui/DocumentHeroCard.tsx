@@ -21,6 +21,7 @@ interface DocumentHeroCardProps {
     actionLabel: string;
     actionAriaLabel?: string;
     onClick: () => void;
+    alignToBottom?: boolean;
   } | null;
 }
 
@@ -54,7 +55,7 @@ export function DocumentHeroCard({
     <div className="mt-4 px-4 pb-6">
       <section className="ghost-shadow rounded-[var(--radius-document)] border-l-4 border-primary bg-surface-container-lowest p-4">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex flex-col">
             <Eyebrow>CLIENT</Eyebrow>
             <p className="mt-0.5 font-bold text-on-surface">{clientName}</p>
             <p className="mt-1 text-sm text-on-surface-variant">{clientContact}</p>
@@ -69,7 +70,10 @@ export function DocumentHeroCard({
             {linkedDocument ? (
               <button
                 type="button"
-                className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary"
+                className={[
+                  "inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary",
+                  linkedDocument.alignToBottom ? "mt-auto pt-3" : "mt-3",
+                ].join(" ")}
                 aria-label={linkedDocument.actionAriaLabel ?? linkedDocument.actionLabel}
                 onClick={linkedDocument.onClick}
               >
@@ -79,7 +83,7 @@ export function DocumentHeroCard({
             ) : null}
           </div>
 
-          <div className="self-end justify-self-end text-right">
+          <div className="self-start justify-self-end text-right">
             <p className="font-headline text-[1.625rem] font-bold leading-none tracking-[0.12em] text-on-surface sm:text-[1.75rem]">
               {documentLabel}
             </p>
