@@ -59,6 +59,13 @@ export function DocumentHeroCard({
             <p className="mt-0.5 font-bold text-on-surface">{clientName}</p>
             <p className="mt-1 text-sm text-on-surface-variant">{clientContact}</p>
 
+            {documentLabel === "INVOICE" ? (
+              <div className="mt-3">
+                <Eyebrow>DUE DATE</Eyebrow>
+                <p className="mt-2 text-sm text-on-surface">{dueDateLabel}</p>
+              </div>
+            ) : null}
+
             {linkedDocument ? (
               <button
                 type="button"
@@ -88,13 +95,6 @@ export function DocumentHeroCard({
             <p className="mt-1 font-headline text-2xl font-bold text-primary">
               {formatCurrency(totalAmount)}
             </p>
-
-            {documentLabel === "INVOICE" ? (
-              <div className="mt-4">
-                <Eyebrow>DUE DATE</Eyebrow>
-                <p className="mt-2 text-sm text-on-surface">{dueDateLabel}</p>
-              </div>
-            ) : null}
           </div>
         </div>
 
