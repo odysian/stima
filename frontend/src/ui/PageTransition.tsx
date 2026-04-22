@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigationType, useOutlet } from "react-router-dom";
 
 type StartViewTransition = (updateCallback: () => void) => unknown;
+const TRANSITION_FALLBACK_MS = 220;
 
 function usePrefersReducedMotion(): boolean {
   const mediaQuery = useMemo(
@@ -73,16 +74,43 @@ export function PageTransition(): React.ReactElement {
 
     if (shouldAnimateNavigation) {
       let isCancelled = false;
+      let hasCommitted = false;
+      let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const commitOnce = (sync = false) => {
+        if (hasCommitted) {
+          return;
+        }
+        hasCommitted = true;
+        commitNavigation(sync);
+      };
+
       queueMicrotask(() => {
         if (isCancelled) {
           return;
         }
-        startViewTransition(() => {
-          commitNavigation(true);
-        });
+
+        fallbackTimer = setTimeout(() => {
+          if (isCancelled) {
+            return;
+          }
+          commitOnce(false);
+        }, TRANSITION_FALLBACK_MS);
+
+        try {
+          startViewTransition(() => {
+            commitOnce(true);
+          });
+        } catch {
+          commitOnce(false);
+        }
       });
+
       return () => {
         isCancelled = true;
+        if (fallbackTimer) {
+          clearTimeout(fallbackTimer);
+        }
       };
     }
 

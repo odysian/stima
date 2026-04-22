@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -30,6 +30,7 @@ function renderWithRouter(initialPath = "/"): void {
 
 afterEach(() => {
   Reflect.deleteProperty(document, "startViewTransition");
+  vi.useRealTimers();
 });
 
 describe("PageTransition", () => {
@@ -61,5 +62,23 @@ describe("PageTransition", () => {
 
     expect(startViewTransition).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("heading", { name: "Review" })).toBeInTheDocument();
+  });
+
+  it("falls back to normal navigation when startViewTransition does not run callback", async () => {
+    const startViewTransition = vi.fn(() => ({}));
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      value: startViewTransition as StartViewTransition,
+    });
+
+    const user = userEvent.setup();
+    renderWithRouter("/");
+
+    await user.click(screen.getByRole("link", { name: "Go review" }));
+
+    expect(startViewTransition).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Review" })).toBeInTheDocument();
+    });
   });
 });
