@@ -40,9 +40,9 @@ const variantClasses: Record<ButtonVariant, string> = {
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "min-h-11 gap-1.5 px-3 py-2 text-sm",
-  md: "min-h-12 gap-2 px-4 py-4 text-sm",
-  lg: "min-h-14 gap-2.5 px-5 py-5 text-base",
+  sm: "min-h-11 px-3 py-2 text-sm",
+  md: "min-h-12 px-4 py-4 text-sm",
+  lg: "min-h-14 px-5 py-5 text-base",
 };
 
 const iconButtonSizeClasses: Record<ButtonSize, string> = {
@@ -55,6 +55,12 @@ const spinnerSizeClasses: Record<ButtonSize, string> = {
   sm: "h-4 w-4",
   md: "h-5 w-5",
   lg: "h-6 w-6",
+};
+
+const contentGapClasses: Record<ButtonSize, string> = {
+  sm: "gap-1.5",
+  md: "gap-2",
+  lg: "gap-2.5",
 };
 
 export function Button({
@@ -92,14 +98,24 @@ export function Button({
       aria-busy={isLoading || undefined}
       className={buttonClassName}
     >
-      <span className={`inline-flex items-center ${isLoading ? "opacity-0" : "opacity-100"}`}>
+      <span
+        className={`inline-flex items-center justify-center whitespace-nowrap ${isIconButton ? "leading-none" : contentGapClasses[size]} ${isLoading ? "opacity-0" : "opacity-100"}`}
+      >
         {isIconButton ? (
           children
         ) : (
           <>
-            {leadingIcon ? <span aria-hidden="true">{leadingIcon}</span> : null}
-            <span>{children}</span>
-            {trailingIcon ? <span aria-hidden="true">{trailingIcon}</span> : null}
+            {leadingIcon ? (
+              <span aria-hidden="true" className="inline-flex items-center justify-center leading-none">
+                {leadingIcon}
+              </span>
+            ) : null}
+            <span className="leading-none">{children}</span>
+            {trailingIcon ? (
+              <span aria-hidden="true" className="inline-flex items-center justify-center leading-none">
+                {trailingIcon}
+              </span>
+            ) : null}
           </>
         )}
       </span>
