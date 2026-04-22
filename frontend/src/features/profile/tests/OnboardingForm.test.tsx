@@ -176,8 +176,9 @@ describe("OnboardingForm", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
-    const submitButton = screen.getByRole("button", { name: /loading/i });
+    const submitButton = screen.getByRole("button", { name: /continue/i });
     expect(submitButton).toBeDisabled();
+    expect(submitButton.querySelector("[data-testid='button-spinner']")).toBeInTheDocument();
 
     resolveUpdate?.(profileResponse());
     await waitFor(() => expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled());

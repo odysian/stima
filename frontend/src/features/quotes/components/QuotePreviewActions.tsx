@@ -113,8 +113,9 @@ export function QuotePreviewActions({
       utilityActions={showUtilities ? (
         <>
           {showEmailAction ? (
-            <button
+            <Button
               type="button"
+              variant="secondary"
               className={documentActionUtilityButtonClassName}
               disabled={
                 disabled
@@ -125,15 +126,17 @@ export function QuotePreviewActions({
                 || isMarkingWon
                 || isMarkingLost
               }
+              isLoading={isSendingEmail}
+              leadingIcon={<span className="material-symbols-outlined text-base">mail</span>}
               onClick={onRequestSendEmail}
             >
-              <span className="material-symbols-outlined text-base">mail</span>
-              {isSendingEmail ? "Sending..." : emailActionLabel}
-            </button>
+              {emailActionLabel}
+            </Button>
           ) : null}
 
-          <button
+          <Button
             type="button"
+            variant="secondary"
             className={documentActionUtilityButtonClassName}
             disabled={
               disabled
@@ -143,13 +146,13 @@ export function QuotePreviewActions({
               || isMarkingWon
               || isMarkingLost
             }
+            leadingIcon={<span className="material-symbols-outlined text-base">content_copy</span>}
             onClick={() => {
               void onCopyLink();
             }}
           >
-            <span className="material-symbols-outlined text-base">content_copy</span>
             Copy Link
-          </button>
+          </Button>
         </>
       ) : null}
       utilityLabel={showUtilities ? "Quote utilities" : undefined}

@@ -2,6 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 import type { ExtractionReviewHiddenDetails, HiddenItemState } from "@/features/quotes/types/quote.types";
 import { resolveCaptureDetailsActionableItems } from "@/features/quotes/utils/captureDetails";
+import { Button } from "@/shared/components/Button";
 
 interface CaptureDetailsSheetProps {
   open: boolean;
@@ -56,14 +57,16 @@ export function CaptureDetailsSheet({
                         <p className="font-semibold">{item.label}</p>
                         <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{item.text}</p>
                         <div className="mt-3">
-                          <button
+                          <Button
                             type="button"
-                            className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-on-surface-variant transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60"
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] uppercase tracking-wide"
                             disabled={isMutating || !onDismissHiddenItem}
                             onClick={() => { void onDismissHiddenItem?.(item.id); }}
                           >
                             Dismiss
-                          </button>
+                          </Button>
                         </div>
                       </li>
                     ))}
@@ -84,13 +87,14 @@ export function CaptureDetailsSheet({
             </div>
 
             <div className="mt-6">
-              <button
+              <Button
                 type="button"
-                className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
+                variant="secondary"
+                className="w-full rounded-lg border border-outline-variant/30 py-3"
                 onClick={onClose}
               >
                 Close
-              </button>
+              </Button>
             </div>
           </Dialog.Content>
         </div>

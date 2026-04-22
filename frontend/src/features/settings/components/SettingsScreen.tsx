@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -35,7 +35,6 @@ export function SettingsScreen(): React.ReactElement {
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const logoPreviewSrc = `${import.meta.env.VITE_API_URL ?? ""}/api/profile/logo`;
   const logoSizeLimitLabel = formatByteLimit(MAX_LOGO_SIZE_BYTES);
-
   const [businessName, setBusinessName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -54,7 +53,7 @@ export function SettingsScreen(): React.ReactElement {
   const [isRemoveLogoOpen, setIsRemoveLogoOpen] = useState(false);
   const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
   const [logoPreviewVersion, setLogoPreviewVersion] = useState(0);
-
+  const logoUploadInputRef = useRef<HTMLInputElement>(null);
   function applyProfile(profile: ProfileResponse): void {
     setBusinessName(profile.business_name ?? "");
     setFirstName(profile.first_name ?? "");
@@ -68,11 +67,9 @@ export function SettingsScreen(): React.ReactElement {
 
   useEffect(() => {
     let isActive = true;
-
     async function loadProfile(): Promise<void> {
       setIsLoadingProfile(true);
       setLoadError(null);
-
       try {
         const profile = await profileService.getProfile();
         if (isActive) {
@@ -89,9 +86,7 @@ export function SettingsScreen(): React.ReactElement {
         }
       }
     }
-
     void loadProfile();
-
     return () => {
       isActive = false;
     };
@@ -103,15 +98,12 @@ export function SettingsScreen(): React.ReactElement {
     if (!file) {
       return;
     }
-
     if (file.size > MAX_LOGO_SIZE_BYTES) {
       setLogoError(`Logo must be ${logoSizeLimitLabel} or smaller.`);
       return;
     }
-
     setLogoError(null);
     setIsLogoSubmitting(true);
-
     try {
       const profile = await profileService.uploadLogo(file);
       applyProfile(profile);
@@ -128,10 +120,8 @@ export function SettingsScreen(): React.ReactElement {
     if (isLogoSubmitting) {
       return;
     }
-
     setLogoError(null);
     setIsLogoSubmitting(true);
-
     try {
       await profileService.deleteLogo();
       setHasLogo(false);
@@ -155,7 +145,6 @@ export function SettingsScreen(): React.ReactElement {
     setSaveError(null);
     setSaveSuccess(null);
     setIsSubmitting(true);
-
     try {
       await profileService.updateProfile({
         business_name: businessName,
@@ -182,18 +171,15 @@ export function SettingsScreen(): React.ReactElement {
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader title="Settings" layout="top-level" />
-
       <section className="mx-auto w-full max-w-3xl space-y-4 px-4 pt-4">
         {isLoadingProfile ? (
           <p role="status" className="text-sm text-on-surface-variant">
             Loading settings...
           </p>
         ) : null}
-
         {!isLoadingProfile && loadError ? (
           <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
         ) : null}
-
         {!isLoadingProfile && !loadError ? (
           <form className="space-y-4 pb-8" onSubmit={onSubmit}>
             {saveError ? (
@@ -244,14 +230,20 @@ export function SettingsScreen(): React.ReactElement {
                           {`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`}
                         </p>
                         <div className="flex flex-col items-start gap-2">
-                          <label
-                            htmlFor="settings-logo-upload"
-                            className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container"
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="min-h-10 rounded-lg border border-outline-variant/30 px-3 text-xs text-on-surface"
+                            disabled={isLogoSubmitting}
+                            onClick={() => logoUploadInputRef.current?.click()}
                           >
                             Upload Logo
-                          </label>
+                          </Button>
                           <input
+                            ref={logoUploadInputRef}
                             id="settings-logo-upload"
+                            aria-label="Upload logo"
                             type="file"
                             accept="image/jpeg,image/png"
                             className="sr-only"
@@ -259,14 +251,16 @@ export function SettingsScreen(): React.ReactElement {
                             onChange={onLogoUpload}
                           />
                           {hasLogo ? (
-                            <button
+                            <Button
                               type="button"
-                              className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-secondary px-3 py-2 text-xs font-semibold text-secondary transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                              variant="destructive"
+                              size="sm"
+                              className="min-h-10 rounded-lg px-3 text-xs"
                               disabled={isLogoSubmitting}
                               onClick={() => setIsRemoveLogoOpen(true)}
                             >
                               Remove
-                            </button>
+                            </Button>
                           ) : null}
                         </div>
                         {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
@@ -392,14 +386,15 @@ export function SettingsScreen(): React.ReactElement {
                   <p className="truncate text-sm text-on-surface">{email}</p>
                 </div>
 
-                {/* Sign out is a compact filled terracotta button per Stitch, not the shared outlined destructive variant. */}
-                <button
+                <Button
                   type="button"
-                  className="shrink-0 cursor-pointer rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-on-secondary transition-all active:scale-[0.98]"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 rounded-lg border border-outline-variant/30 px-4 text-sm text-on-surface"
                   onClick={() => setIsSignOutConfirmOpen(true)}
                 >
                   Sign Out
-                </button>
+                </Button>
               </div>
             </section>
 
