@@ -9,7 +9,7 @@ const utilityGridClassNames = {
 
 export const documentActionPrimaryButtonClassName = "min-h-14 w-full gap-2 text-center";
 export const documentActionPrimaryLinkClassName = "forest-gradient inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-document)] px-4 py-4 text-center font-semibold text-on-primary transition-all active:scale-[0.98]";
-export const documentActionUtilityButtonClassName = "w-full border border-outline text-center";
+export const documentActionUtilityButtonClassName = "w-full border border-outline text-center text-on-surface";
 
 interface DocumentActionSurfaceProps {
   sectionLabel: string;

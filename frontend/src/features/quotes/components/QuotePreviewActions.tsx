@@ -119,7 +119,7 @@ export function QuotePreviewActions({
           {showEmailAction ? (
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="lg"
               className={documentActionUtilityButtonClassName}
               disabled={
@@ -141,7 +141,7 @@ export function QuotePreviewActions({
 
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             size="lg"
             className={documentActionUtilityButtonClassName}
             disabled={

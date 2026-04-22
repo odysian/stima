@@ -246,7 +246,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   {emailActionLabel ? (
                     <Button
                       type="button"
-                      variant="secondary"
+                      variant="ghost"
                       size="lg"
                       className={documentActionUtilityButtonClassName}
                       disabled={!hasCustomerEmail || isBusy}
@@ -260,7 +260,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="ghost"
                     size="lg"
                     className={documentActionUtilityButtonClassName}
                     disabled={isBusy}
