@@ -33,6 +33,7 @@ describe("BottomNav", () => {
     render(<BottomNav active="customers" />);
 
     expect(screen.getByRole("navigation")).toHaveClass(
+      "safe-bottom",
       "glass-surface-strong",
       "glass-shadow-bottom",
       "border-outline-variant/20",
