@@ -22,6 +22,8 @@ import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
 import { parseTaxPercentInput, toTaxPercentDisplay } from "@/shared/lib/pricing";
 import type { ThemePreference } from "@/shared/lib/theme";
+import { NumericField } from "@/ui/NumericField";
+import { Select } from "@/ui/Select";
 
 const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = [
   { label: "System default", value: "system" },
@@ -298,75 +300,56 @@ export function SettingsScreen(): React.ReactElement {
                   data-testid="settings-profile-meta-row"
                   className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"
                 >
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="settings-trade-type" className="text-sm font-medium text-on-surface">
-                      Trade type
-                    </label>
-                    <select
-                      id="settings-trade-type"
-                      value={tradeType}
-                      onChange={(event) => setTradeType(event.target.value as TradeType)}
-                      className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    >
-                      {TRADE_TYPES.map((tradeTypeOption) => (
-                        <option key={tradeTypeOption} value={tradeTypeOption}>
-                          {tradeTypeOption}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="settings-default-tax-rate" className="text-sm font-medium text-on-surface">
-                      Tax rate (%)
-                    </label>
-                    <input
-                      id="settings-default-tax-rate"
-                      type="number"
-                      step="0.01"
-                      value={defaultTaxRate}
-                      onChange={(event) => setDefaultTaxRate(event.target.value)}
-                      className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      placeholder="8.25"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="settings-timezone" className="text-sm font-medium text-on-surface">
-                    Timezone
-                  </label>
-                  <select
-                    id="settings-timezone"
-                    value={timezone}
-                    onChange={(event) => setTimezone(event.target.value)}
-                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  <Select
+                    id="settings-trade-type"
+                    label="Trade type"
+                    value={tradeType}
+                    onChange={(event) => setTradeType(event.target.value as TradeType)}
                   >
-                    {getTimezoneOptions(timezone).map((timezoneOption) => (
-                      <option key={timezoneOption} value={timezoneOption}>
-                        {timezoneOption}
+                    {TRADE_TYPES.map((tradeTypeOption) => (
+                      <option key={tradeTypeOption} value={tradeTypeOption}>
+                        {tradeTypeOption}
                       </option>
                     ))}
-                  </select>
+                  </Select>
+
+                  <NumericField
+                    id="settings-default-tax-rate"
+                    label="Tax rate (%)"
+                    step={0.01}
+                    value={defaultTaxRate}
+                    onChange={setDefaultTaxRate}
+                    placeholder="8.25"
+                    showStepControls={false}
+                    formatOnBlur={false}
+                  />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="settings-theme" className="text-sm font-medium text-on-surface">
-                    Theme
-                  </label>
-                  <select
-                    id="settings-theme"
-                    value={themePreference}
-                    onChange={(event) => setThemePreference(event.target.value as ThemePreference)}
-                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  >
-                    {THEME_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  id="settings-timezone"
+                  label="Timezone"
+                  value={timezone}
+                  onChange={(event) => setTimezone(event.target.value)}
+                >
+                  {getTimezoneOptions(timezone).map((timezoneOption) => (
+                    <option key={timezoneOption} value={timezoneOption}>
+                      {timezoneOption}
+                    </option>
+                  ))}
+                </Select>
+
+                <Select
+                  id="settings-theme"
+                  label="Theme"
+                  value={themePreference}
+                  onChange={(event) => setThemePreference(event.target.value as ThemePreference)}
+                >
+                  {THEME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
               </div>
             </section>
 

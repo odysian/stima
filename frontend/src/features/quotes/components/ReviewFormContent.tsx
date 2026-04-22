@@ -4,6 +4,7 @@ import { ReviewLineItemsSection } from "@/features/quotes/components/ReviewLineI
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
 import type { ExtractionTier } from "@/features/quotes/types/quote.types";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { Input } from "@/shared/components/Input";
 import {
   DOCUMENT_NOTES_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
@@ -122,19 +123,15 @@ export function ReviewFormContent({
       ) : null}
 
       <section className="space-y-2">
-        <label htmlFor="quote-review-title">
-          <Eyebrow>
-          {documentType === "invoice" ? "INVOICE TITLE" : "QUOTE TITLE"}
-          </Eyebrow>
-        </label>
-        <input
+        <Eyebrow>{documentType === "invoice" ? "INVOICE TITLE" : "QUOTE TITLE"}</Eyebrow>
+        <Input
           id="quote-review-title"
-          type="text"
+          label={documentType === "invoice" ? "Invoice title" : "Quote title"}
+          hideLabel
           value={draft.title}
           maxLength={120}
           disabled={isInteractionLocked}
           onChange={(event) => onTitleChange(event.target.value)}
-          className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
           placeholder="Front yard refresh (optional)"
         />
       </section>
@@ -156,16 +153,15 @@ export function ReviewFormContent({
 
       {showDueDateField ? (
         <section className="space-y-2">
-          <label htmlFor="document-review-due-date">
-            <Eyebrow>INVOICE DUE DATE</Eyebrow>
-          </label>
-          <input
+          <Eyebrow>INVOICE DUE DATE</Eyebrow>
+          <Input
             id="document-review-due-date"
             type="date"
+            label="Invoice due date"
+            hideLabel
             value={draft.dueDate ?? ""}
             disabled={isInteractionLocked}
             onChange={(event) => onDueDateChange(event.target.value)}
-            className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </section>
       ) : null}

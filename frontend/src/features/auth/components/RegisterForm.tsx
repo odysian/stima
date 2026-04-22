@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
+import { PasswordField } from "@/ui/PasswordField";
 
 export function RegisterForm(): React.ReactElement {
   const { register } = useAuth();
@@ -11,8 +12,6 @@ export function RegisterForm(): React.ReactElement {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const passwordsMatch = password === confirmPassword;
@@ -51,71 +50,26 @@ export function RegisterForm(): React.ReactElement {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password" className="text-sm font-medium text-on-surface">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                type={isPasswordVisible ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                aria-required="true"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className={[
-                  "w-full bg-surface-container-high rounded-lg px-4 py-3 pr-20 font-body text-sm text-on-surface",
-                  "placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-surface-container-lowest transition-all",
-                ].join(" ")}
-              />
-              <button
-                type="button"
-                className="absolute inset-y-0 right-3 cursor-pointer text-xs font-semibold text-primary"
-                aria-label={isPasswordVisible ? "Hide password" : "Show password"}
-                aria-pressed={isPasswordVisible}
-                onClick={() => setIsPasswordVisible((visible) => !visible)}
-              >
-                {isPasswordVisible ? "Hide" : "Show"}
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="confirm-password" className="text-sm font-medium text-on-surface">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <input
-                id="confirm-password"
-                type={isConfirmPasswordVisible ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                aria-required="true"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                aria-invalid={showPasswordMismatch}
-                aria-describedby={showPasswordMismatch ? "confirm-password-error" : undefined}
-                className={[
-                  "w-full bg-surface-container-high rounded-lg px-4 py-3 pr-28 font-body text-sm text-on-surface",
-                  "placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-surface-container-lowest transition-all",
-                ].join(" ")}
-              />
-              <button
-                type="button"
-                className="absolute inset-y-0 right-3 cursor-pointer text-xs font-semibold text-primary"
-                aria-label={isConfirmPasswordVisible ? "Hide confirm password" : "Show confirm password"}
-                aria-pressed={isConfirmPasswordVisible}
-                onClick={() => setIsConfirmPasswordVisible((visible) => !visible)}
-              >
-                {isConfirmPasswordVisible ? "Hide" : "Show"}
-              </button>
-            </div>
-            {showPasswordMismatch ? (
-              <p id="confirm-password-error" className="text-xs text-error">
-                Passwords do not match.
-              </p>
-            ) : null}
-          </div>
+          <PasswordField
+            id="password"
+            label="Password"
+            autoComplete="new-password"
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <PasswordField
+            id="confirm-password"
+            label="Confirm Password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            invalid={showPasswordMismatch}
+            error={showPasswordMismatch ? "Passwords do not match." : undefined}
+            showToggleLabel="Show confirm password"
+            hideToggleLabel="Hide confirm password"
+          />
 
           {error ? (
             <div role="alert" className="rounded-lg border-l-4 border-error bg-error-container p-4">
