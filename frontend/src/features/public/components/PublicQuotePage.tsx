@@ -9,16 +9,22 @@ import type { PublicDocument } from "@/features/public/types/public.types";
 import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
+import { Eyebrow } from "@/ui/Eyebrow";
+import { StatusPill, type StatusPillVariant } from "@/ui/StatusPill";
 
 type LoadState = "loading" | "ready" | "invalid" | "error";
 
 const statusCopy = {
   approved: {
     title: "This quote has been accepted",
+    icon: "check_circle",
+    pillVariant: "approved" as StatusPillVariant,
     className: "border border-success/20 bg-success-container text-success",
   },
   declined: {
     title: "This quote is no longer available",
+    icon: "error",
+    pillVariant: "declined" as StatusPillVariant,
     className: "border border-warning/20 bg-warning-container text-warning",
   },
 } as const;
@@ -140,7 +146,7 @@ export function PublicQuotePage(): React.ReactElement {
   if (effectiveLoadState === "loading") {
     return (
       <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
-        <div className="mx-auto max-w-3xl rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest p-8 ghost-shadow">
+        <div className="mx-auto max-w-3xl rounded-[var(--radius-document)] border border-surface-container-high bg-surface-container-lowest p-8 ghost-shadow">
           <p role="status" className="text-sm text-on-surface-variant">
             Loading shared document...
           </p>
@@ -152,10 +158,8 @@ export function PublicQuotePage(): React.ReactElement {
   if (effectiveLoadState === "invalid") {
     return (
       <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
-        <div className="mx-auto max-w-xl rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest p-8 text-center ghost-shadow">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-outline">
-            Shared Document
-          </p>
+        <div className="mx-auto max-w-xl rounded-[var(--radius-document)] border border-surface-container-high bg-surface-container-lowest p-8 text-center ghost-shadow">
+          <Eyebrow>Shared Document</Eyebrow>
           <h1 className="mt-4 text-3xl font-semibold">This link is not valid</h1>
           <p className="mt-3 text-sm text-on-surface-variant">
             Double-check the link or ask the contractor to share it again.
@@ -168,7 +172,7 @@ export function PublicQuotePage(): React.ReactElement {
   if (effectiveLoadState === "error" || documentData === null) {
     return (
       <main className="screen-radial-backdrop min-h-screen px-4 py-10 text-on-surface">
-        <div className="mx-auto max-w-xl rounded-[1.75rem] border border-error/15 bg-surface-container-lowest p-8 ghost-shadow">
+        <div className="mx-auto max-w-xl rounded-[var(--radius-document)] border border-error/15 bg-surface-container-lowest p-8 ghost-shadow">
           <h1 className="text-2xl font-semibold">We couldn&apos;t load this document</h1>
           <p className="mt-3 text-sm text-on-surface-variant">
             Try refreshing the page in a moment.
@@ -200,10 +204,10 @@ export function PublicQuotePage(): React.ReactElement {
   return (
     <main className="screen-radial-backdrop min-h-screen px-4 py-6 text-on-surface sm:px-6 lg:py-10">
       <div className="mx-auto max-w-4xl">
-        <section className="overflow-hidden rounded-[1.75rem] border border-surface-container-high bg-surface-container-lowest ghost-shadow">
+        <section className="overflow-hidden rounded-[var(--radius-document)] border border-surface-container-high bg-surface-container-lowest ghost-shadow">
           <div className="forest-gradient px-5 py-6 text-on-primary sm:px-8 sm:py-8">
             <div className="flex items-start gap-3 sm:gap-4">
-              <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-on-primary/15 text-xl font-semibold uppercase text-on-primary ring-1 ring-on-primary/20 sm:h-20 sm:w-24 sm:text-2xl">
+              <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-document)] bg-on-primary/15 text-xl font-semibold uppercase text-on-primary ring-1 ring-on-primary/20 sm:h-20 sm:w-24 sm:text-2xl">
                 {showLogo ? (
                   <img
                     src={documentData.logo_url}
@@ -217,9 +221,7 @@ export function PublicQuotePage(): React.ReactElement {
               </div>
               <div className="min-w-0">
                 {displayBusinessName ? (
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-on-primary/70">
-                    {displayBusinessName}
-                  </p>
+                  <Eyebrow className="text-on-primary/70">{displayBusinessName}</Eyebrow>
                 ) : null}
                 <h1 className="mt-2 text-2xl font-semibold leading-tight sm:mt-3 sm:text-3xl">
                   {getDisplayTitle(documentData)}
@@ -233,33 +235,33 @@ export function PublicQuotePage(): React.ReactElement {
 
           <div className="space-y-6 px-5 py-6 sm:px-8 sm:py-8">
             {banner ? (
-              <div className={`rounded-2xl px-4 py-3 text-sm font-medium ${banner.className}`}>
-                {banner.title}
+              <div className={`flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-document)] px-4 py-3 text-sm font-medium ${banner.className}`}>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem] leading-none">
+                    {banner.icon}
+                  </span>
+                  <p>{banner.title}</p>
+                </div>
+                <StatusPill variant={banner.pillVariant} />
               </div>
             ) : null}
 
             <section
-              className={`grid gap-4 rounded-2xl bg-surface-container-low p-4 sm:grid-cols-2 ${summaryGridColsClass}`}
+              className={`grid gap-4 rounded-[var(--radius-document)] bg-surface-container-low p-4 sm:grid-cols-2 ${summaryGridColsClass}`}
             >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
-                  Customer
-                </p>
+                <Eyebrow>Customer</Eyebrow>
                 <p className="mt-2 text-lg font-semibold">{documentData.customer_name}</p>
               </div>
               <div className="sm:text-right">
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
-                  Total
-                </p>
+                <Eyebrow>Total</Eyebrow>
                 <p className="mt-2 text-lg font-semibold">
                   {documentData.total_amount !== null ? formatCurrency(documentData.total_amount) : "TBD"}
                 </p>
               </div>
               {isInvoice ? (
                 <div className="lg:text-right">
-                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-outline">
-                    Due Date
-                  </p>
+                  <Eyebrow>Due Date</Eyebrow>
                   <p className="mt-2 text-lg font-semibold">
                     {documentData.due_date ?? "Not set"}
                   </p>
@@ -281,7 +283,7 @@ export function PublicQuotePage(): React.ReactElement {
                   return (
                     <li
                       key={`${index}-${item.description}-${item.details ?? "none"}`}
-                      className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4"
+                      className="rounded-[var(--radius-document)] border border-surface-container-high bg-surface-container-lowest p-4"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
@@ -305,7 +307,7 @@ export function PublicQuotePage(): React.ReactElement {
             </section>
 
             {pricingBreakdown.hasPricingBreakdown ? (
-              <section className="rounded-2xl bg-surface-container-low p-4">
+              <section className="rounded-[var(--radius-document)] bg-surface-container-low p-4">
                 <div className="space-y-2 text-sm">
                   <PricingRow label="Subtotal" value={pricingBreakdown.subtotal} />
                   {pricingBreakdown.discountAmount !== null ? (
@@ -326,7 +328,7 @@ export function PublicQuotePage(): React.ReactElement {
             ) : null}
 
             {documentData.notes ? (
-              <section className="rounded-2xl border border-surface-container-high bg-surface-container-lowest p-4">
+              <section className="rounded-[var(--radius-document)] border border-surface-container-high bg-surface-container-lowest p-4">
                 <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-outline">
                   Notes
                 </h2>
@@ -338,7 +340,7 @@ export function PublicQuotePage(): React.ReactElement {
 
             <a
               href={documentData.download_url}
-              className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-4 text-sm font-semibold text-on-primary transition-transform active:scale-[0.99]"
+              className="inline-flex w-full items-center justify-center rounded-[var(--radius-document)] bg-primary px-5 py-4 text-sm font-semibold text-on-primary transition-transform active:scale-[0.99]"
             >
               Download PDF
             </a>
