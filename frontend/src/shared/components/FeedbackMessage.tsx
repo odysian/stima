@@ -14,7 +14,7 @@ export function FeedbackMessage({
   children,
 }: FeedbackMessageProps): React.ReactElement {
   return (
-    <p role="alert" className={`rounded-lg p-4 text-sm ${variantClasses[variant]}`}>
+    <p role="alert" className={`rounded-[var(--radius-document)] p-4 text-sm ${variantClasses[variant]}`}>
       {children}
     </p>
   );
