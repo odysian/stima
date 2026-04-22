@@ -375,8 +375,9 @@ describe("SettingsScreen", () => {
     await screen.findByLabelText(/business name/i);
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
-    const submitButton = screen.getByRole("button", { name: /loading/i });
+    const submitButton = screen.getByRole("button", { name: /save changes/i });
     expect(submitButton).toBeDisabled();
+    expect(within(submitButton).getByTestId("button-spinner")).toHaveClass("animate-spin");
 
     resolveUpdate?.(makeProfileResponse());
     await waitFor(() => expect(screen.getByRole("button", { name: /save changes/i })).toBeEnabled());
@@ -404,8 +405,8 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     const signOutButton = await screen.findByRole("button", { name: /sign out/i });
-    expect(signOutButton).toHaveClass("bg-secondary", "text-on-secondary");
-    expect(signOutButton).not.toHaveClass("border");
+    expect(signOutButton).toHaveClass("border", "border-outline-variant/30", "text-on-surface");
+    expect(signOutButton).not.toHaveClass("bg-secondary");
 
     fireEvent.click(signOutButton);
 

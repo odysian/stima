@@ -36,14 +36,16 @@ export function ReviewActionFooter({
           >
             {primaryActionLabel}
           </Button>
-          <button
+          <Button
             type="button"
-            className="w-full cursor-pointer rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-low px-4 py-3 font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
+            variant="tonal"
+            className="w-full sm:flex-1"
             disabled={isInteractionLocked || isSavingDraft}
+            isLoading={isSavingDraft}
             onClick={onSaveDraft}
           >
-            {isSavingDraft ? "Loading..." : "Save Draft"}
-          </button>
+            Save Draft
+          </Button>
         </div>
         {requiresCustomerAssignment ? (
           <p className="text-center text-xs text-warning">

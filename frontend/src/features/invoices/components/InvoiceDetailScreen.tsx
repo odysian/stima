@@ -220,7 +220,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   rel="noopener noreferrer"
                   className={documentActionPrimaryLinkClassName}
                 >
-                  <span className="material-symbols-outlined text-base">open_in_new</span>
+                  <span className="material-symbols-outlined text-base leading-none">open_in_new</span>
                   Open PDF
                 </a>
               ) : (
@@ -232,6 +232,11 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     void onGeneratePdf();
                   }}
                   isLoading={isPdfBusy}
+                  leadingIcon={(
+                    <span className="material-symbols-outlined text-base leading-none">
+                      picture_as_pdf
+                    </span>
+                  )}
                 >
                   Generate PDF
                 </Button>
@@ -239,28 +244,37 @@ export function InvoiceDetailScreen(): React.ReactElement {
               utilityActions={(
                 <>
                   {emailActionLabel ? (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="lg"
                       className={documentActionUtilityButtonClassName}
                       disabled={!hasCustomerEmail || isBusy}
+                      isLoading={isSendingEmail}
+                      leadingIcon={<span className="material-symbols-outlined text-base leading-none">mail</span>}
                       onClick={() => onRequestSendEmail({ emailActionLabel, hasCustomerEmail, isPdfBusy })}
                     >
-                      <span className="material-symbols-outlined text-base">mail</span>
-                      {isSendingEmail ? "Sending..." : emailActionLabel}
-                    </button>
+                      {emailActionLabel}
+                    </Button>
                   ) : null}
 
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="lg"
                     className={documentActionUtilityButtonClassName}
                     disabled={isBusy}
+                    leadingIcon={(
+                      <span className="material-symbols-outlined text-base leading-none">
+                        content_copy
+                      </span>
+                    )}
                     onClick={() => {
                       void onCopyLink();
                     }}
                   >
-                    <span className="material-symbols-outlined text-base">content_copy</span>
                     Copy Link
-                  </button>
+                  </Button>
                 </>
               )}
               utilityLabel="Invoice utilities"
