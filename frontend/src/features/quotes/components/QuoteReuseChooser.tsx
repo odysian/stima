@@ -5,7 +5,7 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteReuseCandidate } from "@/features/quotes/types/quote.types";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
-import { StatusBadge } from "@/shared/components/StatusBadge";
+import { StatusPill } from "@/ui/StatusPill";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 interface QuoteReuseChooserProps {
@@ -246,7 +246,7 @@ export function QuoteReuseChooser({
                             {formatDate(candidate.created_at, timezone ?? null)}
                           </p>
                           <span className="ml-auto">
-                            <StatusBadge variant={candidate.status} />
+                            <StatusPill variant={candidate.status} />
                           </span>
                         </div>
 
