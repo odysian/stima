@@ -6,6 +6,7 @@ import type { Customer, CustomerCreateRequest } from "@/features/customers/types
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { Sheet, SheetBody, SheetCloseButton, SheetHeader } from "@/ui/Sheet";
 
 interface ReviewCustomerAssignmentSheetProps {
   open: boolean;
@@ -137,14 +138,17 @@ export function ReviewCustomerAssignmentSheet({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="modal-backdrop fixed inset-0 z-50" />
-        <div className="sheet-safe-bottom fixed inset-0 z-50 flex items-end justify-center px-4 sm:items-center">
-          <Dialog.Content
-            className="modal-shadow w-full max-w-md rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6"
-            onOpenAutoFocus={(event) => event.preventDefault()}
-          >
+    <Sheet
+      open={open}
+      onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}
+      size="md"
+      contentProps={{
+        className: "bg-surface-container-lowest",
+        onOpenAutoFocus: (event) => event.preventDefault(),
+      }}
+    >
+      <SheetHeader>
+        <div>
             <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
               Assign Customer
             </Dialog.Title>
@@ -152,8 +156,11 @@ export function ReviewCustomerAssignmentSheet({
             <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
               Search existing customers or create one inline, then apply the assignment.
             </Dialog.Description>
+        </div>
+        <SheetCloseButton />
+      </SheetHeader>
 
-            <div className="mt-4 space-y-4">
+      <SheetBody className="space-y-4">
               {sheetError ? <FeedbackMessage variant="error">{sheetError}</FeedbackMessage> : null}
 
               <Input
@@ -244,10 +251,7 @@ export function ReviewCustomerAssignmentSheet({
                   </div>
                 ) : null}
               </div>
-            </div>
-          </Dialog.Content>
-        </div>
-      </Dialog.Portal>
-    </Dialog.Root>
+      </SheetBody>
+    </Sheet>
   );
 }
