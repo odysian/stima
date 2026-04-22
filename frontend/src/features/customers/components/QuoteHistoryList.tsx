@@ -1,5 +1,6 @@
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
+import { Eyebrow } from "@/ui/Eyebrow";
 import { StatusPill } from "@/ui/StatusPill";
 
 interface QuoteHistoryListProps {
@@ -21,17 +22,13 @@ export function QuoteHistoryList({
     <section>
       {showHeader ? (
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-            Quote History
-          </p>
-          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-            {quoteCountLabel}
-          </p>
+          <Eyebrow>Quote History</Eyebrow>
+          <Eyebrow>{quoteCountLabel}</Eyebrow>
         </div>
       ) : null}
 
       {quotes.length > 0 ? (
-        <div className="rounded-xl bg-surface-container-low p-3">
+        <div className="rounded-[var(--radius-document)] bg-surface-container-low p-3">
           <ul className="flex flex-col gap-3">
             {quotes.map((quote) => {
               const itemCountLabel = `${quote.item_count} ${quote.item_count === 1 ? "item" : "items"}`;
@@ -46,7 +43,7 @@ export function QuoteHistoryList({
                 <li key={quote.id}>
                   <button
                     type="button"
-                    className="w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
+                    className="w-full cursor-pointer rounded-[var(--radius-document)] bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
                     onClick={() => onQuoteClick(quote.id)}
                   >
                     <div className="flex items-baseline justify-between gap-3">

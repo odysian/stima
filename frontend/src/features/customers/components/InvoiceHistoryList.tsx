@@ -2,6 +2,7 @@ import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { SkeletonBlock } from "@/shared/components/SkeletonBlock";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
+import { Eyebrow } from "@/ui/Eyebrow";
 import { StatusPill } from "@/ui/StatusPill";
 
 interface InvoiceHistoryListProps {
@@ -27,19 +28,22 @@ export function InvoiceHistoryList({
     <section>
       {showHeader ? (
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-            Invoice History
-          </p>
-          <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-            {invoiceCountLabel}
-          </p>
+          <Eyebrow>Invoice History</Eyebrow>
+          <Eyebrow>{invoiceCountLabel}</Eyebrow>
         </div>
       ) : null}
 
       {isLoading ? (
-        <div role="status" aria-label="Loading invoices" className="space-y-3 rounded-xl bg-surface-container-low p-3">
+        <div
+          role="status"
+          aria-label="Loading invoices"
+          className="space-y-3 rounded-[var(--radius-document)] bg-surface-container-low p-3"
+        >
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={`invoice-history-skeleton-${index}`} className="rounded-xl bg-surface-container-lowest p-4 ghost-shadow">
+            <div
+              key={`invoice-history-skeleton-${index}`}
+              className="rounded-[var(--radius-document)] bg-surface-container-lowest p-4 ghost-shadow"
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <SkeletonBlock width="42%" height="1rem" />
                 <SkeletonBlock width="26%" height="1rem" />
@@ -56,7 +60,7 @@ export function InvoiceHistoryList({
       {!isLoading && loadError ? <FeedbackMessage variant="error">{loadError}</FeedbackMessage> : null}
 
       {!isLoading && !loadError && invoices.length > 0 ? (
-        <div className="rounded-xl bg-surface-container-low p-3">
+        <div className="rounded-[var(--radius-document)] bg-surface-container-low p-3">
           <ul className="flex flex-col gap-3">
             {invoices.map((invoice) => {
               const primaryLabel = invoice.title ?? invoice.doc_number;
@@ -69,7 +73,7 @@ export function InvoiceHistoryList({
                 <li key={invoice.id}>
                   <button
                     type="button"
-                    className="w-full cursor-pointer rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
+                    className="w-full cursor-pointer rounded-[var(--radius-document)] bg-surface-container-lowest p-4 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low"
                     onClick={() => onInvoiceClick(invoice.id)}
                   >
                     <div className="flex items-baseline justify-between gap-3">

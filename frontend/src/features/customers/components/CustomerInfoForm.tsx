@@ -4,6 +4,7 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { CUSTOMER_ADDRESS_MAX_CHARS } from "@/shared/lib/inputLimits";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 interface CustomerInfoFormProps {
   name: string;
@@ -35,10 +36,8 @@ export function CustomerInfoForm({
   saveError,
 }: CustomerInfoFormProps): React.ReactElement {
   return (
-    <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
-      <h2 className="mb-4 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-        Customer Info
-      </h2>
+    <section className="rounded-[var(--radius-document)] bg-surface-container-lowest p-6 ghost-shadow">
+      <Eyebrow className="mb-4">Customer Info</Eyebrow>
 
       {saveError ? (
         <div className="mb-4">
