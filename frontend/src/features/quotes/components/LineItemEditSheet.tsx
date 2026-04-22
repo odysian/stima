@@ -10,6 +10,7 @@ import {
   LINE_ITEM_DESCRIPTION_MAX_CHARS,
   LINE_ITEM_DETAILS_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
+import { Sheet } from "@/ui/Sheet";
 interface LineItemEditSheetProps {
   open: boolean;
   mode: "add" | "edit";
@@ -205,30 +206,26 @@ export function LineItemEditSheet({
     onClose();
   }
   return (
-    <Dialog.Root
+    <Sheet
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
           dismissWithAutosave();
         }
       }}
+      size="md"
+      overlayProps={{ "data-testid": "line-item-edit-sheet-overlay" }}
+      contentProps={{
+        "aria-describedby": showManualFields ? undefined : "line-item-sheet-catalog-description",
+        className: "bg-surface-container-lowest",
+        onOpenAutoFocus: (event) => {
+          event.preventDefault();
+          if (showManualFields) {
+            descriptionInputRef.current?.focus();
+          }
+        },
+      }}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay
-          data-testid="line-item-edit-sheet-overlay"
-          className="modal-backdrop fixed inset-0 z-50"
-        />
-        <div className="sheet-safe-bottom pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 sm:items-center">
-          <Dialog.Content
-            className="modal-shadow pointer-events-auto w-full max-w-md rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6"
-            aria-describedby={showManualFields ? undefined : "line-item-sheet-catalog-description"}
-            onOpenAutoFocus={(event) => {
-              event.preventDefault();
-              if (showManualFields) {
-                descriptionInputRef.current?.focus();
-              }
-            }}
-          >
             <div className="flex items-start justify-between gap-4">
               <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
                 {title}
@@ -442,9 +439,6 @@ export function LineItemEditSheet({
                 />
               )}
             </div>
-          </Dialog.Content>
-        </div>
-      </Dialog.Portal>
-    </Dialog.Root>
+    </Sheet>
   );
 }

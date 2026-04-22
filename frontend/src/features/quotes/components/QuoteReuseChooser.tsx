@@ -7,6 +7,7 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { StatusPill } from "@/ui/StatusPill";
+import { Sheet, SheetBody, SheetCloseButton, SheetFooter, SheetHeader } from "@/ui/Sheet";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 interface QuoteReuseChooserProps {
@@ -146,19 +147,26 @@ export function QuoteReuseChooser({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="modal-backdrop fixed inset-0 z-50" />
-        <div className="sheet-safe-bottom pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 sm:items-center">
-          <Dialog.Content className="modal-shadow pointer-events-auto w-full max-w-2xl rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6">
+    <Sheet
+      open={open}
+      onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}
+      size="lg"
+      contentProps={{ className: "bg-surface-container-lowest" }}
+    >
+      <SheetHeader>
+        <div>
             <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
               Create from existing
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
               Pick a quote to duplicate into a new draft.
             </Dialog.Description>
+        </div>
+        <SheetCloseButton />
+      </SheetHeader>
 
-            <div className="mt-4">
+      <SheetBody>
+        <div>
               <Input
                 label="Search existing quotes"
                 id="quote-reuse-search"
@@ -278,22 +286,20 @@ export function QuoteReuseChooser({
                   ))}
                 </ul>
               ) : null}
-            </div>
-
-            <div className="mt-6">
-              <Button
-                type="button"
-                variant="secondary"
-                size="md"
-                className="w-full"
-                onClick={onClose}
-              >
-                Close
-              </Button>
-            </div>
-          </Dialog.Content>
         </div>
-      </Dialog.Portal>
-    </Dialog.Root>
+      </SheetBody>
+
+      <SheetFooter>
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          className="w-full"
+          onClick={onClose}
+        >
+          Close
+        </Button>
+      </SheetFooter>
+    </Sheet>
   );
 }

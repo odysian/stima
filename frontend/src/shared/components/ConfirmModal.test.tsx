@@ -123,7 +123,7 @@ describe("ConfirmModal", () => {
 
     expect(screen.getByTestId("confirm-modal-overlay")).toHaveClass("modal-backdrop");
     expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toHaveClass(
-      "modal-shadow",
+      "ghost-shadow",
       "bg-surface-container-lowest",
       "border-outline-variant/20",
     );
