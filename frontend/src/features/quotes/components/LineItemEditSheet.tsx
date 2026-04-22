@@ -10,6 +10,8 @@ import {
   LINE_ITEM_DESCRIPTION_MAX_CHARS,
   LINE_ITEM_DETAILS_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
+import { Card } from "@/ui/Card";
+import { Eyebrow } from "@/ui/Eyebrow";
 import { Sheet } from "@/ui/Sheet";
 interface LineItemEditSheetProps {
   open: boolean;
@@ -292,12 +294,12 @@ export function LineItemEditSheet({
             <div className="mt-4 space-y-4">
               {formError ? <FeedbackMessage variant="error">{formError}</FeedbackMessage> : null}
               {reviewExplanation ? (
-                <div className="rounded-lg border-l-4 border-warning-accent bg-warning-container/50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wide text-warning">Review needed</p>
+                <Card accent="warn" className="bg-warning-container/50">
+                  <Eyebrow className="text-warning">Review needed</Eyebrow>
                   <p className="mt-1 text-sm leading-6 text-warning">{reviewExplanation}</p>
                   <button
                     type="button"
-                    className="mt-3 inline-flex items-center justify-center rounded-md border border-warning-accent/50 bg-warning-container px-2.5 py-1.5 text-xs font-bold uppercase tracking-wide text-warning transition-colors hover:bg-warning-container/80"
+                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-[var(--radius-document)] border border-warning-accent/50 bg-warning-container px-3.5 py-2 text-xs font-bold uppercase tracking-wide text-warning transition-all hover:bg-warning-container/80 active:scale-[0.98]"
                     onClick={() => {
                       setLineItemFlagged(false);
                       setLineItemFlagReason(null);
@@ -305,7 +307,7 @@ export function LineItemEditSheet({
                   >
                     Dismiss
                   </button>
-                </div>
+                </Card>
               ) : null}
               {mode === "add" ? (
                 <div
@@ -319,7 +321,7 @@ export function LineItemEditSheet({
                     type="button"
                     aria-controls="line-item-tabpanel-manual"
                     aria-selected={activeAddTab === "manual"}
-                    className={`rounded-full px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+                    className={`min-h-11 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-wide transition-all active:scale-[0.98] ${
                       activeAddTab === "manual"
                         ? "bg-surface-container-lowest text-primary"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -337,7 +339,7 @@ export function LineItemEditSheet({
                     type="button"
                     aria-controls="line-item-tabpanel-catalog"
                     aria-selected={activeAddTab === "catalog"}
-                    className={`rounded-full px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+                    className={`min-h-11 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-wide transition-all active:scale-[0.98] ${
                       activeAddTab === "catalog"
                         ? "bg-surface-container-lowest text-primary"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -376,7 +378,7 @@ export function LineItemEditSheet({
                           setFormError(null);
                         }
                       }}
-                      className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </section>
                   <section className="space-y-2">
@@ -400,7 +402,7 @@ export function LineItemEditSheet({
                           setFormError(null);
                         }
                       }}
-                      className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
+                      className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
                     />
                   </section>
                   <section className="space-y-2">
@@ -422,7 +424,7 @@ export function LineItemEditSheet({
                           setFormError(null);
                         }
                       }}
-                      className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </section>
                 </div>
