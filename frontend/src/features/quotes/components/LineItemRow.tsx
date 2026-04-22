@@ -1,4 +1,5 @@
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
+import { Button } from "@/shared/components/Button";
 import { resolveLineItemFlagMessage } from "@/features/quotes/utils/lineItemFlags";
 
 interface LineItemRowProps {
@@ -87,13 +88,14 @@ export function LineItemRow({
           />
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="destructive"
+          size="sm"
           onClick={onDelete}
-          className="cursor-pointer rounded-md border border-outline-variant px-3 py-2 text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
         >
           Delete
-        </button>
+        </Button>
       </div>
     </div>
   );

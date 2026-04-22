@@ -1,4 +1,5 @@
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
+import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 
 interface LineItemCatalogTabPanelProps {
@@ -32,13 +33,15 @@ export function LineItemCatalogTabPanel({
       {loadState === "error" && loadError ? (
         <div className="space-y-2">
           <FeedbackMessage variant="error">{loadError}</FeedbackMessage>
-          <button
+          <Button
             type="button"
-            className="inline-flex min-h-9 items-center rounded-lg border border-outline-variant/40 px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+            variant="secondary"
+            size="sm"
+            className="min-h-9 px-3 text-xs"
             onClick={onRetry}
           >
             Retry
-          </button>
+          </Button>
         </div>
       ) : null}
 

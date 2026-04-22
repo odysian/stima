@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { Button } from "@/shared/components/Button";
 
 export interface OverflowMenuItem {
   label: string;
@@ -132,11 +133,13 @@ export function OverflowMenu({
             }
 
             return (
-              <button
+              <Button
                 key={item.label}
                 type="button"
+                variant="ghost"
+                size="sm"
                 role="menuitem"
-                className={`${itemClassName} cursor-pointer ${toneClassName}`}
+                className={`${itemClassName} ${toneClassName}`}
                 disabled={item.disabled}
                 onClick={() => {
                   setIsOpen(false);
@@ -146,7 +149,7 @@ export function OverflowMenu({
               >
                 <span className="material-symbols-outlined text-[1.125rem]">{item.icon}</span>
                 <span>{item.label}</span>
-              </button>
+              </Button>
             );
           })}
         </div>

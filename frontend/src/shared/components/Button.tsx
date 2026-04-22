@@ -1,11 +1,12 @@
+import { forwardRef } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "tonal" | "destructive" | "ghost" | "iconButton";
-type ButtonSize = "sm" | "md" | "lg";
+type RegularButtonSize = "sm" | "md" | "lg";
+type IconButtonSize = RegularButtonSize | "xs";
 
 interface BaseButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   className?: string;
-  size?: ButtonSize;
   isLoading?: boolean;
   leadingIcon?: ReactNode;
   trailingIcon?: ReactNode;
@@ -13,11 +14,13 @@ interface BaseButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 
 type RegularButtonProps = BaseButtonProps & {
   variant?: Exclude<ButtonVariant, "iconButton">;
+  size?: RegularButtonSize;
   children: ReactNode;
 };
 
 type IconButtonProps = BaseButtonProps & {
   variant: "iconButton";
+  size?: IconButtonSize;
   children?: ReactNode;
   "aria-label": string;
 };
@@ -39,25 +42,35 @@ const variantClasses: Record<ButtonVariant, string> = {
     "rounded-full bg-transparent text-on-surface-variant hover:bg-surface-container-low",
 };
 
-const sizeClasses: Record<ButtonSize, string> = {
+const sizeClasses: Record<RegularButtonSize, string> = {
   sm: "min-h-11 px-3 py-2 text-sm",
   md: "min-h-12 px-4 py-4 text-sm",
   lg: "min-h-14 px-5 py-5 text-base",
 };
 
-const iconButtonSizeClasses: Record<ButtonSize, string> = {
+/**
+ * `xs` intentionally breaks the 44px tap-target floor and is reserved for close/dismiss controls
+ * inside larger tappable containers (for example banners and toasts).
+ */
+const iconButtonSizeClasses: Record<IconButtonSize, string> = {
+  xs: "h-8 w-8 min-h-8 min-w-8 p-0",
   sm: "h-11 w-11 min-h-11 min-w-11 p-0",
   md: "h-12 w-12 min-h-12 min-w-12 p-0",
   lg: "h-14 w-14 min-h-14 min-w-14 p-0",
 };
 
-const spinnerContainerSizeClasses: Record<ButtonSize, string> = {
+const spinnerContainerSizeClasses: Record<IconButtonSize, string> = {
+  xs: "h-4 w-4",
   sm: "h-4 w-4",
   md: "h-5 w-5",
   lg: "h-6 w-6",
 };
 
-const spinnerDotClasses: Record<ButtonSize, { top: string; bottom: string }> = {
+const spinnerDotClasses: Record<IconButtonSize, { top: string; bottom: string }> = {
+  xs: {
+    top: "top-0 h-1.5 w-1.5",
+    bottom: "bottom-0 h-1 w-1",
+  },
   sm: {
     top: "top-0 h-1.5 w-1.5",
     bottom: "bottom-0 h-1 w-1",
@@ -81,34 +94,38 @@ const spinnerToneClasses: Record<ButtonVariant, string> = {
   iconButton: "text-on-surface-variant",
 };
 
-const contentGapClasses: Record<ButtonSize, string> = {
+const contentGapClasses: Record<RegularButtonSize, string> = {
   sm: "gap-1.5",
   md: "gap-2",
   lg: "gap-2.5",
 };
 
-export function Button({
-  children,
-  variant = "primary",
-  className,
-  size = "md",
-  type = "button",
-  disabled = false,
-  isLoading = false,
-  leadingIcon,
-  trailingIcon,
-  ...rest
-}: ButtonProps): React.ReactElement {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    children,
+    variant = "primary",
+    className,
+    size = "md",
+    type = "button",
+    disabled = false,
+    isLoading = false,
+    leadingIcon,
+    trailingIcon,
+    ...rest
+  }: ButtonProps,
+  ref,
+): React.ReactElement {
   if (variant === "iconButton" && !rest["aria-label"]) {
     throw new Error("Button variant `iconButton` requires an aria-label.");
   }
 
   const isIconButton = variant === "iconButton";
+  const regularSize: RegularButtonSize = size === "xs" ? "sm" : size;
 
   const buttonClassName = [
     "relative inline-flex cursor-pointer items-center justify-center font-semibold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
     variantClasses[variant],
-    isIconButton ? iconButtonSizeClasses[size] : `${sizeClasses[size]} min-w-[6ch]`,
+    isIconButton ? iconButtonSizeClasses[size] : `${sizeClasses[regularSize]} min-w-[6ch]`,
     className,
   ]
     .filter(Boolean)
@@ -117,13 +134,14 @@ export function Button({
   return (
     <button
       {...rest}
+      ref={ref}
       type={type}
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
       className={buttonClassName}
     >
       <span
-        className={`inline-flex items-center justify-center whitespace-nowrap ${isIconButton ? "leading-none" : contentGapClasses[size]} ${isLoading ? "opacity-0" : "opacity-100"}`}
+        className={`inline-flex items-center justify-center whitespace-nowrap ${isIconButton ? "leading-none" : contentGapClasses[regularSize]} ${isLoading ? "opacity-0" : "opacity-100"}`}
       >
         {isIconButton ? (
           children
@@ -163,4 +181,6 @@ export function Button({
       ) : null}
     </button>
   );
-}
+});
+
+Button.displayName = "Button";

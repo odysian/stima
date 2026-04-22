@@ -6,9 +6,7 @@ import {
   DocumentActionStatus,
   DocumentActionSuccessMessage,
   DocumentActionSurface,
-  documentActionPrimaryButtonClassName,
   documentActionPrimaryLinkClassName,
-  documentActionUtilityButtonClassName,
 } from "@/shared/components/DocumentActionSurface";
 
 interface QuotePreviewActionsProps {
@@ -87,7 +85,9 @@ export function QuotePreviewActions({
     return (
       <Button
         type="button"
-        className={documentActionPrimaryButtonClassName}
+        variant="primary"
+        size="lg"
+        className="w-full"
         disabled={
           disabled
           || isGeneratingPdf
@@ -119,9 +119,9 @@ export function QuotePreviewActions({
           {showEmailAction ? (
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               size="lg"
-              className={documentActionUtilityButtonClassName}
+              className="w-full"
               disabled={
                 disabled
                 || !hasCustomerEmail
@@ -141,9 +141,9 @@ export function QuotePreviewActions({
 
           <Button
             type="button"
-            variant="ghost"
+            variant="secondary"
             size="lg"
-            className={documentActionUtilityButtonClassName}
+            className="w-full"
             disabled={
               disabled
               || isGeneratingPdf

@@ -4,6 +4,7 @@ import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lin
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { LineItemCatalogTabPanel } from "@/features/quotes/components/LineItemCatalogTabPanel";
 import { resolveLineItemReviewExplanation } from "@/features/quotes/utils/lineItemFlags";
+import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import {
   LINE_ITEM_DESCRIPTION_MAX_CHARS,
@@ -24,7 +25,6 @@ interface LineItemEditSheetProps {
   onLoadCatalogItems?: () => Promise<LineItemCatalogItem[]>;
   onRequestDelete?: () => void;
 }
-
 interface ParsedPrice {
   value: number | null;
   valid: boolean;
@@ -235,10 +235,12 @@ export function LineItemEditSheet({
               </Dialog.Title>
               <div className="flex items-center gap-2">
                 {onSaveToCatalog && showManualFields ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="iconButton"
+                    size="sm"
                     aria-label="Save to catalog"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
                     disabled={isCatalogMutationInFlight || (!canSaveToCatalog && !canDeleteSavedCatalogItem)}
                     onClick={() => {
                       if (savedCatalogItem) {
@@ -254,27 +256,31 @@ export function LineItemEditSheet({
                     >
                       {bookmarkIcon}
                     </span>
-                  </button>
+                  </Button>
                 ) : null}
                 {mode === "add" && showManualFields ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="iconButton"
+                    size="sm"
                     aria-label="Add line item"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-primary transition-colors hover:bg-primary/10"
+                    className="border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
                     onClick={addLineItemAndClose}
                   >
                     <span className="material-symbols-outlined text-base leading-none">check</span>
-                  </button>
+                  </Button>
                 ) : null}
                 {mode === "edit" && onRequestDelete ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="iconButton"
+                    size="sm"
                     aria-label="Delete line item"
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-error/30 bg-error-container/40 text-error transition-colors hover:bg-error-container/60"
+                    className="shrink-0 border border-error/30 bg-error-container/40 text-error hover:bg-error-container/60"
                     onClick={onRequestDelete}
                   >
                     <span className="material-symbols-outlined text-[1.125rem] leading-none">delete</span>
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             </div>

@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer, CustomerCreateRequest } from "@/features/customers/types/customer.types";
+import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 
@@ -197,15 +198,17 @@ export function ReviewCustomerAssignmentSheet({
               )}
 
               <div className="rounded-lg bg-surface-container-low p-4">
-                <button
+                <Button
                   type="button"
-                  className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-primary"
+                  variant="ghost"
+                  size="sm"
+                  className="items-center gap-2 px-0"
                   disabled={isSubmitting}
                   onClick={() => setIsCreateExpanded((isExpanded) => !isExpanded)}
                 >
                   <span className="material-symbols-outlined text-base">person_add</span>
                   {isCreateExpanded ? "Hide New Customer Form" : "Create New Customer"}
-                </button>
+                </Button>
 
                 {isCreateExpanded ? (
                   <div className="mt-3 space-y-3">
@@ -228,14 +231,16 @@ export function ReviewCustomerAssignmentSheet({
                       value={newCustomerEmail}
                       onChange={(event) => setNewCustomerEmail(event.target.value)}
                     />
-                    <button
+                    <Button
                       type="button"
-                      className="w-full cursor-pointer rounded-lg forest-gradient px-4 py-3 text-sm font-semibold text-on-primary disabled:cursor-not-allowed disabled:opacity-60"
+                      variant="primary"
+                      size="md"
+                      className="w-full"
                       disabled={isSubmitting}
                       onClick={() => void createAndAssignCustomer()}
                     >
                       Create and Assign
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
               </div>

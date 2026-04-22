@@ -73,14 +73,16 @@ export function CustomerInfoForm({
 
         <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           {onCancel ? (
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               onClick={onCancel}
               disabled={isSaving}
-              className="w-full cursor-pointer rounded-lg border border-outline/20 px-4 py-3 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              className="w-full sm:w-auto"
             >
               Cancel
-            </button>
+            </Button>
           ) : null}
 
           <Button type="submit" variant="primary" className="w-full px-6 sm:w-auto" isLoading={isSaving}>

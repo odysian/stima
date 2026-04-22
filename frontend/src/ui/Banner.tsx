@@ -1,3 +1,4 @@
+import { Button } from "@/shared/components/Button";
 import { Eyebrow } from "@/ui/Eyebrow";
 
 type BannerKind = "warn" | "info" | "success" | "error";
@@ -65,14 +66,16 @@ export function Banner({
           <p className={["text-sm font-medium leading-snug", style.body].join(" ")}>{message}</p>
         </div>
         {onDismiss ? (
-          <button
+          <Button
             type="button"
+            variant="iconButton"
+            size="xs"
             aria-label={dismissLabel}
-            className={["inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-current/10", style.body].join(" ")}
+            className={["shrink-0 hover:bg-current/10", style.body].join(" ")}
             onClick={onDismiss}
           >
             <span className="material-symbols-outlined text-base">close</span>
-          </button>
+          </Button>
         ) : null}
       </div>
     </section>

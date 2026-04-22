@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Button } from "@/shared/components/Button";
 
 interface ConfirmModalProps {
   title: string;
@@ -12,11 +13,6 @@ interface ConfirmModalProps {
   confirmDisabled?: boolean;
   variant?: "primary" | "destructive";
 }
-
-const confirmButtonClasses = {
-  primary: "forest-gradient text-on-primary",
-  destructive: "bg-secondary text-on-secondary",
-} as const;
 
 export function ConfirmModal({
   title,
@@ -80,22 +76,26 @@ export function ConfirmModal({
               </Dialog.Description>
             ) : null}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
-              <button
+              <Button
                 type="button"
-                className={`inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition-all ${confirmDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer active:scale-[0.98]"} ${confirmButtonClasses[variant]}`}
+                variant={variant}
+                size="md"
+                className="flex-1"
                 onClick={handleConfirm}
-                disabled={confirmDisabled}
+                disabled={confirmDisabled || undefined}
               >
                 {confirmLabel}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 ref={cancelButtonRef}
-                className="inline-flex min-h-12 cursor-pointer flex-1 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
+                variant="secondary"
+                size="md"
+                className="flex-1"
                 onClick={handleCancel}
               >
                 {cancelLabel}
-              </button>
+              </Button>
             </div>
           </Dialog.Content>
         </div>

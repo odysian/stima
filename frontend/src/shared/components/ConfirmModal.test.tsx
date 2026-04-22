@@ -93,7 +93,7 @@ describe("ConfirmModal", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Delete" })).toHaveClass("bg-secondary", "text-on-secondary");
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveClass("border-secondary", "text-secondary");
   });
 
   it("renders primary confirm styling by default", () => {

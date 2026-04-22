@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { Button } from "@/shared/components/Button";
 
 interface QuoteCreateEntrySheetProps {
   open: boolean;
@@ -31,20 +32,24 @@ export function QuoteCreateEntrySheet({
             </Dialog.Description>
 
             <div className="mt-6 space-y-3">
-              <button
+              <Button
                 type="button"
-                className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg forest-gradient px-4 py-3 text-sm font-semibold text-on-primary transition-all active:scale-[0.98]"
+                variant="primary"
+                size="md"
+                className="w-full"
                 onClick={onCreateNew}
               >
                 Create new
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
+                variant="secondary"
+                size="md"
+                className="w-full"
                 onClick={onCreateFromExisting}
               >
                 Create from existing
-              </button>
+              </Button>
             </div>
           </Dialog.Content>
         </div>

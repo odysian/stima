@@ -4,6 +4,7 @@ import {
   MAX_AUDIO_CLIPS_PER_REQUEST,
   NOTE_INPUT_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
+import { Button } from "@/shared/components/Button";
 import { Eyebrow } from "@/ui/Eyebrow";
 
 interface CaptureInputPanelProps {
@@ -74,17 +75,19 @@ export function CaptureInputPanel({
                       Clip {clipNumber} · {clip.durationSeconds}s
                     </p>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="iconButton"
+                    size="xs"
                     aria-label={`Delete clip ${clipNumber}`}
-                    className="cursor-pointer rounded-full p-1 text-outline transition-colors hover:bg-surface-container-low active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="text-outline hover:bg-surface-container-low"
                     onClick={() => removeClip(clip.id)}
                     disabled={isExtracting}
                   >
                     <span className="material-symbols-outlined text-base">
                       close
                     </span>
-                  </button>
+                  </Button>
                 </div>
               );
             })}

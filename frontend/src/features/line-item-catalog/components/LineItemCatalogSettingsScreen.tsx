@@ -263,13 +263,14 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
                     {isEditMode ? "Update Item" : "Create Item"}
                   </Button>
                   {isEditMode ? (
-                    <button
+                    <Button
                       type="button"
-                      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-outline-variant/40 px-4 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+                      variant="secondary"
+                      size="sm"
                       onClick={resetForm}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </form>
@@ -299,20 +300,24 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
                           ) : null}
                         </div>
                         <div className="flex gap-2">
-                          <button
+                          <Button
                             type="button"
-                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-outline-variant/40 px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-low"
+                            variant="secondary"
+                            size="sm"
+                            className="min-h-9 px-3 text-xs"
                             onClick={() => startEdit(item)}
                           >
                             Edit
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
-                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-error/30 px-3 text-xs font-semibold text-error transition-colors hover:bg-error-container/40"
+                            variant="destructive"
+                            size="sm"
+                            className="min-h-9 px-3 text-xs"
                             onClick={() => setItemPendingDelete(item)}
                           >
                             Delete
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </article>

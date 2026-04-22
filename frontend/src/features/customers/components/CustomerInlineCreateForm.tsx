@@ -70,13 +70,15 @@ export function CustomerInlineCreateForm({
         <Button type="submit" variant="primary" className="mt-2 w-full" isLoading={isCreating}>
           Create {"&"} Continue {">"}
         </Button>
-        <button
+        <Button
           type="button"
-          className="cursor-pointer text-sm font-semibold text-on-surface-variant transition-colors hover:text-on-surface"
+          variant="ghost"
+          size="sm"
+          className="justify-start px-0"
           onClick={onCancel}
         >
           Back to search
-        </button>
+        </Button>
       </form>
     </section>
   );
