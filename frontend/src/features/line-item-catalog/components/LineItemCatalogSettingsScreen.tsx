@@ -11,6 +11,8 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { Input } from "@/shared/components/Input";
 import { NumericField } from "@/ui/NumericField";
 import { useToast } from "@/ui/Toast";
+import { Card } from "@/ui/Card";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 interface ParsedPriceInput {
   value: number | null;
@@ -216,10 +218,8 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
 
         {!isLoading && !loadError ? (
           <>
-            <section className="ghost-shadow rounded-xl bg-surface-container-lowest p-6">
-              <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                {isEditMode ? "Edit Catalog Item" : "Add Catalog Item"}
-              </h2>
+            <Card className="p-6">
+              <Eyebrow>{isEditMode ? "Edit Catalog Item" : "Add Catalog Item"}</Eyebrow>
 
               <form className="mt-4 space-y-3" onSubmit={(event) => void handleSubmit(event)}>
                 {formError ? <FeedbackMessage variant="error">{formError}</FeedbackMessage> : null}
@@ -240,7 +240,7 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
                     rows={3}
                     value={details}
                     onChange={(event) => setDetails(event.target.value)}
-                    className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
 
@@ -276,12 +276,10 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
                   ) : null}
                 </div>
               </form>
-            </section>
+            </Card>
 
-            <section className="rounded-xl bg-surface-container-low p-4">
-              <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                Saved Items
-              </h2>
+            <Card className="bg-surface-container-low p-4">
+              <Eyebrow>Saved Items</Eyebrow>
               {sortedItems.length === 0 ? (
                 <p className="mt-3 text-sm text-on-surface-variant">
                   No catalog items yet. Create one to reuse it in quote line items.
@@ -291,7 +289,7 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
                   {sortedItems.map((item) => (
                     <article
                       key={item.id}
-                      className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-3"
+                      className="rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-lowest p-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 space-y-1">
@@ -326,7 +324,7 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
                   ))}
                 </div>
               )}
-            </section>
+            </Card>
           </>
         ) : null}
       </section>

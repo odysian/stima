@@ -24,6 +24,8 @@ import type { ThemePreference } from "@/shared/lib/theme";
 import { NumericField } from "@/ui/NumericField";
 import { Select } from "@/ui/Select";
 import { useToast } from "@/ui/Toast";
+import { Card } from "@/ui/Card";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = [
   { label: "System default", value: "system" },
@@ -197,27 +199,23 @@ export function SettingsScreen(): React.ReactElement {
               <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
             ) : null}
 
-            <section className="ghost-shadow rounded-xl bg-surface-container-lowest p-6">
-              <h2 className="mb-4 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                Business Profile
-              </h2>
+            <Card className="p-6">
+              <Eyebrow className="mb-4">Business Profile</Eyebrow>
 
               <div className="mt-4 flex flex-col gap-4">
                 <div
                   data-testid="settings-logo-block"
-                  className="rounded-xl bg-surface-container-low p-4"
+                  className="rounded-[var(--radius-document)] bg-surface-container-low p-4"
                 >
                   <div className="flex flex-col gap-3">
-                    <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                      Logo
-                    </p>
+                    <Eyebrow>Logo</Eyebrow>
                     <div
                       data-testid="settings-logo-content-row"
                       className="flex flex-col gap-3 min-[360px]:grid min-[360px]:grid-cols-[128px_minmax(0,1fr)] min-[360px]:items-start min-[360px]:gap-4"
                     >
                       <div
                         data-testid="settings-logo-preview-tile"
-                        className="flex h-[128px] w-[128px] rounded-xl bg-surface-container-lowest p-2"
+                        className="flex h-[128px] w-[128px] rounded-[var(--radius-document)] bg-surface-container-lowest p-2"
                       >
                         <div className="flex h-full w-full items-center justify-center rounded-lg bg-surface-container p-2">
                           {hasLogo ? (
@@ -245,7 +243,7 @@ export function SettingsScreen(): React.ReactElement {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="min-h-10 rounded-lg border border-outline-variant/30 px-3 text-xs text-on-surface"
+                            className="min-h-10 border border-outline-variant/30 px-3 text-xs text-on-surface"
                             disabled={isLogoSubmitting}
                             onClick={() => logoUploadInputRef.current?.click()}
                           >
@@ -266,7 +264,7 @@ export function SettingsScreen(): React.ReactElement {
                               type="button"
                               variant="destructive"
                               size="sm"
-                              className="min-h-10 rounded-lg px-3 text-xs"
+                              className="min-h-10 px-3 text-xs"
                               disabled={isLogoSubmitting}
                               onClick={() => setIsRemoveLogoOpen(true)}
                             >
@@ -360,21 +358,17 @@ export function SettingsScreen(): React.ReactElement {
                   ))}
                 </Select>
               </div>
-            </section>
+            </Card>
 
             <SettingsCatalogShortcutCard
               onOpenLineItemCatalog={() => navigate("/settings/line-item-catalog")}
             />
 
-            <section className="rounded-xl bg-surface-container-low p-4">
-              <h2 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                Account
-              </h2>
+            <Card className="bg-surface-container-low p-4">
+              <Eyebrow>Account</Eyebrow>
               <div className="mt-3 flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                    Email
-                  </p>
+                  <Eyebrow>Email</Eyebrow>
                   <p className="truncate text-sm text-on-surface">{email}</p>
                 </div>
 
@@ -382,13 +376,13 @@ export function SettingsScreen(): React.ReactElement {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="shrink-0 rounded-lg border border-outline-variant/30 px-4 text-sm text-on-surface"
+                  className="shrink-0 border border-outline-variant/30 px-4 text-sm text-on-surface"
                   onClick={() => setIsSignOutConfirmOpen(true)}
                 >
                   Sign Out
                 </Button>
               </div>
-            </section>
+            </Card>
 
             <div className="pt-2">
               <Button
