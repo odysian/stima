@@ -43,9 +43,9 @@ export function CaptureInputPanel({
       <section className="mb-4 rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-low p-4">
         <div className="mb-3 flex items-center justify-between">
           <Eyebrow className="text-on-surface">RECORDED CLIPS</Eyebrow>
-          <span className="rounded-full bg-surface-container-lowest px-2.5 py-1 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
+          <Eyebrow as="span" className="rounded-full bg-surface-container-lowest px-2.5 py-1 tracking-widest">
             {clips.length} CLIPS
-          </span>
+          </Eyebrow>
         </div>
 
         {clips.length === 0 ? (
@@ -141,9 +141,7 @@ export function CaptureInputPanel({
         </div>
       ) : (
         <div className="mt-auto mb-2 flex flex-col items-center gap-3 pt-4 sm:pt-6">
-          <p className="text-xs uppercase tracking-widest text-outline">
-            TAP TO START
-          </p>
+          <Eyebrow as="span" className="text-xs tracking-widest">TAP TO START</Eyebrow>
           {hasReachedClipLimit ? (
             <p className="text-center text-xs text-outline">
               Maximum of {MAX_AUDIO_CLIPS_PER_REQUEST} clips per request reached.

@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import type { ExtractionReviewHiddenDetails, HiddenItemState } from "@/features/quotes/types/quote.types";
 import { resolveCaptureDetailsActionableItems } from "@/features/quotes/utils/captureDetails";
 import { Button } from "@/shared/components/Button";
+import { Eyebrow } from "@/ui/Eyebrow";
 import { Sheet, SheetBody, SheetCloseButton, SheetFooter, SheetHeader } from "@/ui/Sheet";
 
 interface CaptureDetailsSheetProps {
@@ -49,9 +50,7 @@ export function CaptureDetailsSheet({
 
       <SheetBody className="max-h-[70vh] space-y-5 overflow-y-auto pr-1">
               <section className="space-y-2">
-                <h3 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                  Actionable Capture Details
-                </h3>
+                <Eyebrow as="h3">Actionable Capture Details</Eyebrow>
                 {actionableItems.length > 0 ? (
                   <ul className="space-y-2">
                     {actionableItems.map((item) => (
@@ -66,7 +65,7 @@ export function CaptureDetailsSheet({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] uppercase tracking-wide"
+                            className="rounded-md border border-outline-variant/40 px-2 py-1 text-xs font-medium uppercase tracking-wide"
                             disabled={isMutating || !onDismissHiddenItem}
                             onClick={() => { void onDismissHiddenItem?.(item.id); }}
                           >
@@ -82,9 +81,7 @@ export function CaptureDetailsSheet({
               </section>
 
               <section className="space-y-2">
-                <h3 className="text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                  Transcript
-                </h3>
+                <Eyebrow as="h3">Transcript</Eyebrow>
                 <div className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm leading-6 text-on-surface whitespace-pre-wrap">
                   {transcript.trim().length > 0 ? transcript : "No transcript notes captured."}
                 </div>

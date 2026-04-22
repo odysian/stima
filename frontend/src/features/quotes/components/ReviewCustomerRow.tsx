@@ -23,9 +23,9 @@ export function ReviewCustomerRow({
       <div className="flex items-center justify-between gap-3">
         <Eyebrow>Customer</Eyebrow>
         {requiresCustomerAssignment ? (
-          <span className="rounded-full bg-warning-container px-2.5 py-1 text-[0.6875rem] font-bold uppercase tracking-wide text-warning">
+          <Eyebrow as="span" className="rounded-full bg-warning-container px-2.5 py-1 text-warning">
             Needs customer
-          </span>
+          </Eyebrow>
         ) : null}
       </div>
 

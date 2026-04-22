@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { Button } from "@/shared/components/Button";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 export function ErrorFallback(): ReactElement {
   return (
@@ -9,9 +10,7 @@ export function ErrorFallback(): ReactElement {
         role="alert"
         className="ghost-shadow w-full max-w-md rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-8 text-center"
       >
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-error">
-          Something went wrong
-        </p>
+        <Eyebrow className="text-error">Something went wrong</Eyebrow>
         <h1 className="mt-4 text-3xl font-semibold text-on-surface">Please reload Stima</h1>
         <p className="mt-3 text-sm leading-6 text-on-surface-variant">
           We hit an unexpected error and recorded it for follow-up. Reload to try again.
