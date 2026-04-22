@@ -87,6 +87,7 @@ export function TotalAmountSection({
             showStepControls={false}
             formatOnBlur={false}
             currencySymbol="$"
+            currencySymbolClassName="!text-2xl !font-bold text-primary"
             trailingAdornment={(
               <span className="pointer-events-none material-symbols-outlined !text-base leading-none text-on-surface-variant">
                 edit

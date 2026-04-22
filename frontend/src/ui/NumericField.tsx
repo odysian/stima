@@ -11,6 +11,7 @@ interface NumericFieldProps extends Omit<InputProps, "type" | "value" | "onChang
   formatOnBlur?: boolean;
   showStepControls?: boolean;
   currencySymbol?: string;
+  currencySymbolClassName?: string;
   trailingAdornment?: ReactNode;
 }
 
@@ -54,6 +55,7 @@ export function NumericField({
   formatOnBlur = true,
   showStepControls = true,
   currencySymbol,
+  currencySymbolClassName,
   trailingAdornment,
   ...props
 }: NumericFieldProps): React.ReactElement {
@@ -105,7 +107,7 @@ export function NumericField({
       }}
       inputMode="decimal"
       startAdornment={currencySymbol ? (
-        <span aria-hidden="true" className="!text-2xl !font-bold text-primary">
+        <span aria-hidden="true" className={currencySymbolClassName}>
           {currencySymbol}
         </span>
       ) : undefined}
