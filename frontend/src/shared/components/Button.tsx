@@ -51,10 +51,34 @@ const iconButtonSizeClasses: Record<ButtonSize, string> = {
   lg: "h-14 w-14 min-h-14 min-w-14 p-0",
 };
 
-const spinnerSizeClasses: Record<ButtonSize, string> = {
+const spinnerContainerSizeClasses: Record<ButtonSize, string> = {
   sm: "h-4 w-4",
   md: "h-5 w-5",
   lg: "h-6 w-6",
+};
+
+const spinnerDotClasses: Record<ButtonSize, { top: string; bottom: string }> = {
+  sm: {
+    top: "top-0 h-1.5 w-1.5",
+    bottom: "bottom-0 h-1 w-1",
+  },
+  md: {
+    top: "top-0 h-2 w-2",
+    bottom: "bottom-0 h-1.5 w-1.5",
+  },
+  lg: {
+    top: "top-0 h-2.5 w-2.5",
+    bottom: "bottom-0 h-2 w-2",
+  },
+};
+
+const spinnerToneClasses: Record<ButtonVariant, string> = {
+  primary: "text-on-primary",
+  secondary: "text-on-surface",
+  tonal: "text-primary",
+  destructive: "text-secondary",
+  ghost: "text-on-surface-variant",
+  iconButton: "text-on-surface-variant",
 };
 
 const contentGapClasses: Record<ButtonSize, string> = {
@@ -121,27 +145,19 @@ export function Button({
       </span>
       {isLoading ? (
         <span className="pointer-events-none absolute inset-0 inline-flex items-center justify-center">
-          <svg
-            data-testid="button-spinner"
-            className={`animate-spin ${spinnerSizeClasses[size]}`}
-            viewBox="0 0 24 24"
+          <span
             aria-hidden="true"
+            className={`relative inline-flex items-center justify-center ${spinnerContainerSizeClasses[size]} ${spinnerToneClasses[variant]}`}
           >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-90"
-              fill="currentColor"
-              d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4z"
-            />
-          </svg>
+            <span data-testid="button-spinner" className="absolute inset-0 animate-spin [animation-duration:1.1s]">
+              <span
+                className={`absolute left-1/2 -translate-x-1/2 rounded-full bg-current ${spinnerDotClasses[size].top}`}
+              />
+              <span
+                className={`absolute bottom-0 left-1/2 -translate-x-1/2 rounded-full bg-current opacity-[0.65] ${spinnerDotClasses[size].bottom}`}
+              />
+            </span>
+          </span>
           <span className="sr-only">Loading</span>
         </span>
       ) : null}

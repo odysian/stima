@@ -59,7 +59,21 @@ describe("Button", () => {
 
     expect(button).toBeDisabled();
     expect(screen.getByTestId("button-spinner")).toHaveClass("animate-spin");
+    const movingDots = screen.getByTestId("button-spinner").querySelectorAll("span");
+    expect(movingDots).toHaveLength(2);
+    expect(movingDots[0]).toHaveClass("bg-current", "rounded-full");
+    expect(movingDots[1]).toHaveClass("bg-current", "rounded-full", "opacity-[0.65]");
     expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("applies variant-aware spinner contrast colors", () => {
+    render(
+      <Button variant="destructive" isLoading>
+        Delete
+      </Button>,
+    );
+
+    expect(screen.getByTestId("button-spinner").parentElement).toHaveClass("text-secondary");
   });
 
   it("throws if iconButton is rendered without an aria-label", () => {
