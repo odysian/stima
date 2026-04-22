@@ -123,16 +123,22 @@ Deliver:
 ### 3a) Short reviewer kickoff (default)
 
 ```text
-Review Task #<task-id> / PR #<pr-id> | branch `<task-branch>` vs `<base-branch>`.
+Use code-review-graph selectively to review Task #<task-id> / PR #<pr-id> | branch `<task-branch>` vs `<base-branch>`.
 
 Implementation verification (already run, green): <e.g. make backend-verify>
 
-Follow `docs/template/KICKOFF.md` section **3b) Full reviewer brief** for review scope, constraints, and required output shape. Reply with `APPROVED` or `ACTIONABLE` per that section. If `APPROVED`, end the same response with the lightweight tutoring handoff per section 4.
+Follow `docs/template/KICKOFF.md` section **3b) Full reviewer brief** for review scope, graph-usage policy, constraints, and required output shape. Reply with `APPROVED` or `ACTIONABLE` per that section. If `APPROVED`, end the same response with the lightweight tutoring handoff per section 4.
 ```
 
 ### 3b) Full reviewer brief (authoritative source)
 
 Use `.github/prompts/review-task.prompt.md`.
+
+Graph usage policy:
+- Prefer minimal-first graph usage.
+- For small/local PRs, raw diff review is acceptable and often preferable.
+- Do not call full `detect_changes` by default.
+- Escalate to `detect_changes` only when blast radius or hidden impact is unclear.
 
 Required output shape remains authoritative:
 1. Verdict: `APPROVED` or `ACTIONABLE`
