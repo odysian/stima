@@ -32,7 +32,7 @@ export function CaptureDetailsSheet({
           data-testid="capture-details-sheet-overlay"
           className="modal-backdrop fixed inset-0 z-50"
         />
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0">
+        <div className="sheet-safe-bottom pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 sm:items-center">
           <Dialog.Content className="modal-shadow pointer-events-auto w-full max-w-2xl rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6">
             <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
               Capture Details

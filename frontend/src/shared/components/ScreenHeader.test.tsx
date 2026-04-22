@@ -10,6 +10,7 @@ describe("ScreenHeader", () => {
     expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /back/i })).not.toBeInTheDocument();
     expect(container.querySelector("header")).toHaveClass(
+      "safe-top",
       "glass-surface",
       "glass-shadow-top",
       "border-outline-variant/20",

@@ -259,6 +259,36 @@
   background-color: var(--overlay-backdrop);
 }
 
+.safe-top {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+}
+
+.safe-bottom-keyboard {
+  padding-bottom: max(
+    env(keyboard-inset-height, 0px),
+    env(safe-area-inset-bottom),
+    0.75rem
+  );
+}
+
+.sheet-safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+}
+
+@media (min-width: 640px) {
+  .sheet-safe-bottom {
+    padding-bottom: 0;
+  }
+}
+
+.toast-safe-bottom {
+  bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+
 .modal-shadow {
   box-shadow: var(--shadow-modal);
 }

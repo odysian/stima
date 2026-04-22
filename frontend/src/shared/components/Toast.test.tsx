@@ -23,8 +23,8 @@ describe("Toast", () => {
 
     const toast = screen.getByRole("status");
     expect(toast).toHaveClass(
+      "toast-safe-bottom",
       "fixed",
-      "bottom-20",
       "left-1/2",
       "-translate-x-1/2",
       "rounded-xl",

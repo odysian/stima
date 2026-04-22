@@ -22,7 +22,7 @@ export function ScreenHeader({
   const isTopLevelLayout = layout === "top-level";
 
   return (
-    <header className="glass-surface glass-shadow-top fixed top-0 z-50 h-16 w-full border-b border-outline-variant/20 backdrop-blur-md">
+    <header className="safe-top glass-surface glass-shadow-top fixed top-0 z-50 h-16 w-full border-b border-outline-variant/20 backdrop-blur-md">
       <div
         className={[
           "flex h-16 w-full items-center gap-3 px-4",

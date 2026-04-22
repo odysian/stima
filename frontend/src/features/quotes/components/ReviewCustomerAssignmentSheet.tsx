@@ -139,7 +139,7 @@ export function ReviewCustomerAssignmentSheet({
     <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="modal-backdrop fixed inset-0 z-50" />
-        <div className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center sm:pb-0">
+        <div className="sheet-safe-bottom fixed inset-0 z-50 flex items-end justify-center px-4 sm:items-center">
           <Dialog.Content
             className="modal-shadow w-full max-w-md rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest p-6"
             onOpenAutoFocus={(event) => event.preventDefault()}
@@ -246,4 +246,3 @@ export function ReviewCustomerAssignmentSheet({
     </Dialog.Root>
   );
 }
-

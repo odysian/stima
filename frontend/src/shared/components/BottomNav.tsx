@@ -29,7 +29,7 @@ export function BottomNav({ active }: BottomNavProps): React.ReactElement {
   const navigate = useNavigate();
 
   return (
-    <nav className="glass-surface-strong glass-shadow-bottom fixed bottom-0 z-50 flex w-full justify-around border-t border-outline-variant/20 py-3 backdrop-blur-md">
+    <nav className="safe-bottom glass-surface-strong glass-shadow-bottom fixed bottom-0 z-50 flex w-full justify-around border-t border-outline-variant/20 py-3 backdrop-blur-md">
       {tabs.map((tab) => {
         const isActive = active === tab.key;
         return (

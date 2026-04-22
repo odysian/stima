@@ -12,6 +12,7 @@ describe("ScreenFooter", () => {
     );
 
     expect(container.querySelector("footer")).toHaveClass(
+      "safe-bottom-keyboard",
       "glass-surface",
       "glass-shadow-bottom",
       "border-outline-variant/20",
