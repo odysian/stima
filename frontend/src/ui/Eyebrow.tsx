@@ -7,16 +7,18 @@ interface EyebrowProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
 
 function mergeEyebrowClasses(className?: string): string {
   const extra = className?.trim() ? className.trim().split(/\s+/) : [];
-  const hasTextOverride = extra.some((token) => token.startsWith("text-"));
+  const sizeClassPattern = /^text-(?:xs|sm|base|lg|[0-9]+xl|\[)/;
+  const hasSizeOverride = extra.some((token) => sizeClassPattern.test(token));
+  const hasColorOverride = extra.some((token) => token.startsWith("text-") && !sizeClassPattern.test(token));
   const hasTrackingOverride = extra.some((token) => token.startsWith("tracking-"));
   const hasFontOverride = extra.some((token) => token.startsWith("font-"));
 
   const base = [
-    hasTextOverride ? null : "text-[0.6875rem]",
+    hasSizeOverride ? null : "text-[0.6875rem]",
     hasFontOverride ? null : "font-bold",
     "uppercase",
     hasTrackingOverride ? null : "tracking-[0.12em]",
-    hasTextOverride ? null : "text-outline",
+    hasColorOverride ? null : "text-outline",
   ].filter(Boolean);
 
   return [...base, ...extra].join(" ");
