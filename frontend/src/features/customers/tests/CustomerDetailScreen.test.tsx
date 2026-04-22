@@ -446,6 +446,8 @@ describe("CustomerDetailScreen", () => {
     await switchToInvoicesTab();
 
     expect(await screen.findByText("No invoices yet.")).toBeInTheDocument();
+    const icons = screen.getAllByText("description");
+    expect(icons.some((icon) => icon.classList.contains("text-3xl"))).toBe(true);
   });
 
   it("renders invoice history error state without hiding the customer details", async () => {
@@ -485,6 +487,8 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("No quotes yet.")).toBeInTheDocument();
+    const icons = screen.getAllByText("description");
+    expect(icons.some((icon) => icon.classList.contains("text-3xl"))).toBe(true);
   });
 
   it("renders BottomNav with customers tab active", async () => {

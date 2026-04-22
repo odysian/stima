@@ -77,6 +77,7 @@ describe("QuoteHistoryList", () => {
     render(<QuoteHistoryList quotes={[]} onQuoteClick={vi.fn()} timezone="UTC" />);
 
     expect(screen.getByText("No quotes yet.")).toBeInTheDocument();
+    expect(screen.getByText("description")).toHaveClass("material-symbols-outlined");
   });
 
   it("renders dates using the provided timezone", () => {

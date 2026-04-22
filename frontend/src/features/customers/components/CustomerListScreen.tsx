@@ -7,6 +7,7 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { EmptyState } from "@/ui/EmptyState";
 import { useToast } from "@/ui/Toast";
 
 interface CustomerListLocationState {
@@ -136,17 +137,15 @@ export function CustomerListScreen(): React.ReactElement {
         ) : null}
 
         {showNoCustomersState ? (
-          <section className="mx-4 mt-8 flex flex-col items-center rounded-lg bg-surface-container-lowest p-8 text-center ghost-shadow">
-            <span className="material-symbols-outlined mb-2 text-3xl text-outline">group</span>
-            <p className="text-sm text-outline">No customers yet.</p>
-          </section>
+          <EmptyState className="mx-4 mt-8 p-8" icon="group" title="No customers yet." />
         ) : null}
 
         {showNoSearchMatches ? (
-          <section className="mx-4 mt-8 flex flex-col items-center rounded-lg bg-surface-container-lowest p-8 text-center ghost-shadow">
-            <span className="material-symbols-outlined mb-2 text-3xl text-outline">group</span>
-            <p className="text-sm text-outline">No customers match your search.</p>
-          </section>
+          <EmptyState
+            className="mx-4 mt-8 p-8"
+            icon="group"
+            title="No customers match your search."
+          />
         ) : null}
       </section>
 

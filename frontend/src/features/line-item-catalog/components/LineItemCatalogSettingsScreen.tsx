@@ -12,6 +12,7 @@ import { Input } from "@/shared/components/Input";
 import { NumericField } from "@/ui/NumericField";
 import { useToast } from "@/ui/Toast";
 import { Card } from "@/ui/Card";
+import { EmptyState } from "@/ui/EmptyState";
 import { Eyebrow } from "@/ui/Eyebrow";
 
 interface ParsedPriceInput {
@@ -281,9 +282,11 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
             <Card className="bg-surface-container-low p-4">
               <Eyebrow>Saved Items</Eyebrow>
               {sortedItems.length === 0 ? (
-                <p className="mt-3 text-sm text-on-surface-variant">
-                  No catalog items yet. Create one to reuse it in quote line items.
-                </p>
+                <EmptyState
+                  className="mt-3"
+                  icon="folder_off"
+                  title="No catalog items yet. Create one to reuse it in quote line items."
+                />
               ) : (
                 <div className="mt-3 space-y-2">
                   {sortedItems.map((item) => (

@@ -114,9 +114,9 @@ describe("CustomerListScreen", () => {
 
     renderScreen();
 
-    const emptyState = (await screen.findByText("No customers yet.")).closest("section");
-    expect(emptyState).not.toBeNull();
-    expect(emptyState?.querySelector(".material-symbols-outlined")).toHaveClass("text-3xl");
+    expect(await screen.findByText("No customers yet.")).toBeInTheDocument();
+    const icons = screen.getAllByText("group");
+    expect(icons.some((icon) => icon.classList.contains("text-3xl"))).toBe(true);
   });
 
   it("renders the search-empty icon with the compact token size", async () => {
@@ -129,9 +129,9 @@ describe("CustomerListScreen", () => {
       target: { value: "zzz" },
     });
 
-    const emptyState = (await screen.findByText("No customers match your search.")).closest("section");
-    expect(emptyState).not.toBeNull();
-    expect(emptyState?.querySelector(".material-symbols-outlined")).toHaveClass("text-3xl");
+    expect(await screen.findByText("No customers match your search.")).toBeInTheDocument();
+    const icons = screen.getAllByText("group");
+    expect(icons.some((icon) => icon.classList.contains("text-3xl"))).toBe(true);
   });
 
   it("navigates to customer detail when a row is clicked", async () => {
