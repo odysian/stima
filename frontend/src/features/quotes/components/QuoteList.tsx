@@ -13,6 +13,7 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { formatDate } from "@/shared/lib/formatters";
+import { EmptyState } from "@/ui/EmptyState";
 import { Eyebrow } from "@/ui/Eyebrow";
 import { QuoteListRow } from "@/ui/QuoteListRow";
 import type { StatusPillVariant } from "@/ui/StatusPill";
@@ -339,10 +340,11 @@ export function QuoteList(): React.ReactElement {
         ) : null}
 
         {!isLoading && !loadError && filteredRows.length === 0 ? (
-          <section className="mx-4 mt-8 flex flex-col items-center rounded-lg bg-surface-container-lowest p-8 text-center ghost-shadow">
-            <span className="material-symbols-outlined mb-2 text-3xl text-outline">description</span>
-            <p className="text-sm text-outline">{emptyStateMessage}</p>
-          </section>
+          <EmptyState
+            className="mx-4 mt-8 p-8"
+            icon="description"
+            title={emptyStateMessage}
+          />
         ) : null}
 
         {!isLoading && !loadError && filteredRows.length > 0 ? (

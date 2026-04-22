@@ -2,6 +2,7 @@ import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { SkeletonBlock } from "@/shared/components/SkeletonBlock";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
+import { EmptyState } from "@/ui/EmptyState";
 import { Eyebrow } from "@/ui/Eyebrow";
 import { StatusPill } from "@/ui/StatusPill";
 
@@ -95,9 +96,7 @@ export function InvoiceHistoryList({
       ) : null}
 
       {!isLoading && !loadError && invoices.length === 0 ? (
-        <p className="rounded-lg bg-surface-container-lowest p-4 text-sm text-outline ghost-shadow">
-          No invoices yet.
-        </p>
+        <EmptyState icon="inbox_out" title="No invoices yet." />
       ) : null}
     </section>
   );
