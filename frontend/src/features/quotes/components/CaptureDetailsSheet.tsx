@@ -65,7 +65,7 @@ export function CaptureDetailsSheet({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="rounded-md border border-outline-variant/40 px-2 py-1 text-[0.6875rem] uppercase tracking-wide"
+                            className="rounded-md border border-outline-variant/40 px-2 py-1 text-xs font-medium uppercase tracking-wide"
                             disabled={isMutating || !onDismissHiddenItem}
                             onClick={() => { void onDismissHiddenItem?.(item.id); }}
                           >
