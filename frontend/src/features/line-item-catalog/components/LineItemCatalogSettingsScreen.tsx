@@ -9,6 +9,8 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { Toast } from "@/shared/components/Toast";
+import { Input } from "@/shared/components/Input";
+import { NumericField } from "@/ui/NumericField";
 
 interface ParsedPriceInput {
   value: number | null;
@@ -16,7 +18,7 @@ interface ParsedPriceInput {
 }
 
 function parsePriceInput(priceInput: string): ParsedPriceInput {
-  const trimmed = priceInput.trim();
+  const trimmed = priceInput.replaceAll(",", "").trim();
   if (trimmed.length === 0) {
     return { value: null, error: null };
   }
@@ -213,18 +215,12 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
               <form className="mt-4 space-y-3" onSubmit={(event) => void handleSubmit(event)}>
                 {formError ? <FeedbackMessage variant="error">{formError}</FeedbackMessage> : null}
 
-                <div className="space-y-1">
-                  <label htmlFor="line-item-catalog-title" className="text-sm font-medium text-on-surface">
-                    Title
-                  </label>
-                  <input
-                    id="line-item-catalog-title"
-                    type="text"
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
+                <Input
+                  id="line-item-catalog-title"
+                  label="Title"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
 
                 <div className="space-y-1">
                   <label htmlFor="line-item-catalog-details" className="text-sm font-medium text-on-surface">
@@ -239,20 +235,17 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label htmlFor="line-item-catalog-default-price" className="text-sm font-medium text-on-surface">
-                    Default price (optional)
-                  </label>
-                  <input
-                    id="line-item-catalog-default-price"
-                    type="text"
-                    inputMode="decimal"
-                    value={defaultPriceInput}
-                    onChange={(event) => setDefaultPriceInput(event.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-lg bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
+                <NumericField
+                  id="line-item-catalog-default-price"
+                  label="Default price (optional)"
+                  value={defaultPriceInput}
+                  onChange={setDefaultPriceInput}
+                  placeholder="0.00"
+                  currencySymbol="$"
+                  step={0.01}
+                  formatOnBlur
+                  showStepControls
+                />
 
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button

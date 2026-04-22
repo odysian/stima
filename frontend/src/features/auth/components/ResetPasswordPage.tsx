@@ -3,8 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { authService } from "@/features/auth/services/authService";
 import { Button } from "@/shared/components/Button";
-import { Input } from "@/shared/components/Input";
 import { isHttpRequestError } from "@/shared/lib/http";
+import { PasswordField } from "@/ui/PasswordField";
 
 const RESET_PASSWORD_SUCCESS_MESSAGE = "Password reset successful. Please sign in.";
 const BAD_TOKEN_MESSAGE = "This reset link is invalid or expired. Request a new reset link.";
@@ -87,21 +87,23 @@ export function ResetPasswordPage(): React.ReactElement {
           </div>
         ) : (
           <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-            <Input
+            <PasswordField
               id="new-password"
               label="New Password"
-              type="password"
               required
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
+              autoComplete="new-password"
             />
-            <Input
+            <PasswordField
               id="confirm-password"
               label="Confirm Password"
-              type="password"
               required
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
+              autoComplete="new-password"
+              showToggleLabel="Show password confirmation"
+              hideToggleLabel="Hide password confirmation"
             />
 
             {error ? (

@@ -1,6 +1,8 @@
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
+import { Input } from "@/shared/components/Input";
 import { resolveLineItemFlagMessage } from "@/features/quotes/utils/lineItemFlags";
+import { NumericField } from "@/ui/NumericField";
 
 interface LineItemRowProps {
   rowId: string;
@@ -20,8 +22,6 @@ export function LineItemRow({
   const descriptionInputId = `${rowId}-description`;
   const detailsInputId = `${rowId}-details`;
   const priceInputId = `${rowId}-price`;
-  const inputClassName =
-    "rounded-md border border-outline-variant px-3 py-2 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30";
 
   return (
     <div className="rounded-md border border-outline-variant p-4">
@@ -31,27 +31,20 @@ export function LineItemRow({
         </p>
       ) : null}
       <div className="grid gap-3 md:grid-cols-[1.3fr_1.3fr_0.8fr_auto] md:items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-on-surface" htmlFor={descriptionInputId}>
-            Description
-          </label>
-          <input
+        <div>
+          <Input
             id={descriptionInputId}
-            type="text"
+            label="Description"
             value={item.description}
             onChange={(event) => onChange({ ...item, description: event.target.value })}
-            className={inputClassName}
+            error={descriptionError ?? undefined}
           />
-          {descriptionError ? <p className="text-xs text-error">{descriptionError}</p> : null}
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-on-surface" htmlFor={detailsInputId}>
-            Details
-          </label>
-          <input
+        <div>
+          <Input
             id={detailsInputId}
-            type="text"
+            label="Details"
             value={item.details ?? ""}
             onChange={(event) =>
               onChange({
@@ -59,32 +52,31 @@ export function LineItemRow({
                 details: event.target.value.trim().length > 0 ? event.target.value : null,
               })
             }
-            className={inputClassName}
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-on-surface" htmlFor={priceInputId}>
-            Price
-          </label>
-          <input
+        <div>
+          <NumericField
             id={priceInputId}
-            type="number"
-            step="0.01"
-            value={item.price ?? ""}
-            onChange={(event) => {
-              const rawValue = event.target.value.trim();
-              if (rawValue === "") {
+            label="Price"
+            step={0.01}
+            value={item.price === null ? "" : item.price.toString()}
+            currencySymbol="$"
+            onChange={(rawPriceValue) => {
+              const normalizedValue = rawPriceValue.replaceAll(",", "").trim();
+              if (normalizedValue === "") {
                 onChange({ ...item, price: null });
                 return;
               }
-              const parsedValue = Number(rawValue);
+              const parsedValue = Number(normalizedValue);
               onChange({
                 ...item,
                 price: Number.isFinite(parsedValue) ? parsedValue : null,
               });
             }}
-            className={inputClassName}
+            showStepControls
+            formatOnBlur
+            hint="USD"
           />
         </div>
 
