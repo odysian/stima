@@ -16,7 +16,6 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { Toast } from "@/shared/components/Toast";
 import { useTheme } from "@/shared/hooks/useTheme";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
@@ -24,6 +23,7 @@ import { parseTaxPercentInput, toTaxPercentDisplay } from "@/shared/lib/pricing"
 import type { ThemePreference } from "@/shared/lib/theme";
 import { NumericField } from "@/ui/NumericField";
 import { Select } from "@/ui/Select";
+import { useToast } from "@/ui/Toast";
 
 const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = [
   { label: "System default", value: "system" },
@@ -33,6 +33,7 @@ const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = 
 
 export function SettingsScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const { show } = useToast();
   const { logout, refreshUser } = useAuth();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const logoPreviewSrc = `${import.meta.env.VITE_API_URL ?? ""}/api/profile/logo`;
@@ -93,6 +94,14 @@ export function SettingsScreen(): React.ReactElement {
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!saveSuccess) {
+      return;
+    }
+    show({ message: saveSuccess, variant: "success" });
+    setSaveSuccess(null);
+  }, [saveSuccess, show]);
 
   const onLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -396,7 +405,6 @@ export function SettingsScreen(): React.ReactElement {
       </section>
 
       <BottomNav active="settings" />
-      <Toast message={saveSuccess} onDismiss={() => setSaveSuccess(null)} />
 
       {isRemoveLogoOpen ? (
         <ConfirmModal

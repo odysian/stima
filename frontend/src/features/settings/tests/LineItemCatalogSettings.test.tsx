@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LineItemCatalogSettingsScreen } from "@/features/line-item-catalog/components/LineItemCatalogSettingsScreen";
 import { lineItemCatalogService } from "@/features/line-item-catalog/services/lineItemCatalogService";
+import { ToastProvider } from "@/ui/Toast";
 
 vi.mock("@/features/line-item-catalog/services/lineItemCatalogService", () => ({
   lineItemCatalogService: {
@@ -19,7 +20,9 @@ const mockedLineItemCatalogService = vi.mocked(lineItemCatalogService);
 function renderScreen(): void {
   render(
     <MemoryRouter>
-      <LineItemCatalogSettingsScreen />
+      <ToastProvider>
+        <LineItemCatalogSettingsScreen />
+      </ToastProvider>
     </MemoryRouter>,
   );
 }

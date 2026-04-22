@@ -11,6 +11,7 @@ import type { InvoiceDetail } from "@/features/invoices/types/invoice.types";
 import { profileService } from "@/features/profile/services/profileService";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
+import { ToastProvider } from "@/ui/Toast";
 
 const navigateMock = vi.fn();
 const useParamsMock = vi.fn(() => ({ id: "doc-1" }));
@@ -225,7 +226,9 @@ function renderScreen(options?: {
 
   render(
     <MemoryRouter>
-      <DocumentEditScreen />
+      <ToastProvider>
+        <DocumentEditScreen />
+      </ToastProvider>
     </MemoryRouter>,
   );
 

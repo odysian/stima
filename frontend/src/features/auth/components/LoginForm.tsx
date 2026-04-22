@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Location } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
-import { Toast } from "@/shared/components/Toast";
 import { PasswordField } from "@/ui/PasswordField";
+import { useToast } from "@/ui/Toast";
 
 interface LoginLocationState {
   from?: Location;
@@ -15,6 +15,7 @@ interface LoginLocationState {
 
 export function LoginForm(): React.ReactElement {
   const { login } = useAuth();
+  const { show } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -24,6 +25,14 @@ export function LoginForm(): React.ReactElement {
   const [flashMessage, setFlashMessage] = useState(
     (location.state as LoginLocationState | undefined)?.flashMessage ?? null,
   );
+
+  useEffect(() => {
+    if (!flashMessage) {
+      return;
+    }
+    show({ message: flashMessage, variant: "success" });
+    setFlashMessage(null);
+  }, [flashMessage, show]);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -89,7 +98,6 @@ export function LoginForm(): React.ReactElement {
           </Link>
         </p>
       </section>
-      <Toast message={flashMessage} onDismiss={() => setFlashMessage(null)} />
     </main>
   );
 }

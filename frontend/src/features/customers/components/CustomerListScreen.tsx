@@ -7,7 +7,7 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { Toast } from "@/shared/components/Toast";
+import { useToast } from "@/ui/Toast";
 
 interface CustomerListLocationState {
   flashMessage?: string;
@@ -20,6 +20,7 @@ function contactLine(customer: Customer): string {
 export function CustomerListScreen(): React.ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
+  const { show } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -27,6 +28,14 @@ export function CustomerListScreen(): React.ReactElement {
   const [flashMessage, setFlashMessage] = useState(
     (location.state as CustomerListLocationState | undefined)?.flashMessage ?? null,
   );
+
+  useEffect(() => {
+    if (!flashMessage) {
+      return;
+    }
+    show({ message: flashMessage, variant: "success" });
+    setFlashMessage(null);
+  }, [flashMessage, show]);
 
   useEffect(() => {
     let isActive = true;
@@ -151,7 +160,6 @@ export function CustomerListScreen(): React.ReactElement {
       </button>
 
       <BottomNav active="customers" />
-      <Toast message={flashMessage} onDismiss={() => setFlashMessage(null)} />
     </main>
   );
 }
