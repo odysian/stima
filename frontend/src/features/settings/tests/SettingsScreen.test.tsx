@@ -135,7 +135,7 @@ describe("SettingsScreen", () => {
       "text-[0.6875rem]",
       "font-bold",
       "uppercase",
-      "tracking-widest",
+      "tracking-[0.12em]",
       "text-outline",
     );
     expect(screen.getByText("Stima")).toBeInTheDocument();
@@ -156,7 +156,7 @@ describe("SettingsScreen", () => {
     );
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).toBeNull();
-    expect(screen.getByText("Account").closest("section")).toHaveClass("bg-surface-container-low");
+    expect(screen.getByText("Account").closest("div")).toHaveClass("bg-surface-container-low");
     expect(screen.queryByText("Session")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /back/i })).not.toBeInTheDocument();
@@ -408,8 +408,8 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     const signOutButton = await screen.findByRole("button", { name: /sign out/i });
-    expect(signOutButton).toHaveClass("border", "border-outline-variant/30", "text-on-surface");
-    expect(signOutButton).not.toHaveClass("bg-secondary");
+    expect(signOutButton).toHaveClass("border", "border-secondary", "text-secondary");
+    expect(signOutButton).not.toHaveClass("text-on-surface");
 
     fireEvent.click(signOutButton);
 
@@ -437,7 +437,7 @@ describe("SettingsScreen", () => {
 
     expect(await screen.findByText("Business Profile")).toBeInTheDocument();
     expect(screen.getByTestId("settings-logo-block")).toHaveClass(
-      "rounded-xl",
+      "rounded-[var(--radius-document)]",
       "bg-surface-container-low",
       "p-4",
     );
@@ -460,7 +460,7 @@ describe("SettingsScreen", () => {
     expect(previewTile).toHaveClass(
       "h-[128px]",
       "w-[128px]",
-      "rounded-xl",
+      "rounded-[var(--radius-document)]",
       "bg-surface-container-lowest",
     );
     expect(
@@ -483,7 +483,7 @@ describe("SettingsScreen", () => {
 
     expect(await screen.findByText("Business Profile")).toBeInTheDocument();
     expect(screen.getByTestId("settings-logo-block")).toHaveClass(
-      "rounded-xl",
+      "rounded-[var(--radius-document)]",
       "bg-surface-container-low",
       "p-4",
     );
@@ -506,7 +506,7 @@ describe("SettingsScreen", () => {
     expect(previewTile).toHaveClass(
       "h-[128px]",
       "w-[128px]",
-      "rounded-xl",
+      "rounded-[var(--radius-document)]",
       "bg-surface-container-lowest",
     );
     expect(
@@ -620,7 +620,7 @@ describe("SettingsScreen", () => {
       expect(screen.getByTestId("settings-logo-preview-tile")).toHaveClass(
         "h-[128px]",
         "w-[128px]",
-        "rounded-xl",
+        "rounded-[var(--radius-document)]",
         "bg-surface-container-lowest",
       );
       expect(screen.getByText("No logo")).toBeInTheDocument();
