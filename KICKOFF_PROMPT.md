@@ -12,6 +12,8 @@ Run kickoff for existing Task #<task-id> mode=single.
 Reference <execution-brief-filepath>  # when present
 Reference <analog-filepath>  # when relevant
 
+Then execute the full Task flow end-to-end.
+
 ## Review request
 
 Use `docs/template/KICKOFF.md` section 3a.
