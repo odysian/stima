@@ -25,6 +25,7 @@ import { DocumentEditScreen } from "@/features/quotes/components/ReviewScreen";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { QuotePreview } from "@/features/quotes/components/QuotePreview";
 import { SettingsScreen } from "@/features/settings/components/SettingsScreen";
+import { PageTransition } from "@/ui/PageTransition";
 import { ToastProvider } from "@/ui/Toast";
 
 function ProtectedRoute(): React.ReactElement {
@@ -91,61 +92,63 @@ export default function App(): React.ReactElement {
   return (
     <ToastProvider>
       <Routes>
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <LoginForm />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <PublicRoute>
-              <RegisterForm />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            <PublicRoute>
-              <ForgotPasswordPage />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/reset-password"
-          element={
-            <PublicRoute>
-              <ResetPasswordPage />
-            </PublicRoute>
-          }
-        />
-        <Route path="/" element={<RootHome />} />
-        <Route path="/doc/:token" element={<PublicQuotePage />} />
-        <Route element={<OnboardingRoute />}>
-          <Route path="/onboarding" element={<OnboardingForm />} />
+        <Route element={<PageTransition />}>
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <LoginForm />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <PublicRoute>
+                <RegisterForm />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <PublicRoute>
+                <ForgotPasswordPage />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <PublicRoute>
+                <ResetPasswordPage />
+              </PublicRoute>
+            }
+          />
+          <Route path="/" element={<RootHome />} />
+          <Route path="/doc/:token" element={<PublicQuotePage />} />
+          <Route element={<OnboardingRoute />}>
+            <Route path="/onboarding" element={<OnboardingForm />} />
+          </Route>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/customers" element={<CustomerListScreen />} />
+            <Route path="/customers/new" element={<CustomerCreateScreen />} />
+            <Route path="/customers/:id" element={<CustomerDetailScreen />} />
+            <Route path="/settings" element={<SettingsScreen />} />
+            <Route path="/settings/line-item-catalog" element={<LineItemCatalogSettingsScreen />} />
+            <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
+            <Route path="/invoices/:id/edit" element={<InvoiceEditRedirect />} />
+            <Route path="/invoices/:id/edit/line-items/:lineItemIndex/edit" element={<InvoiceEditRedirect />} />
+            <Route path="/quotes/new" element={<Navigate to="/quotes/capture" replace />} />
+            <Route path="/quotes/capture" element={<CaptureScreen />} />
+            <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
+            <Route path="/documents/:id/edit" element={<DocumentEditScreen />} />
+            <Route path="/quotes/:id/review" element={<QuoteEditRedirect />} />
+            <Route path="/quotes/:id/edit" element={<QuoteEditRedirect />} />
+            <Route path="/quotes/:id/preview" element={<QuotePreview />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Route>
-        <Route element={<ProtectedRoute />}>
-          <Route path="/customers" element={<CustomerListScreen />} />
-          <Route path="/customers/new" element={<CustomerCreateScreen />} />
-          <Route path="/customers/:id" element={<CustomerDetailScreen />} />
-          <Route path="/settings" element={<SettingsScreen />} />
-          <Route path="/settings/line-item-catalog" element={<LineItemCatalogSettingsScreen />} />
-          <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
-          <Route path="/invoices/:id/edit" element={<InvoiceEditRedirect />} />
-          <Route path="/invoices/:id/edit/line-items/:lineItemIndex/edit" element={<InvoiceEditRedirect />} />
-          <Route path="/quotes/new" element={<Navigate to="/quotes/capture" replace />} />
-          <Route path="/quotes/capture" element={<CaptureScreen />} />
-          <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
-          <Route path="/documents/:id/edit" element={<DocumentEditScreen />} />
-          <Route path="/quotes/:id/review" element={<QuoteEditRedirect />} />
-          <Route path="/quotes/:id/edit" element={<QuoteEditRedirect />} />
-          <Route path="/quotes/:id/preview" element={<QuotePreview />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </ToastProvider>
   );

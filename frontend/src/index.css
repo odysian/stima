@@ -319,6 +319,64 @@
   animation: shimmer 1.5s linear infinite;
 }
 
+.page-transition-root {
+  min-height: 100%;
+}
+
+.page-transition-content {
+  opacity: 1;
+  transition: opacity 170ms ease;
+}
+
+@starting-style {
+  .page-transition-content {
+    opacity: 0;
+  }
+}
+
+@keyframes page-transition-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes page-transition-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 170ms;
+  animation-timing-function: ease;
+}
+
+::view-transition-old(root) {
+  animation-name: page-transition-fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: page-transition-fade-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-content {
+    transition: none;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 1ms;
+  }
+}
+
 body {
   margin: 0;
   background-color: var(--color-background);
