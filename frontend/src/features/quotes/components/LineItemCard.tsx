@@ -79,7 +79,7 @@ export function LineItemCard({
           <div className="flex items-center gap-2">
             <p className="truncate font-bold text-on-surface">{description}</p>
             {flagged ? (
-              <Eyebrow className="rounded-full bg-warning-container px-2.5 py-1 text-warning">
+              <Eyebrow as="span" className="rounded-full bg-warning-container px-2.5 py-1 text-warning">
                 REVIEW
               </Eyebrow>
             ) : null}

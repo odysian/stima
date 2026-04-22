@@ -271,9 +271,7 @@ export function PublicQuotePage(): React.ReactElement {
 
             <section>
               <div className="flex items-center justify-between gap-3">
-                <h2>
-                  <Eyebrow>Line Items</Eyebrow>
-                </h2>
+                <Eyebrow as="h2">Line Items</Eyebrow>
                 <span className="text-xs text-on-surface-variant">
                   {documentData.line_items.length} item{documentData.line_items.length === 1 ? "" : "s"}
                 </span>
@@ -329,9 +327,7 @@ export function PublicQuotePage(): React.ReactElement {
 
             {documentData.notes ? (
               <section className="rounded-[var(--radius-document)] border border-surface-container-high bg-surface-container-lowest p-4">
-                <h2>
-                  <Eyebrow>Notes</Eyebrow>
-                </h2>
+                <Eyebrow as="h2">Notes</Eyebrow>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-on-surface-variant">
                   {documentData.notes}
                 </p>

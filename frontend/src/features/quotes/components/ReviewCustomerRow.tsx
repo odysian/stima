@@ -23,7 +23,7 @@ export function ReviewCustomerRow({
       <div className="flex items-center justify-between gap-3">
         <Eyebrow>Customer</Eyebrow>
         {requiresCustomerAssignment ? (
-          <Eyebrow className="rounded-full bg-warning-container px-2.5 py-1 text-warning">
+          <Eyebrow as="span" className="rounded-full bg-warning-container px-2.5 py-1 text-warning">
             Needs customer
           </Eyebrow>
         ) : null}
