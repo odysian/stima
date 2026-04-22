@@ -46,7 +46,7 @@ describe("QuoteHistoryList", () => {
     expect(screen.getByText(/Mar 14, 2026\s*·\s*1 item/)).toBeInTheDocument();
 
     const quoteButton = screen.getByRole("button", { name: /front yard refresh/i });
-    expect(quoteButton).toHaveClass("rounded-xl");
+    expect(quoteButton).toHaveClass("rounded-[var(--radius-document)]");
     expect(quoteButton).toHaveClass("active:scale-[0.98]");
     expect(quoteButton).toHaveClass("active:bg-surface-container-low");
   });

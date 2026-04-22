@@ -60,7 +60,7 @@ export function CustomerCreateScreen(): React.ReactElement {
       />
 
       <section className="mx-auto w-full max-w-3xl px-4 pt-20">
-        <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
+        <section className="rounded-[var(--radius-document)] bg-surface-container-lowest p-6 ghost-shadow">
           {createError ? (
             <div className="mb-4">
               <FeedbackMessage variant="error">{createError}</FeedbackMessage>

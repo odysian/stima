@@ -35,7 +35,7 @@ export function CustomerInlineCreateForm({
   error,
 }: CustomerInlineCreateFormProps): React.ReactElement {
   return (
-    <section className="rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
+    <section className="rounded-[var(--radius-document)] bg-surface-container-lowest p-6 ghost-shadow">
       {error ? (
         <div className="mb-4">
           <FeedbackMessage variant="error">{error}</FeedbackMessage>

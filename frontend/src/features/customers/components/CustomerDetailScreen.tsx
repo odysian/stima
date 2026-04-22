@@ -294,7 +294,7 @@ export function CustomerDetailScreen(): React.ReactElement {
         {!isLoading && !loadError && customer ? (
           <>
             {!isEditing ? (
-              <section className="rounded-xl bg-surface-container-lowest p-4 ghost-shadow">
+              <section className="rounded-[var(--radius-document)] bg-surface-container-lowest p-4 ghost-shadow">
                 <div className="flex flex-col gap-3">
                   <dl className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-3">
