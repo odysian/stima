@@ -120,6 +120,7 @@ export function QuotePreviewActions({
             <Button
               type="button"
               variant="secondary"
+              size="lg"
               className={documentActionUtilityButtonClassName}
               disabled={
                 disabled
@@ -141,6 +142,7 @@ export function QuotePreviewActions({
           <Button
             type="button"
             variant="secondary"
+            size="lg"
             className={documentActionUtilityButtonClassName}
             disabled={
               disabled

@@ -247,6 +247,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     <Button
                       type="button"
                       variant="secondary"
+                      size="lg"
                       className={documentActionUtilityButtonClassName}
                       disabled={!hasCustomerEmail || isBusy}
                       isLoading={isSendingEmail}
@@ -260,6 +261,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   <Button
                     type="button"
                     variant="secondary"
+                    size="lg"
                     className={documentActionUtilityButtonClassName}
                     disabled={isBusy}
                     leadingIcon={(
