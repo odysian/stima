@@ -1,8 +1,8 @@
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
-import { StatusBadge } from "@/shared/components/StatusBadge";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { SkeletonBlock } from "@/shared/components/SkeletonBlock";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
+import { StatusPill } from "@/ui/StatusPill";
 
 interface InvoiceHistoryListProps {
   invoices: InvoiceListItem[];
@@ -80,7 +80,7 @@ export function InvoiceHistoryList({
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <p className="text-sm text-on-surface-variant">{supportingDetails}</p>
-                      <StatusBadge variant={invoice.status} />
+                      <StatusPill variant={invoice.status} />
                     </div>
                   </button>
                 </li>

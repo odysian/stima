@@ -1,6 +1,6 @@
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
-import { StatusBadge } from "@/shared/components/StatusBadge";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
+import { StatusPill } from "@/ui/StatusPill";
 
 interface QuoteHistoryListProps {
   quotes: QuoteListItem[];
@@ -57,7 +57,7 @@ export function QuoteHistoryList({
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <p className="text-sm text-on-surface-variant">{supportingDetails}</p>
-                      <StatusBadge variant={quote.status} />
+                      <StatusPill variant={quote.status} />
                     </div>
                   </button>
                 </li>
