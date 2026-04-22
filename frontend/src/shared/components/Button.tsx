@@ -106,7 +106,7 @@ export function Button({
   const isIconButton = variant === "iconButton";
 
   const buttonClassName = [
-    "relative inline-flex items-center justify-center font-semibold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
+    "relative inline-flex cursor-pointer items-center justify-center font-semibold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
     variantClasses[variant],
     isIconButton ? iconButtonSizeClasses[size] : `${sizeClasses[size]} min-w-[6ch]`,
     className,
