@@ -18,6 +18,7 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { Eyebrow } from "@/ui/Eyebrow";
 import { useToast } from "@/ui/Toast";
 type HistoryMode = "quotes" | "invoices";
 
@@ -298,24 +299,24 @@ export function CustomerDetailScreen(): React.ReactElement {
                 <div className="flex flex-col gap-3">
                   <dl className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-3">
-                      <dt className="w-16 shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                        Phone
+                      <dt className="w-16 shrink-0">
+                        <Eyebrow>Phone</Eyebrow>
                       </dt>
                       <dd className="text-sm text-on-surface">
                         {formatSummaryValue(customer.phone, "—")}
                       </dd>
                     </div>
                     <div className="flex items-center gap-3">
-                      <dt className="w-16 shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                        Email
+                      <dt className="w-16 shrink-0">
+                        <Eyebrow>Email</Eyebrow>
                       </dt>
                       <dd className="min-w-0 truncate text-sm text-on-surface">
                         {formatSummaryValue(customer.email, "—")}
                       </dd>
                     </div>
                     <div className="flex items-start gap-3">
-                      <dt className="w-16 shrink-0 pt-0.5 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                        Address
+                      <dt className="w-16 shrink-0 pt-0.5">
+                        <Eyebrow>Address</Eyebrow>
                       </dt>
                       <dd className="whitespace-pre-wrap text-sm text-on-surface">
                         {formatSummaryValue(customer.address, "—")}
@@ -398,9 +399,7 @@ export function CustomerDetailScreen(): React.ReactElement {
                     Invoices
                   </button>
                 </div>
-                <p className="shrink-0 text-[0.6875rem] font-bold uppercase tracking-widest text-outline">
-                  {activeHistoryCountLabel}
-                </p>
+                <Eyebrow className="shrink-0">{activeHistoryCountLabel}</Eyebrow>
               </div>
 
               {historyMode === "quotes" ? (

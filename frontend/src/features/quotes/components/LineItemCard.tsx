@@ -1,4 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 interface LineItemCardProps {
   description: string;
@@ -78,9 +79,9 @@ export function LineItemCard({
           <div className="flex items-center gap-2">
             <p className="truncate font-bold text-on-surface">{description}</p>
             {flagged ? (
-              <span className="rounded-full bg-warning-container px-2.5 py-1 text-[0.6875rem] font-bold uppercase tracking-wide text-warning">
+              <Eyebrow className="rounded-full bg-warning-container px-2.5 py-1 text-warning">
                 REVIEW
-              </span>
+              </Eyebrow>
             ) : null}
           </div>
           {details ? <p className="mt-0.5 text-sm text-on-surface-variant">{details}</p> : null}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "@/shared/components/Button";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 interface ScreenHeaderProps {
   title: string;
@@ -47,7 +48,7 @@ export function ScreenHeader({
         ) : null}
         <div className={["min-w-0 flex-1", isTopLevelLayout ? "text-right" : ""].join(" ")}>
           {eyebrow ? (
-            <p className="truncate text-[0.6875rem] font-bold uppercase tracking-wider text-outline">{eyebrow}</p>
+            <Eyebrow className="truncate">{eyebrow}</Eyebrow>
           ) : null}
           <h1 className="truncate font-headline text-lg font-bold tracking-tight text-on-surface">{title}</h1>
           {subtitle ? <p className="truncate text-xs text-on-surface-variant">{subtitle}</p> : null}

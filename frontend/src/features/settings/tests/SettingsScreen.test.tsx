@@ -132,7 +132,6 @@ describe("SettingsScreen", () => {
     expect(screen.getByLabelText(/timezone/i)).toHaveValue("America/New_York");
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.getByText("Email")).toHaveClass(
-      "text-[0.6875rem]",
       "font-bold",
       "uppercase",
       "tracking-[0.12em]",
