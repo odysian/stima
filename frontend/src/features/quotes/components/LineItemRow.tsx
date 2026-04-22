@@ -24,9 +24,9 @@ export function LineItemRow({
   const priceInputId = `${rowId}-price`;
 
   return (
-    <div className="rounded-md border border-outline-variant p-4">
+    <div className="rounded-[var(--radius-document)] border border-outline-variant p-4">
       {item.flagged ? (
-        <p className="mb-3 rounded-md border border-warning-accent/40 bg-warning-container px-3 py-2 text-sm text-warning">
+        <p className="mb-3 rounded-[var(--radius-document)] border border-warning-accent/40 bg-warning-container px-3 py-2 text-sm text-warning">
           {resolveLineItemFlagMessage(item.flagReason)}
         </p>
       ) : null}
@@ -82,11 +82,13 @@ export function LineItemRow({
 
         <Button
           type="button"
-          variant="destructive"
+          variant="iconButton"
           size="sm"
+          aria-label="Delete line item"
+          className="shrink-0 border border-error/30 bg-error-container/40 text-error hover:bg-error-container/60"
           onClick={onDelete}
         >
-          Delete
+          <span className="material-symbols-outlined text-[1.125rem] leading-none">delete</span>
         </Button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { Input, type InputProps } from "@/shared/components/Input";
+import type { ReactNode } from "react";
 
 interface NumericFieldProps extends Omit<InputProps, "type" | "value" | "onChange" | "inputMode" | "startAdornment" | "endAdornment"> {
   value: string;
@@ -10,6 +11,7 @@ interface NumericFieldProps extends Omit<InputProps, "type" | "value" | "onChang
   formatOnBlur?: boolean;
   showStepControls?: boolean;
   currencySymbol?: string;
+  trailingAdornment?: ReactNode;
 }
 
 function parseNumericValue(value: string): number | null {
@@ -52,6 +54,7 @@ export function NumericField({
   formatOnBlur = true,
   showStepControls = true,
   currencySymbol,
+  trailingAdornment,
   ...props
 }: NumericFieldProps): React.ReactElement {
   const applyStep = (direction: "up" | "down") => {
@@ -101,7 +104,11 @@ export function NumericField({
         props.onFocus?.(event);
       }}
       inputMode="decimal"
-      startAdornment={currencySymbol ? <span aria-hidden="true">{currencySymbol}</span> : undefined}
+      startAdornment={currencySymbol ? (
+        <span aria-hidden="true" className="!text-2xl !font-bold text-primary">
+          {currencySymbol}
+        </span>
+      ) : undefined}
       endAdornment={showStepControls ? (
         <div className="flex items-center gap-1">
           <button
@@ -121,7 +128,7 @@ export function NumericField({
             +
           </button>
         </div>
-      ) : undefined}
+      ) : trailingAdornment}
     />
   );
 }
