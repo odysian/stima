@@ -54,7 +54,7 @@ export function LoginForm(): React.ReactElement {
   return (
     <main className="screen-radial-backdrop flex min-h-screen flex-col items-center justify-center px-4 py-8">
       <h1 className="mb-8 font-headline text-3xl font-bold text-primary">Stima</h1>
-      <section className="w-full max-w-sm rounded-xl bg-surface-container-lowest p-6 ghost-shadow">
+      <section className="w-full max-w-sm rounded-[var(--radius-document)] bg-surface-container-lowest p-6 ghost-shadow">
         <h2 className="mb-6 font-headline text-2xl font-bold text-on-surface">Welcome Back</h2>
         <form className="flex flex-col gap-4" onSubmit={onSubmit}>
           <Input
@@ -81,7 +81,10 @@ export function LoginForm(): React.ReactElement {
           </p>
 
           {error ? (
-            <div role="alert" className="rounded-lg border-l-4 border-error bg-error-container p-4">
+            <div
+              role="alert"
+              className="rounded-[var(--radius-document)] border-l-4 border-error bg-error-container p-4"
+            >
               <p className="text-sm font-medium text-error">{error}</p>
             </div>
           ) : null}
