@@ -374,9 +374,9 @@ export function SettingsScreen(): React.ReactElement {
 
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="destructive"
                   size="sm"
-                  className="shrink-0 border border-outline-variant/30 px-4 text-sm text-on-surface"
+                  className="shrink-0 px-4"
                   onClick={() => setIsSignOutConfirmOpen(true)}
                 >
                   Sign Out
