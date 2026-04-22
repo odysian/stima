@@ -294,30 +294,29 @@ export function QuoteList(): React.ReactElement {
             ) : null}
           </div>
           {isSearchOpen ? (
-            <div className="relative">
-              <Input
-                label={searchLabel}
-                id="document-search"
-                placeholder={searchPlaceholder}
-                hideLabel
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="pr-14"
-              />
-              <Button
-                type="button"
-                variant="iconButton"
-                size="xs"
-                aria-label="Close search"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-outline"
-                onClick={() => {
-                  setSearchQuery("");
-                  setIsSearchOpen(false);
-                }}
-              >
-                <span className="material-symbols-outlined block text-base leading-none">close</span>
-              </Button>
-            </div>
+            <Input
+              label={searchLabel}
+              id="document-search"
+              placeholder={searchPlaceholder}
+              hideLabel
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              endAdornment={(
+                <Button
+                  type="button"
+                  variant="iconButton"
+                  size="xs"
+                  aria-label="Close search"
+                  className="text-outline"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setIsSearchOpen(false);
+                  }}
+                >
+                  <span className="material-symbols-outlined block text-base leading-none">close</span>
+                </Button>
+              )}
+            />
           ) : null}
         </div>
 
