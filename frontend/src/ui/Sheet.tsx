@@ -63,11 +63,11 @@ export function Sheet({
     overlayProps?.className,
   );
   const containerClass = joinClasses(
-    "sheet-safe-bottom pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 md:items-center",
+    "pointer-events-none fixed inset-0 z-50 flex items-end justify-center px-4 md:items-center",
     containerClassName,
   );
   const contentClassName = joinClasses(
-    "modal-shadow pointer-events-auto w-full border border-outline-variant/20 glass-surface ghost-shadow backdrop-blur-md rounded-[var(--radius-document)] p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] outline-none md:pb-6",
+    "pointer-events-auto w-full border border-outline-variant/20 glass-surface ghost-shadow backdrop-blur-md rounded-[var(--radius-document)] p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] outline-none md:pb-6",
     sheetSizeClasses[size],
     contentProps?.className,
   );
