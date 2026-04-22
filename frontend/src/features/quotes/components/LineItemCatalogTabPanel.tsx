@@ -1,6 +1,8 @@
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { Card } from "@/ui/Card";
+import { Eyebrow } from "@/ui/Eyebrow";
 
 interface LineItemCatalogTabPanelProps {
   loadState: "idle" | "loading" | "loaded" | "error";
@@ -25,7 +27,7 @@ export function LineItemCatalogTabPanel({
   onInsertItem,
 }: LineItemCatalogTabPanelProps): React.ReactElement {
   return (
-    <div id="line-item-tabpanel-catalog" role="tabpanel" className="space-y-2">
+    <div id="line-item-tabpanel-catalog" role="tabpanel" className="space-y-3">
       {loadState === "loading" ? (
         <p role="status" className="text-sm text-on-surface-variant">Loading catalog items...</p>
       ) : null}
@@ -46,34 +48,37 @@ export function LineItemCatalogTabPanel({
       ) : null}
 
       {loadState === "loaded" && items.length === 0 ? (
-        <p className="rounded-lg bg-surface-container-high p-4 text-sm text-on-surface-variant">
-          No catalog items yet. Save one from the Manual tab or from another line item.
-        </p>
+        <Card className="bg-surface-container-high">
+          <p className="text-sm text-on-surface-variant">
+            No catalog items yet. Save one from the Manual tab or from another line item.
+          </p>
+        </Card>
       ) : null}
 
       {loadState === "loaded" && items.length > 0 ? (
         <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
           {items.map((item) => (
-            <li
-              key={item.id}
-              className="rounded-lg border border-outline-variant/20 bg-surface-container-high p-3"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-on-surface">{item.title}</p>
-                  <p className="text-xs text-on-surface-variant">{formatCatalogPrice(item.defaultPrice)}</p>
-                  {item.details ? (
-                    <p className="mt-1 text-sm text-on-surface-variant">{item.details}</p>
-                  ) : null}
+            <li key={item.id}>
+              <Card className="border border-outline-variant/20 bg-surface-container-high p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-on-surface">{item.title}</p>
+                    <Eyebrow>{formatCatalogPrice(item.defaultPrice)}</Eyebrow>
+                    {item.details ? (
+                      <p className="mt-1 text-sm text-on-surface-variant">{item.details}</p>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0 px-3 text-xs text-primary"
+                    onClick={() => onInsertItem(item)}
+                  >
+                    Insert
+                  </Button>
                 </div>
-                <button
-                  type="button"
-                  className="inline-flex min-h-9 shrink-0 items-center rounded-lg border border-primary/40 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
-                  onClick={() => onInsertItem(item)}
-                >
-                  Insert
-                </button>
-              </div>
+              </Card>
             </li>
           ))}
         </ul>
