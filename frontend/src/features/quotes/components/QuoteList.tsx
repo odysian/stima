@@ -7,6 +7,7 @@ import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
+import { Button } from "@/shared/components/Button";
 import { DocumentCardSkeleton } from "@/shared/components/DocumentCardSkeleton";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
@@ -40,8 +41,6 @@ interface DocumentRowsSectionProps {
   rows: DocumentRow[];
   onRowClick: (row: DocumentRow) => void;
 }
-
-const headerIconButtonClasses = "inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95";
 
 function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
   return (
@@ -281,14 +280,16 @@ export function QuoteList(): React.ReactElement {
               </button>
             </div>
             {!isSearchOpen ? (
-              <button
+              <Button
                 type="button"
+                variant="iconButton"
+                size="sm"
                 aria-label="Open search"
-                className={headerIconButtonClasses}
+                className="border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow"
                 onClick={() => setIsSearchOpen(true)}
               >
                 <span className="material-symbols-outlined block text-[1.125rem] leading-none">search</span>
-              </button>
+              </Button>
             ) : null}
           </div>
           {isSearchOpen ? (
@@ -302,17 +303,19 @@ export function QuoteList(): React.ReactElement {
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="pr-14"
               />
-              <button
+              <Button
                 type="button"
+                variant="iconButton"
+                size="xs"
                 aria-label="Close search"
-                className="absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-outline transition-all hover:bg-surface-container-low active:scale-95"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-outline"
                 onClick={() => {
                   setSearchQuery("");
                   setIsSearchOpen(false);
                 }}
               >
                 <span className="material-symbols-outlined block text-base leading-none">close</span>
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>

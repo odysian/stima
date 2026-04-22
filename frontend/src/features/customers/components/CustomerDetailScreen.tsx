@@ -19,7 +19,6 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { Toast } from "@/shared/components/Toast";
-
 type HistoryMode = "quotes" | "invoices";
 
 function getCustomerDraftValues(nextCustomer: Customer): {
@@ -39,7 +38,6 @@ export function CustomerDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerQuotes, setCustomerQuotes] = useState<QuoteListItem[]>([]);
   const [customerInvoices, setCustomerInvoices] = useState<InvoiceListItem[]>([]);
@@ -338,20 +336,22 @@ export function CustomerDetailScreen(): React.ReactElement {
                     >
                       Create Document
                     </Button>
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="md"
                       onClick={openEditMode}
-                      className="cursor-pointer rounded-lg border border-outline/20 px-4 py-4 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-low active:scale-[0.98]"
                     >
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="destructive"
+                      size="md"
                       onClick={openDeleteConfirmation}
-                      className="cursor-pointer rounded-lg border border-error/40 px-4 py-4 text-sm font-semibold text-error transition-all hover:bg-error/10 active:scale-[0.98]"
                     >
                       Delete Customer
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </section>

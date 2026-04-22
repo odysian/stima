@@ -1,3 +1,5 @@
+import { Button } from "@/shared/components/Button";
+
 interface SettingsCatalogShortcutCardProps {
   onOpenLineItemCatalog: () => void;
 }
@@ -14,13 +16,15 @@ export function SettingsCatalogShortcutCard({
         <p className="text-sm text-on-surface-variant">
           Save and manage reusable line item presets.
         </p>
-        <button
+        <Button
           type="button"
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-outline-variant/40 px-3 py-2 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container"
+          variant="secondary"
+          size="sm"
+          className="px-3 py-2 text-xs"
           onClick={onOpenLineItemCatalog}
         >
           Line Item Catalog
-        </button>
+        </Button>
       </div>
     </section>
   );

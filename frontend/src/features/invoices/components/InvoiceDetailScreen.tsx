@@ -16,9 +16,7 @@ import {
   DocumentActionStatus,
   DocumentActionSuccessMessage,
   DocumentActionSurface,
-  documentActionPrimaryButtonClassName,
   documentActionPrimaryLinkClassName,
-  documentActionUtilityButtonClassName,
 } from "@/shared/components/DocumentActionSurface";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { OverflowMenu } from "@/shared/components/OverflowMenu";
@@ -143,14 +141,15 @@ export function InvoiceDetailScreen(): React.ReactElement {
         trailing={invoice ? (
           <div className="flex items-center gap-2">
             {canEdit ? (
-              <button
-                type="button"
+              <Button
+                variant="iconButton"
+                size="sm"
                 onClick={() => navigate(`/documents/${invoice.id}/edit`)}
                 aria-label="Edit invoice"
-                className="inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow transition-all hover:bg-surface-container-low active:scale-95"
+                className="border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow"
               >
                 <span className="material-symbols-outlined block text-[1.125rem] leading-none">edit</span>
-              </button>
+              </Button>
             ) : null}
             <OverflowMenu items={overflowItems} />
           </div>
@@ -226,7 +225,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
               ) : (
                 <Button
                   type="button"
-                  className={documentActionPrimaryButtonClassName}
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
                   disabled={isBusy}
                   onClick={() => {
                     void onGeneratePdf();
@@ -246,9 +247,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   {emailActionLabel ? (
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       size="lg"
-                      className={documentActionUtilityButtonClassName}
+                      className="w-full"
                       disabled={!hasCustomerEmail || isBusy}
                       isLoading={isSendingEmail}
                       leadingIcon={<span className="material-symbols-outlined text-base leading-none">mail</span>}
@@ -260,9 +261,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="lg"
-                    className={documentActionUtilityButtonClassName}
+                    className="w-full"
                     disabled={isBusy}
                     leadingIcon={(
                       <span className="material-symbols-outlined text-base leading-none">

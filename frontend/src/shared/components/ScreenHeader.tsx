@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "@/shared/components/Button";
 
 interface ScreenHeaderProps {
   title: string;
@@ -30,14 +31,16 @@ export function ScreenHeader({
         ].join(" ")}
       >
         {onBack ? (
-          <button
+          <Button
             type="button"
+            variant="iconButton"
+            size="sm"
             onClick={onBack}
             aria-label={backLabel}
-            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-primary transition-all hover:bg-surface-container-low active:scale-95"
+            className="text-primary"
           >
             <span className="material-symbols-outlined block text-[1.125rem] leading-none">arrow_back</span>
-          </button>
+          </Button>
         ) : null}
         {isTopLevelLayout ? (
           <p className="shrink-0 font-headline text-[2rem] font-bold leading-none text-primary">Stima</p>

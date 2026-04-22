@@ -1,3 +1,4 @@
+import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -29,6 +30,24 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toHaveClass("border-secondary", "text-secondary");
     expect(screen.getByRole("button", { name: "Back" })).toHaveClass("text-on-surface-variant");
     expect(screen.getByRole("button", { name: "Close dialog" })).toHaveClass("rounded-full", "min-h-12");
+  });
+
+  it("attaches forwarded refs to the native button element", () => {
+    const ref = createRef<HTMLButtonElement>();
+    render(<Button ref={ref}>Open</Button>);
+
+    expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+    expect(ref.current).toBe(screen.getByRole("button", { name: "Open" }));
+  });
+
+  it("supports xs iconButton size for inline dismiss affordances", () => {
+    render(
+      <Button variant="iconButton" size="xs" aria-label="Dismiss banner">
+        <span className="material-symbols-outlined">close</span>
+      </Button>,
+    );
+
+    expect(screen.getByRole("button", { name: "Dismiss banner" })).toHaveClass("h-8", "w-8", "min-h-8", "min-w-8");
   });
 
   it("renders leading and trailing icon slots", () => {

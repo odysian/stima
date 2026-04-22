@@ -10,6 +10,7 @@ import { type DocumentEditDraft, type PersistedEditableDocument } from "@/featur
 import type { ExtractionReviewHiddenDetails, ExtractionTier, HiddenItemState, LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { hasUndismissedCaptureDetailsItems, resolveCaptureDetailsActionableItems } from "@/features/quotes/utils/captureDetails";
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
+import { Button } from "@/shared/components/Button";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 
 interface DocumentEditScreenViewProps {
@@ -151,13 +152,15 @@ export function DocumentEditScreenView({
         backLabel={backLabel}
         onBack={() => onRequestNavigation({ to: backTarget, replace: true })}
         trailing={showCaptureDetailsTrigger ? (
-          <button
+          <Button
             type="button"
+            variant="iconButton"
+            size="sm"
             aria-label="Capture details"
             onClick={() => setIsCaptureDetailsOpen(true)}
             data-testid="capture-details-trigger"
             className={[
-              "inline-flex h-10 w-10 cursor-pointer shrink-0 items-center justify-center rounded-full border transition-colors",
+              "shrink-0 border transition-colors",
               hasHiddenActionableItems
                 ? "border-warning-accent/50 bg-warning-container text-warning hover:bg-warning-container/80"
                 : "border-outline-variant/30 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low",
@@ -166,7 +169,7 @@ export function DocumentEditScreenView({
             <span className="material-symbols-outlined text-[1.125rem] leading-none">
               info
             </span>
-          </button>
+          </Button>
         ) : null}
       />
 

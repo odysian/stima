@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteReuseCandidate } from "@/features/quotes/types/quote.types";
+import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { StatusPill } from "@/ui/StatusPill";
@@ -280,13 +281,15 @@ export function QuoteReuseChooser({
             </div>
 
             <div className="mt-6">
-              <button
+              <Button
                 type="button"
-                className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest"
+                variant="secondary"
+                size="md"
+                className="w-full"
                 onClick={onClose}
               >
                 Close
-              </button>
+              </Button>
             </div>
           </Dialog.Content>
         </div>
