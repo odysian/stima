@@ -21,7 +21,7 @@ export function TradeTypeSelector({
             aria-pressed={isSelected}
             onClick={() => onChange(option)}
             className={[
-              "cursor-pointer py-3 rounded-lg font-label text-sm",
+              "cursor-pointer py-3 rounded-[var(--radius-document)] font-label text-sm",
               isSelected
                 ? "ghost-shadow border border-primary/30 bg-surface-container-lowest text-on-surface font-semibold"
                 : "border border-outline-variant/30 bg-surface-container-low text-on-surface-variant",
