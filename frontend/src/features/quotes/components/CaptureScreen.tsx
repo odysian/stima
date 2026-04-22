@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
@@ -71,15 +71,7 @@ export function CaptureScreen(): React.ReactElement {
     clearError();
   }
 
-  const dismissActiveError = useCallback((): void => {
-    if (error) {
-      setError(null);
-      return;
-    }
-    if (voiceError) {
-      clearError();
-    }
-  }, [clearError, error, voiceError]);
+  const dismissActiveErrorRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -95,6 +87,18 @@ export function CaptureScreen(): React.ReactElement {
   const displayedError = error ?? voiceError;
 
   useEffect(() => {
+    dismissActiveErrorRef.current = () => {
+      if (error) {
+        setError(null);
+        return;
+      }
+      if (voiceError) {
+        clearError();
+      }
+    };
+  }, [clearError, error, voiceError]);
+
+  useEffect(() => {
     if (!displayedError) {
       return;
     }
@@ -102,9 +106,9 @@ export function CaptureScreen(): React.ReactElement {
       message: displayedError,
       variant: "error",
       durationMs: null,
-      onDismiss: dismissActiveError,
+      onDismiss: () => dismissActiveErrorRef.current(),
     });
-  }, [dismissActiveError, displayedError, show]);
+  }, [displayedError, show]);
 
   function applyDraftFromQuoteDetail(
     sourceType: QuoteSourceType,

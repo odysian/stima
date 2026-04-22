@@ -69,6 +69,7 @@
 :root {
   color-scheme: light;
   --radius-document: 0.75rem;
+  --bottom-nav-offset: 5rem;
   --tap-target-min: 44px;
   --tap-target-fab: 56px;
   --surface-glass: rgb(248 249 255 / 0.8);
