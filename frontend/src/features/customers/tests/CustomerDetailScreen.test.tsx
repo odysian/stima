@@ -9,6 +9,7 @@ import type { Customer } from "@/features/customers/types/customer.types";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
+import { ToastProvider } from "@/ui/Toast";
 
 const navigateMock = vi.fn();
 
@@ -93,7 +94,9 @@ function makeInvoice(
 function renderScreen(): void {
   render(
     <MemoryRouter>
-      <CustomerDetailScreen />
+      <ToastProvider>
+        <CustomerDetailScreen />
+      </ToastProvider>
     </MemoryRouter>,
   );
 }

@@ -285,10 +285,6 @@
   }
 }
 
-.toast-safe-bottom {
-  bottom: calc(5rem + env(safe-area-inset-bottom));
-}
-
 .modal-shadow {
   box-shadow: var(--shadow-modal);
 }

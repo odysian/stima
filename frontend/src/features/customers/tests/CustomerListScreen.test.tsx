@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CustomerListScreen } from "@/features/customers/components/CustomerListScreen";
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer } from "@/features/customers/types/customer.types";
+import { ToastProvider } from "@/ui/Toast";
 
 const navigateMock = vi.fn();
 
@@ -46,7 +47,9 @@ function renderScreen(
 ): void {
   render(
     <MemoryRouter initialEntries={initialEntries}>
-      <CustomerListScreen />
+      <ToastProvider>
+        <CustomerListScreen />
+      </ToastProvider>
     </MemoryRouter>,
   );
 }

@@ -8,9 +8,9 @@ import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { Toast } from "@/shared/components/Toast";
 import { Input } from "@/shared/components/Input";
 import { NumericField } from "@/ui/NumericField";
+import { useToast } from "@/ui/Toast";
 
 interface ParsedPriceInput {
   value: number | null;
@@ -47,6 +47,7 @@ function formatPriceLabel(value: number | null): string {
 
 export function LineItemCatalogSettingsScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const { show } = useToast();
   const [items, setItems] = useState<LineItemCatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -91,6 +92,14 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+    show({ message: toastMessage, variant: "success" });
+    setToastMessage(null);
+  }, [show, toastMessage]);
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -323,7 +332,6 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
       </section>
 
       <BottomNav active="settings" />
-      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
 
       {itemPendingDelete ? (
         <ConfirmModal

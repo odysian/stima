@@ -14,6 +14,7 @@ import { ThemeProvider } from "@/shared/components/ThemeProvider";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
 import { THEME_STORAGE_KEY } from "@/shared/lib/theme";
+import { ToastProvider } from "@/ui/Toast";
 
 vi.mock("@/features/auth/hooks/useAuth", () => ({
   useAuth: vi.fn(),
@@ -57,7 +58,9 @@ function renderScreen() {
   return render(
     <ThemeProvider>
       <MemoryRouter>
-        <SettingsScreen />
+        <ToastProvider>
+          <SettingsScreen />
+        </ToastProvider>
       </MemoryRouter>
     </ThemeProvider>,
   );

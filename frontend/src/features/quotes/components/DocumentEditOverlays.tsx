@@ -4,7 +4,6 @@ import type { ReviewLineItemSheetState } from "@/features/quotes/components/revi
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { Toast } from "@/shared/components/Toast";
 
 interface DocumentEditOverlaysProps {
   isAssignmentSheetOpen: boolean;
@@ -27,8 +26,6 @@ interface DocumentEditOverlaysProps {
   lineItemDeleteDescription: string;
   onConfirmDeleteLineItem: () => void;
   onCancelDeleteLineItem: () => void;
-  toastMessage: string | null;
-  onDismissToast: () => void;
   showLeaveWarning: boolean;
   onLeaveConfirm: () => void;
   onLeaveCancel: () => void;
@@ -51,8 +48,6 @@ export function DocumentEditOverlays({
   lineItemDeleteDescription,
   onConfirmDeleteLineItem,
   onCancelDeleteLineItem,
-  toastMessage,
-  onDismissToast,
   showLeaveWarning,
   onLeaveConfirm,
   onLeaveCancel,
@@ -93,8 +88,6 @@ export function DocumentEditOverlays({
           variant="destructive"
         />
       ) : null}
-
-      <Toast message={toastMessage} onDismiss={onDismissToast} />
 
       {showLeaveWarning ? (
         <ConfirmModal

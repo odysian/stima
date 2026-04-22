@@ -35,7 +35,6 @@ interface DocumentEditScreenViewProps {
   isAssignmentSheetOpen: boolean;
   lineItemSheetState: ReviewLineItemSheetState | null;
   lineItemSheetInitialItem: LineItemDraftWithFlags;
-  toastMessage: string | null;
   showLeaveWarning: boolean;
   isSavingDraft: boolean;
   isContinuing: boolean;
@@ -72,7 +71,6 @@ interface DocumentEditScreenViewProps {
   lineItemDeleteDescription: string;
   onConfirmDeleteLineItem: () => void;
   onCancelDeleteLineItem: () => void;
-  onDismissToast: () => void;
   onLeaveConfirm: () => void;
   onLeaveCancel: () => void;
 }
@@ -99,7 +97,6 @@ export function DocumentEditScreenView({
   isAssignmentSheetOpen,
   lineItemSheetState,
   lineItemSheetInitialItem,
-  toastMessage,
   showLeaveWarning,
   isSavingDraft,
   isContinuing,
@@ -132,7 +129,6 @@ export function DocumentEditScreenView({
   lineItemDeleteDescription,
   onConfirmDeleteLineItem,
   onCancelDeleteLineItem,
-  onDismissToast,
   onLeaveConfirm,
   onLeaveCancel,
 }: DocumentEditScreenViewProps): React.ReactElement {
@@ -243,8 +239,6 @@ export function DocumentEditScreenView({
         lineItemDeleteDescription={lineItemDeleteDescription}
         onConfirmDeleteLineItem={onConfirmDeleteLineItem}
         onCancelDeleteLineItem={onCancelDeleteLineItem}
-        toastMessage={toastMessage}
-        onDismissToast={onDismissToast}
         showLeaveWarning={showLeaveWarning}
         onLeaveConfirm={onLeaveConfirm}
         onLeaveCancel={onLeaveCancel}

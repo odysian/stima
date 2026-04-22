@@ -14,9 +14,11 @@ import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { buildDraftSnapshot, readReviewLocationState, resolveBackTarget } from "@/features/quotes/utils/reviewScreenState";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
+import { useToast } from "@/ui/Toast";
 
 export function DocumentEditScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const { show } = useToast();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const {
@@ -137,6 +139,14 @@ export function DocumentEditScreen(): React.ReactElement {
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+    show({ message: toastMessage, variant: "success" });
+    setToastMessage(null);
+  }, [show, toastMessage]);
 
   const hasUnsavedChanges = currentSnapshotKey !== null
     && savedSnapshotKey !== null
@@ -300,7 +310,6 @@ export function DocumentEditScreen(): React.ReactElement {
       isAssignmentSheetOpen={isAssignmentSheetOpen}
       lineItemSheetState={lineItemSheetState}
       lineItemSheetInitialItem={lineItemSheetInitialItem}
-      toastMessage={toastMessage}
       showLeaveWarning={showLeaveWarning}
       isSavingDraft={submitAction === "save"}
       isContinuing={submitAction === "continue"}
@@ -405,7 +414,6 @@ export function DocumentEditScreen(): React.ReactElement {
         setPendingLineItemDeleteIndex(null);
       }}
       onCancelDeleteLineItem={() => setPendingLineItemDeleteIndex(null)}
-      onDismissToast={() => setToastMessage(null)}
       onLeaveConfirm={handleLeaveConfirm}
       onLeaveCancel={handleLeaveCancel}
     />

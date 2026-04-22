@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
@@ -18,16 +18,17 @@ import type { QuoteDetail, QuoteSourceType } from "@/features/quotes/types/quote
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
-import { Toast } from "@/shared/components/Toast";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { jobService } from "@/shared/lib/jobService";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_AUDIO_CLIPS_PER_REQUEST, MAX_AUDIO_TOTAL_BYTES } from "@/shared/lib/inputLimits";
+import { useToast } from "@/ui/Toast";
 
 const START_BLANK_GUARD_TARGET = "__start_blank__";
 
 export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const { show } = useToast();
   const location = useLocation();
   const { customerId } = useParams<{ customerId?: string }>();
   const { setDraft } = useQuoteDraft();
@@ -70,7 +71,7 @@ export function CaptureScreen(): React.ReactElement {
     clearError();
   }
 
-  function dismissActiveError(): void {
+  const dismissActiveError = useCallback((): void => {
     if (error) {
       setError(null);
       return;
@@ -78,7 +79,7 @@ export function CaptureScreen(): React.ReactElement {
     if (voiceError) {
       clearError();
     }
-  }
+  }, [clearError, error, voiceError]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -90,6 +91,20 @@ export function CaptureScreen(): React.ReactElement {
       extractionStageTimerRefs.current = [];
     };
   }, []);
+
+  const displayedError = error ?? voiceError;
+
+  useEffect(() => {
+    if (!displayedError) {
+      return;
+    }
+    show({
+      message: displayedError,
+      variant: "error",
+      durationMs: null,
+      onDismiss: dismissActiveError,
+    });
+  }, [dismissActiveError, displayedError, show]);
 
   function applyDraftFromQuoteDetail(
     sourceType: QuoteSourceType,
@@ -292,7 +307,6 @@ export function CaptureScreen(): React.ReactElement {
     void onStartBlank();
   }
 
-  const displayedError = error ?? voiceError;
   const hasReachedClipLimit = clips.length >= MAX_AUDIO_CLIPS_PER_REQUEST;
   const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording;
 
@@ -352,13 +366,6 @@ export function CaptureScreen(): React.ReactElement {
           </Button>
         </div>
       </ScreenFooter>
-
-      <Toast
-        message={displayedError}
-        variant="error"
-        durationMs={null}
-        onDismiss={dismissActiveError}
-      />
 
       {pendingExitTarget ? (
         <ConfirmModal

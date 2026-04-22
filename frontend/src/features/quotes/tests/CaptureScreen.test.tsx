@@ -18,6 +18,7 @@ import {
   MAX_AUDIO_TOTAL_BYTES,
   NOTE_INPUT_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
+import { ToastProvider } from "@/ui/Toast";
 
 const navigateMock = vi.fn();
 const setDraftMock = vi.fn();
@@ -218,7 +219,9 @@ function renderScreen({
   });
   return render(
     <MemoryRouter initialEntries={[{ pathname, state: { launchOrigin } }]}>
-      <CaptureScreen />
+      <ToastProvider>
+        <CaptureScreen />
+      </ToastProvider>
     </MemoryRouter>,
   );
 }
@@ -923,7 +926,9 @@ describe("CaptureScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
   });
 
   it("shows a timeout error when async extraction polling exceeds the max attempts", async () => {

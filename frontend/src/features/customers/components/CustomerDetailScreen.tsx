@@ -18,7 +18,7 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { Toast } from "@/shared/components/Toast";
+import { useToast } from "@/ui/Toast";
 type HistoryMode = "quotes" | "invoices";
 
 function getCustomerDraftValues(nextCustomer: Customer): {
@@ -36,6 +36,7 @@ function getCustomerDraftValues(nextCustomer: Customer): {
 }
 export function CustomerDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const { show } = useToast();
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -50,7 +51,6 @@ export function CustomerDetailScreen(): React.ReactElement {
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [historyMode, setHistoryMode] = useState<HistoryMode>("quotes");
@@ -70,7 +70,6 @@ export function CustomerDetailScreen(): React.ReactElement {
   function resetEditState(nextCustomer: Customer): void {
     populateDraftFields(nextCustomer);
     setSaveError(null);
-    setSaveSuccess(null);
     setIsEditing(false);
   }
 
@@ -80,7 +79,6 @@ export function CustomerDetailScreen(): React.ReactElement {
     }
     populateDraftFields(customer);
     setSaveError(null);
-    setSaveSuccess(null);
     setIsEditing(true);
   }
 
@@ -184,7 +182,6 @@ export function CustomerDetailScreen(): React.ReactElement {
     const trimmedName = name.trim();
     if (!trimmedName) {
       setSaveError("Name is required");
-      setSaveSuccess(null);
       return;
     }
 
@@ -194,13 +191,12 @@ export function CustomerDetailScreen(): React.ReactElement {
     payload.address = address.trim() || null;
 
     setSaveError(null);
-    setSaveSuccess(null);
     setIsSaving(true);
 
     try {
       const updatedCustomer = await customerService.updateCustomer(id, payload);
       setCustomer(updatedCustomer);
-      setSaveSuccess("Saved");
+      show({ message: "Saved", variant: "success" });
       setSaveError(null);
       setIsEditing(false);
       populateDraftFields(updatedCustomer);
@@ -444,7 +440,6 @@ export function CustomerDetailScreen(): React.ReactElement {
         />
       ) : null}
       <BottomNav active="customers" />
-      <Toast message={saveSuccess} onDismiss={() => setSaveSuccess(null)} />
     </main>
   );
 }

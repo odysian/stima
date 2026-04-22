@@ -6,6 +6,7 @@ import { LoginForm } from "@/features/auth/components/LoginForm";
 import { AuthProvider } from "@/features/auth/hooks/useAuth";
 import { authService } from "@/features/auth/services/authService";
 import { clearCsrfToken } from "@/shared/lib/http";
+import { ToastProvider } from "@/ui/Toast";
 
 vi.mock("@/features/auth/services/authService", () => ({
   authService: {
@@ -21,13 +22,15 @@ const mockedAuthService = vi.mocked(authService);
 function renderLogin(initialEntry: string | { pathname: string; state?: unknown } = "/login") {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/" element={<div>Home</div>} />
-          <Route path="/dashboard" element={<div>Dashboard</div>} />
-        </Routes>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/" element={<div>Home</div>} />
+            <Route path="/dashboard" element={<div>Dashboard</div>} />
+          </Routes>
+        </AuthProvider>
+      </ToastProvider>
     </MemoryRouter>,
   );
 }
