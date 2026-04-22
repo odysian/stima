@@ -38,7 +38,7 @@ export function ReviewActionFooter({
           </Button>
           <Button
             type="button"
-            variant="tonal"
+            variant="secondary"
             className="w-full sm:flex-1"
             disabled={isInteractionLocked || isSavingDraft}
             isLoading={isSavingDraft}
