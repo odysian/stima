@@ -78,7 +78,7 @@ export function QuotePreviewActions({
           rel="noopener noreferrer"
           className={documentActionPrimaryLinkClassName}
         >
-          <span className="material-symbols-outlined text-base">open_in_new</span>
+          <span className="material-symbols-outlined text-base leading-none">open_in_new</span>
           Open PDF
         </a>
       );
@@ -99,8 +99,12 @@ export function QuotePreviewActions({
         onClick={() => {
           void onGeneratePdf();
         }}
+        leadingIcon={(
+          <span className="material-symbols-outlined text-base leading-none">
+            picture_as_pdf
+          </span>
+        )}
       >
-        <span className="material-symbols-outlined text-base">picture_as_pdf</span>
         Generate PDF
       </Button>
     );
@@ -127,7 +131,7 @@ export function QuotePreviewActions({
                 || isMarkingLost
               }
               isLoading={isSendingEmail}
-              leadingIcon={<span className="material-symbols-outlined text-base">mail</span>}
+              leadingIcon={<span className="material-symbols-outlined text-base leading-none">mail</span>}
               onClick={onRequestSendEmail}
             >
               {emailActionLabel}
@@ -146,7 +150,7 @@ export function QuotePreviewActions({
               || isMarkingWon
               || isMarkingLost
             }
-            leadingIcon={<span className="material-symbols-outlined text-base">content_copy</span>}
+            leadingIcon={<span className="material-symbols-outlined text-base leading-none">content_copy</span>}
             onClick={() => {
               void onCopyLink();
             }}

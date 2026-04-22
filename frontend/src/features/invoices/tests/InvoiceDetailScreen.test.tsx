@@ -652,11 +652,11 @@ describe("InvoiceDetailScreen", () => {
     renderScreen();
 
     fireEvent.click(await screen.findByRole("button", { name: /send email/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Send Email$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^(send|resend) email$/i }));
 
-    expect(
-      await screen.findByRole("button", { name: /sending/i }),
-    ).toBeDisabled();
+    const sendingButton = await screen.findByRole("button", { name: /send email/i });
+    expect(sendingButton).toBeDisabled();
+    expect(within(sendingButton).getByTestId("button-spinner")).toBeInTheDocument();
     expect(screen.queryByText(/alice@example\.com/i)).not.toBeInTheDocument();
 
     resolveSend(
@@ -696,7 +696,7 @@ describe("InvoiceDetailScreen", () => {
     renderScreen();
 
     fireEvent.click(await screen.findByRole("button", { name: /send email/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Send Email$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^(send|resend) email$/i }));
 
     expect(await screen.findByText("Email delivery failed. Please try again.")).toBeInTheDocument();
     expect(screen.queryByText(/alice@example\.com/i)).not.toBeInTheDocument();
