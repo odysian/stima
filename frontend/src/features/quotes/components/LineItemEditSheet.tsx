@@ -299,7 +299,7 @@ export function LineItemEditSheet({
                   <p className="mt-1 text-sm leading-6 text-warning">{reviewExplanation}</p>
                   <button
                     type="button"
-                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-[var(--radius-document)] border border-warning-accent/50 bg-warning-container px-3.5 py-2 text-xs font-bold uppercase tracking-wide text-warning transition-all hover:bg-warning-container/80 active:scale-[0.98]"
+                    className="mt-3 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-[var(--radius-document)] border border-warning-accent/50 bg-warning-container px-3.5 py-2 text-xs font-bold uppercase tracking-wide text-warning transition-all hover:bg-warning-container/80 active:scale-[0.98]"
                     onClick={() => {
                       setLineItemFlagged(false);
                       setLineItemFlagReason(null);
