@@ -96,7 +96,7 @@ export function InvoiceHistoryList({
       ) : null}
 
       {!isLoading && !loadError && invoices.length === 0 ? (
-        <EmptyState icon="inbox_out" title="No invoices yet." />
+        <EmptyState icon="description" title="No invoices yet." />
       ) : null}
     </section>
   );

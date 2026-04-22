@@ -64,7 +64,7 @@ export function QuoteHistoryList({
           </ul>
         </div>
       ) : (
-        <EmptyState icon="inbox_out" title="No quotes yet." />
+        <EmptyState icon="description" title="No quotes yet." />
       )}
     </section>
   );

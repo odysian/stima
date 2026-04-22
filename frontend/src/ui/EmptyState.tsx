@@ -15,7 +15,7 @@ interface EmptyStateProps {
  * Empty state icon inventory:
  * - `description` for quote/invoice document lists.
  * - `group` for customer list surfaces.
- * - `inbox_out` for customer document history.
+ * - `description` for customer document history.
  * - `folder_off` for line item catalog.
  */
 export function EmptyState({
