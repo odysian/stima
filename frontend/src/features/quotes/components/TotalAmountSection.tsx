@@ -4,6 +4,7 @@ import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromSubtotal, parseTaxPercentInput, toTaxPercentDisplay, type DiscountType } from "@/shared/lib/pricing";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { NumericField } from "@/ui/NumericField";
 
 interface TotalAmountSectionProps {
   lineItemSum: number;
@@ -64,33 +65,36 @@ export function TotalAmountSection({
         <span>{formatCurrency(lineItemSum)}</span>
       </div>
       <div className="mt-4 border-t border-outline-variant/30 pt-4">
-        <label htmlFor="quote-total" className="block">
-          <Eyebrow className="text-on-surface">{hasPricingBreakdown ? "SUBTOTAL" : "TOTAL AMOUNT"}</Eyebrow>
-        </label>
-        <div className="relative mt-2">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
-            $
-          </span>
-          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-base leading-none text-on-surface-variant">
-            <span className="material-symbols-outlined text-base">edit</span>
-          </span>
-          <input
+        <Eyebrow className="text-on-surface">{hasPricingBreakdown ? "SUBTOTAL" : "TOTAL AMOUNT"}</Eyebrow>
+        <div className="mt-2">
+          <NumericField
             id="quote-total"
-            type="number"
-            step="0.01"
+            label="Total amount"
+            hideLabel
+            step={0.01}
             disabled={disabled}
-            value={total ?? ""}
-            onChange={(event) => {
-              const rawValue = event.target.value.trim();
-              if (rawValue.length === 0) {
+            value={total === null ? "" : total.toString()}
+            onChange={(rawValue) => {
+              const normalizedValue = rawValue.replaceAll(",", "").trim();
+              if (normalizedValue.length === 0) {
                 onTotalChange(null);
                 return;
               }
 
-              const parsedValue = Number(rawValue);
+              const parsedValue = Number(normalizedValue);
               onTotalChange(Number.isFinite(parsedValue) ? parsedValue : null);
             }}
-            className="w-full rounded-[var(--radius-document)] border-2 border-primary bg-surface-container-high py-3 pl-10 pr-12 font-headline text-3xl font-bold tracking-tight text-primary outline-none transition-all focus:ring-2 focus:ring-primary/20"
+            showStepControls={false}
+            formatOnBlur={false}
+            currencySymbol="$"
+            currencySymbolClassName="!text-2xl !font-bold text-primary"
+            trailingAdornment={(
+              <span className="pointer-events-none material-symbols-outlined !text-base leading-none text-on-surface-variant">
+                edit
+              </span>
+            )}
+            fieldClassName="!min-h-[72px] !border-2 !border-primary !bg-surface-container-high !px-4 !py-3 focus-within:!ring-2 focus-within:!ring-primary/20"
+            className="!font-headline !text-3xl !font-bold !tracking-tight text-primary"
           />
         </div>
       </div>

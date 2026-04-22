@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
 import type { DiscountType } from "@/shared/lib/pricing";
@@ -47,12 +47,35 @@ function renderSection({
 }
 
 describe("TotalAmountSection", () => {
-  it("uses the token-backed surface for the total amount input", () => {
+  it("renders line-item sum with a labeled total amount input", () => {
     renderSection();
 
-    expect(screen.getByRole("spinbutton", { name: /total amount/i })).toHaveClass(
-      "bg-surface-container-high",
+    expect(screen.getByText("Line Item Sum")).toBeInTheDocument();
+    expect(screen.getByText("$100.00")).toBeInTheDocument();
+    expect(screen.getByLabelText(/total amount/i)).toHaveAttribute("id", "quote-total");
+  });
+
+  it("forwards total amount edits through onTotalChange", () => {
+    const onTotalChange = vi.fn();
+
+    render(
+      <TotalAmountSection
+        lineItemSum={120}
+        total={120}
+        taxRate={null}
+        discountType={null}
+        discountValue={null}
+        depositAmount={null}
+        onTotalChange={onTotalChange}
+        onTaxRateChange={vi.fn()}
+        onDiscountTypeChange={vi.fn()}
+        onDiscountValueChange={vi.fn()}
+        onDepositAmountChange={vi.fn()}
+      />,
     );
+
+    fireEvent.change(screen.getByLabelText(/total amount/i), { target: { value: "150" } });
+    expect(onTotalChange).toHaveBeenLastCalledWith(150);
   });
 
   it("keeps optional pricing discoverable while collapsed when nothing is active", () => {

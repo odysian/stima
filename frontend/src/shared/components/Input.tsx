@@ -5,6 +5,7 @@ export interface InputProps {
   id?: string;
   placeholder?: string;
   className?: string;
+  fieldClassName?: string;
   type?: string;
   autoComplete?: string;
   required?: boolean;
@@ -29,6 +30,7 @@ export function Input({
   id,
   placeholder,
   className,
+  fieldClassName,
   type = "text",
   autoComplete,
   required = false,
@@ -54,12 +56,13 @@ export function Input({
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   const hasError = invalid || Boolean(error);
 
-  const fieldClassName = [
+  const fieldWrapperClassName = [
     "flex items-center gap-2 rounded-[var(--radius-document)] bg-surface-container-high px-4 font-body text-sm text-on-surface transition-all",
     "focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/30",
     size === "md" ? "min-h-[var(--tap-target-min)] py-2" : "min-h-9 py-1.5",
     hasError ? "border border-error" : "border border-transparent",
     disabled ? "cursor-not-allowed opacity-70" : "",
+    fieldClassName,
   ]
     .filter(Boolean)
     .join(" ");
@@ -84,7 +87,7 @@ export function Input({
           {label}
         </label>
       ) : null}
-      <div className={fieldClassName}>
+      <div className={fieldWrapperClassName}>
         {startAdornment ? (
           <span className="flex shrink-0 items-center text-sm text-on-surface-variant">
             {startAdornment}
