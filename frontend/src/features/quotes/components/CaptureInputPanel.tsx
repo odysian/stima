@@ -115,6 +115,7 @@ export function CaptureInputPanel({
           <Button
             type="button"
             variant="ghost"
+            size="sm"
             className="mt-3 text-sm text-primary underline decoration-primary/60 underline-offset-4 hover:text-primary/80 disabled:text-outline"
             onClick={onStartBlank}
             disabled={isStartBlankDisabled}

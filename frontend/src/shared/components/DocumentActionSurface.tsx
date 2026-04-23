@@ -90,7 +90,7 @@ export function DocumentActionError({ children }: MessageProps): React.ReactElem
 
 export function DocumentActionSuccessMessage({ children }: MessageProps): React.ReactElement {
   return (
-    <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">
+    <p className="mx-4 mt-3 rounded-[var(--radius-document)] bg-success-container p-3 text-sm text-success">
       {children}
     </p>
   );

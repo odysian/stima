@@ -183,7 +183,7 @@ export function TotalAmountSection({
                     step={0.01}
                     disabled={disabled}
                     value={String(discountValue ?? "")}
-                    onChange={(v) => onDiscountValueChange(v ? Number(v) : null)}
+                    onChange={(v) => onDiscountValueChange(v.trim() ? Number(v) : null)}
                     showStepControls={false}
                     formatOnBlur={false}
                     placeholder={discountType === "percent" ? "10" : "25"}
@@ -260,7 +260,7 @@ export function TotalAmountSection({
                     step={0.01}
                     disabled={disabled}
                     value={String(depositAmount ?? "")}
-                    onChange={(v) => onDepositAmountChange(v ? Number(v) : null)}
+                    onChange={(v) => onDepositAmountChange(v.trim() ? Number(v) : null)}
                     showStepControls={false}
                     formatOnBlur={false}
                     placeholder="50"
