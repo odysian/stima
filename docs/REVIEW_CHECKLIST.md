@@ -30,5 +30,15 @@
 - [ ] Architecture/pattern docs updated if needed
 - [ ] Issue and PR links are complete
 
+## UI Adoption
+- [ ] All document-style surfaces in touched files use `rounded-[var(--radius-document)]`.
+- [ ] No new inline hex; all colors reference tokens.
+- [ ] Tappables use `active:scale-*`; no hover-scale introduced.
+- [ ] Tap targets ≥ 44px; verified for new/touched controls.
+- [ ] Section labels use `<Eyebrow>`; status displays use `<StatusPill>`; sheets use `<Sheet>`; empty states use `<EmptyState>`.
+- [ ] Form inputs use `<Input>` / `<NumericField>` / `<Select>` / `<PasswordField>`.
+- [ ] Safe-area insets respected where fixed/sticky elements are introduced.
+- [ ] Light theme smoke-tested (`[data-theme="light"]`).
+
 ## CI
 - [ ] CI status checked (`GitHub Actions: .github/workflows/backend-test.yml and .github/workflows/frontend-test.yml`)

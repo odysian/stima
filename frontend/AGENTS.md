@@ -23,6 +23,31 @@ Apply this file when primary scope is `frontend/` or issue labels include `area:
 - Tier 3 (PR/final gate): `make frontend-verify` (or `make verify` when cross-surface).
 - Tier 4 (operator-only heavy): manual/live checks only when explicitly required.
 
+## UI System (Required Reading)
+
+For any `area:frontend` work touching visuals, open [`frontend/UI_SYSTEM.md`](UI_SYSTEM.md) before editing. It contains the token catalog, primitive catalog, composition rules, decision tree, banned patterns, and acceptance gates.
+
+### Banned patterns (quick reference)
+
+- No `rounded-xl` / `rounded-lg` on document surfaces — use `rounded-[var(--radius-document)]`.
+- No inline `<button className="forest-gradient...">` — FABs only, and they are whitelisted.
+- No raw `<input>` in feature code — use `<Input>`, `<NumericField>`, `<PasswordField>`, or `<Select>`.
+- No Radix `Dialog.Root` outside `Sheet.tsx` — feature code imports `<Sheet>`.
+- No inline eyebrow spans — use `<Eyebrow>`.
+- No hover-scale — tappables use `active:scale-*`.
+- No new inline hex colors — reference tokens from `frontend/src/index.css`.
+- No undocumented raw `<button>` — whitelist or migrate.
+
+### Before adding new primitives
+
+Grep `frontend/UI_SYSTEM.md` and `frontend/src/ui/` before introducing:
+- a new `<input>` variant
+- a new `<button>` style
+- a `Dialog.Root` import
+- an inline eyebrow span
+
+Reuse existing primitives. If a genuinely new primitive is required, update `UI_SYSTEM.md` catalog in the same PR.
+
 ## Practical File-Size Budgets
 
 - frontend components target `<=250` LOC
