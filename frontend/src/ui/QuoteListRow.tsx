@@ -13,14 +13,10 @@ interface QuoteListRowProps {
   onClick: () => void;
 }
 
-const pillBase = "text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full";
-
 const baseRowClasses =
   "w-full cursor-pointer rounded-[var(--radius-document)] bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const draftRowClasses =
   "glass-surface w-full cursor-pointer rounded-[var(--radius-document)] border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
-const needsCustomerPillClasses = `${pillBase} shrink-0 whitespace-nowrap bg-warning-container text-warning`;
-
 export function QuoteListRow({
   customerLabel,
   titleLabel,
@@ -48,7 +44,9 @@ export function QuoteListRow({
         <div className="flex items-center gap-3">
           <p className="text-xs text-on-surface-variant">{docAndDate}</p>
           {needsCustomerAssignment ? (
-            <span className={`${needsCustomerPillClasses} ml-auto`}>Needs customer</span>
+            <span className="ml-auto">
+              <StatusPill variant="needs_customer" />
+            </span>
           ) : (
             <span className="ml-auto">
               <StatusPill variant={status} />

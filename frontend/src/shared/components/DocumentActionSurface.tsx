@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { Input } from "@/shared/components/Input";
 
 const utilityGridClassNames = {
   1: "grid grid-cols-1 gap-2",
@@ -89,7 +90,7 @@ export function DocumentActionError({ children }: MessageProps): React.ReactElem
 
 export function DocumentActionSuccessMessage({ children }: MessageProps): React.ReactElement {
   return (
-    <p className="mx-4 mt-3 rounded-md bg-success-container p-3 text-sm text-success">
+    <p className="mx-4 mt-3 rounded-[var(--radius-document)] bg-success-container p-3 text-sm text-success">
       {children}
     </p>
   );
@@ -101,16 +102,12 @@ export function DocumentActionManualCopyField({
 }: ManualCopyFieldProps): React.ReactElement {
   return (
     <div className="mx-4 mt-3">
-      <label className="block text-sm font-medium text-on-surface" htmlFor="manual-share-url">
-        {label}
-      </label>
-      <input
+      <Input
         id="manual-share-url"
-        type="text"
+        label={label}
         readOnly
         value={url}
         onFocus={(event) => event.currentTarget.select()}
-        className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
     </div>
   );

@@ -81,7 +81,7 @@ export function OverflowMenu({
   }
 
   const itemClassName =
-    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-surface-container-low focus-visible:bg-surface-container-low focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40";
+    "flex w-full items-center gap-3 rounded-[var(--radius-document)] px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-surface-container-low focus-visible:bg-surface-container-low focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40";
 
   return (
     <div ref={containerRef} className="relative">
@@ -105,7 +105,7 @@ export function OverflowMenu({
           id={menuId}
           role="menu"
           aria-label={triggerLabel}
-          className="absolute right-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-2 ghost-shadow"
+          className="absolute right-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-2rem)] rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-2 ghost-shadow"
         >
           {items.map((item) => {
             const toneClassName = item.tone === "destructive" ? "text-error" : "text-on-surface";

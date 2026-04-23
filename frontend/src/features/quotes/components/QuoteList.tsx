@@ -49,7 +49,7 @@ function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionPro
       <div className="mb-2 px-4">
         <Eyebrow>{label}</Eyebrow>
       </div>
-      <div className="mx-4 rounded-xl bg-surface-container-low p-3">
+      <div className="mx-4 rounded-[var(--radius-document)] bg-surface-container-low p-3">
         <ul className="flex flex-col gap-3">
           {rows.map((row) => (
             <li key={row.id}>

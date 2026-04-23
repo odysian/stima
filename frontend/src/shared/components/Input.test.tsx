@@ -13,12 +13,11 @@ describe("Input", () => {
     expect(input.closest("div")).toHaveClass("rounded-[var(--radius-document)]");
   });
 
-  it("renders input without label and id when omitted", () => {
+  it("renders input without label when label is omitted", () => {
     render(<Input placeholder="Search quotes" value="" onChange={vi.fn()} />);
 
     const input = screen.getByRole("textbox");
-    expect(screen.queryByText("Search quotes")).not.toBeInTheDocument();
-    expect(input).not.toHaveAttribute("id");
+    expect(screen.queryByRole("textbox", { name: "Search quotes" })).not.toBeInTheDocument();
     expect(input).toHaveAttribute("placeholder", "Search quotes");
   });
 

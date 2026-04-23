@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { LineItemCatalogTabPanel } from "@/features/quotes/components/LineItemCatalogTabPanel";
 import { resolveLineItemReviewExplanation } from "@/features/quotes/utils/lineItemFlags";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { Input } from "@/shared/components/Input";
 import {
   LINE_ITEM_DESCRIPTION_MAX_CHARS,
   LINE_ITEM_DETAILS_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
 import { Card } from "@/ui/Card";
 import { Eyebrow } from "@/ui/Eyebrow";
-import { Sheet } from "@/ui/Sheet";
+import { NumericField } from "@/ui/NumericField";
+import { Sheet, SheetDescription, SheetTitle } from "@/ui/Sheet";
 interface LineItemEditSheetProps {
   open: boolean;
   mode: "add" | "edit";
@@ -229,9 +230,7 @@ export function LineItemEditSheet({
       }}
     >
             <div className="flex items-start justify-between gap-4">
-              <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
-                {title}
-              </Dialog.Title>
+              <SheetTitle>{title}</SheetTitle>
               <div className="flex items-center gap-2">
                 {onSaveToCatalog && showManualFields ? (
                   <Button
@@ -284,12 +283,9 @@ export function LineItemEditSheet({
               </div>
             </div>
             {!showManualFields ? (
-              <Dialog.Description
-                id="line-item-sheet-catalog-description"
-                className="mt-2 text-sm leading-6 text-on-surface-variant"
-              >
+              <SheetDescription id="line-item-sheet-catalog-description">
                 Pick a catalog item to insert.
-              </Dialog.Description>
+              </SheetDescription>
             ) : null}
             <div className="mt-4 space-y-4">
               {formError ? <FeedbackMessage variant="error">{formError}</FeedbackMessage> : null}
@@ -297,16 +293,18 @@ export function LineItemEditSheet({
                 <Card accent="warn" className="bg-warning-container/50">
                   <Eyebrow className="text-warning">Review needed</Eyebrow>
                   <p className="mt-1 text-sm leading-6 text-warning">{reviewExplanation}</p>
-                  <button
+                  <Button
                     type="button"
-                    className="mt-3 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-[var(--radius-document)] border border-warning-accent/50 bg-warning-container px-3.5 py-2 text-xs font-bold uppercase tracking-wide text-warning transition-all hover:bg-warning-container/80 active:scale-[0.98]"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-3 border border-warning-accent/50 bg-warning-container text-warning hover:bg-warning-container/80"
                     onClick={() => {
                       setLineItemFlagged(false);
                       setLineItemFlagReason(null);
                     }}
                   >
                     Dismiss
-                  </button>
+                  </Button>
                 </Card>
               ) : null}
               {mode === "add" ? (
@@ -321,7 +319,7 @@ export function LineItemEditSheet({
                     type="button"
                     aria-controls="line-item-tabpanel-manual"
                     aria-selected={activeAddTab === "manual"}
-                    className={`min-h-11 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-wide transition-all active:scale-[0.98] ${
+                    className={`min-h-11 rounded-full px-3 py-2 transition-all active:scale-[0.98] ${
                       activeAddTab === "manual"
                         ? "bg-surface-container-lowest text-primary"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -331,7 +329,7 @@ export function LineItemEditSheet({
                       setActiveAddTab("manual");
                     }}
                   >
-                    Manual
+                    <Eyebrow as="span">Manual</Eyebrow>
                   </button>
                   <button
                     id="line-item-tab-catalog"
@@ -339,7 +337,7 @@ export function LineItemEditSheet({
                     type="button"
                     aria-controls="line-item-tabpanel-catalog"
                     aria-selected={activeAddTab === "catalog"}
-                    className={`min-h-11 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-wide transition-all active:scale-[0.98] ${
+                    className={`min-h-11 rounded-full px-3 py-2 transition-all active:scale-[0.98] ${
                       activeAddTab === "catalog"
                         ? "bg-surface-container-lowest text-primary"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -350,7 +348,7 @@ export function LineItemEditSheet({
                       void loadCatalogItems();
                     }}
                   >
-                    Catalog
+                    <Eyebrow as="span">Catalog</Eyebrow>
                   </button>
                 </div>
               ) : null}
@@ -363,10 +361,9 @@ export function LineItemEditSheet({
                       </label>
                       <span className="text-xs font-bold uppercase text-primary">Required</span>
                     </div>
-                    <input
-                      id="line-item-sheet-description"
+                    <Input
                       ref={descriptionInputRef}
-                      type="text"
+                      id="line-item-sheet-description"
                       maxLength={LINE_ITEM_DESCRIPTION_MAX_CHARS}
                       value={description}
                       onChange={(event) => {
@@ -378,7 +375,6 @@ export function LineItemEditSheet({
                           setFormError(null);
                         }
                       }}
-                      className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </section>
                   <section className="space-y-2">
@@ -409,14 +405,12 @@ export function LineItemEditSheet({
                     <label htmlFor="line-item-sheet-price" className="font-headline text-sm font-bold text-on-surface">
                       Price
                     </label>
-                    <input
+                    <NumericField
                       id="line-item-sheet-price"
-                      type="text"
-                      inputMode="decimal"
                       placeholder="$ 0.00"
                       value={priceInput}
-                      onChange={(event) => {
-                        setPriceInput(event.target.value);
+                      onChange={(nextValue) => {
+                        setPriceInput(nextValue);
                         if (savedCatalogItem) {
                           setSavedCatalogItem(null);
                         }
@@ -424,7 +418,8 @@ export function LineItemEditSheet({
                           setFormError(null);
                         }
                       }}
-                      className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      showStepControls={false}
+                      formatOnBlur={false}
                     />
                   </section>
                 </div>

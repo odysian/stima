@@ -1,10 +1,8 @@
-import * as Dialog from "@radix-ui/react-dialog";
-
 import type { ExtractionReviewHiddenDetails, HiddenItemState } from "@/features/quotes/types/quote.types";
 import { resolveCaptureDetailsActionableItems } from "@/features/quotes/utils/captureDetails";
 import { Button } from "@/shared/components/Button";
 import { Eyebrow } from "@/ui/Eyebrow";
-import { Sheet, SheetBody, SheetCloseButton, SheetFooter, SheetHeader } from "@/ui/Sheet";
+import { Sheet, SheetBody, SheetCloseButton, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/ui/Sheet";
 
 interface CaptureDetailsSheetProps {
   open: boolean;
@@ -38,12 +36,10 @@ export function CaptureDetailsSheet({
     >
       <SheetHeader>
         <div>
-            <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
-              Capture Details
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Secondary capture output for review. Main review inputs stay focused on line items, notes, and pricing.
-            </Dialog.Description>
+          <SheetTitle>Capture Details</SheetTitle>
+          <SheetDescription>
+            Secondary capture output for review. Main review inputs stay focused on line items, notes, and pricing.
+          </SheetDescription>
         </div>
         <SheetCloseButton />
       </SheetHeader>
@@ -56,7 +52,7 @@ export function CaptureDetailsSheet({
                     {actionableItems.map((item) => (
                       <li
                         key={item.id}
-                        className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
+                        className="rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-3 text-sm text-on-surface"
                       >
                         <p className="font-semibold">{item.label}</p>
                         <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{item.text}</p>
@@ -65,7 +61,7 @@ export function CaptureDetailsSheet({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="rounded-md border border-outline-variant/40 px-2 py-1 text-xs font-medium uppercase tracking-wide"
+                            className="border border-outline-variant/40 px-2 py-1"
                             disabled={isMutating || !onDismissHiddenItem}
                             onClick={() => { void onDismissHiddenItem?.(item.id); }}
                           >
@@ -82,7 +78,7 @@ export function CaptureDetailsSheet({
 
               <section className="space-y-2">
                 <Eyebrow as="h3">Transcript</Eyebrow>
-                <div className="rounded-lg border border-outline-variant/30 bg-surface-container-high p-3 text-sm leading-6 text-on-surface whitespace-pre-wrap">
+                <div className="rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-3 text-sm leading-6 text-on-surface whitespace-pre-wrap">
                   {transcript.trim().length > 0 ? transcript : "No transcript notes captured."}
                 </div>
               </section>
@@ -92,7 +88,7 @@ export function CaptureDetailsSheet({
         <Button
           type="button"
           variant="secondary"
-          className="w-full rounded-lg border border-outline-variant/30 py-3"
+          className="w-full border border-outline-variant/30 py-3"
           onClick={onClose}
         >
           Close

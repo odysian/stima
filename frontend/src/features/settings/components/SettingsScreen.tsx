@@ -217,7 +217,7 @@ export function SettingsScreen(): React.ReactElement {
                         data-testid="settings-logo-preview-tile"
                         className="flex h-[128px] w-[128px] rounded-[var(--radius-document)] bg-surface-container-lowest p-2"
                       >
-                        <div className="flex h-full w-full items-center justify-center rounded-lg bg-surface-container p-2">
+                        <div className="flex h-full w-full items-center justify-center rounded-[var(--radius-document)] bg-surface-container p-2">
                           {hasLogo ? (
                             <img
                               key={logoPreviewVersion}

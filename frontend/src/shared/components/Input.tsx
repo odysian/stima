@@ -1,4 +1,4 @@
-import { useId, type ChangeEvent, type FocusEvent, type ReactNode } from "react";
+import { forwardRef, useId, type ChangeEvent, type FocusEvent, type ReactNode } from "react";
 
 export interface InputProps {
   label?: string;
@@ -10,10 +10,11 @@ export interface InputProps {
   autoComplete?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   hideLabel?: boolean;
   maxLength?: number;
   value: string;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
   error?: string;
   hint?: string;
   startAdornment?: ReactNode;
@@ -25,7 +26,7 @@ export interface InputProps {
   onFocus?: (event: FocusEvent<HTMLInputElement>) => void;
 }
 
-export function Input({
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({
   label,
   id,
   placeholder,
@@ -35,6 +36,7 @@ export function Input({
   autoComplete,
   required = false,
   disabled = false,
+  readOnly = false,
   hideLabel = false,
   maxLength,
   value,
@@ -48,7 +50,7 @@ export function Input({
   inputMode,
   onBlur,
   onFocus,
-}: InputProps): React.ReactElement {
+}: InputProps, ref) {
   const generatedId = useId();
   const accessibilityBaseId = id ?? `input-${generatedId.replaceAll(":", "")}`;
   const hintId = hint ? `${accessibilityBaseId}-hint` : undefined;
@@ -78,7 +80,7 @@ export function Input({
     <div className="flex flex-col gap-1">
       {label ? (
         <label
-          htmlFor={id}
+          htmlFor={accessibilityBaseId}
           className={[
             hideLabel ? "sr-only" : "text-sm font-medium",
             hasError ? "text-error" : "text-on-surface",
@@ -94,13 +96,15 @@ export function Input({
           </span>
         ) : null}
         <input
-          id={id}
+          ref={ref}
+          id={accessibilityBaseId}
           type={type}
           autoComplete={autoComplete}
           value={value}
           onChange={onChange}
           required={required}
           disabled={disabled}
+          readOnly={readOnly}
           aria-required={required}
           aria-invalid={hasError}
           aria-describedby={describedBy}
@@ -129,4 +133,4 @@ export function Input({
       ) : null}
     </div>
   );
-}
+});

@@ -26,3 +26,9 @@ This file documents production `<button>` usages that intentionally stay raw and
 
 - Test-only `<button>` elements:
   - Test files may continue to use raw `<button>` markup for focused behavior fixtures.
+
+## Additions (2026-04-23)
+
+- `CustomerDetailScreen.tsx:377,389` — history mode filter toggles (`aria-pressed`) — structural segmented control.
+- `QuoteReuseChooser.tsx:181,193` — tab toggles (`aria-pressed`) — structural.
+- `OverflowMenu.tsx:88` — custom-geometry trigger — structural chrome.

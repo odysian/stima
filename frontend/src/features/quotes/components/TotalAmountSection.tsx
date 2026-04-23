@@ -177,16 +177,15 @@ export function TotalAmountSection({
                       <span className="material-symbols-outlined block text-sm leading-none">expand_more</span>
                     </span>
                   </div>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <NumericField
+                    label="Discount value"
+                    hideLabel
+                    step={0.01}
                     disabled={disabled}
-                    value={discountValue ?? ""}
-                    onChange={(event) => {
-                      const nextValue = event.target.value.trim();
-                      onDiscountValueChange(nextValue.length > 0 ? Number(nextValue) : null);
-                    }}
-                    className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
+                    value={String(discountValue ?? "")}
+                    onChange={(v) => onDiscountValueChange(v.trim() ? Number(v) : null)}
+                    showStepControls={false}
+                    formatOnBlur={false}
                     placeholder={discountType === "percent" ? "10" : "25"}
                   />
                 </div>
@@ -214,20 +213,19 @@ export function TotalAmountSection({
                 <span className="font-semibold">Tax</span>
               </label>
               {isTaxEnabled ? (
-                <div className="relative mt-3">
-                  <input
-                    type="number"
-                    step="0.01"
-                    aria-label="Tax rate (%)"
+                <div className="mt-3">
+                  <NumericField
+                    label="Tax rate (%)"
+                    hideLabel
+                    step={0.01}
                     disabled={disabled}
                     value={toTaxPercentDisplay(taxRate)}
-                    onChange={(event) => onTaxRateChange(parseTaxPercentInput(event.target.value))}
-                    className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 pr-10 text-sm text-on-surface transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
+                    onChange={(v) => onTaxRateChange(parseTaxPercentInput(v))}
+                    showStepControls={false}
+                    formatOnBlur={false}
                     placeholder="8.25"
+                    trailingAdornment={<span className="text-sm text-outline">%</span>}
                   />
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-outline">
-                    %
-                  </span>
                 </div>
               ) : null}
             </section>
@@ -255,18 +253,19 @@ export function TotalAmountSection({
                 <span className="font-semibold">Deposit</span>
               </label>
               {isDepositEnabled ? (
-                <input
-                  type="number"
-                  step="0.01"
-                  disabled={disabled}
-                  value={depositAmount ?? ""}
-                  onChange={(event) => {
-                    const nextValue = event.target.value.trim();
-                    onDepositAmountChange(nextValue.length > 0 ? Number(nextValue) : null);
-                  }}
-                  className="mt-3 w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-sm text-on-surface transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
-                  placeholder="50"
-                />
+                <div className="mt-3">
+                  <NumericField
+                    label="Deposit amount"
+                    hideLabel
+                    step={0.01}
+                    disabled={disabled}
+                    value={String(depositAmount ?? "")}
+                    onChange={(v) => onDepositAmountChange(v.trim() ? Number(v) : null)}
+                    showStepControls={false}
+                    formatOnBlur={false}
+                    placeholder="50"
+                  />
+                </div>
               ) : null}
             </section>
           </div>
