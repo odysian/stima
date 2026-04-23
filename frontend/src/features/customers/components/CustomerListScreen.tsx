@@ -115,13 +115,13 @@ export function CustomerListScreen(): React.ReactElement {
         ) : null}
 
         {!isLoading && !loadError && filteredCustomers.length > 0 ? (
-          <div className="mx-4 rounded-xl bg-surface-container-low p-3">
+          <div className="mx-4 rounded-[var(--radius-document)] bg-surface-container-low p-3">
             <ul className="flex flex-col gap-3">
               {filteredCustomers.map((customer) => (
                 <li key={customer.id}>
                   <button
                     type="button"
-                    className="flex w-full cursor-pointer items-center justify-between rounded-xl bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low"
+                    className="flex w-full cursor-pointer items-center justify-between rounded-[var(--radius-document)] bg-surface-container-lowest p-4 text-left ghost-shadow transition-all active:scale-[0.98] active:bg-surface-container-low"
                     onClick={() => navigate(`/customers/${customer.id}`)}
                   >
                     <div>

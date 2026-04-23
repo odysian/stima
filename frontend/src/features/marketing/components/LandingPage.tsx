@@ -32,7 +32,7 @@ export function LandingPage(): React.ReactElement {
 
   return (
     <main className="screen-radial-backdrop min-h-screen bg-background text-on-surface" data-testid="landing-page">
-      <header className="glass-surface glass-shadow-top fixed top-0 z-50 w-full border-b border-outline-variant/20 backdrop-blur-md">
+      <header className="glass-surface glass-shadow-top safe-top fixed top-0 z-50 w-full border-b border-outline-variant/20 backdrop-blur-md">
         <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
           <p className="font-headline text-[2rem] font-bold leading-none text-primary">Stima</p>
           <div className="flex items-center gap-3">

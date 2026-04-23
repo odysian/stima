@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
 
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteReuseCandidate } from "@/features/quotes/types/quote.types";
@@ -7,7 +6,7 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { StatusPill } from "@/ui/StatusPill";
-import { Sheet, SheetBody, SheetCloseButton, SheetFooter, SheetHeader } from "@/ui/Sheet";
+import { Sheet, SheetBody, SheetCloseButton, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/ui/Sheet";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 
 interface QuoteReuseChooserProps {
@@ -155,12 +154,8 @@ export function QuoteReuseChooser({
     >
       <SheetHeader>
         <div>
-            <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
-              Create from existing
-            </Dialog.Title>
-            <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Pick a quote to duplicate into a new draft.
-            </Dialog.Description>
+          <SheetTitle>Create from existing</SheetTitle>
+          <SheetDescription>Pick a quote to duplicate into a new draft.</SheetDescription>
         </div>
         <SheetCloseButton />
       </SheetHeader>
@@ -206,7 +201,7 @@ export function QuoteReuseChooser({
 
             <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-1">
               {isLoading ? (
-                <div role="status" aria-label="Loading quotes" className="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
+                <div role="status" aria-label="Loading quotes" className="rounded-[var(--radius-document)] bg-surface-container-low p-4 text-sm text-on-surface-variant">
                   Loading quotes...
                 </div>
               ) : null}
@@ -220,7 +215,7 @@ export function QuoteReuseChooser({
               ) : null}
 
               {!isLoading && !loadError && visibleCandidates.length === 0 ? (
-                <section className="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
+                <section className="rounded-[var(--radius-document)] bg-surface-container-low p-4 text-sm text-on-surface-variant">
                   {emptyStateMessage}
                 </section>
               ) : null}
@@ -231,7 +226,7 @@ export function QuoteReuseChooser({
                     <li key={candidate.id}>
                       <button
                         type="button"
-                        className="w-full cursor-pointer rounded-xl border border-outline-variant/30 bg-surface-container-low p-4 text-left transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-70"
+                        className="w-full cursor-pointer rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-low p-4 text-left transition-colors hover:bg-surface-container-lowest disabled:cursor-not-allowed disabled:opacity-70"
                         disabled={duplicatingId !== null}
                         onClick={() => { void onCandidateSelect(candidate.id); }}
                       >

@@ -78,7 +78,7 @@ export function CaptureInputPanel({
                   <Button
                     type="button"
                     variant="iconButton"
-                    size="xs"
+                    size="sm"
                     aria-label={`Delete clip ${clipNumber}`}
                     className="text-outline hover:bg-surface-container-low"
                     onClick={() => removeClip(clip.id)}
@@ -112,14 +112,15 @@ export function CaptureInputPanel({
           className="w-full resize-none rounded-[var(--radius-document)] border border-outline-variant/25 bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
         />
         {onStartBlank ? (
-          <button
+          <Button
             type="button"
-            className="mt-3 cursor-pointer text-sm text-primary underline decoration-primary/60 underline-offset-4 transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:text-outline"
+            variant="ghost"
+            className="mt-3 text-sm text-primary underline decoration-primary/60 underline-offset-4 hover:text-primary/80 disabled:text-outline"
             onClick={onStartBlank}
             disabled={isStartBlankDisabled}
           >
             Or start with a blank document
-          </button>
+          </Button>
         ) : null}
       </section>
 

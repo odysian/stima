@@ -1,6 +1,5 @@
-import * as Dialog from "@radix-ui/react-dialog";
 import { Button } from "@/shared/components/Button";
-import { Sheet, SheetBody, SheetCloseButton, SheetHeader } from "@/ui/Sheet";
+import { Sheet, SheetBody, SheetCloseButton, SheetDescription, SheetHeader, SheetTitle } from "@/ui/Sheet";
 
 interface QuoteCreateEntrySheetProps {
   open: boolean;
@@ -28,12 +27,8 @@ export function QuoteCreateEntrySheet({
     >
       <SheetHeader>
         <div>
-          <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
-            {title}
-          </Dialog.Title>
-          <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
-            {description}
-          </Dialog.Description>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
         </div>
         <SheetCloseButton />
       </SheetHeader>

@@ -85,7 +85,7 @@ export function Toast({ toast, onDismiss }: ToastProps): React.ReactElement {
         <button
           type="button"
           aria-label="Dismiss"
-          className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-base leading-none transition-colors hover:bg-black/10"
+          className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-base leading-none transition-colors hover:bg-surface-container"
           onClick={onDismiss}
         >
           ×

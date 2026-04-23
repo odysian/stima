@@ -7,7 +7,8 @@ export type StatusPillVariant =
   | "declined"
   | "sent"
   | "paid"
-  | "void";
+  | "void"
+  | "needs_customer";
 
 interface StatusPillProps {
   variant: StatusPillVariant;
@@ -23,6 +24,7 @@ const styles: Record<StatusPillVariant, string> = {
   sent: "bg-info-container text-info",
   paid: "bg-success-container text-success",
   void: "bg-neutral-container text-on-surface-variant line-through",
+  needs_customer: "bg-warning-container text-warning",
 };
 
 const labels: Record<StatusPillVariant, string> = {
@@ -35,6 +37,7 @@ const labels: Record<StatusPillVariant, string> = {
   sent: "Sent",
   paid: "Paid",
   void: "Void",
+  needs_customer: "Needs customer",
 };
 
 const pillBase = "text-[0.6875rem] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full";

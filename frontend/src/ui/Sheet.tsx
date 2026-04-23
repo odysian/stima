@@ -20,6 +20,7 @@ interface SheetProps extends Omit<Dialog.DialogProps, "children"> {
 interface SheetRegionProps {
   children: ReactNode;
   className?: string;
+  id?: string;
 }
 
 interface SheetCloseButtonProps {
@@ -117,6 +118,37 @@ export function SheetBody({ children, className }: SheetRegionProps): React.Reac
 
 export function SheetFooter({ children, className }: SheetRegionProps): React.ReactElement {
   return <div className={joinClasses("mt-6", className)}>{children}</div>;
+}
+
+export function SheetTitle({
+  children,
+  className,
+}: SheetRegionProps): React.ReactElement {
+  return (
+    <Dialog.Title
+      className={joinClasses(
+        "font-headline text-xl font-bold tracking-tight text-on-surface",
+        className,
+      )}
+    >
+      {children}
+    </Dialog.Title>
+  );
+}
+
+export function SheetDescription({
+  children,
+  className,
+  id,
+}: SheetRegionProps): React.ReactElement {
+  return (
+    <Dialog.Description
+      id={id}
+      className={joinClasses("mt-2 text-sm leading-6 text-on-surface-variant", className)}
+    >
+      {children}
+    </Dialog.Description>
+  );
 }
 
 export function SheetCloseButton({

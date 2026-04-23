@@ -105,11 +105,11 @@ describe("TotalAmountSection", () => {
 
     const taxCheckbox = screen.getByRole("checkbox", { name: "Tax" });
     expect(taxCheckbox).not.toBeChecked();
-    expect(screen.queryByRole("spinbutton", { name: /tax rate/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /tax rate/i })).not.toBeInTheDocument();
 
     fireEvent.click(taxCheckbox);
 
-    const taxInput = screen.getByRole("spinbutton", { name: /tax rate/i }) as HTMLInputElement;
+    const taxInput = screen.getByRole("textbox", { name: /tax rate/i }) as HTMLInputElement;
     expect(taxInput.value).toBe("8.25");
   });
 
@@ -118,14 +118,14 @@ describe("TotalAmountSection", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /optional pricing/i }));
 
-    expect(screen.queryByRole("spinbutton", { name: /tax rate/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /tax rate/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Discount" }));
     const discountInput = screen.getByPlaceholderText("25") as HTMLInputElement;
     expect(discountInput.value).toBe("");
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Tax" }));
-    const taxInput = screen.getByRole("spinbutton", { name: /tax rate/i }) as HTMLInputElement;
+    const taxInput = screen.getByRole("textbox", { name: /tax rate/i }) as HTMLInputElement;
     expect(taxInput.value).toBe("8.25");
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Deposit" }));

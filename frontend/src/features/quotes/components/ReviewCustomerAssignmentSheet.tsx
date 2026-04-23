@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
 
 import { customerService } from "@/features/customers/services/customerService";
 import type { Customer, CustomerCreateRequest } from "@/features/customers/types/customer.types";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
-import { Sheet, SheetBody, SheetCloseButton, SheetHeader } from "@/ui/Sheet";
+import { Eyebrow } from "@/ui/Eyebrow";
+import { Sheet, SheetBody, SheetCloseButton, SheetDescription, SheetHeader, SheetTitle } from "@/ui/Sheet";
 
 interface ReviewCustomerAssignmentSheetProps {
   open: boolean;
@@ -149,13 +149,10 @@ export function ReviewCustomerAssignmentSheet({
     >
       <SheetHeader>
         <div>
-            <Dialog.Title className="font-headline text-xl font-bold tracking-tight text-on-surface">
-              Assign Customer
-            </Dialog.Title>
-
-            <Dialog.Description className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Search existing customers or create one inline, then apply the assignment.
-            </Dialog.Description>
+          <SheetTitle>Assign Customer</SheetTitle>
+          <SheetDescription>
+            Search existing customers or create one inline, then apply the assignment.
+          </SheetDescription>
         </div>
         <SheetCloseButton />
       </SheetHeader>
@@ -185,7 +182,7 @@ export function ReviewCustomerAssignmentSheet({
                       <button
                         key={customer.id}
                         type="button"
-                        className="flex w-full cursor-pointer items-center justify-between rounded-lg bg-surface-container-low px-4 py-3 text-left transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex w-full cursor-pointer items-center justify-between rounded-[var(--radius-document)] bg-surface-container-low px-4 py-3 text-left transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
                         disabled={isSubmitting}
                         onClick={() => void assignCustomer(customer.id)}
                       >
@@ -196,7 +193,7 @@ export function ReviewCustomerAssignmentSheet({
                           </span>
                         </span>
                         {currentCustomerId === customer.id ? (
-                          <span className="text-xs font-bold uppercase tracking-wide text-primary">Current</span>
+                          <Eyebrow className="text-primary">Current</Eyebrow>
                         ) : null}
                       </button>
                     ))
@@ -204,7 +201,7 @@ export function ReviewCustomerAssignmentSheet({
                 </div>
               )}
 
-              <div className="rounded-lg bg-surface-container-low p-4">
+              <div className="rounded-[var(--radius-document)] bg-surface-container-low p-4">
                 <Button
                   type="button"
                   variant="ghost"
