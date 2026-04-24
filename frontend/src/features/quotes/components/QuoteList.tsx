@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { DocumentRowsSection, type DocumentRow } from "@/features/quotes/components/DocumentRowsSection";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
+import { PendingCapturesSection } from "@/features/quotes/components/PendingCapturesSection";
 import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
+import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -14,62 +17,9 @@ import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { formatDate } from "@/shared/lib/formatters";
 import { EmptyState } from "@/ui/EmptyState";
-import { Eyebrow } from "@/ui/Eyebrow";
-import { QuoteListRow } from "@/ui/QuoteListRow";
-import type { StatusPillVariant } from "@/ui/StatusPill";
 import { buildInvoiceSubtitle, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
 
 type DocumentMode = "quotes" | "invoices";
-type DocumentStatus = StatusPillVariant;
-
-interface DocumentRow {
-  id: string;
-  customerLabel: string;
-  titleLabel?: string | null;
-  docAndDate: string;
-  totalAmount: number | null;
-  status: DocumentStatus;
-  destination: string;
-  destinationState?: {
-    origin: "list";
-  };
-  isDraft?: boolean;
-  needsCustomerAssignment?: boolean;
-}
-
-interface DocumentRowsSectionProps {
-  label: string;
-  rows: DocumentRow[];
-  onRowClick: (row: DocumentRow) => void;
-}
-
-function DocumentRowsSection({ label, rows, onRowClick }: DocumentRowsSectionProps): React.ReactElement {
-  return (
-    <section aria-label={label}>
-      <div className="mb-2 px-4">
-        <Eyebrow>{label}</Eyebrow>
-      </div>
-      <div className="mx-4 rounded-[var(--radius-document)] bg-surface-container-low p-3">
-        <ul className="flex flex-col gap-3">
-          {rows.map((row) => (
-            <li key={row.id}>
-              <QuoteListRow
-                customerLabel={row.customerLabel}
-                titleLabel={row.titleLabel}
-                docAndDate={row.docAndDate}
-                totalAmount={row.totalAmount}
-                status={row.status}
-                isDraft={row.isDraft}
-                needsCustomerAssignment={row.needsCustomerAssignment}
-                onClick={() => onRowClick(row)}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  );
-}
 
 export function QuoteList(): React.ReactElement {
   const navigate = useNavigate();
@@ -83,6 +33,16 @@ export function QuoteList(): React.ReactElement {
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [quoteLoadError, setQuoteLoadError] = useState<string | null>(null);
   const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
+  const [pendingCaptureActionError, setPendingCaptureActionError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  const {
+    captures: recoverableCaptures,
+    isLoading: isLoadingRecoverableCaptures,
+    error: recoverableCapturesError,
+    deleteCapture,
+  } = useRecoverableCaptures(user?.id);
 
   useEffect(() => {
     let isActive = true;
@@ -144,6 +104,23 @@ export function QuoteList(): React.ReactElement {
       inputElement.focus();
     }
   }, [isSearchOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    function onOnlineChange(): void {
+      setIsOnline(window.navigator.onLine);
+    }
+
+    window.addEventListener("online", onOnlineChange);
+    window.addEventListener("offline", onOnlineChange);
+    return () => {
+      window.removeEventListener("online", onOnlineChange);
+      window.removeEventListener("offline", onOnlineChange);
+    };
+  }, []);
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQuotes = useMemo(
@@ -245,6 +222,31 @@ export function QuoteList(): React.ReactElement {
     onQuoteDuplicated: (quoteId) => navigate(`/documents/${quoteId}/edit`),
   });
 
+  function navigateToLocalCapture(
+    sessionId: string,
+    options?: { autoExtract?: boolean },
+  ): void {
+    const nextSearchParams = new URLSearchParams({
+      localSession: sessionId,
+    });
+    if (options?.autoExtract) {
+      nextSearchParams.set("autoExtract", "1");
+    }
+    navigate(`/quotes/capture?${nextSearchParams.toString()}`);
+  }
+
+  async function onDeleteCapture(sessionId: string): Promise<void> {
+    setPendingCaptureActionError(null);
+    try {
+      await deleteCapture(sessionId);
+    } catch (deleteError) {
+      const message = deleteError instanceof Error
+        ? deleteError.message
+        : "Unable to delete pending capture";
+      setPendingCaptureActionError(message);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-background pb-24">
       <ScreenHeader title={headerTitle} subtitle={headerSubtitle} layout="top-level" />
@@ -319,6 +321,21 @@ export function QuoteList(): React.ReactElement {
             />
           ) : null}
         </div>
+
+        {documentMode === "quotes" ? (
+          <PendingCapturesSection
+            captures={recoverableCaptures}
+            isLoading={isLoadingRecoverableCaptures}
+            isOnline={isOnline}
+            timezone={timezone}
+            error={recoverableCapturesError ?? pendingCaptureActionError}
+            onResume={(sessionId) => navigateToLocalCapture(sessionId)}
+            onExtract={(sessionId) => navigateToLocalCapture(sessionId, { autoExtract: true })}
+            onDelete={(sessionId) => {
+              void onDeleteCapture(sessionId);
+            }}
+          />
+        ) : null}
 
         {isLoading ? (
           <div

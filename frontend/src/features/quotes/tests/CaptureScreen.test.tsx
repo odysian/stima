@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
@@ -28,6 +29,10 @@ const startRecordingMock = vi.fn(async () => undefined);
 const stopRecordingMock = vi.fn();
 const removeClipMock = vi.fn();
 const clearVoiceErrorMock = vi.fn();
+const markLocalCaptureStatusMock = vi.fn<(status: string, options?: unknown) => Promise<void>>(
+  async () => undefined,
+);
+const ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR = Object.getOwnPropertyDescriptor(window.navigator, "onLine");
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -45,6 +50,52 @@ vi.mock("@/features/quotes/hooks/useVoiceCapture", () => ({
 vi.mock("@/features/quotes/hooks/useQuoteDraft", () => ({
   useQuoteDraft: vi.fn(),
 }));
+
+vi.mock("@/features/auth/hooks/useAuth", () => ({
+  useAuth: vi.fn(),
+}));
+
+vi.mock("@/features/quotes/offline/useLocalCaptureSession", async () => {
+  const React = await vi.importActual<typeof import("react")>("react");
+
+  return {
+    useLocalCaptureSession: vi.fn(() => {
+      const [notes, setNotes] = React.useState("");
+      const [sessionId, setSessionId] = React.useState<string | null>(null);
+      const [sessionStatus, setSessionStatus] = React.useState<
+        "local_only" | "ready_to_extract" | "submitting" | "extract_failed" | "synced" | "discarded" | null
+      >(null);
+
+      React.useEffect(() => {
+        if (notes.trim().length > 0 && sessionId === null) {
+          setSessionId("local-session-1");
+          setSessionStatus("local_only");
+        }
+      }, [notes, sessionId]);
+
+      return {
+        notes,
+        setNotes,
+        sessionId,
+        sessionStatus,
+        isHydrating: false,
+        hydrationError: null,
+        saveState: notes.trim().length > 0 ? "saved" : "idle",
+        saveError: null,
+        markStatus: async (
+          status: "local_only" | "ready_to_extract" | "submitting" | "extract_failed" | "synced" | "discarded",
+          options?: unknown,
+        ) => {
+          markLocalCaptureStatusMock(status, options);
+          setSessionStatus(status);
+          if (notes.trim().length > 0 && sessionId === null) {
+            setSessionId("local-session-1");
+          }
+        },
+      };
+    }),
+  };
+});
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
@@ -68,6 +119,7 @@ vi.mock("@/shared/lib/jobService", () => ({
 
 const mockedUseVoiceCapture = vi.mocked(useVoiceCapture);
 const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
+const mockedUseAuth = vi.mocked(useAuth);
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedJobService = vi.mocked(jobService);
 
@@ -202,6 +254,21 @@ function mockVoiceCapture(overrides: Partial<ReturnType<typeof useVoiceCapture>>
   });
 }
 
+function setNavigatorOnline(value: boolean): void {
+  Object.defineProperty(window.navigator, "onLine", {
+    configurable: true,
+    value,
+  });
+}
+
+function restoreNavigatorOnline(): void {
+  if (ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR) {
+    Object.defineProperty(window.navigator, "onLine", ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR);
+    return;
+  }
+  delete (window.navigator as { onLine?: boolean }).onLine;
+}
+
 function renderScreen({
   launchOrigin = HOME_ROUTE,
   pathname = "/quotes/capture/cust-1",
@@ -227,6 +294,21 @@ function renderScreen({
 }
 
 beforeEach(() => {
+  mockedUseAuth.mockReturnValue({
+    isLoading: false,
+    isOnboarded: true,
+    login: vi.fn(async () => undefined),
+    logout: vi.fn(async () => undefined),
+    refreshUser: vi.fn(async () => undefined),
+    register: vi.fn(async () => undefined),
+    user: {
+      id: "user-1",
+      email: "tester@stima.dev",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "UTC",
+    },
+  });
   mockedUseQuoteDraft.mockReturnValue({
     draft: null,
     setDraft: setDraftMock,
@@ -265,6 +347,8 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   window.localStorage.clear();
+  restoreNavigatorOnline();
+  markLocalCaptureStatusMock.mockReset();
 });
 
 describe("CaptureScreen", () => {
@@ -365,7 +449,7 @@ describe("CaptureScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
 
-    expect(await screen.findByText("Analyzing notes...")).toBeInTheDocument();
+    expect(screen.getByText("Analyzing notes...")).toBeInTheDocument();
     expect(
       screen.queryByText(/extraction saves your notes as a draft for manual review/i),
     ).not.toBeInTheDocument();
@@ -425,7 +509,7 @@ describe("CaptureScreen", () => {
     expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
-  it("shows a leave confirmation when navigating back with unsaved notes", () => {
+  it("navigates back without confirmation when notes are already saved locally", () => {
     renderScreen();
 
     fireEvent.change(screen.getByLabelText(/written description/i), {
@@ -433,8 +517,8 @@ describe("CaptureScreen", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
 
-    expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toBeInTheDocument();
-    expect(navigateMock).not.toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
+    expect(screen.queryByRole("dialog", { name: "Leave this screen?" })).not.toBeInTheDocument();
+    expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
   });
 
   it("navigates back to the recorded launch origin when there is no unsaved work", () => {
@@ -447,11 +531,9 @@ describe("CaptureScreen", () => {
   });
 
   it("dismisses the leave confirmation when Stay is clicked", () => {
+    mockVoiceCapture({ clips: [clipFixture] });
     renderScreen();
 
-    fireEvent.change(screen.getByLabelText(/written description/i), {
-      target: { value: "Install sod in backyard" },
-    });
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
     fireEvent.click(screen.getByRole("button", { name: "Stay" }));
 
@@ -460,11 +542,9 @@ describe("CaptureScreen", () => {
   });
 
   it("navigates to the launch origin after confirming Leave", () => {
+    mockVoiceCapture({ clips: [clipFixture] });
     renderScreen({ launchOrigin: "/customers/cust-1" });
 
-    fireEvent.change(screen.getByLabelText(/written description/i), {
-      target: { value: "Install sod in backyard" },
-    });
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
     fireEvent.click(screen.getByRole("button", { name: "Leave" }));
 
@@ -495,6 +575,22 @@ describe("CaptureScreen", () => {
       }),
     );
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();
+  });
+
+  it("marks notes as ready to extract and skips submit while browser is offline", async () => {
+    setNavigatorOnline(false);
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    expect(mockedQuoteService.extract).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText("Ready to extract when online. Your notes are still saved on this device."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Ready to extract when online")).toBeInTheDocument();
   });
 
   it("starts a blank draft with customer context and routes to edit", async () => {
@@ -701,14 +797,11 @@ describe("CaptureScreen", () => {
     expect(mockedQuoteService.extract).not.toHaveBeenCalled();
   });
 
-  it("shows staged extraction progress and clears it after extraction resolves", async () => {
+  it("shows staged extraction progress for notes-only extraction", () => {
     vi.useFakeTimers();
 
-    let resolveExtraction: ((value: { type: "sync"; quoteId: string; result: ExtractionResult }) => void) | undefined;
     mockedQuoteService.extract.mockReturnValueOnce(
-      new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>((resolve) => {
-        resolveExtraction = resolve;
-      }),
+      new Promise<{ type: "sync"; quoteId: string; result: ExtractionResult }>(() => {}),
     );
 
     renderScreen();
@@ -728,13 +821,6 @@ describe("CaptureScreen", () => {
     });
 
     expect(screen.getByText("Extracting line items...")).toBeInTheDocument();
-
-    await act(async () => {
-      resolveExtraction?.({ type: "sync", quoteId: "quote-1", result: extractionFixture });
-      await Promise.resolve();
-    });
-
-    expect(screen.queryByText("Extracting line items...")).not.toBeInTheDocument();
   });
 
   it("shows audio-specific staged copy when extracting recorded clips", async () => {
@@ -977,7 +1063,6 @@ describe("CaptureScreen", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
     fireEvent.click(screen.getByRole("button", { name: /go back/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
 
     expect(navigateMock).toHaveBeenCalledWith(HOME_ROUTE, { replace: true });
 

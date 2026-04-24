@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
+import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 
@@ -52,9 +53,15 @@ vi.mock("@/features/auth/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
+vi.mock("@/features/quotes/offline/useRecoverableCaptures", () => ({
+  useRecoverableCaptures: vi.fn(),
+}));
+
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedInvoiceService = vi.mocked(invoiceService);
 const mockedUseAuth = vi.mocked(useAuth);
+const mockedUseRecoverableCaptures = vi.mocked(useRecoverableCaptures);
+const ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR = Object.getOwnPropertyDescriptor(window.navigator, "onLine");
 
 function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListItem {
   return {
@@ -113,6 +120,21 @@ function renderScreen(): void {
   );
 }
 
+function setNavigatorOnline(value: boolean): void {
+  Object.defineProperty(window.navigator, "onLine", {
+    configurable: true,
+    value,
+  });
+}
+
+function restoreNavigatorOnline(): void {
+  if (ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR) {
+    Object.defineProperty(window.navigator, "onLine", ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR);
+    return;
+  }
+  delete (window.navigator as { onLine?: boolean }).onLine;
+}
+
 async function openSearch(label: "Search quotes" | "Search invoices" = "Search quotes"): Promise<HTMLInputElement> {
   fireEvent.click(screen.getByRole("button", { name: "Open search" }));
   return await screen.findByLabelText(label) as HTMLInputElement;
@@ -120,10 +142,18 @@ async function openSearch(label: "Search quotes" | "Search invoices" = "Search q
 
 beforeEach(() => {
   mockProfile();
+  mockedUseRecoverableCaptures.mockReturnValue({
+    captures: [],
+    isLoading: false,
+    error: null,
+    refresh: vi.fn(async () => undefined),
+    deleteCapture: vi.fn(async () => undefined),
+  });
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  restoreNavigatorOnline();
 });
 
 describe("QuoteList", () => {
@@ -207,6 +237,72 @@ describe("QuoteList", () => {
 
     expect(quotesButton).toHaveClass("ghost-shadow", "bg-surface-container-lowest", "text-primary");
     expect(createButton).toHaveClass("forest-gradient", "ghost-shadow", "text-on-primary");
+  });
+
+  it("renders pending captures with resume, extract, and delete actions", async () => {
+    const deleteCaptureMock = vi.fn(async () => undefined);
+    setNavigatorOnline(true);
+    mockedUseRecoverableCaptures.mockReturnValue({
+      captures: [
+        {
+          sessionId: "session-1",
+          status: "ready_to_extract",
+          notes: "Patio estimate",
+          updatedAt: "2026-03-20T00:00:00.000Z",
+          lastFailureKind: null,
+          lastError: null,
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(async () => undefined),
+      deleteCapture: deleteCaptureMock,
+    });
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    expect(screen.getByRole("region", { name: "Pending captures" })).toBeInTheDocument();
+    expect(screen.getByText("Patio estimate")).toBeInTheDocument();
+    expect(screen.getByText("Ready to extract when online")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture?localSession=session-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Extract" }));
+    expect(navigateMock).toHaveBeenCalledWith("/quotes/capture?localSession=session-1&autoExtract=1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => {
+      expect(deleteCaptureMock).toHaveBeenCalledWith("session-1");
+    });
+  });
+
+  it("disables pending-capture extract action while offline", async () => {
+    setNavigatorOnline(false);
+    mockedUseRecoverableCaptures.mockReturnValue({
+      captures: [
+        {
+          sessionId: "session-1",
+          status: "ready_to_extract",
+          notes: "Patio estimate",
+          updatedAt: "2026-03-20T00:00:00.000Z",
+          lastFailureKind: null,
+          lastError: null,
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(async () => undefined),
+      deleteCapture: vi.fn(async () => undefined),
+    });
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    expect(screen.getByRole("button", { name: "Extract" })).toBeDisabled();
   });
 
   it("renders quote cards from listQuotes response", async () => {

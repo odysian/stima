@@ -1,17 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
-import {
-  EXTRACTION_MAX_POLLS,
-  EXTRACTION_POLL_INTERVAL_MS,
-  EXTRACTION_STAGE_DELAY_MS,
-  getExtractionStages,
-} from "@/features/quotes/components/captureScreenHelpers";
+import { EXTRACTION_STAGE_DELAY_MS, getExtractionStages } from "@/features/quotes/components/captureScreenHelpers";
+import { buildDraftFromQuoteDetail } from "@/features/quotes/components/captureScreenDraft";
+import { pollExtractionJobUntilQuote } from "@/features/quotes/components/captureScreenPolling";
 import { CaptureInputPanel } from "@/features/quotes/components/CaptureInputPanel";
-import {
-  resolveCaptureLaunchOrigin,
-} from "@/features/quotes/utils/workflowNavigation";
+import { classifySubmitFailure } from "@/features/quotes/offline/classifySubmitFailure";
+import { getLocalCaptureStatusCopy } from "@/features/quotes/offline/localCaptureStatusCopy";
+import { useLocalCaptureSession } from "@/features/quotes/offline/useLocalCaptureSession";
+import { resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
 import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail, QuoteSourceType } from "@/features/quotes/types/quote.types";
@@ -19,7 +18,6 @@ import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
-import { jobService } from "@/shared/lib/jobService";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_AUDIO_CLIPS_PER_REQUEST, MAX_AUDIO_TOTAL_BYTES } from "@/shared/lib/inputLimits";
 import { perfMark, perfMeasure, perfMeasureSincePageLoad } from "@/shared/perf";
@@ -30,6 +28,7 @@ const START_BLANK_GUARD_TARGET = "__start_blank__";
 export function CaptureScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { show } = useToast();
+  const { user } = useAuth();
   const location = useLocation();
   const { customerId } = useParams<{ customerId?: string }>();
   const { setDraft } = useQuoteDraft();
@@ -46,12 +45,30 @@ export function CaptureScreen(): React.ReactElement {
     removeClip,
     clearError,
   } = useVoiceCapture();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const localSessionQueryParam = searchParams.get("localSession");
+  const autoExtractOnLoad = searchParams.get("autoExtract") === "1";
+  const {
+    notes,
+    setNotes,
+    sessionId: localSessionId,
+    sessionStatus,
+    isHydrating: isHydratingLocalSession,
+    hydrationError: localHydrationError,
+    saveState: localSaveState,
+    saveError: localSaveError,
+    markStatus: markLocalCaptureStatus,
+  } = useLocalCaptureSession({
+    userId: user?.id,
+    customerId,
+    initialSessionId: localSessionQueryParam,
+  });
 
-  const [notes, setNotes] = useState("");
   const [extractionStage, setExtractionStage] = useState<string | null>(null);
   const [pendingExitTarget, setPendingExitTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStartingBlank, setIsStartingBlank] = useState(false);
+  const [hasAttemptedAutoExtract, setHasAttemptedAutoExtract] = useState(false);
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
@@ -87,7 +104,7 @@ export function CaptureScreen(): React.ReactElement {
     };
   }, []);
 
-  const displayedError = error ?? voiceError;
+  const displayedError = error ?? localHydrationError ?? localSaveError ?? voiceError;
 
   useEffect(() => {
     dismissActiveErrorRef.current = () => {
@@ -95,11 +112,14 @@ export function CaptureScreen(): React.ReactElement {
         setError(null);
         return;
       }
+      if (localHydrationError || localSaveError) {
+        return;
+      }
       if (voiceError) {
         clearError();
       }
     };
-  }, [clearError, error, voiceError]);
+  }, [clearError, error, localHydrationError, localSaveError, voiceError]);
 
   useEffect(() => {
     if (!displayedError) {
@@ -118,26 +138,22 @@ export function CaptureScreen(): React.ReactElement {
     quoteDetail: QuoteDetail,
     quoteId: string,
   ): void {
-    setDraft({
-      quoteId,
-      customerId: quoteDetail.customer_id ?? customerId ?? "",
-      launchOrigin,
-      title: "",
-      transcript: quoteDetail.transcript,
-      lineItems: quoteDetail.line_items.map((lineItem) => ({
-        description: lineItem.description,
-        details: lineItem.details,
-        price: lineItem.price,
-        flagged: lineItem.flagged,
-        flagReason: lineItem.flag_reason,
-      })),
-      total: quoteDetail.total_amount,
-      taxRate: quoteDetail.tax_rate,
-      discountType: quoteDetail.discount_type,
-      discountValue: quoteDetail.discount_value,
-      depositAmount: quoteDetail.deposit_amount,
-      notes: quoteDetail.notes ?? "",
+    setDraft(buildDraftFromQuoteDetail({
       sourceType,
+      quoteDetail,
+      quoteId,
+      customerId,
+      launchOrigin,
+    }));
+  }
+
+  async function markSyncedLocalCaptureStatus(
+    quoteId: string,
+    extractJobId?: string | null,
+  ): Promise<void> {
+    await markLocalCaptureStatus("synced", {
+      serverQuoteId: quoteId,
+      extractJobId: extractJobId ?? null,
     });
   }
 
@@ -159,6 +175,13 @@ export function CaptureScreen(): React.ReactElement {
   async function onExtract(): Promise<void> {
     // TODO(spec1): perfMark("capture:local:save_start") / perfMark("capture:local:save_done")
     clearActionErrors();
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      await markLocalCaptureStatus("ready_to_extract", {
+        failureKind: "offline",
+      });
+      setError("Ready to extract when online. Your notes are still saved on this device.");
+      return;
+    }
     if (clips.length > MAX_AUDIO_CLIPS_PER_REQUEST) {
       setError(
         `You can upload up to ${MAX_AUDIO_CLIPS_PER_REQUEST} clips at a time.`,
@@ -175,6 +198,7 @@ export function CaptureScreen(): React.ReactElement {
       );
       return;
     }
+    void markLocalCaptureStatus("submitting");
     perfMark("capture:extract:start");
     clearExtractionStageTimers();
     const stages = getExtractionStages(hasClips, hasNotes);
@@ -209,20 +233,29 @@ export function CaptureScreen(): React.ReactElement {
       }
       const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
       if (extraction.type === "sync") {
+        await markSyncedLocalCaptureStatus(extraction.quoteId, null);
         await hydrateFromPersistedQuote(extraction.quoteId, sourceType);
         navigateToReview(extraction.quoteId);
         return;
       }
 
+      void markLocalCaptureStatus("submitting", {
+        extractJobId: extraction.jobId,
+      });
       await pollExtractionJob(extraction.jobId, sourceType);
     } catch (submitError) {
       if (!isMountedRef.current) {
         return;
       }
+      const failureKind = classifySubmitFailure(submitError);
       const message =
         submitError instanceof Error
           ? submitError.message
           : "Unable to extract line items";
+      await markLocalCaptureStatus("extract_failed", {
+        failureKind,
+        error: message,
+      });
       setError(message);
     } finally {
       const shouldResetExtractionStage = isMountedRef.current;
@@ -260,49 +293,26 @@ export function CaptureScreen(): React.ReactElement {
     jobId: string,
     sourceType: QuoteSourceType,
   ): Promise<void> {
-    for (let pollCount = 0; pollCount < EXTRACTION_MAX_POLLS; pollCount += 1) {
-      const job = await jobService.getJobStatus(jobId);
-      if (!isMountedRef.current) {
-        return;
-      }
-
-      if (job.quote_id) {
-        if (!job.extraction_result) {
+    await pollExtractionJobUntilQuote({
+      jobId,
+      isMounted: () => isMountedRef.current,
+      onQuoteReady: async (job) => {
+        if (!job.quote_id || !job.extraction_result) {
           throw new Error(
             "Extraction completed without a result. Please try again.",
           );
         }
+        await markSyncedLocalCaptureStatus(job.quote_id, job.id);
         await hydrateFromPersistedQuote(job.quote_id, sourceType);
         navigateToReview(job.quote_id);
-        return;
-      }
-
-      if (job.status === "success") {
-        throw new Error("Extraction completed without a persisted draft. Please try again.");
-      }
-
-      if (job.status === "terminal") {
-        throw new Error("Extraction failed. Please try again.");
-      }
-
-      if (pollCount === EXTRACTION_MAX_POLLS - 1) {
-        break;
-      }
-      await new Promise((resolve) => {
-        window.setTimeout(resolve, EXTRACTION_POLL_INTERVAL_MS);
-      });
-      if (!isMountedRef.current) {
-        return;
-      }
-    }
-
-    throw new Error(
-      "Extraction is taking longer than expected. Please try again.",
-    );
+      },
+    });
   }
 
   function hasUnsavedWork(): boolean {
-    return clips.length > 0 || notes.trim().length > 0;
+    const hasPotentiallyUnsavedNotes = notes.trim().length > 0
+      && (localSessionId === null || localSaveState === "saving" || localSaveState === "error");
+    return clips.length > 0 || hasPotentiallyUnsavedNotes;
   }
   function requestExit(target: string): void {
     if (hasUnsavedWork()) {
@@ -327,6 +337,24 @@ export function CaptureScreen(): React.ReactElement {
 
   const hasReachedClipLimit = clips.length >= MAX_AUDIO_CLIPS_PER_REQUEST;
   const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording;
+  const localStatusCopy = localSaveState === "saving"
+    ? "Saving on this device..."
+    : localSaveState === "error"
+      ? "Stima could not save this capture on your device. Copy your notes before leaving this screen."
+      : getLocalCaptureStatusCopy(sessionStatus);
+
+  useEffect(() => {
+    setHasAttemptedAutoExtract(false);
+  }, [autoExtractOnLoad, localSessionQueryParam]);
+
+  useEffect(() => {
+    if (!autoExtractOnLoad || hasAttemptedAutoExtract || isHydratingLocalSession || !canExtract) {
+      return;
+    }
+
+    setHasAttemptedAutoExtract(true);
+    void onExtract();
+  }, [autoExtractOnLoad, canExtract, hasAttemptedAutoExtract, isHydratingLocalSession, onExtract]);
 
   return (
     <main className="min-h-dvh bg-background">
@@ -368,6 +396,11 @@ export function CaptureScreen(): React.ReactElement {
 
       <ScreenFooter>
         <div className="mx-auto w-full max-w-2xl">
+          {!extractionStage && localStatusCopy ? (
+            <p className="mb-2 text-center text-sm font-medium text-on-surface-variant">
+              {localStatusCopy}
+            </p>
+          ) : null}
           {extractionStage ? (
             <p className="mb-2 text-center text-sm font-medium text-on-surface-variant">
               {extractionStage}
@@ -388,7 +421,7 @@ export function CaptureScreen(): React.ReactElement {
       {pendingExitTarget ? (
         <ConfirmModal
           title="Leave this screen?"
-          body="Your clips and notes will be lost."
+          body="Unsaved clips or notes not yet stored on this device will be lost."
           confirmLabel="Leave"
           cancelLabel="Stay"
           onConfirm={() => {
