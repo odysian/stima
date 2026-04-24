@@ -22,6 +22,7 @@ import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { jobService } from "@/shared/lib/jobService";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_AUDIO_CLIPS_PER_REQUEST, MAX_AUDIO_TOTAL_BYTES } from "@/shared/lib/inputLimits";
+import { perfMark, perfMeasure, perfMeasureSincePageLoad } from "@/shared/perf";
 import { useToast } from "@/ui/Toast";
 
 const START_BLANK_GUARD_TARGET = "__start_blank__";
@@ -75,6 +76,8 @@ export function CaptureScreen(): React.ReactElement {
 
   useEffect(() => {
     isMountedRef.current = true;
+    perfMark("capture:route:mounted");
+    perfMeasureSincePageLoad("capture:route:load_ms");
     return () => {
       isMountedRef.current = false;
       extractionStageTimerRefs.current.forEach((timerId) => {
@@ -142,8 +145,11 @@ export function CaptureScreen(): React.ReactElement {
     quoteId: string,
     sourceType: QuoteSourceType,
   ): Promise<void> {
+    perfMark("capture:draft:hydrate_start");
     const persistedQuote = await quoteService.getQuote(quoteId);
     applyDraftFromQuoteDetail(sourceType, persistedQuote, quoteId);
+    perfMark("capture:draft:ready");
+    perfMeasure("capture:draft:hydrate_ms", "capture:draft:hydrate_start", "capture:draft:ready");
   }
 
   function navigateToReview(quoteId: string): void {
@@ -151,6 +157,7 @@ export function CaptureScreen(): React.ReactElement {
   }
 
   async function onExtract(): Promise<void> {
+    // TODO(spec1): perfMark("capture:local:save_start") / perfMark("capture:local:save_done")
     clearActionErrors();
     if (clips.length > MAX_AUDIO_CLIPS_PER_REQUEST) {
       setError(
@@ -168,6 +175,7 @@ export function CaptureScreen(): React.ReactElement {
       );
       return;
     }
+    perfMark("capture:extract:start");
     clearExtractionStageTimers();
     const stages = getExtractionStages(hasClips, hasNotes);
     setExtractionStage(stages[0]);
@@ -190,6 +198,12 @@ export function CaptureScreen(): React.ReactElement {
         notes,
         customerId,
       });
+      perfMark("capture:extract:response");
+      perfMeasure(
+        "capture:extract:submit_to_response_ms",
+        "capture:extract:start",
+        "capture:extract:response",
+      );
       if (!isMountedRef.current) {
         return;
       }
