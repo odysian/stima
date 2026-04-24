@@ -55,7 +55,8 @@ Custom interaction behaviors and geometry tighter than the shared button abstrac
 - `src/ui/PasswordField.tsx:24` — Show / Hide visibility toggle (text-only input adornment).
 - `src/ui/Toast.tsx:85` — Dismiss `×` button (h-6×w-6; too small for `<Button>`).
 - `src/shared/components/OverflowMenu.tsx:88` — overflow menu trigger (custom-geometry circular chrome button).
-- **Reason:** custom interaction behaviors, geometry, or size constraints are tighter than the shared `<Button>` abstraction.
+- `src/shared/components/OverflowMenu.tsx:135` — overflow menu action row (`role="menuitem"` with icon/label grid and tight padding).
+- **Reason:** custom interaction behaviors, geometry, or size constraints are tighter than the shared `<Button>` abstraction; overflow menu action rows require a 2-column icon/label grid and compact spacing that do not map cleanly to the shared `<Button>` content layout.
 
 ### Test-only
 - Test files may continue to use raw `<button>` markup for focused behavior fixtures.

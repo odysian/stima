@@ -17,6 +17,7 @@ import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
+import { OverflowMenu } from "@/shared/components/OverflowMenu";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { Eyebrow } from "@/ui/Eyebrow";
 import { useToast } from "@/ui/Toast";
@@ -282,6 +283,19 @@ export function CustomerDetailScreen(): React.ReactElement {
         title={customer?.name ?? "Customer"}
         backLabel="Back to customers"
         onBack={() => navigate("/customers")}
+        trailing={customer ? (
+          <OverflowMenu
+            triggerLabel="Customer actions"
+            items={[
+              {
+                label: "Delete Customer",
+                icon: "delete",
+                tone: "destructive",
+                onSelect: openDeleteConfirmation,
+              },
+            ]}
+          />
+        ) : null}
       />
       <section className="mx-auto w-full max-w-3xl space-y-4 px-4 pt-20">
         {isLoading ? (
@@ -324,11 +338,11 @@ export function CustomerDetailScreen(): React.ReactElement {
                     </div>
                   </dl>
 
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex flex-col gap-2 pt-1">
                     <Button
                       type="button"
                       variant="primary"
-                      className="flex-1"
+                      className="w-full"
                       onClick={quoteCreateFlow.openCreateEntry}
                     >
                       Create Document
@@ -336,18 +350,10 @@ export function CustomerDetailScreen(): React.ReactElement {
                     <Button
                       type="button"
                       variant="secondary"
-                      size="md"
+                      className="w-full"
                       onClick={openEditMode}
                     >
                       Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="md"
-                      onClick={openDeleteConfirmation}
-                    >
-                      Delete Customer
                     </Button>
                   </div>
                 </div>

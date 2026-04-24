@@ -111,6 +111,12 @@ async function switchToInvoicesTab(): Promise<void> {
   fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
 }
 
+async function openDeleteCustomerModal(): Promise<void> {
+  fireEvent.click(screen.getByRole("button", { name: /customer actions/i }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /delete customer/i }));
+  await screen.findByRole("dialog", { name: "Delete customer?" });
+}
+
 beforeEach(() => {
   mockedCustomerService.getCustomer.mockResolvedValue({
     id: "cust-1",
@@ -193,6 +199,12 @@ describe("CustomerDetailScreen", () => {
     expect(screen.getByText("555-0101")).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();
     expect(screen.getByText("1 Main St")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create document/i })).toHaveClass("w-full");
+    expect(screen.getByRole("button", { name: /^edit$/i })).toHaveClass("w-full");
+    expect(screen.getByRole("button", { name: /customer actions/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^delete customer$/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -504,9 +516,7 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
     await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
 
-    fireEvent.click(screen.getByRole("button", { name: /delete customer/i }));
-
-    expect(await screen.findByRole("dialog", { name: "Delete customer?" })).toBeInTheDocument();
+    await openDeleteCustomerModal();
     expect(screen.getByText("This cannot be undone.")).toBeInTheDocument();
     const deleteButton = screen.getByRole("button", { name: /^delete customer$/i });
     expect(deleteButton).toBeDisabled();
@@ -526,7 +536,7 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
     await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
 
-    fireEvent.click(screen.getByRole("button", { name: /delete customer/i }));
+    await openDeleteCustomerModal();
     fireEvent.change(screen.getByLabelText("Type Alice Johnson to confirm"), {
       target: { value: "Alice Johnson" },
     });
@@ -548,7 +558,7 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
     await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
 
-    fireEvent.click(screen.getByRole("button", { name: /delete customer/i }));
+    await openDeleteCustomerModal();
     fireEvent.change(screen.getByLabelText("Type Alice Johnson to confirm"), {
       target: { value: "Alice Johnson" },
     });
