@@ -29,9 +29,9 @@ interface SheetCloseButtonProps {
 }
 
 const sheetSizeClasses: Record<SheetSize, string> = {
-  sm: "max-w-sm max-h-[70vh]",
-  md: "max-w-md max-h-[85vh]",
-  lg: "max-w-2xl max-h-[85vh]",
+  sm: "max-w-sm max-h-[70dvh]",
+  md: "max-w-md max-h-[85dvh]",
+  lg: "max-w-2xl max-h-[85dvh]",
   full: "h-[100dvh] max-w-none rounded-none md:max-w-4xl md:rounded-[var(--radius-document)]",
 };
 
@@ -68,7 +68,7 @@ export function Sheet({
     containerClassName,
   );
   const contentClassName = joinClasses(
-    "pointer-events-auto w-full border border-outline-variant/20 glass-surface ghost-shadow backdrop-blur-md rounded-[var(--radius-document)] p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] outline-none md:pb-6",
+    "pointer-events-auto w-full border border-outline-variant/20 glass-surface ghost-shadow backdrop-blur-md rounded-[var(--radius-document)] p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] outline-none overflow-y-auto md:pb-6",
     sheetSizeClasses[size],
     contentProps?.className,
   );

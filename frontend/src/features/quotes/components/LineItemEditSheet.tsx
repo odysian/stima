@@ -378,6 +378,27 @@ export function LineItemEditSheet({
                     />
                   </section>
                   <section className="space-y-2">
+                    <label htmlFor="line-item-sheet-price" className="font-headline text-sm font-bold text-on-surface">
+                      Price
+                    </label>
+                    <NumericField
+                      id="line-item-sheet-price"
+                      placeholder="$ 0.00"
+                      value={priceInput}
+                      onChange={(nextValue) => {
+                        setPriceInput(nextValue);
+                        if (savedCatalogItem) {
+                          setSavedCatalogItem(null);
+                        }
+                        if (formError) {
+                          setFormError(null);
+                        }
+                      }}
+                      showStepControls={false}
+                      formatOnBlur={false}
+                    />
+                  </section>
+                  <section className="space-y-2">
                     <div className="flex items-end justify-between">
                       <label htmlFor="line-item-sheet-details" className="font-headline text-sm font-bold text-on-surface">
                         Details
@@ -399,27 +420,6 @@ export function LineItemEditSheet({
                         }
                       }}
                       className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
-                    />
-                  </section>
-                  <section className="space-y-2">
-                    <label htmlFor="line-item-sheet-price" className="font-headline text-sm font-bold text-on-surface">
-                      Price
-                    </label>
-                    <NumericField
-                      id="line-item-sheet-price"
-                      placeholder="$ 0.00"
-                      value={priceInput}
-                      onChange={(nextValue) => {
-                        setPriceInput(nextValue);
-                        if (savedCatalogItem) {
-                          setSavedCatalogItem(null);
-                        }
-                        if (formError) {
-                          setFormError(null);
-                        }
-                      }}
-                      showStepControls={false}
-                      formatOnBlur={false}
                     />
                   </section>
                 </div>
