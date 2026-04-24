@@ -99,4 +99,29 @@ describe("OverflowMenu", () => {
       expect(screen.getByRole("button", { name: "After" })).toHaveFocus();
     });
   });
+
+  it("renders a compact menu panel with left-aligned action rows", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <OverflowMenu
+        items={[
+          {
+            label: "Delete Customer",
+            icon: "delete",
+            onSelect: vi.fn(),
+          },
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /more actions/i }));
+
+    const menu = screen.getByRole("menu");
+    const row = screen.getByRole("menuitem", { name: /delete customer/i });
+
+    expect(menu).toHaveClass("w-52");
+    expect(row).toHaveClass("grid");
+    expect(row).toHaveClass("grid-cols-[1.25rem_minmax(0,1fr)]");
+  });
 });

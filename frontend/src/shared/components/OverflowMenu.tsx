@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Button } from "@/shared/components/Button";
 
 export interface OverflowMenuItem {
   label: string;
@@ -81,7 +80,7 @@ export function OverflowMenu({
   }
 
   const itemClassName =
-    "flex w-full items-center gap-3 rounded-[var(--radius-document)] px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-surface-container-low focus-visible:bg-surface-container-low focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40";
+    "grid w-full grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-2.5 rounded-[var(--radius-document)] px-2.5 py-2.5 text-left text-sm font-medium transition-colors hover:bg-surface-container-low focus-visible:bg-surface-container-low focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40";
 
   return (
     <div ref={containerRef} className="relative">
@@ -105,7 +104,7 @@ export function OverflowMenu({
           id={menuId}
           role="menu"
           aria-label={triggerLabel}
-          className="absolute right-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-2rem)] rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-2 ghost-shadow"
+          className="absolute right-0 top-full z-50 mt-2 w-52 max-w-[calc(100vw-2rem)] rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-1.5 ghost-shadow"
         >
           {items.map((item) => {
             const toneClassName = item.tone === "destructive" ? "text-error" : "text-on-surface";
@@ -126,20 +125,18 @@ export function OverflowMenu({
                     item.onSelect?.();
                   }}
                 >
-                  <span className="material-symbols-outlined text-[1.125rem]">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span className="material-symbols-outlined block text-[1.125rem] leading-none">{item.icon}</span>
+                  <span className="whitespace-nowrap leading-none">{item.label}</span>
                 </a>
               );
             }
 
             return (
-              <Button
+              <button
                 key={item.label}
                 type="button"
-                variant="ghost"
-                size="sm"
                 role="menuitem"
-                className={`${itemClassName} ${toneClassName}`}
+                className={`${itemClassName} ${toneClassName} cursor-pointer`}
                 disabled={item.disabled}
                 onClick={() => {
                   setIsOpen(false);
@@ -147,9 +144,9 @@ export function OverflowMenu({
                   item.onSelect?.();
                 }}
               >
-                <span className="material-symbols-outlined text-[1.125rem]">{item.icon}</span>
-                <span>{item.label}</span>
-              </Button>
+                <span className="material-symbols-outlined block text-[1.125rem] leading-none">{item.icon}</span>
+                <span className="whitespace-nowrap leading-none">{item.label}</span>
+              </button>
             );
           })}
         </div>
