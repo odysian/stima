@@ -24,6 +24,7 @@ New file: `frontend/src/shared/perf.ts`
 Exports:
 - `perfMark(name: string): void` — wraps `performance.mark(name)`; no-op on error
 - `perfMeasure(name: string, startMark: string, endMark?: string): number` — wraps `performance.measure`, returns duration in ms, logs to `console.debug` in dev only, no-op on error (returns 0)
+- `perfMeasureSincePageLoad(name: string): number` — records a measure entry from page-load time origin to now
 
 ```ts
 const DEV = import.meta.env.DEV;
@@ -41,6 +42,14 @@ export function perfMeasure(name: string, startMark: string, endMark?: string): 
     return entry.duration;
   } catch { return 0; }
 }
+
+export function perfMeasureSincePageLoad(name: string): number {
+  try {
+    const entry = performance.measure(name, { start: 0, end: performance.now() });
+    if (DEV) console.debug(`[perf] ${name}: ${entry.duration.toFixed(1)}ms`);
+    return entry.duration;
+  } catch { return 0; }
+}
 ```
 
 ### 2. Capture route load
@@ -51,7 +60,7 @@ In the mount `useEffect` (the one that sets `isMountedRef.current = true`), add 
 
 ```ts
 perfMark("capture:route:mounted");
-perfMeasure("capture:route:load_ms", "navigationStart", "capture:route:mounted");
+perfMeasureSincePageLoad("capture:route:load_ms");
 ```
 
 > **Note (React Strict Mode):** In development, React Strict Mode runs effects twice, producing two `capture:route:mounted` marks and two `capture:route:load_ms` entries. This is expected and harmless — production builds see exactly one entry. If single-entry dev behavior is required, guard with a `useRef` flag.

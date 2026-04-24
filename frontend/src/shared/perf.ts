@@ -27,3 +27,20 @@ export function perfMeasure(
     return 0;
   }
 }
+
+export function perfMeasureSincePageLoad(name: string): number {
+  try {
+    const entry = performance.measure(name, {
+      start: 0,
+      end: performance.now(),
+    });
+
+    if (DEV) {
+      console.debug(`[perf] ${name}: ${entry.duration.toFixed(1)}ms`);
+    }
+
+    return entry.duration;
+  } catch {
+    return 0;
+  }
+}

@@ -22,7 +22,7 @@ import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { jobService } from "@/shared/lib/jobService";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_AUDIO_CLIPS_PER_REQUEST, MAX_AUDIO_TOTAL_BYTES } from "@/shared/lib/inputLimits";
-import { perfMark, perfMeasure } from "@/shared/perf";
+import { perfMark, perfMeasure, perfMeasureSincePageLoad } from "@/shared/perf";
 import { useToast } from "@/ui/Toast";
 
 const START_BLANK_GUARD_TARGET = "__start_blank__";
@@ -77,7 +77,7 @@ export function CaptureScreen(): React.ReactElement {
   useEffect(() => {
     isMountedRef.current = true;
     perfMark("capture:route:mounted");
-    perfMeasure("capture:route:load_ms", "navigationStart", "capture:route:mounted");
+    perfMeasureSincePageLoad("capture:route:load_ms");
     return () => {
       isMountedRef.current = false;
       extractionStageTimerRefs.current.forEach((timerId) => {
