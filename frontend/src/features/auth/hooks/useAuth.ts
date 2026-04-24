@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { authService } from "@/features/auth/services/authService";
+import { clearDraftsForUser, deleteStaleLocalDrafts } from "@/features/quotes/offline/draftRepository";
 import type { LoginRequest, RegisterRequest, User } from "@/features/auth/types/auth.types";
 import { LoadingScreen } from "@/shared/components/LoadingScreen";
 import { hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
@@ -32,6 +33,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const refreshUser = useCallback(async () => {
     const currentUser = await authService.me();
     setUser(currentUser);
+    void deleteStaleLocalDrafts(currentUser.id, 7).catch((error) => {
+      console.warn("Unable to clean stale local drafts during auth refresh.", error);
+    });
   }, []);
 
   useEffect(() => {
@@ -43,6 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         const currentUser = await authService.me();
         if (active) {
           setUser(currentUser);
+          void deleteStaleLocalDrafts(currentUser.id, 7).catch((error) => {
+            console.warn("Unable to clean stale local drafts during auth bootstrap.", error);
+          });
         }
       } catch {
         if (active) {
@@ -74,9 +81,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   }, [refreshUser]);
 
   const logout = useCallback(async () => {
+    const userId = user?.id;
     await authService.logout();
+    if (userId) {
+      await clearDraftsForUser(userId).catch((error) => {
+        console.warn("Unable to clear local drafts during logout.", error);
+      });
+    }
     setUser(null);
-  }, []);
+  }, [user]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

@@ -6,12 +6,12 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import { isQuoteEditableStatus } from "@/features/quotes/utils/quoteStatus";
 import { isHttpRequestError } from "@/shared/lib/http";
 import {
-  clearDocumentDraftFromStorage,
+  clearDocumentDraftFromIDB,
   mapDocumentToEditDraft,
   mapInvoiceToEditDraft,
   mapQuoteToEditDraft,
-  persistDocumentDraftToStorage,
-  readDocumentDraftFromStorage,
+  persistDocumentDraftToIDB,
+  readDocumentDraftFromIDB,
   type DocumentEditDraft,
   type PersistedEditableDocument,
 } from "@/features/quotes/hooks/persistedDocumentDraft";
@@ -57,10 +57,14 @@ interface UsePersistedReviewResult {
   refreshDocument: (options?: { reseedDraft?: boolean }) => Promise<PersistedEditableDocument>;
 }
 
-export function usePersistedReview(documentId: string | undefined): UsePersistedReviewResult {
-  const [draft, setDraftState] = useState<DocumentEditDraft | null>(() => readDocumentDraftFromStorage());
+export function usePersistedReview(
+  documentId: string | undefined,
+  userId: string | undefined,
+): UsePersistedReviewResult {
+  const [draft, setDraftState] = useState<DocumentEditDraft | null>(null);
   const [document, setDocument] = useState<PersistedEditableDocument | null>(null);
-  const [isLoadingDocument, setIsLoadingDocument] = useState(true);
+  const [isLoadingDocumentState, setIsLoadingDocumentState] = useState(true);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const setDraft = useCallback((
@@ -76,14 +80,24 @@ export function usePersistedReview(documentId: string | undefined): UsePersisted
         return currentDraft;
       }
 
-      persistDocumentDraftToStorage(resolvedDraft);
+      if (userId) {
+        void persistDocumentDraftToIDB(resolvedDraft, userId).catch((error) => {
+          console.warn("Unable to persist document edit draft locally.", error);
+        });
+      }
       return resolvedDraft;
     });
-  }, []);
+  }, [userId]);
 
   const clearDraft = useCallback(() => {
-    clearDocumentDraftFromStorage();
-    setDraftState(null);
+    setDraftState((currentDraft) => {
+      if (currentDraft) {
+        void clearDocumentDraftFromIDB(currentDraft.documentId, currentDraft.docType).catch((error) => {
+          console.warn("Unable to clear document edit draft.", error);
+        });
+      }
+      return null;
+    });
   }, []);
 
   const refreshDocument = useCallback(async (
@@ -107,11 +121,14 @@ export function usePersistedReview(documentId: string | undefined): UsePersisted
     async function fetchDocument(): Promise<void> {
       if (!documentId) {
         setLoadError("Missing document id.");
-        setIsLoadingDocument(false);
+        setDraftState(null);
+        setIsLoadingDraft(false);
+        setIsLoadingDocumentState(false);
         return;
       }
 
-      setIsLoadingDocument(true);
+      setIsLoadingDocumentState(true);
+      setIsLoadingDraft(true);
       setLoadError(null);
 
       try {
@@ -121,6 +138,18 @@ export function usePersistedReview(documentId: string | undefined): UsePersisted
         }
 
         setDocument(fetchedDocument);
+        if (!userId) {
+          setDraftState(mapDocumentToEditDraft(fetchedDocument));
+          return;
+        }
+
+        const docType = "customer" in fetchedDocument ? "invoice" : "quote";
+        const hydratedDraft = await readDocumentDraftFromIDB(fetchedDocument.id, docType, userId);
+        if (!isActive) {
+          return;
+        }
+
+        setDraftState(hydratedDraft ?? mapDocumentToEditDraft(fetchedDocument));
       } catch (error) {
         if (!isActive) {
           return;
@@ -130,7 +159,8 @@ export function usePersistedReview(documentId: string | undefined): UsePersisted
         setLoadError(message);
       } finally {
         if (isActive) {
-          setIsLoadingDocument(false);
+          setIsLoadingDocumentState(false);
+          setIsLoadingDraft(false);
         }
       }
     }
@@ -140,19 +170,10 @@ export function usePersistedReview(documentId: string | undefined): UsePersisted
     return () => {
       isActive = false;
     };
-  }, [documentId]);
-
-  useEffect(() => {
-    if (!document) {
-      return;
-    }
-
-    if (!draft || draft.documentId !== document.id) {
-      setDraft(mapDocumentToEditDraft(document));
-    }
-  }, [document, draft, setDraft]);
+  }, [documentId, userId]);
 
   const currentDraft = draft && document && draft.documentId === document.id ? draft : null;
+  const isLoadingDocument = isLoadingDocumentState || isLoadingDraft;
 
   return {
     document,

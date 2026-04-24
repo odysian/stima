@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "@/features/auth/hooks/useAuth";
 import { authService } from "@/features/auth/services/authService";
+import { clearDraftsForUser, deleteStaleLocalDrafts } from "@/features/quotes/offline/draftRepository";
 import { hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
 
 vi.mock("@/features/auth/services/authService", () => ({
@@ -12,6 +13,11 @@ vi.mock("@/features/auth/services/authService", () => ({
     logout: vi.fn(),
     me: vi.fn(),
   },
+}));
+
+vi.mock("@/features/quotes/offline/draftRepository", () => ({
+  clearDraftsForUser: vi.fn(),
+  deleteStaleLocalDrafts: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/http", async () => {
@@ -25,6 +31,8 @@ vi.mock("@/shared/lib/http", async () => {
 
 const mockedAuthService = vi.mocked(authService);
 const mockedHydrateCsrf = vi.mocked(hydrateCsrfTokenFromCookie);
+const mockedClearDraftsForUser = vi.mocked(clearDraftsForUser);
+const mockedDeleteStaleLocalDrafts = vi.mocked(deleteStaleLocalDrafts);
 
 function AuthHarness(): React.ReactElement {
   const { user, register, logout } = useAuth();
@@ -50,12 +58,17 @@ function AuthHarness(): React.ReactElement {
   );
 }
 
+beforeEach(() => {
+  mockedClearDraftsForUser.mockResolvedValue(undefined);
+  mockedDeleteStaleLocalDrafts.mockResolvedValue(undefined);
+});
+
 afterEach(() => {
   vi.clearAllMocks();
 });
 
 describe("useAuth", () => {
-  it("hydrates CSRF on bootstrap and loads user when session exists", async () => {
+  it("hydrates CSRF on bootstrap, loads user, and prunes stale drafts", async () => {
     mockedAuthService.me.mockResolvedValueOnce({
       id: "user-1",
       email: "user@example.com",
@@ -72,9 +85,10 @@ describe("useAuth", () => {
 
     expect(await screen.findByText("user@example.com")).toBeInTheDocument();
     expect(mockedHydrateCsrf).toHaveBeenCalledTimes(1);
+    expect(mockedDeleteStaleLocalDrafts).toHaveBeenCalledWith("user-1", 7);
   });
 
-  it("registers, logs in, and then logs out", async () => {
+  it("registers, logs in, prunes stale drafts, and clears drafts on logout", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
     mockedAuthService.register.mockResolvedValueOnce();
     mockedAuthService.login.mockResolvedValueOnce();
@@ -109,11 +123,13 @@ describe("useAuth", () => {
     expect(mockedAuthService.register.mock.invocationCallOrder[0]).toBeLessThan(
       mockedAuthService.login.mock.invocationCallOrder[0],
     );
+    expect(mockedDeleteStaleLocalDrafts).toHaveBeenCalledWith("user-2", 7);
 
     fireEvent.click(screen.getByRole("button", { name: "Logout" }));
 
     await waitFor(() => {
       expect(mockedAuthService.logout).toHaveBeenCalledTimes(1);
+      expect(mockedClearDraftsForUser).toHaveBeenCalledWith("user-2");
       expect(screen.getByTestId("auth-state")).toHaveTextContent("none");
     });
   });

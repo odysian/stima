@@ -3,6 +3,7 @@ import { useBeforeUnload, useLocation, useNavigate, useParams } from "react-rout
 
 import { lineItemCatalogService } from "@/features/line-item-catalog/services/lineItemCatalogService";
 import { profileService } from "@/features/profile/services/profileService";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { DocumentEditScreenView } from "@/features/quotes/components/DocumentEditScreenView";
 import { buildDefaultInvoiceDueDate, buildDocumentSnapshotKey, buildSaveValidationMessage, isInvoiceDocument, persistDocumentDraft } from "@/features/quotes/components/documentEditUtils";
 import { useHiddenDetailLifecycle } from "@/features/quotes/hooks/useHiddenDetailLifecycle";
@@ -19,6 +20,7 @@ import { useToast } from "@/ui/Toast";
 export function DocumentEditScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { show } = useToast();
+  const { user } = useAuth();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const {
@@ -29,7 +31,7 @@ export function DocumentEditScreen(): React.ReactElement {
     isLoadingDocument,
     loadError,
     refreshDocument,
-  } = usePersistedReview(id);
+  } = usePersistedReview(id, user?.id);
 
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);

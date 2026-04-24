@@ -66,6 +66,24 @@ vi.mock("@/features/profile/services/profileService", () => ({
   },
 }));
 
+vi.mock("@/features/auth/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: {
+      id: "user-1",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: null,
+    },
+    isLoading: false,
+    isOnboarded: true,
+    refreshUser: async () => undefined,
+    login: async () => undefined,
+    register: async () => undefined,
+    logout: async () => undefined,
+  }),
+}));
+
 const mockedUsePersistedReview = vi.mocked(usePersistedReview);
 const mockedLineItemCatalogService = vi.mocked(lineItemCatalogService);
 const mockedQuoteService = vi.mocked(quoteService);

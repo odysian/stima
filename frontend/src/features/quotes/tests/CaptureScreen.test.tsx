@@ -319,6 +319,7 @@ beforeEach(() => {
   });
   mockedUseQuoteDraft.mockReturnValue({
     draft: null,
+    isLoading: false,
     setDraft: setDraftMock,
     updateLineItem: vi.fn(),
     removeLineItem: vi.fn(),
