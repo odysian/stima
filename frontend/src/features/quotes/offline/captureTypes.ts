@@ -64,6 +64,16 @@ export interface LocalSyncEvent {
 
 export type CreateLocalSyncEventInput = Omit<LocalSyncEvent, "eventId" | "createdAt">;
 
+export class AudioClipMissingError extends Error {
+  clipId: string;
+
+  constructor(clipId: string) {
+    super(`Audio clip is missing from local storage: ${clipId}`);
+    this.name = "AudioClipMissingError";
+    this.clipId = clipId;
+  }
+}
+
 export interface LocalAudioClip {
   clipId: string;
   sessionId: string;
@@ -76,6 +86,8 @@ export interface LocalAudioClip {
   objectUrl?: never;
   createdAt: string;
 }
+
+export type LocalAudioClipMeta = Omit<LocalAudioClip, "blob">;
 
 export interface LocalDraftRecord {
   draftKey: string;

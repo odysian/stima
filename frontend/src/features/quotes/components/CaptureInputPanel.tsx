@@ -1,9 +1,6 @@
 import { formatElapsed } from "@/features/quotes/components/captureScreenHelpers";
 import type { VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
-import {
-  MAX_AUDIO_CLIPS_PER_REQUEST,
-  NOTE_INPUT_MAX_CHARS,
-} from "@/shared/lib/inputLimits";
+import { NOTE_INPUT_MAX_CHARS } from "@/shared/lib/inputLimits";
 import { Button } from "@/shared/components/Button";
 import { Eyebrow } from "@/ui/Eyebrow";
 
@@ -146,7 +143,7 @@ export function CaptureInputPanel({
           <Eyebrow as="span" className="text-xs tracking-widest">TAP TO START</Eyebrow>
           {hasReachedClipLimit ? (
             <p className="text-center text-xs text-outline">
-              Maximum of {MAX_AUDIO_CLIPS_PER_REQUEST} clips per request reached.
+              Maximum clips reached.
             </p>
           ) : null}
           <button

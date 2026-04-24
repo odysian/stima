@@ -20,6 +20,7 @@ import {
   updateCaptureField,
   updateCaptureNotes,
 } from "@/features/quotes/offline/captureRepository";
+import { getAudioClip, saveAudioClip } from "@/features/quotes/offline/audioRepository";
 import type { LocalCaptureSession } from "@/features/quotes/offline/captureTypes";
 import { getStorageEstimate, isStoragePressured } from "@/features/quotes/offline/storageHealth";
 
@@ -197,10 +198,21 @@ describe("captureRepository", () => {
       userId: "user-a",
       notes: "to delete",
     });
+    await saveAudioClip({
+      clipId: "clip-1",
+      sessionId: session.sessionId,
+      userId: "user-a",
+      blob: new Blob(["clip-a"], { type: "audio/webm" }),
+      mimeType: "audio/webm",
+      sizeBytes: 6,
+      durationSeconds: 3,
+      sequenceNumber: 1,
+    });
 
     await deleteCaptureSession(session.sessionId);
 
     expect(await getCaptureSession(session.sessionId)).toBeNull();
+    expect(await getAudioClip("clip-1")).toBeNull();
   });
 
   it("deletes only empty abandoned local-only sessions", async () => {

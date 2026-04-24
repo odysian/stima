@@ -11,7 +11,7 @@ import { classifySubmitFailure } from "@/features/quotes/offline/classifySubmitF
 import { getLocalCaptureStatusCopy } from "@/features/quotes/offline/localCaptureStatusCopy";
 import { useLocalCaptureSession } from "@/features/quotes/offline/useLocalCaptureSession";
 import { resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
-import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
+import { MAX_VOICE_CLIPS_PER_CAPTURE, useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteDetail, QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
@@ -34,17 +34,6 @@ export function CaptureScreen(): React.ReactElement {
   const { setDraft } = useQuoteDraft();
   const isMountedRef = useRef(true);
   const extractionStageTimerRefs = useRef<number[]>([]);
-  const {
-    clips,
-    elapsedSeconds,
-    error: voiceError,
-    isRecording,
-    isSupported,
-    startRecording,
-    stopRecording,
-    removeClip,
-    clearError,
-  } = useVoiceCapture();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const localSessionQueryParam = searchParams.get("localSession");
   const autoExtractOnLoad = searchParams.get("autoExtract") === "1";
@@ -57,12 +46,25 @@ export function CaptureScreen(): React.ReactElement {
     hydrationError: localHydrationError,
     saveState: localSaveState,
     saveError: localSaveError,
+    ensureSession: ensureLocalCaptureSession,
+    setClipIds: setLocalCaptureClipIds,
     markStatus: markLocalCaptureStatus,
   } = useLocalCaptureSession({
     userId: user?.id,
     customerId,
     initialSessionId: localSessionQueryParam,
   });
+  const {
+    clips,
+    elapsedSeconds,
+    error: voiceError,
+    isRecording,
+    isSupported,
+    startRecording,
+    stopRecording,
+    removeClip,
+    clearError,
+  } = useVoiceCapture(localSessionId, user?.id);
 
   const [extractionStage, setExtractionStage] = useState<string | null>(null);
   const [pendingExitTarget, setPendingExitTarget] = useState<string | null>(null);
@@ -120,6 +122,10 @@ export function CaptureScreen(): React.ReactElement {
       }
     };
   }, [clearError, error, localHydrationError, localSaveError, voiceError]);
+
+  useEffect(() => {
+    void setLocalCaptureClipIds(clips.map((clip) => clip.id));
+  }, [clips, setLocalCaptureClipIds]);
 
   useEffect(() => {
     if (!displayedError) {
@@ -189,7 +195,7 @@ export function CaptureScreen(): React.ReactElement {
       return;
     }
     const totalClipBytes = clips.reduce(
-      (runningTotal, clip) => runningTotal + clip.blob.size,
+      (runningTotal, clip) => runningTotal + clip.sizeBytes,
       0,
     );
     if (totalClipBytes > MAX_AUDIO_TOTAL_BYTES) {
@@ -218,7 +224,7 @@ export function CaptureScreen(): React.ReactElement {
 
     try {
       const extraction = await quoteService.extract({
-        clips: clips.map((clip) => clip.blob),
+        clipIds: clips.map((clip) => clip.id),
         notes,
         customerId,
       });
@@ -335,7 +341,7 @@ export function CaptureScreen(): React.ReactElement {
     void onStartBlank();
   }
 
-  const hasReachedClipLimit = clips.length >= MAX_AUDIO_CLIPS_PER_REQUEST;
+  const hasReachedClipLimit = clips.length >= MAX_VOICE_CLIPS_PER_CAPTURE;
   const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording;
   const localStatusCopy = localSaveState === "saving"
     ? "Saving on this device..."
@@ -385,7 +391,10 @@ export function CaptureScreen(): React.ReactElement {
             hasReachedClipLimit={hasReachedClipLimit}
             isSupported={isSupported}
             onStartRecording={() => {
-              void startRecording();
+              void (async () => {
+                const ensuredSessionId = await ensureLocalCaptureSession();
+                await startRecording(ensuredSessionId);
+              })();
             }}
             onStopRecording={stopRecording}
             onStartBlank={onStartBlankClick}
