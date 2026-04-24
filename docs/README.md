@@ -2,12 +2,10 @@
 
 Use this index to keep template docs easy to traverse.
 
-## Product and Roadmap
+## Active Product Direction
 
-- `PRODUCT.md` — product strategy, north star, version goals, non-goals
-- `V0_ROADMAP.md` — V0 completion record and locked contracts
-- `V1_ROADMAP.md` — V1 detailed milestone spec (implementation-ready)
-- `V2_ROADMAP.md` — V2 directional roadmap (subject to V1 pilot data)
+- `PRODUCT.md` — current product positioning, ICP, non-goals, and decision heuristics
+- `roadmaps/P0_FIELD_RESILIENT_CAPTURE.md` — active P0 roadmap and spec umbrella (field-resilient capture program)
 
 ## Workflow Docs
 
@@ -39,5 +37,9 @@ Use this index to keep template docs easy to traverse.
 
 ## Archive
 
-Historical docs that have been superseded are in `archive/`. Do not use as active
-guidance.
+Historical docs that have been superseded are in `archive/`. Do not use as active guidance.
+
+- `archive/roadmaps/V0_ROADMAP.md` — V0 completion record and locked contracts (complete)
+- `archive/roadmaps/V1_ROADMAP.md` — V1 milestone delivery record (complete)
+- `archive/roadmaps/V2_ROADMAP.md` — V2 initial directional doc (superseded by V2.1, archived)
+- `archive/roadmaps/V2.1_ROADMAP.md` — V2.1 directional context (superseded by P0 field-resilient capture program)

@@ -467,7 +467,7 @@ Invoice rules:
 
 ## V1 Roadmap Cross-Reference
 
-Current implementation status against `docs/V1_ROADMAP.md` milestones:
+Current implementation status against `docs/archive/roadmaps/V1_ROADMAP.md` milestones:
 
 | Milestone | Roadmap Status | Implementation Status In This Codebase | Notes |
 |---|---|---|---|

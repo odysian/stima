@@ -75,7 +75,7 @@ it correctly without prompting.
 
 ## Version Structure
 
-### V0 — Prove the Core Loop (complete)
+### V0 — Prove the Core Loop ✓ complete
 
 Proved that voice or text notes → AI extraction → review/edit → professional PDF → share
 is fast and reliable enough for a real user to prefer it over their current workflow.
@@ -85,7 +85,7 @@ screen, PDF generation, public share link, quote history, pilot event logging.
 
 ---
 
-### V1 — Close the Loop
+### V1 — Close the Loop ✓ complete
 
 **Goal:** A complete quoting workflow. Contractor sends a quote → customer sees it on a
 branded landing page → contractor knows the outcome → converts to an invoice.
@@ -118,24 +118,43 @@ quote to invoice.
 
 ---
 
-### V2 — Speed and Memory
+### P0 — Field-Resilient Capture (active)
+
+**Goal:** Make Stima dependable in the field — when signal is bad, the browser refreshes,
+or AI extraction has to wait. The product wedge is local-first quote capture: capture now,
+clean up later.
+
+**Why before V2:** Field resilience is a prerequisite for real-world daily use. V2 "Speed
+and Memory" features (templates, customer notes, context-aware extraction) require users
+to trust that work does not vanish. That trust comes from P0.
+
+**Core scope:**
+
+- Performance baseline and instrumentation (Spec 0)
+- IndexedDB local storage foundation (Spec 1)
+- Offline capture workspace — notes-first local recovery (Spec 2)
+- Audio blob lifecycle hardening — durable clips (Spec 3)
+- Local draft persistence migration from sessionStorage to IndexedDB (Spec 4)
+- Idempotent extraction submit — safe retries before outbox (Spec 5)
+- Outbox sync engine — foreground retry when back online (Spec 6)
+- PWA shell foundations — installable, cold offline fallback (Spec 7)
+- Backend Redis degraded mode — Redis outage degrades gracefully (Infra Spec A)
+
+Full spec: `docs/roadmaps/P0_FIELD_RESILIENT_CAPTURE.md`
+
+---
+
+### V2 — Speed and Memory (deferred — resumes after P0)
 
 **Goal:** Make repeat quoting dramatically faster. Turn Stima into a business memory
 layer — not just a generator for one-off quotes.
 
-**Core scope:**
+**Deferred pending P0 completion.** The V2 direction (templates, quote duplication,
+customer detail rebuild, gallery/photos, context-aware extraction, revision history,
+stronger search) remains the correct next build after P0 ships. Exact scope will be
+adjusted based on P0 and pilot usage data.
 
-- Line item templates and saved service catalog
-- Quote duplication ("create from this quote")
-- Customer detail rebuild: three-tab layout — Jobs | Gallery | Notes
-- Photo documentation per customer and job
-- Persistent customer notes (gate codes, access instructions, preferences)
-- Context-aware extraction: "last time you quoted this customer, you used these items"
-- Quote revision history
-- Stronger search across quotes and customers
-
-**V2 is intentionally directional.** Exact scope will be adjusted based on what V1
-pilot usage reveals about where users lose time or drop off.
+Historical directional context: `docs/archive/roadmaps/V2.1_ROADMAP.md`
 
 ---
 
@@ -185,7 +204,7 @@ should answer "what am I looking at and what do I do next" within one second.
 
 ---
 
-## Non-Goals Through V2
+## Non-Goals Through P0 and V2
 
 These are deliberately out of scope unless strong pilot evidence changes the calculus:
 
@@ -193,7 +212,7 @@ These are deliberately out of scope unless strong pilot evidence changes the cal
 - scheduling or calendar integration
 - accounting integrations beyond CSV export (V3 only)
 - marketplace or lead generation
-- full offline sync engine
+- real-time cross-device sync or collaborative editing (P0 outbox handles single-device field recovery, not multi-device replication)
 - AI auto-pricing without user review and confirmation
 - broad workflow automation beyond quoting, invoicing, and follow-up
 - multi-trade AI optimization before the first trade is proven reliable

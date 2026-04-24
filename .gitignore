@@ -31,8 +31,10 @@ venv/
 infra/terraform/envs/*.tfvars
 plans/archived
 plans/*
-!plans/2026-04-21
 !plans/2026-04-22
+!plans/2026-04-24
+!plans/follow-ups
+
 stima-design-system/
 # Added by code-review-graph
 .code-review-graph/

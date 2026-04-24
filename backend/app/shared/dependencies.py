@@ -278,6 +278,12 @@ async def extraction_capacity_guard(user_id: UUID) -> AsyncIterator[None]:
 
     Use inside route handlers after SlowAPI's per-route limit check so 429s from the
     rate limiter do not consume quota or concurrency slots.
+
+    Coupling note: disabling the SlowAPI limiter (``limiter.enabled = False``) also
+    disables extraction quota and concurrency enforcement. This is intentional for test
+    and dev environments where rate limiting is off. If production ever needs to disable
+    SlowAPI decorators independently of extraction guards, introduce a dedicated
+    ``EXTRACTION_GUARDS_ENABLED`` setting rather than removing this check.
     """
     if not limiter.enabled:
         yield
