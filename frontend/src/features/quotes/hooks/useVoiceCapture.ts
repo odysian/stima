@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { perfMark, perfMeasure } from "@/shared/perf";
 
 const MIME_TYPE_CANDIDATES = [
   "audio/webm;codecs=opus",
@@ -134,12 +135,14 @@ export function useVoiceCapture(): UseVoiceCaptureResult {
       return;
     }
 
+    perfMark("capture:record:tap");
     setError(null);
     setElapsedSeconds(0);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      perfMark("capture:record:stream_ready");
 
       const preferredMimeType = resolvePreferredMimeType();
       const recorder = preferredMimeType
@@ -199,6 +202,9 @@ export function useVoiceCapture(): UseVoiceCaptureResult {
       };
 
       recorder.start();
+      perfMark("capture:record:active");
+      perfMeasure("capture:record:tap_to_stream_ms", "capture:record:tap", "capture:record:stream_ready");
+      perfMeasure("capture:record:tap_to_active_ms", "capture:record:tap", "capture:record:active");
       setIsRecording(true);
       timerRef.current = window.setInterval(() => {
         setElapsedSeconds((currentSeconds) => currentSeconds + 1);

@@ -4,11 +4,16 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { visualizer } from "rollup-plugin-visualizer";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    process.env.ANALYZE === "true" && visualizer({ open: true, gzipSize: true }),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
