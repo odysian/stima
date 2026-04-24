@@ -95,6 +95,12 @@ describe("captureRepository", () => {
     expect(updatedSession?.updatedAt).not.toBe(firstUpdatedAt);
   });
 
+  it("throws when updating notes for a missing session", async () => {
+    await expect(updateCaptureNotes("missing-session", "new notes")).rejects.toThrowError(
+      "Capture session not found: missing-session",
+    );
+  });
+
   it("updates arbitrary mutable fields without changing immutable fields", async () => {
     const session = await createCaptureSession({
       userId: "user-a",
@@ -116,6 +122,35 @@ describe("captureRepository", () => {
     expect(updatedSession?.status).toBe("ready_to_extract");
     expect(updatedSession?.notes).toBe("patched note");
     expect(updatedSession?.customerSnapshot).toEqual({ name: "Ada Lovelace" });
+  });
+
+  it("throws when updating fields for a missing session", async () => {
+    await expect(updateCaptureField("missing-session", { notes: "new notes" })).rejects.toThrowError(
+      "Capture session not found: missing-session",
+    );
+  });
+
+  it("rejects invalid enumerated patch values", async () => {
+    const session = await createCaptureSession({
+      userId: "user-a",
+      notes: "first note",
+    });
+
+    await expect(
+      updateCaptureField(session.sessionId, {
+        status: "invalid" as unknown as LocalCaptureSession["status"],
+      }),
+    ).rejects.toThrowError("Invalid capture status patch: invalid");
+
+    await expect(
+      updateCaptureField(session.sessionId, {
+        lastFailureKind: "not-a-kind" as unknown as LocalCaptureSession["lastFailureKind"],
+      }),
+    ).rejects.toThrowError("Invalid capture failure kind patch: not-a-kind");
+
+    const loadedSession = await getCaptureSession(session.sessionId);
+    expect(loadedSession?.status).toBe("local_only");
+    expect(loadedSession?.lastFailureKind).toBeNull();
   });
 
   it("lists only recoverable captures for the requested user", async () => {

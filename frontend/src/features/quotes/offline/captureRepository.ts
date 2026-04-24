@@ -92,6 +92,7 @@ export async function updateCaptureField(
   sessionId: string,
   patch: Partial<LocalCaptureSession>,
 ): Promise<void> {
+  validateCapturePatch(patch);
   const db = await getDb();
   const transaction = db.transaction(CAPTURE_STORE_NAMES.captureSessions, "readwrite");
   const store = transaction.objectStore(CAPTURE_STORE_NAMES.captureSessions);
@@ -108,6 +109,24 @@ export async function updateCaptureField(
   session.updatedAt = new Date().toISOString();
   store.put(session);
   await transactionDone(transaction);
+}
+
+function validateCapturePatch(patch: Partial<LocalCaptureSession>): void {
+  if (
+    patch.status !== undefined &&
+    (typeof patch.status !== "string" || !CAPTURE_STATUSES.has(patch.status as LocalCaptureStatus))
+  ) {
+    throw new Error(`Invalid capture status patch: ${String(patch.status)}`);
+  }
+
+  if (
+    patch.lastFailureKind !== undefined &&
+    patch.lastFailureKind !== null &&
+    (typeof patch.lastFailureKind !== "string" ||
+      !SUBMIT_FAILURE_KINDS.has(patch.lastFailureKind as SubmitFailureKind))
+  ) {
+    throw new Error(`Invalid capture failure kind patch: ${String(patch.lastFailureKind)}`);
+  }
 }
 
 export async function listRecoverableCaptures(userId: string): Promise<LocalCaptureSummary[]> {

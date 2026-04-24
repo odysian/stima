@@ -77,7 +77,10 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 
 export async function getDb(): Promise<IDBDatabase> {
   if (!dbPromise) {
-    dbPromise = openDb();
+    dbPromise = openDb().catch((error) => {
+      dbPromise = null;
+      throw error;
+    });
   }
 
   return dbPromise;
@@ -116,6 +119,7 @@ async function openDb(): Promise<IDBDatabase> {
     request.onsuccess = () => {
       const db = request.result;
       db.onversionchange = () => {
+        dbPromise = null;
         db.close();
       };
       resolve(db);
