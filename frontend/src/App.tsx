@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import {
   Navigate,
   Outlet,
@@ -12,21 +13,46 @@ import { LoginForm } from "@/features/auth/components/LoginForm";
 import { RegisterForm } from "@/features/auth/components/RegisterForm";
 import { ResetPasswordPage } from "@/features/auth/components/ResetPasswordPage";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { CustomerCreateScreen } from "@/features/customers/components/CustomerCreateScreen";
-import { CustomerDetailScreen } from "@/features/customers/components/CustomerDetailScreen";
-import { CustomerListScreen } from "@/features/customers/components/CustomerListScreen";
-import { InvoiceDetailScreen } from "@/features/invoices/components/InvoiceDetailScreen";
 import { LandingPage } from "@/features/marketing/components/LandingPage";
-import { PublicQuotePage } from "@/features/public/components/PublicQuotePage";
-import { OnboardingForm } from "@/features/profile/components/OnboardingForm";
-import { LineItemCatalogSettingsScreen } from "@/features/line-item-catalog/components/LineItemCatalogSettingsScreen";
-import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
-import { DocumentEditScreen } from "@/features/quotes/components/ReviewScreen";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
-import { QuotePreview } from "@/features/quotes/components/QuotePreview";
-import { SettingsScreen } from "@/features/settings/components/SettingsScreen";
 import { PageTransition } from "@/ui/PageTransition";
 import { ToastProvider } from "@/ui/Toast";
+
+const CustomerCreateScreen = lazy(() =>
+  import("@/features/customers/components/CustomerCreateScreen").then((m) => ({ default: m.CustomerCreateScreen })),
+);
+const CustomerDetailScreen = lazy(() =>
+  import("@/features/customers/components/CustomerDetailScreen").then((m) => ({ default: m.CustomerDetailScreen })),
+);
+const CustomerListScreen = lazy(() =>
+  import("@/features/customers/components/CustomerListScreen").then((m) => ({ default: m.CustomerListScreen })),
+);
+const InvoiceDetailScreen = lazy(() =>
+  import("@/features/invoices/components/InvoiceDetailScreen").then((m) => ({ default: m.InvoiceDetailScreen })),
+);
+const PublicQuotePage = lazy(() =>
+  import("@/features/public/components/PublicQuotePage").then((m) => ({ default: m.PublicQuotePage })),
+);
+const OnboardingForm = lazy(() =>
+  import("@/features/profile/components/OnboardingForm").then((m) => ({ default: m.OnboardingForm })),
+);
+const LineItemCatalogSettingsScreen = lazy(() =>
+  import("@/features/line-item-catalog/components/LineItemCatalogSettingsScreen").then((m) => ({
+    default: m.LineItemCatalogSettingsScreen,
+  })),
+);
+const CaptureScreen = lazy(() =>
+  import("@/features/quotes/components/CaptureScreen").then((m) => ({ default: m.CaptureScreen })),
+);
+const DocumentEditScreen = lazy(() =>
+  import("@/features/quotes/components/ReviewScreen").then((m) => ({ default: m.DocumentEditScreen })),
+);
+const QuotePreview = lazy(() =>
+  import("@/features/quotes/components/QuotePreview").then((m) => ({ default: m.QuotePreview })),
+);
+const SettingsScreen = lazy(() =>
+  import("@/features/settings/components/SettingsScreen").then((m) => ({ default: m.SettingsScreen })),
+);
 
 function ProtectedRoute(): React.ReactElement {
   const { user, isOnboarded } = useAuth();
@@ -88,6 +114,10 @@ function InvoiceEditRedirect(): React.ReactElement {
   return <Navigate to={id ? `/documents/${id}/edit` : "/"} replace />;
 }
 
+function withRouteSuspense(node: React.ReactNode): React.ReactElement {
+  return <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>{node}</Suspense>;
+}
+
 export default function App(): React.ReactElement {
   return (
     <ToastProvider>
@@ -126,26 +156,29 @@ export default function App(): React.ReactElement {
             }
           />
           <Route path="/" element={<RootHome />} />
-          <Route path="/doc/:token" element={<PublicQuotePage />} />
+          <Route path="/doc/:token" element={withRouteSuspense(<PublicQuotePage />)} />
           <Route element={<OnboardingRoute />}>
-            <Route path="/onboarding" element={<OnboardingForm />} />
+            <Route path="/onboarding" element={withRouteSuspense(<OnboardingForm />)} />
           </Route>
           <Route element={<ProtectedRoute />}>
-            <Route path="/customers" element={<CustomerListScreen />} />
-            <Route path="/customers/new" element={<CustomerCreateScreen />} />
-            <Route path="/customers/:id" element={<CustomerDetailScreen />} />
-            <Route path="/settings" element={<SettingsScreen />} />
-            <Route path="/settings/line-item-catalog" element={<LineItemCatalogSettingsScreen />} />
-            <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
+            <Route path="/customers" element={withRouteSuspense(<CustomerListScreen />)} />
+            <Route path="/customers/new" element={withRouteSuspense(<CustomerCreateScreen />)} />
+            <Route path="/customers/:id" element={withRouteSuspense(<CustomerDetailScreen />)} />
+            <Route path="/settings" element={withRouteSuspense(<SettingsScreen />)} />
+            <Route
+              path="/settings/line-item-catalog"
+              element={withRouteSuspense(<LineItemCatalogSettingsScreen />)}
+            />
+            <Route path="/invoices/:id" element={withRouteSuspense(<InvoiceDetailScreen />)} />
             <Route path="/invoices/:id/edit" element={<InvoiceEditRedirect />} />
             <Route path="/invoices/:id/edit/line-items/:lineItemIndex/edit" element={<InvoiceEditRedirect />} />
             <Route path="/quotes/new" element={<Navigate to="/quotes/capture" replace />} />
-            <Route path="/quotes/capture" element={<CaptureScreen />} />
-            <Route path="/quotes/capture/:customerId" element={<CaptureScreen />} />
-            <Route path="/documents/:id/edit" element={<DocumentEditScreen />} />
+            <Route path="/quotes/capture" element={withRouteSuspense(<CaptureScreen />)} />
+            <Route path="/quotes/capture/:customerId" element={withRouteSuspense(<CaptureScreen />)} />
+            <Route path="/documents/:id/edit" element={withRouteSuspense(<DocumentEditScreen />)} />
             <Route path="/quotes/:id/review" element={<QuoteEditRedirect />} />
             <Route path="/quotes/:id/edit" element={<QuoteEditRedirect />} />
-            <Route path="/quotes/:id/preview" element={<QuotePreview />} />
+            <Route path="/quotes/:id/preview" element={withRouteSuspense(<QuotePreview />)} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Route>
