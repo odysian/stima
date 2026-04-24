@@ -6,7 +6,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
-import { useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
+import { MAX_VOICE_CLIPS_PER_CAPTURE, useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type {
   ExtractionResult,
@@ -15,7 +15,6 @@ import type {
 } from "@/features/quotes/types/quote.types";
 import { jobService } from "@/shared/lib/jobService";
 import {
-  MAX_AUDIO_CLIPS_PER_REQUEST,
   MAX_AUDIO_TOTAL_BYTES,
   NOTE_INPUT_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
@@ -45,6 +44,7 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("@/features/quotes/hooks/useVoiceCapture", () => ({
   useVoiceCapture: vi.fn(),
+  MAX_VOICE_CLIPS_PER_CAPTURE: 5,
 }));
 
 vi.mock("@/features/quotes/hooks/useQuoteDraft", () => ({
@@ -82,6 +82,13 @@ vi.mock("@/features/quotes/offline/useLocalCaptureSession", async () => {
         hydrationError: null,
         saveState: notes.trim().length > 0 ? "saved" : "idle",
         saveError: null,
+        ensureSession: async () => {
+          if (sessionId === null) {
+            setSessionId("local-session-1");
+          }
+          return "local-session-1";
+        },
+        setClipIds: async () => undefined,
         markStatus: async (
           status: "local_only" | "ready_to_extract" | "submitting" | "extract_failed" | "synced" | "discarded",
           options?: unknown,
@@ -91,6 +98,7 @@ vi.mock("@/features/quotes/offline/useLocalCaptureSession", async () => {
           if (notes.trim().length > 0 && sessionId === null) {
             setSessionId("local-session-1");
           }
+          return "local-session-1";
         },
       };
     }),
@@ -213,9 +221,9 @@ const quoteDetailFixture: QuoteDetail = {
 
 const clipFixture: VoiceClip = {
   id: "clip-1",
-  blob: new Blob(["clip-1"], { type: "audio/webm" }),
-  url: "blob:clip-1",
   durationSeconds: 4,
+  sizeBytes: 6,
+  mimeType: "audio/webm",
 };
 
 function makeJobStatusResponse(
@@ -394,7 +402,7 @@ describe("CaptureScreen", () => {
   });
 
   it("renders recorded clips inside a bounded scroll region", () => {
-    mockVoiceCapture({ clips: [clipFixture, { ...clipFixture, id: "clip-2", url: "blob:clip-2" }] });
+    mockVoiceCapture({ clips: [clipFixture, { ...clipFixture, id: "clip-2" }] });
     renderScreen();
 
     const scrollRegion = screen.getByTestId("recorded-clips-scroll-region");
@@ -412,16 +420,15 @@ describe("CaptureScreen", () => {
   });
 
   it("disables recording when the clip-count limit is reached", () => {
-    const clips = Array.from({ length: MAX_AUDIO_CLIPS_PER_REQUEST }, (_, index) => ({
+    const clips = Array.from({ length: MAX_VOICE_CLIPS_PER_CAPTURE }, (_, index) => ({
       ...clipFixture,
       id: `clip-${index + 1}`,
-      url: `blob:clip-${index + 1}`,
     }));
     mockVoiceCapture({ clips });
     renderScreen();
 
     expect(
-      screen.getByText(`Maximum of ${MAX_AUDIO_CLIPS_PER_REQUEST} clips per request reached.`),
+      screen.getByText("Maximum clips reached."),
     ).toBeInTheDocument();
     const startButton = screen.getByText("mic").closest("button");
     expect(startButton).toBeDisabled();
@@ -562,7 +569,7 @@ describe("CaptureScreen", () => {
 
     await waitFor(() => {
       expect(mockedQuoteService.extract).toHaveBeenCalledWith({
-        clips: [clipFixture.blob],
+        clipIds: [clipFixture.id],
         notes: "  add travel surcharge  ",
         customerId: "cust-1",
       });
@@ -697,7 +704,7 @@ describe("CaptureScreen", () => {
 
     await waitFor(() => {
       expect(mockedQuoteService.extract).toHaveBeenCalledWith({
-        clips: [],
+        clipIds: [],
         notes: "Install sod in backyard",
         customerId: undefined,
       });
@@ -777,13 +784,11 @@ describe("CaptureScreen", () => {
   });
 
   it("derives the total audio limit error from the shared byte ceiling", async () => {
-    const oversizedBlob = new Blob(["clip-1"], { type: "audio/webm" });
-    Object.defineProperty(oversizedBlob, "size", { value: MAX_AUDIO_TOTAL_BYTES + 1 });
     mockVoiceCapture({
       clips: [
         {
           ...clipFixture,
-          blob: oversizedBlob,
+          sizeBytes: MAX_AUDIO_TOTAL_BYTES + 1,
         },
       ],
     });

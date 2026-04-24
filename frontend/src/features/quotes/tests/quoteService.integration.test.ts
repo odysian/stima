@@ -1,6 +1,10 @@
-import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it } from "vitest";
+import "fake-indexeddb/auto";
 
+import { http, HttpResponse } from "msw";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { saveAudioClip } from "@/features/quotes/offline/audioRepository";
+import { resetCaptureDbForTests } from "@/features/quotes/offline/captureDb";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type {
   Quote,
@@ -12,8 +16,13 @@ import { clearCsrfToken, setCsrfToken } from "@/shared/lib/http";
 import { server } from "@/shared/tests/mocks/server";
 
 describe("quoteService integration (MSW)", () => {
-  afterEach(() => {
+  beforeEach(async () => {
+    await resetCaptureDbForTests();
+  });
+
+  afterEach(async () => {
     clearCsrfToken();
+    await resetCaptureDbForTests();
   });
 
   it("convertNotes returns parsed ExtractionResult and sends CSRF header", async () => {
@@ -395,6 +404,26 @@ describe("quoteService integration (MSW)", () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;
     let capturedContentType: string | null = null;
+    await saveAudioClip({
+      clipId: "clip-id-1",
+      sessionId: "session-1",
+      userId: "user-1",
+      blob: new Blob(["clip-1"], { type: "audio/webm" }),
+      mimeType: "audio/webm",
+      sizeBytes: 6,
+      durationSeconds: 2,
+      sequenceNumber: 1,
+    });
+    await saveAudioClip({
+      clipId: "clip-id-2",
+      sessionId: "session-1",
+      userId: "user-1",
+      blob: new Blob(["clip-2"], { type: "audio/mp4" }),
+      mimeType: "audio/mp4",
+      sizeBytes: 6,
+      durationSeconds: 3,
+      sequenceNumber: 2,
+    });
 
     server.use(
       http.post("/api/quotes/extract", async ({ request }) => {
@@ -411,10 +440,7 @@ describe("quoteService integration (MSW)", () => {
     );
 
     const result = await quoteService.extract({
-      clips: [
-        new Blob(["clip-1"], { type: "audio/webm" }),
-        new Blob(["clip-2"], { type: "audio/mp4" }),
-      ],
+      clipIds: ["clip-id-1", "clip-id-2"],
       notes: "  add 10% travel surcharge  ",
       customerId: "cust-9",
     });
@@ -463,6 +489,16 @@ describe("quoteService integration (MSW)", () => {
 
   it("extract omits notes field when clips-only", async () => {
     setCsrfToken("integration-csrf-token");
+    await saveAudioClip({
+      clipId: "clip-id-1",
+      sessionId: "session-1",
+      userId: "user-1",
+      blob: new Blob(["clip-1"], { type: "audio/webm;codecs=opus" }),
+      mimeType: "audio/webm;codecs=opus",
+      sizeBytes: 6,
+      durationSeconds: 2,
+      sequenceNumber: 1,
+    });
 
     server.use(
       http.post("/api/quotes/extract", async ({ request }) => {
@@ -478,7 +514,7 @@ describe("quoteService integration (MSW)", () => {
     );
 
     const result = await quoteService.extract({
-      clips: [new Blob(["clip-1"], { type: "audio/webm;codecs=opus" })],
+      clipIds: ["clip-id-1"],
     });
 
     expect(result).toEqual({

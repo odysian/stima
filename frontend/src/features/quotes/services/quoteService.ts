@@ -12,6 +12,8 @@ import type {
   QuoteReuseCandidate,
   QuoteUpdateRequest,
 } from "@/features/quotes/types/quote.types";
+import { getAudioClip } from "@/features/quotes/offline/audioRepository";
+import { AudioClipMissingError } from "@/features/quotes/offline/captureTypes";
 import { buildIdempotencyKey } from "@/shared/lib/idempotency";
 import { request, requestWithMetadata } from "@/shared/lib/http";
 
@@ -50,12 +52,20 @@ interface PersistedExtractionPayload extends ExtractionResult {
   quote_id: string;
 }
 
-function buildExtractionFormData(params: { clips?: Blob[]; notes?: string; customerId?: string }): FormData {
+async function buildExtractionFormDataFromIds(params: {
+  clipIds?: string[];
+  notes?: string;
+  customerId?: string;
+}): Promise<FormData> {
   const formData = new FormData();
-  (params.clips ?? []).forEach((clip, index) => {
-    const extension = resolveAudioExtensionFromMimeType(clip.type);
-    formData.append("clips", clip, `clip-${index + 1}.${extension}`);
-  });
+  for (const [index, clipId] of (params.clipIds ?? []).entries()) {
+    const clip = await getAudioClip(clipId);
+    if (!clip) {
+      throw new AudioClipMissingError(clipId);
+    }
+    const extension = resolveAudioExtensionFromMimeType(clip.mimeType);
+    formData.append("clips", clip.blob, `clip-${index + 1}.${extension}`);
+  }
 
   const notes = params.notes?.trim() ?? "";
   if (notes.length > 0) {
@@ -71,9 +81,9 @@ function buildExtractionFormData(params: { clips?: Blob[]; notes?: string; custo
 
 async function submitExtraction(
   path: string,
-  params: { clips?: Blob[]; notes?: string; customerId?: string },
+  params: { clipIds?: string[]; notes?: string; customerId?: string },
 ): Promise<QuoteExtractResponse> {
-  const formData = buildExtractionFormData(params);
+  const formData = await buildExtractionFormDataFromIds(params);
 
   const response = await requestWithMetadata<PersistedExtractionPayload | JobStatusResponse>(path, {
     method: "POST",
@@ -96,7 +106,7 @@ async function submitExtraction(
   };
 }
 
-async function extract(params: { clips?: Blob[]; notes?: string; customerId?: string }): Promise<QuoteExtractResponse> {
+async function extract(params: { clipIds?: string[]; notes?: string; customerId?: string }): Promise<QuoteExtractResponse> {
   return submitExtraction("/api/quotes/extract", params);
 }
 

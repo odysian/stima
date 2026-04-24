@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { AudioClipMissingError } from "@/features/quotes/offline/captureTypes";
+import { getAudioClip } from "@/features/quotes/offline/audioRepository";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import { request, requestWithMetadata } from "@/shared/lib/http";
 
@@ -8,9 +10,13 @@ vi.mock("@/shared/lib/http", () => ({
   requestWithMetadata: vi.fn(),
   requestBlob: vi.fn(),
 }));
+vi.mock("@/features/quotes/offline/audioRepository", () => ({
+  getAudioClip: vi.fn(),
+}));
 
 const mockedRequestWithMetadata = vi.mocked(requestWithMetadata);
 const mockedRequest = vi.mocked(request);
+const mockedGetAudioClip = vi.mocked(getAudioClip);
 
 describe("quoteService.extract", () => {
   const extractionPayload = {
@@ -31,21 +37,42 @@ describe("quoteService.extract", () => {
   afterEach(() => {
     mockedRequestWithMetadata.mockReset();
     mockedRequest.mockReset();
+    mockedGetAudioClip.mockReset();
   });
 
-  it("builds multipart form data with clips and trimmed notes for async extraction", async () => {
+  it("builds multipart form data with clip IDs and trimmed notes for async extraction", async () => {
     mockedRequestWithMetadata.mockResolvedValue({
       status: 202,
       data: {
         id: "job-1",
       },
     });
+    mockedGetAudioClip
+      .mockResolvedValueOnce({
+        clipId: "clip-id-1",
+        sessionId: "session-1",
+        userId: "user-1",
+        blob: new Blob(["clip-a"], { type: "audio/mp4" }),
+        mimeType: "audio/mp4",
+        sizeBytes: 6,
+        durationSeconds: 2,
+        sequenceNumber: 1,
+        createdAt: "2026-04-24T00:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        clipId: "clip-id-2",
+        sessionId: "session-1",
+        userId: "user-1",
+        blob: new Blob(["clip-b"], { type: "audio/webm;codecs=opus" }),
+        mimeType: "audio/webm;codecs=opus",
+        sizeBytes: 6,
+        durationSeconds: 3,
+        sequenceNumber: 2,
+        createdAt: "2026-04-24T00:00:01.000Z",
+      });
 
     const result = await quoteService.extract({
-      clips: [
-        new Blob(["clip-a"], { type: "audio/mp4" }),
-        new Blob(["clip-b"], { type: "audio/webm;codecs=opus" }),
-      ],
+      clipIds: ["clip-id-1", "clip-id-2"],
       notes: "  add 10% travel surcharge  ",
       customerId: "cust-1",
     });
@@ -99,9 +126,20 @@ describe("quoteService.extract", () => {
         transcript: "clips only",
       },
     });
+    mockedGetAudioClip.mockResolvedValueOnce({
+      clipId: "clip-id-1",
+      sessionId: "session-1",
+      userId: "user-1",
+      blob: new Blob(["clip-a"], { type: "audio/webm" }),
+      mimeType: "audio/webm",
+      sizeBytes: 6,
+      durationSeconds: 3,
+      sequenceNumber: 1,
+      createdAt: "2026-04-24T00:00:00.000Z",
+    });
 
     await quoteService.extract({
-      clips: [new Blob(["clip-a"], { type: "audio/webm" })],
+      clipIds: ["clip-id-1"],
     });
 
     const [, options] = mockedRequestWithMetadata.mock.calls[0] ?? [];
@@ -110,6 +148,18 @@ describe("quoteService.extract", () => {
     expect((formData.getAll("clips")[0] as File).name).toBe("clip-1.webm");
     expect(formData.get("notes")).toBeNull();
     expect(formData.get("customer_id")).toBeNull();
+  });
+
+  it("throws AudioClipMissingError and skips submit when a clip ID is missing from IndexedDB", async () => {
+    mockedGetAudioClip.mockResolvedValueOnce(null);
+
+    await expect(
+      quoteService.extract({
+        clipIds: ["missing-clip"],
+        notes: "Install sod in backyard",
+      }),
+    ).rejects.toBeInstanceOf(AudioClipMissingError);
+    expect(mockedRequestWithMetadata).not.toHaveBeenCalled();
   });
 
   it("creates manual draft with customer payload when customerId is provided", async () => {

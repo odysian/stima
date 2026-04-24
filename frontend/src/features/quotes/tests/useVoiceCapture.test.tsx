@@ -1,7 +1,24 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
+import {
+  MAX_VOICE_CLIPS_PER_CAPTURE,
+  useVoiceCapture,
+} from "@/features/quotes/hooks/useVoiceCapture";
+import {
+  deleteAudioClip,
+  getTotalAudioBytes,
+  listClipsForSession,
+  saveAudioClip,
+} from "@/features/quotes/offline/audioRepository";
+
+vi.mock("@/features/quotes/offline/audioRepository", () => ({
+  saveAudioClip: vi.fn(),
+  deleteAudioClip: vi.fn(),
+  deleteAllClipsForSession: vi.fn(),
+  getTotalAudioBytes: vi.fn(async () => 0),
+  listClipsForSession: vi.fn(async () => []),
+}));
 
 class FakeMediaRecorder {
   static isTypeSupported = vi.fn(() => true);
@@ -34,15 +51,21 @@ class FakeMediaRecorder {
 }
 
 describe("useVoiceCapture", () => {
-  const createObjectUrlMock = vi.fn(() => "blob:test-clip");
-  const revokeObjectUrlMock = vi.fn();
+  const mockedSaveAudioClip = vi.mocked(saveAudioClip);
+  const mockedDeleteAudioClip = vi.mocked(deleteAudioClip);
+  const mockedGetTotalAudioBytes = vi.mocked(getTotalAudioBytes);
+  const mockedListClipsForSession = vi.mocked(listClipsForSession);
   const stopTrackMock = vi.fn();
   const getUserMediaMock = vi.fn();
 
   beforeEach(() => {
-    vi.useFakeTimers();
-    createObjectUrlMock.mockClear();
-    revokeObjectUrlMock.mockClear();
+    mockedSaveAudioClip.mockReset();
+    mockedDeleteAudioClip.mockReset();
+    mockedGetTotalAudioBytes.mockReset();
+    mockedListClipsForSession.mockReset();
+    mockedDeleteAudioClip.mockResolvedValue(undefined);
+    mockedGetTotalAudioBytes.mockResolvedValue(0);
+    mockedListClipsForSession.mockResolvedValue([]);
     stopTrackMock.mockReset();
     getUserMediaMock.mockResolvedValue({
       getTracks: () => [{ stop: stopTrackMock }],
@@ -61,18 +84,6 @@ describe("useVoiceCapture", () => {
       writable: true,
       value: FakeMediaRecorder,
     });
-
-    Object.defineProperty(URL, "createObjectURL", {
-      configurable: true,
-      writable: true,
-      value: createObjectUrlMock,
-    });
-
-    Object.defineProperty(URL, "revokeObjectURL", {
-      configurable: true,
-      writable: true,
-      value: revokeObjectUrlMock,
-    });
   });
 
   afterEach(() => {
@@ -80,8 +91,8 @@ describe("useVoiceCapture", () => {
     vi.restoreAllMocks();
   });
 
-  it("handles recording lifecycle and accumulates clips", async () => {
-    const { result } = renderHook(() => useVoiceCapture());
+  it("records, persists clip metadata, and keeps blobs out of React state", async () => {
+    const { result } = renderHook(() => useVoiceCapture("session-1", "user-1"));
 
     await act(async () => {
       await result.current.startRecording();
@@ -89,26 +100,30 @@ describe("useVoiceCapture", () => {
 
     expect(result.current.isRecording).toBe(true);
 
-    await act(async () => {
-      vi.advanceTimersByTime(2100);
-    });
-
-    expect(result.current.elapsedSeconds).toBe(2);
-
     act(() => {
       result.current.stopRecording();
     });
 
-    expect(result.current.isRecording).toBe(false);
-    expect(result.current.elapsedSeconds).toBe(0);
-    expect(result.current.clips).toHaveLength(1);
-    expect(result.current.clips[0]?.durationSeconds).toBeGreaterThanOrEqual(1);
-    expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(result.current.clips).toHaveLength(1);
+    });
+
+    const storedClip = result.current.clips[0];
+    expect(storedClip).toEqual(
+      expect.objectContaining({
+        id: "clip-0",
+        sequenceNumber: 1,
+        mimeType: expect.stringContaining("audio/"),
+        sizeBytes: expect.any(Number),
+      }),
+    );
+    expect("blob" in storedClip).toBe(false);
+    expect(mockedSaveAudioClip).toHaveBeenCalledTimes(1);
     expect(stopTrackMock).toHaveBeenCalledTimes(1);
   });
 
-  it("removes individual clips and revokes object URLs", async () => {
-    const { result } = renderHook(() => useVoiceCapture());
+  it("removes a clip from state and local storage", async () => {
+    const { result } = renderHook(() => useVoiceCapture("session-1", "user-1"));
 
     await act(async () => {
       await result.current.startRecording();
@@ -117,73 +132,115 @@ describe("useVoiceCapture", () => {
       result.current.stopRecording();
     });
 
-    const clipId = result.current.clips[0]?.id;
-    expect(clipId).toBeDefined();
+    await waitFor(() => {
+      expect(result.current.clips).toHaveLength(1);
+    });
 
+    const clipId = result.current.clips[0]?.id;
     act(() => {
       result.current.removeClip(clipId ?? "");
     });
 
     expect(result.current.clips).toHaveLength(0);
-    expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:test-clip");
+    await waitFor(() => {
+      expect(mockedDeleteAudioClip).toHaveBeenCalledWith(clipId);
+    });
   });
 
-  it("clears all clips and revokes each URL", async () => {
-    const { result } = renderHook(() => useVoiceCapture());
+  it("hydrates persisted clips when session changes", async () => {
+    mockedListClipsForSession.mockResolvedValueOnce([
+      {
+        clipId: "clip-22",
+        sessionId: "session-22",
+        userId: "user-1",
+        mimeType: "audio/webm",
+        sizeBytes: 1234,
+        durationSeconds: 7,
+        sequenceNumber: 3,
+        createdAt: "2026-04-24T00:00:00.000Z",
+      },
+    ]);
 
-    await act(async () => {
-      await result.current.startRecording();
-    });
-    act(() => {
-      result.current.stopRecording();
-    });
+    const { result } = renderHook(() => useVoiceCapture("session-22", "user-1"));
 
-    await act(async () => {
-      await result.current.startRecording();
+    await waitFor(() => {
+      expect(result.current.clips).toEqual([
+        {
+          id: "clip-22",
+          durationSeconds: 7,
+          sequenceNumber: 3,
+          sizeBytes: 1234,
+          mimeType: "audio/webm",
+        },
+      ]);
     });
-    act(() => {
-      result.current.stopRecording();
-    });
-
-    expect(result.current.clips).toHaveLength(2);
-
-    act(() => {
-      result.current.clearClips();
-    });
-
-    expect(result.current.clips).toHaveLength(0);
-    expect(revokeObjectUrlMock).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps clip sequence numbers stable after deleting earlier clips", async () => {
-    const { result } = renderHook(() => useVoiceCapture());
+  it("enforces max clip count before starting a recording", async () => {
+    mockedListClipsForSession.mockResolvedValueOnce(
+      Array.from({ length: MAX_VOICE_CLIPS_PER_CAPTURE }, (_, index) => ({
+        clipId: `clip-${index}`,
+        sessionId: "session-1",
+        userId: "user-1",
+        mimeType: "audio/webm",
+        sizeBytes: 100,
+        durationSeconds: 3,
+        sequenceNumber: index + 1,
+        createdAt: `2026-04-24T00:00:0${index}.000Z`,
+      })),
+    );
+
+    const { result } = renderHook(() => useVoiceCapture("session-1", "user-1"));
+
+    await waitFor(() => {
+      expect(result.current.clips).toHaveLength(MAX_VOICE_CLIPS_PER_CAPTURE);
+    });
 
     await act(async () => {
       await result.current.startRecording();
     });
-    act(() => {
-      result.current.stopRecording();
-    });
+
+    expect(result.current.error).toBe("Maximum clips reached.");
+    expect(getUserMediaMock).not.toHaveBeenCalled();
+  });
+
+  it("auto-stops recording at the 120-second duration cap", async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useVoiceCapture("session-1", "user-1"));
 
     await act(async () => {
       await result.current.startRecording();
     });
-    act(() => {
-      result.current.stopRecording();
+
+    await act(async () => {
+      vi.advanceTimersByTime(120_000);
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
-    expect(result.current.clips).toHaveLength(2);
-    expect(result.current.clips[0]?.sequenceNumber).toBe(1);
-    expect(result.current.clips[1]?.sequenceNumber).toBe(2);
-
-    const firstClipId = result.current.clips[0]?.id;
-    expect(firstClipId).toBeDefined();
-
-    act(() => {
-      result.current.removeClip(firstClipId ?? "");
-    });
-
+    expect(result.current.isRecording).toBe(false);
     expect(result.current.clips).toHaveLength(1);
-    expect(result.current.clips[0]?.sequenceNumber).toBe(2);
+    expect(result.current.error).toBe("Clip length limit reached.");
+    vi.useRealTimers();
+  });
+
+  it("shows a storage warning when clip persistence fails", async () => {
+    mockedSaveAudioClip.mockRejectedValueOnce(new Error("quota exceeded"));
+
+    const { result } = renderHook(() => useVoiceCapture("session-1", "user-1"));
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => {
+      result.current.stopRecording();
+    });
+
+    await waitFor(() => {
+      expect(result.current.error).toBe(
+        "Stima could not save this clip. Free up device storage or remove an existing clip, then try again.",
+      );
+    });
+    expect(result.current.clips).toHaveLength(0);
   });
 });

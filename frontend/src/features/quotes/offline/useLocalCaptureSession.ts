@@ -8,6 +8,7 @@ import {
   updateCaptureField,
   updateCaptureNotes,
 } from "@/features/quotes/offline/captureRepository";
+import { deleteAllClipsForSession } from "@/features/quotes/offline/audioRepository";
 import type {
   LocalCaptureSession,
   LocalCaptureStatus,
@@ -15,6 +16,8 @@ import type {
 } from "@/features/quotes/offline/captureTypes";
 
 const NOTES_PERSIST_DEBOUNCE_MS = 350;
+const SYNCED_AUDIO_CLEANUP_DELAY_MS = 60_000;
+const syncedAudioCleanupTimerBySession = new Map<string, number>();
 
 type LocalSaveState = "idle" | "saving" | "saved" | "error";
 
@@ -40,11 +43,46 @@ interface UseLocalCaptureSessionResult {
   hydrationError: string | null;
   saveState: LocalSaveState;
   saveError: string | null;
-  markStatus: (status: LocalCaptureStatus, options?: MarkCaptureStatusOptions) => Promise<void>;
+  ensureSession: () => Promise<string | null>;
+  setClipIds: (clipIds: string[]) => Promise<void>;
+  markStatus: (status: LocalCaptureStatus, options?: MarkCaptureStatusOptions) => Promise<string | null>;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function clearSyncedAudioCleanupTimer(sessionId: string): void {
+  const timerId = syncedAudioCleanupTimerBySession.get(sessionId);
+  if (timerId === undefined) {
+    return;
+  }
+  if (typeof window !== "undefined") {
+    window.clearTimeout(timerId);
+  }
+  syncedAudioCleanupTimerBySession.delete(sessionId);
+}
+
+function scheduleSyncedAudioCleanup(sessionId: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  clearSyncedAudioCleanupTimer(sessionId);
+
+  const timerId = window.setTimeout(() => {
+    syncedAudioCleanupTimerBySession.delete(sessionId);
+    void (async () => {
+      try {
+        await deleteAllClipsForSession(sessionId);
+        await updateCaptureField(sessionId, { clipIds: [] });
+      } catch {
+        // Ignore cleanup retries; stale clips can still be removed manually.
+      }
+    })();
+  }, SYNCED_AUDIO_CLEANUP_DELAY_MS);
+
+  syncedAudioCleanupTimerBySession.set(sessionId, timerId);
 }
 
 export function useLocalCaptureSession({
@@ -86,6 +124,36 @@ export function useLocalCaptureSession({
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  const ensureSessionRecord = useCallback(async (): Promise<LocalCaptureSession | null> => {
+    if (!userId) {
+      return null;
+    }
+
+    let targetSession = sessionRef.current;
+    if (targetSession) {
+      return targetSession;
+    }
+
+    targetSession = await createCaptureSession({
+      userId,
+      notes: notesRef.current,
+      customerId: customerId ?? null,
+    });
+
+    if (isMountedRef.current) {
+      setSession(targetSession);
+      setSaveState("saved");
+      setSaveError(null);
+    }
+
+    return targetSession;
+  }, [customerId, userId]);
+
+  const ensureSession = useCallback(async (): Promise<string | null> => {
+    const targetSession = await ensureSessionRecord();
+    return targetSession?.sessionId ?? null;
+  }, [ensureSessionRecord]);
 
   useEffect(() => {
     let isActive = true;
@@ -135,6 +203,14 @@ export function useLocalCaptureSession({
 
         setSession(loadedSession);
         setNotesState(loadedSession.notes);
+
+        if (
+          loadedSession.status === "synced" &&
+          loadedSession.serverQuoteId &&
+          loadedSession.clipIds.length > 0
+        ) {
+          scheduleSyncedAudioCleanup(loadedSession.sessionId);
+        }
 
         await updateCaptureField(loadedSession.sessionId, {
           lastOpenedAt: new Date().toISOString(),
@@ -231,35 +307,41 @@ export function useLocalCaptureSession({
     return clearPersistTimer;
   }, [clearPersistTimer, customerId, isHydrating, notes, userId]);
 
-  const markStatus = useCallback(async (
-    status: LocalCaptureStatus,
-    options?: MarkCaptureStatusOptions,
-  ): Promise<void> => {
-    if (!userId) {
+  const setClipIds = useCallback(async (clipIds: string[]): Promise<void> => {
+    const normalizedClipIds = Array.from(new Set(clipIds));
+    let targetSession = sessionRef.current;
+
+    if (!targetSession && normalizedClipIds.length > 0) {
+      targetSession = await ensureSessionRecord();
+    }
+
+    if (!targetSession) {
       return;
     }
 
-    const noteSnapshot = notesRef.current;
-    let targetSession = sessionRef.current;
+    await updateCaptureField(targetSession.sessionId, {
+      clipIds: normalizedClipIds,
+    });
 
+    const refreshedSession = await getCaptureSession(targetSession.sessionId);
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    if (refreshedSession) {
+      setSession(refreshedSession);
+    }
+    setSaveState("saved");
+    setSaveError(null);
+  }, [ensureSessionRecord]);
+
+  const markStatus = useCallback(async (
+    status: LocalCaptureStatus,
+    options?: MarkCaptureStatusOptions,
+  ): Promise<string | null> => {
+    const targetSession = await ensureSessionRecord();
     if (!targetSession) {
-      const hasMeaningfulNotes = noteSnapshot.trim().length > 0;
-      const hasCustomerContext = typeof customerId === "string" && customerId.length > 0;
-
-      if (!hasMeaningfulNotes && !hasCustomerContext) {
-        return;
-      }
-
-      targetSession = await createCaptureSession({
-        userId,
-        notes: noteSnapshot,
-        customerId: customerId ?? null,
-      });
-
-      if (!isMountedRef.current) {
-        return;
-      }
-      setSession(targetSession);
+      return null;
     }
 
     await markCaptureStatus(targetSession.sessionId, status, {
@@ -280,7 +362,7 @@ export function useLocalCaptureSession({
 
     const refreshedSession = await getCaptureSession(targetSession.sessionId);
     if (!isMountedRef.current) {
-      return;
+      return targetSession.sessionId;
     }
 
     if (refreshedSession) {
@@ -288,7 +370,13 @@ export function useLocalCaptureSession({
     }
     setSaveState("saved");
     setSaveError(null);
-  }, [customerId, userId]);
+
+    if (status === "synced" && options?.serverQuoteId) {
+      scheduleSyncedAudioCleanup(targetSession.sessionId);
+    }
+
+    return targetSession.sessionId;
+  }, [ensureSessionRecord]);
 
   return {
     notes,
@@ -299,6 +387,8 @@ export function useLocalCaptureSession({
     hydrationError,
     saveState,
     saveError,
+    ensureSession,
+    setClipIds,
     markStatus,
   };
 }
