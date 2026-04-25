@@ -35,7 +35,6 @@ export async function enqueueJob(input: EnqueueJobInput): Promise<OutboxJob> {
   const existingForSession = await listJobsForSessionFromStore(store, input.sessionId);
   const activeJob = existingForSession.find((job) => ACTIVE_STATUSES.has(job.status));
   if (activeJob) {
-    activeJob.idempotencyKey = input.idempotencyKey;
     activeJob.maxAttempts = normalizeMaxAttempts(input.maxAttempts ?? activeJob.maxAttempts);
     activeJob.updatedAt = new Date().toISOString();
     store.put(activeJob);
@@ -178,6 +177,31 @@ export async function listPendingJobs(userId: string): Promise<OutboxJob[]> {
       return Number.isFinite(nextRetryAtMs) && nextRetryAtMs <= nowMs;
     })
     .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
+}
+
+export async function unpauseAuthRequiredJobs(userId: string): Promise<void> {
+  const db = await getDb();
+  const transaction = db.transaction(CAPTURE_STORE_NAMES.outboxJobs, "readwrite");
+  const store = transaction.objectStore(CAPTURE_STORE_NAMES.outboxJobs);
+  const userIndex = store.index("userId");
+  const records = await requestToPromise(userIndex.getAll(IDBKeyRange.only(userId)));
+
+  for (const rawRecord of records) {
+    const job = parseStoredOutboxJob(rawRecord);
+    if (!job || job.userId !== userId) {
+      continue;
+    }
+    if (job.status !== "failed_retryable" || job.lastFailureKind !== "auth_required") {
+      continue;
+    }
+
+    job.status = "queued";
+    job.nextRetryAt = null;
+    job.updatedAt = new Date().toISOString();
+    store.put(job);
+  }
+
+  await transactionDone(transaction);
 }
 
 export async function listAllJobsForUser(userId: string): Promise<OutboxJob[]> {

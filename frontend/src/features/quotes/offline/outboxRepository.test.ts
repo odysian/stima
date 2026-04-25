@@ -46,7 +46,7 @@ describe("outboxRepository", () => {
     });
 
     expect(secondJob.jobId).toBe(firstJob.jobId);
-    expect(secondJob.idempotencyKey).toBe("idem-2");
+    expect(secondJob.idempotencyKey).toBe("idem-1");
   });
 
   it("lists only pending queued and due retryable jobs", async () => {

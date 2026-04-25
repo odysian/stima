@@ -5,10 +5,11 @@ import {
   markCaptureStatus,
   updateCaptureField,
 } from "@/features/quotes/offline/captureRepository";
-import type { OutboxJob, SubmitFailureKind } from "@/features/quotes/offline/captureTypes";
+import type { LocalCaptureSession, OutboxJob, SubmitFailureKind } from "@/features/quotes/offline/captureTypes";
 import { classifySubmitFailure } from "@/features/quotes/offline/classifySubmitFailure";
 import {
   listPendingJobs,
+  unpauseAuthRequiredJobs,
   updateJobStatus,
 } from "@/features/quotes/offline/outboxRepository";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -26,6 +27,7 @@ const TERMINAL_FAILURE_KINDS = new Set<SubmitFailureKind>([
 ]);
 const BACKOFF_BASE_MS = 2_000;
 const BACKOFF_MAX_MS = 120_000;
+const EXTRACTION_REQUEST_TIMEOUT_MS = 30_000;
 
 const inFlightPasses = new Map<string, Promise<void>>();
 const authPausedUsers = new Set<string>();
@@ -38,6 +40,7 @@ export type OutboxEngineEvent =
 interface OutboxPassOptions {
   onEvent?: (event: OutboxEngineEvent) => void;
   forceAfterAuth?: boolean;
+  extractionTimeoutMs?: number;
 }
 
 export async function runOutboxPass(userId: string, opts?: OutboxPassOptions): Promise<void> {
@@ -76,9 +79,15 @@ export function registerOnlineTrigger(userId: string, opts?: OutboxPassOptions):
   };
 }
 
+export function clearOutboxEngineStateForUser(userId: string): void {
+  authPausedUsers.delete(userId);
+  inFlightPasses.delete(userId);
+}
+
 async function runOutboxPassInternal(userId: string, opts?: OutboxPassOptions): Promise<void> {
   if (opts?.forceAfterAuth) {
     authPausedUsers.delete(userId);
+    await unpauseAuthRequiredJobs(userId);
   }
 
   if (authPausedUsers.has(userId)) {
@@ -108,12 +117,7 @@ async function processJob(job: OutboxJob, opts?: OutboxPassOptions): Promise<voi
   }
 
   try {
-    const extraction = await quoteService.extract({
-      clipIds: session.clipIds,
-      notes: session.notes,
-      customerId: session.customerId ?? undefined,
-      idempotencyKey: job.idempotencyKey,
-    });
+    const extraction = await extractWithTimeout(job, session, opts?.extractionTimeoutMs);
 
     if (extraction.type === "sync") {
       await markSuccess(job, {
@@ -275,4 +279,33 @@ async function pollForPersistedQuote(jobId: string): Promise<{ quote_id: string 
 function computeNextRetryAt(attemptCount: number): string {
   const delayMs = Math.min(BACKOFF_BASE_MS * (2 ** Math.max(attemptCount - 1, 0)), BACKOFF_MAX_MS);
   return new Date(Date.now() + delayMs).toISOString();
+}
+
+async function extractWithTimeout(
+  job: OutboxJob,
+  session: LocalCaptureSession,
+  timeoutMs = EXTRACTION_REQUEST_TIMEOUT_MS,
+) {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = globalThis.setTimeout(() => {
+      reject(new Error("Outbox extraction timed out."));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([
+      quoteService.extract({
+        clipIds: session.clipIds,
+        notes: session.notes,
+        customerId: session.customerId ?? undefined,
+        idempotencyKey: job.idempotencyKey,
+      }),
+      timeoutPromise,
+    ]);
+  } finally {
+    if (timeoutHandle !== undefined) {
+      globalThis.clearTimeout(timeoutHandle);
+    }
+  }
 }

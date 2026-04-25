@@ -1,7 +1,8 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import {
+  clearOutboxEngineStateForUser,
   registerOnlineTrigger,
   runOutboxPass,
   type OutboxEngineEvent,
@@ -11,6 +12,7 @@ import { useToast } from "@/ui/Toast";
 export function OutboxSyncCoordinator(): React.ReactElement | null {
   const { user } = useAuth();
   const { show } = useToast();
+  const previousUserIdRef = useRef<string | null>(null);
 
   const onEvent = useCallback((event: OutboxEngineEvent) => {
     if (event.kind === "sync_success") {
@@ -38,13 +40,22 @@ export function OutboxSyncCoordinator(): React.ReactElement | null {
   }, [show]);
 
   useEffect(() => {
+    const previousUserId = previousUserIdRef.current;
+    if (previousUserId && previousUserId !== user?.id) {
+      clearOutboxEngineStateForUser(previousUserId);
+    }
+    previousUserIdRef.current = user?.id ?? null;
+
     if (!user?.id) {
       return;
     }
 
     void runOutboxPass(user.id, { onEvent, forceAfterAuth: true });
     const cleanup = registerOnlineTrigger(user.id, { onEvent });
-    return cleanup;
+    return () => {
+      cleanup();
+      clearOutboxEngineStateForUser(user.id);
+    };
   }, [onEvent, user?.id]);
 
   return null;

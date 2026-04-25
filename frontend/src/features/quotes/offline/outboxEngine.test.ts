@@ -9,11 +9,14 @@ import {
   updateCaptureField,
 } from "@/features/quotes/offline/captureRepository";
 import { resetCaptureDbForTests } from "@/features/quotes/offline/captureDb";
-import { registerOnlineTrigger, runOutboxPass } from "@/features/quotes/offline/outboxEngine";
+import {
+  clearOutboxEngineStateForUser,
+  registerOnlineTrigger,
+  runOutboxPass,
+} from "@/features/quotes/offline/outboxEngine";
 import {
   enqueueJob,
   getJob,
-  getJobForSession,
   updateJobStatus,
 } from "@/features/quotes/offline/outboxRepository";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -35,7 +38,10 @@ describe("outboxEngine", () => {
 
   afterEach(async () => {
     await resetCaptureDbForTests();
+    clearOutboxEngineStateForUser("user-1");
+    clearOutboxEngineStateForUser("user-2");
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("marks queued jobs as succeeded and syncs capture sessions", async () => {
@@ -202,17 +208,75 @@ describe("outboxEngine", () => {
       },
     });
 
-    const resumedJob = await getJobForSession(session.sessionId);
-    if (!resumedJob) {
-      throw new Error("Expected resumed job");
-    }
-    await updateJobStatus(resumedJob.jobId, {
+    await runOutboxPass("user-1", { forceAfterAuth: true });
+
+    const completedJob = await getJob(queuedJob.jobId);
+    expect(completedJob?.status).toBe("succeeded");
+  });
+
+  it("marks retryable timeout when extraction call hangs", async () => {
+    const session = await createCaptureSession({
+      userId: "user-1",
+      notes: "Install sod",
+      customerId: "customer-1",
+    });
+
+    const queuedJob = await enqueueJob({
+      userId: "user-1",
+      sessionId: session.sessionId,
+      idempotencyKey: "idem-1",
+    });
+
+    mockedQuoteService.extract.mockReturnValueOnce(new Promise(() => undefined));
+    await runOutboxPass("user-1", { extractionTimeoutMs: 1 });
+
+    const updatedJob = await getJob(queuedJob.jobId);
+    expect(updatedJob?.status).toBe("failed_retryable");
+    expect(updatedJob?.lastFailureKind).toBe("timeout");
+  });
+
+  it("clears per-user paused state via cleanup helper", async () => {
+    const session = await createCaptureSession({
+      userId: "user-1",
+      notes: "Install sod",
+      customerId: "customer-1",
+    });
+    const queuedJob = await enqueueJob({
+      userId: "user-1",
+      sessionId: session.sessionId,
+      idempotencyKey: "idem-1",
+    });
+
+    mockedQuoteService.extract.mockRejectedValueOnce(
+      new HttpRequestError("Unauthorized", 401, { detail: "Unauthorized" }),
+    );
+    await runOutboxPass("user-1");
+
+    clearOutboxEngineStateForUser("user-1");
+    await updateJobStatus(queuedJob.jobId, {
       status: "queued",
       nextRetryAt: null,
     });
+    mockedQuoteService.extract.mockResolvedValueOnce({
+      type: "sync",
+      quoteId: "quote-cleared-state",
+      result: {
+        transcript: "Install sod",
+        line_items: [],
+        pricing_hints: {
+          explicit_total: null,
+          deposit_amount: null,
+          tax_rate: null,
+          discount_type: null,
+          discount_value: null,
+        },
+        customer_notes_suggestion: null,
+        extraction_tier: "primary",
+        extraction_degraded_reason_code: null,
+      },
+    });
 
-    await runOutboxPass("user-1", { forceAfterAuth: true });
-
+    await runOutboxPass("user-1");
     const completedJob = await getJob(queuedJob.jobId);
     expect(completedJob?.status).toBe("succeeded");
   });
