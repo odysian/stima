@@ -39,7 +39,10 @@ async def probe_redis(
     except Exception:
         return False, "redis_probe_failed"
     finally:
-        await client.aclose()
+        try:
+            await client.aclose()
+        except Exception:
+            pass
     return True, None
 
 
