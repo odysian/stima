@@ -279,7 +279,7 @@ async def extract_combined(
     """Extract quote data, persist the draft, and return a quote id or extraction job."""
     del request
     clip_inputs = await _parse_upload_clips(clips or [])
-    clip_sizes = [len(clip.content) for clip in clip_inputs]
+    clip_hashes = [sha256(clip.content).hexdigest() for clip in clip_inputs]
     capture_detail = _resolve_capture_detail(clip_inputs, notes)
     source_type = _resolve_source_type(clip_inputs)
 
@@ -302,7 +302,7 @@ async def extract_combined(
         idempotency_resource_id = _build_extraction_resource_id(
             user_id=user.id,
             notes=notes,
-            clip_sizes=clip_sizes,
+            clip_hashes=clip_hashes,
             customer_id=customer_id,
         )
         replay = await idempotency_store.begin(
@@ -488,13 +488,13 @@ def _build_extraction_resource_id(
     *,
     user_id: UUID,
     notes: str,
-    clip_sizes: list[int],
+    clip_hashes: list[str],
     customer_id: UUID | None,
 ) -> UUID:
     fingerprint = _build_extraction_fingerprint(
         user_id=user_id,
         notes=notes,
-        clip_sizes=clip_sizes,
+        clip_hashes=clip_hashes,
         customer_id=customer_id,
     )
     return uuid5(NAMESPACE_URL, f"extract:{fingerprint}")
@@ -504,14 +504,14 @@ def _build_extraction_fingerprint(
     *,
     user_id: UUID,
     notes: str,
-    clip_sizes: list[int],
+    clip_hashes: list[str],
     customer_id: UUID | None,
 ) -> str:
     normalized_parts = [
         str(user_id),
         notes.strip(),
-        str(len(clip_sizes)),
-        ",".join(str(size) for size in sorted(clip_sizes)),
+        str(len(clip_hashes)),
+        ",".join(sorted(clip_hashes)),
         str(customer_id) if customer_id is not None else "",
     ]
     return sha256("|".join(normalized_parts).encode()).hexdigest()

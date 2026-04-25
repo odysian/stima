@@ -779,6 +779,35 @@ describe("CaptureScreen", () => {
     expect(secondCall?.idempotencyKey).toBe(firstCall?.idempotencyKey);
   });
 
+  it("generates a new idempotency key when notes change before retry", async () => {
+    mockedQuoteService.extract
+      .mockRejectedValueOnce(new Error("Temporary extraction failure"))
+      .mockResolvedValueOnce({
+        type: "sync",
+        quoteId: "quote-after-edit-retry",
+        result: extractionFixture,
+      });
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+    await screen.findByRole("alert");
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard and add mulch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    await waitFor(() => expect(mockedQuoteService.extract).toHaveBeenCalledTimes(2));
+    const firstCall = mockedQuoteService.extract.mock.calls[0]?.[0];
+    const secondCall = mockedQuoteService.extract.mock.calls[1]?.[0];
+    expect(firstCall?.idempotencyKey).toBeDefined();
+    expect(secondCall?.idempotencyKey).toBeDefined();
+    expect(secondCall?.idempotencyKey).not.toBe(firstCall?.idempotencyKey);
+  });
+
   it("clears persisted idempotency key after extraction submission succeeds", async () => {
     renderScreen();
 

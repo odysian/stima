@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -78,6 +78,7 @@ export function CaptureScreen(): React.ReactElement {
   const [isRetryLockedByInFlightExtraction, setIsRetryLockedByInFlightExtraction] = useState(false);
   const [hasAttemptedAutoExtract, setHasAttemptedAutoExtract] = useState(false);
   const extractionIdempotencyKeyRef = useRef<string | null>(null);
+  const previousClipSignatureRef = useRef("");
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
@@ -136,8 +137,34 @@ export function CaptureScreen(): React.ReactElement {
   }, [clips, setLocalCaptureClipIds]);
 
   useEffect(() => {
+    const currentClipSignature = clips
+      .map((clip) => `${clip.id}:${clip.sizeBytes}`)
+      .join("|");
+    const hasChanged = previousClipSignatureRef.current !== currentClipSignature;
+    previousClipSignatureRef.current = currentClipSignature;
+    if (!hasChanged) {
+      return;
+    }
+    if (!isRetryLockedByInFlightExtraction && extractionIdempotencyKeyRef.current === null) {
+      return;
+    }
     setIsRetryLockedByInFlightExtraction(false);
-  }, [clips, notes]);
+    void clearExtractionRequestIdempotencyKey(localSessionId, extractionIdempotencyKeyRef);
+  }, [clips, isRetryLockedByInFlightExtraction, localSessionId]);
+
+  useEffect(() => {
+    setIsRetryLockedByInFlightExtraction(false);
+  }, [notes]);
+
+  const handleNotesChange = useCallback((value: string): void => {
+    if (value !== notes) {
+      if (isRetryLockedByInFlightExtraction || extractionIdempotencyKeyRef.current !== null) {
+        setIsRetryLockedByInFlightExtraction(false);
+        void clearExtractionRequestIdempotencyKey(localSessionId, extractionIdempotencyKeyRef);
+      }
+    }
+    setNotes(value);
+  }, [isRetryLockedByInFlightExtraction, localSessionId, notes, setNotes]);
 
   useEffect(() => {
     if (!displayedError) {
@@ -378,7 +405,7 @@ export function CaptureScreen(): React.ReactElement {
             isExtracting={isExtracting}
             removeClip={removeClip}
             notes={notes}
-            onNotesChange={setNotes}
+            onNotesChange={handleNotesChange}
             isRecording={isRecording}
             elapsedSeconds={elapsedSeconds}
             hasReachedClipLimit={hasReachedClipLimit}

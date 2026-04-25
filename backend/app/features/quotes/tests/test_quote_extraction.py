@@ -244,6 +244,34 @@ async def test_extract_combined_same_idempotency_key_with_different_content_retu
     assert second_response.json() == {"detail": "Idempotency key reused with different content"}
 
 
+async def test_extract_combined_same_idempotency_key_with_same_size_different_clips_returns_422(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    first_response = await client.post(
+        "/api/quotes/extract",
+        files=[
+            ("clips", ("clip-1.webm", b"aaaa", "audio/webm")),
+            ("notes", (None, "mulch and edging")),
+        ],
+        headers=_extract_headers(csrf_token, idempotency_key="extract-clip-conflict-key"),
+    )
+    second_response = await client.post(
+        "/api/quotes/extract",
+        files=[
+            ("clips", ("clip-1.webm", b"bbbb", "audio/webm")),
+            ("notes", (None, "mulch and edging")),
+        ],
+        headers=_extract_headers(csrf_token, idempotency_key="extract-clip-conflict-key"),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 422
+    assert second_response.json() == {"detail": "Idempotency key reused with different content"}
+
+
 async def test_extract_combined_duplicate_in_progress_idempotency_key_returns_409(
     client: AsyncClient,
 ) -> None:
