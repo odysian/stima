@@ -16,6 +16,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { LandingPage } from "@/features/marketing/components/LandingPage";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { OutboxSyncCoordinator } from "@/features/quotes/offline/OutboxSyncCoordinator";
+import { PwaUpdatePrompt } from "@/shared/components/PwaUpdatePrompt";
 import { PageTransition } from "@/ui/PageTransition";
 import { ToastProvider } from "@/ui/Toast";
 
@@ -123,6 +124,7 @@ export default function App(): React.ReactElement {
   return (
     <ToastProvider>
       <OutboxSyncCoordinator />
+      <PwaUpdatePrompt />
       <Routes>
         <Route element={<PageTransition />}>
           <Route
