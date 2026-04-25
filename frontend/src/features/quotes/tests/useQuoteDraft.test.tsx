@@ -1,9 +1,10 @@
 import "fake-indexeddb/auto";
 
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useQuoteDraft, type QuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import * as draftRepositoryModule from "@/features/quotes/offline/draftRepository";
 import {
   buildCaptureHandoffDraftKey,
   CAPTURE_HANDOFF_DOCUMENT_ID,
@@ -259,5 +260,31 @@ describe("useQuoteDraft", () => {
       expect(screen.getByTestId("draft-loading")).toHaveTextContent("ready");
       expect(screen.getByTestId("draft-state")).toHaveTextContent("null");
     });
+  });
+
+  it("cancels pending persist when user changes before debounce fires", async () => {
+    const persistSpy = vi.spyOn(draftRepositoryModule, "saveLocalDraft").mockResolvedValue(undefined);
+    try {
+      const { rerender } = render(<HookHarness userId="user-a" />);
+      await waitFor(() => {
+        expect(screen.getByTestId("draft-loading")).toHaveTextContent("ready");
+      });
+
+      vi.useFakeTimers();
+      act(() => {
+        fireEvent.click(screen.getByRole("button", { name: "Set Draft" }));
+      });
+      rerender(<HookHarness userId="user-b" />);
+
+      await act(async () => {
+        vi.advanceTimersByTime(200);
+        await Promise.resolve();
+      });
+
+      expect(persistSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      persistSpy.mockRestore();
+    }
   });
 });

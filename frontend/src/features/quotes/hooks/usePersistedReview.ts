@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { isInvoiceEditableStatus } from "@/features/invoices/utils/invoiceStatus";
@@ -22,6 +22,8 @@ export {
   type DocumentEditDraft,
   type PersistedEditableDocument,
 };
+
+const DOCUMENT_DRAFT_PERSIST_DEBOUNCE_MS = 250;
 
 async function fetchEditableDocument(documentId: string): Promise<PersistedEditableDocument> {
   try {
@@ -66,6 +68,39 @@ export function usePersistedReview(
   const [isLoadingDocumentState, setIsLoadingDocumentState] = useState(true);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const persistTimerRef = useRef<number | null>(null);
+
+  const scheduleDraftPersist = useCallback((nextDraft: DocumentEditDraft) => {
+    if (!userId || typeof window === "undefined") {
+      return;
+    }
+
+    if (persistTimerRef.current !== null) {
+      window.clearTimeout(persistTimerRef.current);
+    }
+
+    persistTimerRef.current = window.setTimeout(() => {
+      persistTimerRef.current = null;
+      void persistDocumentDraftToIDB(nextDraft, userId).catch((error) => {
+        console.warn("Unable to persist document edit draft locally.", error);
+      });
+    }, DOCUMENT_DRAFT_PERSIST_DEBOUNCE_MS);
+  }, [userId]);
+
+  useEffect(() => {
+    return () => {
+      if (persistTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(persistTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (persistTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+  }, [userId]);
 
   const setDraft = useCallback((
     nextDraft: DocumentEditDraft | ((current: DocumentEditDraft) => DocumentEditDraft),
@@ -80,14 +115,10 @@ export function usePersistedReview(
         return currentDraft;
       }
 
-      if (userId) {
-        void persistDocumentDraftToIDB(resolvedDraft, userId).catch((error) => {
-          console.warn("Unable to persist document edit draft locally.", error);
-        });
-      }
+      scheduleDraftPersist(resolvedDraft);
       return resolvedDraft;
     });
-  }, [userId]);
+  }, [scheduleDraftPersist]);
 
   const clearDraft = useCallback(() => {
     setDraftState((currentDraft) => {

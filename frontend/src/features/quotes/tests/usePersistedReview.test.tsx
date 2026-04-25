@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { usePersistedReview } from "@/features/quotes/hooks/usePersistedReview";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import { resetCaptureDbForTests } from "@/features/quotes/offline/captureDb";
+import * as persistedDraftModule from "@/features/quotes/hooks/persistedDocumentDraft";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { InvoiceDetail } from "@/features/invoices/types/invoice.types";
 import type { QuoteDetail } from "@/features/quotes/types/quote.types";
@@ -226,5 +227,42 @@ describe("usePersistedReview", () => {
 
     expect(result.current.loadError).toBeTruthy();
     expect(mockedInvoiceService.getInvoice).not.toHaveBeenCalled();
+  });
+
+  it("debounces document draft persistence to one write for rapid updates", async () => {
+    const persistDraftSpy = vi.spyOn(persistedDraftModule, "persistDocumentDraftToIDB");
+    mockedQuoteService.getQuote.mockResolvedValueOnce(makeQuote());
+
+    const { result } = renderHook(() => usePersistedReview("doc-1", "user-a"));
+
+    await waitFor(() => {
+      expect(result.current.isLoadingDocument).toBe(false);
+    });
+    persistDraftSpy.mockClear();
+
+    vi.useFakeTimers();
+    try {
+      act(() => {
+        result.current.setDraft((currentDraft) => ({ ...currentDraft, title: "Edit 1" }));
+        result.current.setDraft((currentDraft) => ({ ...currentDraft, title: "Edit 2" }));
+        result.current.setDraft((currentDraft) => ({ ...currentDraft, title: "Edit 3" }));
+      });
+      expect(persistDraftSpy).not.toHaveBeenCalled();
+
+      await act(async () => {
+        vi.advanceTimersByTime(249);
+        await Promise.resolve();
+      });
+      expect(persistDraftSpy).not.toHaveBeenCalled();
+
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+        await Promise.resolve();
+      });
+      expect(persistDraftSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      persistDraftSpy.mockRestore();
+    }
   });
 });

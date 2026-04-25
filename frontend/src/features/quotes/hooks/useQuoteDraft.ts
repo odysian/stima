@@ -84,6 +84,13 @@ export function useQuoteDraft(userId: string | undefined): UseQuoteDraftResult {
   }, []);
 
   useEffect(() => {
+    if (persistTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+  }, [userId]);
+
+  useEffect(() => {
     let isActive = true;
 
     void Promise.resolve()
@@ -185,7 +192,7 @@ export function useQuoteDraft(userId: string | undefined): UseQuoteDraftResult {
     });
   }, [scheduleDraftPersist]);
 
-  const scopedDraft = userId ? draft : null;
+  const scopedDraft = userId && hydratedUserId === userId ? draft : null;
 
   return {
     draft: scopedDraft,
