@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Literal
 
@@ -11,6 +12,7 @@ from redis.asyncio import Redis
 from app.core.config import Settings
 
 RedisRuntimeMode = Literal["redis", "degraded_memory"]
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,13 +44,18 @@ async def probe_redis(
         try:
             await client.aclose()
         except Exception:
-            pass
+            LOGGER.warning(
+                "Redis probe client close failed; continuing startup resolution",
+                exc_info=True,
+            )
     return True, None
 
 
 async def resolve_redis_runtime_state(settings: Settings) -> RedisRuntimeState:
     """Resolve startup Redis mode from policy and runtime availability."""
     if settings.redis_url is None:
+        if settings.environment.lower() != "production":
+            return RedisRuntimeState(mode="degraded_memory", degraded_reason="redis_missing")
         if settings.allow_redis_degraded_mode:
             return RedisRuntimeState(mode="degraded_memory", degraded_reason="redis_missing")
         raise RedisRuntimeResolutionError("REDIS_URL is required in production")
