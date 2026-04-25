@@ -13,6 +13,7 @@ interface PendingCapturesSectionProps {
   error: string | null;
   onResume: (sessionId: string) => void;
   onExtract: (sessionId: string) => void;
+  onRetry: (sessionId: string) => void;
   onDelete: (sessionId: string) => void;
 }
 
@@ -26,6 +27,26 @@ function buildCaptureSummaryLabel(notes: string): string {
   return firstLine.length > 60 ? `${firstLine.slice(0, 57)}...` : firstLine;
 }
 
+function buildPendingCaptureStatusCopy(capture: LocalCaptureSummary): string {
+  if (capture.outboxStatus === "running") {
+    const attemptCount = Math.max(capture.outboxAttemptCount ?? 1, 1);
+    const maxAttempts = Math.max(capture.outboxMaxAttempts ?? 5, 1);
+    return `Retrying... (attempt ${attemptCount} of ${maxAttempts})`;
+  }
+
+  if (capture.outboxStatus === "failed_retryable") {
+    const attemptCount = Math.max(capture.outboxAttemptCount ?? 1, 1);
+    const maxAttempts = Math.max(capture.outboxMaxAttempts ?? 5, 1);
+    return `Could not sync. Tap Retry. (tried ${attemptCount} of ${maxAttempts})`;
+  }
+
+  if (capture.outboxStatus === "failed_terminal") {
+    return "Could not sync permanently. Open to edit or delete.";
+  }
+
+  return getLocalCaptureStatusCopy(capture.status) ?? "Saved on this device";
+}
+
 export function PendingCapturesSection({
   captures,
   isLoading,
@@ -34,6 +55,7 @@ export function PendingCapturesSection({
   error,
   onResume,
   onExtract,
+  onRetry,
   onDelete,
 }: PendingCapturesSectionProps): React.ReactElement {
   return (
@@ -70,7 +92,7 @@ export function PendingCapturesSection({
                   {buildCaptureSummaryLabel(capture.notes)}
                 </p>
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  {getLocalCaptureStatusCopy(capture.status) ?? "Saved on this device"}
+                  {buildPendingCaptureStatusCopy(capture)}
                 </p>
                 <p className="mt-1 text-xs text-outline">
                   Updated {formatDate(capture.updatedAt, timezone)}
@@ -88,10 +110,18 @@ export function PendingCapturesSection({
                     type="button"
                     size="sm"
                     variant="secondary"
-                    disabled={!isOnline}
-                    onClick={() => onExtract(capture.sessionId)}
+                    disabled={!isOnline || capture.outboxStatus === "running"}
+                    onClick={() => (
+                      capture.outboxStatus === "failed_retryable"
+                        ? onRetry(capture.sessionId)
+                        : onExtract(capture.sessionId)
+                    )}
                   >
-                    Extract
+                    {capture.outboxStatus === "running"
+                      ? "Retrying..."
+                      : capture.outboxStatus === "failed_retryable"
+                        ? "Retry"
+                        : "Extract"}
                   </Button>
                   <Button
                     type="button"

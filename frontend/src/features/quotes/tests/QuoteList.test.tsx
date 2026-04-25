@@ -7,6 +7,8 @@ import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
+import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
+import { getJobForSession, updateJobStatus } from "@/features/quotes/offline/outboxRepository";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 
@@ -57,10 +59,22 @@ vi.mock("@/features/quotes/offline/useRecoverableCaptures", () => ({
   useRecoverableCaptures: vi.fn(),
 }));
 
+vi.mock("@/features/quotes/offline/outboxRepository", () => ({
+  getJobForSession: vi.fn(async () => null),
+  updateJobStatus: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/features/quotes/offline/outboxEngine", () => ({
+  runOutboxPass: vi.fn(async () => undefined),
+}));
+
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedInvoiceService = vi.mocked(invoiceService);
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedUseRecoverableCaptures = vi.mocked(useRecoverableCaptures);
+const mockedGetJobForSession = vi.mocked(getJobForSession);
+const mockedUpdateJobStatus = vi.mocked(updateJobStatus);
+const mockedRunOutboxPass = vi.mocked(runOutboxPass);
 const ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR = Object.getOwnPropertyDescriptor(window.navigator, "onLine");
 
 function makeQuoteListItem(overrides: Partial<QuoteListItem> = {}): QuoteListItem {
@@ -303,6 +317,60 @@ describe("QuoteList", () => {
     await screen.findByText(/Q-001/);
 
     expect(screen.getByRole("button", { name: "Extract" })).toBeDisabled();
+  });
+
+  it("shows Retry action for failed retryable outbox jobs and runs sync pass", async () => {
+    const refreshRecoverableCaptures = vi.fn(async () => undefined);
+    setNavigatorOnline(true);
+    mockedGetJobForSession.mockResolvedValueOnce({
+      jobId: "job-1",
+      userId: "user-1",
+      sessionId: "session-1",
+      idempotencyKey: "idem-1",
+      status: "failed_retryable",
+      attemptCount: 2,
+      maxAttempts: 5,
+      nextRetryAt: new Date().toISOString(),
+      lastFailureKind: "timeout",
+      lastError: "Request timed out",
+      serverQuoteId: null,
+      serverJobId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    mockedUseRecoverableCaptures.mockReturnValue({
+      captures: [
+        {
+          sessionId: "session-1",
+          status: "extract_failed",
+          notes: "Patio estimate",
+          updatedAt: "2026-03-20T00:00:00.000Z",
+          lastFailureKind: "timeout",
+          lastError: "Request timed out",
+          outboxStatus: "failed_retryable",
+          outboxAttemptCount: 2,
+          outboxMaxAttempts: 5,
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refresh: refreshRecoverableCaptures,
+      deleteCapture: vi.fn(async () => undefined),
+    });
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => {
+      expect(mockedUpdateJobStatus).toHaveBeenCalledWith("job-1", expect.objectContaining({
+        status: "queued",
+      }));
+      expect(mockedRunOutboxPass).toHaveBeenCalledWith("user-1");
+      expect(refreshRecoverableCaptures).toHaveBeenCalled();
+    });
   });
 
   it("renders quote cards from listQuotes response", async () => {

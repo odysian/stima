@@ -1,5 +1,6 @@
 import { CAPTURE_STORE_NAMES, getDb } from "@/features/quotes/offline/captureDb";
 import { deleteAllClipsForSession } from "@/features/quotes/offline/audioRepository";
+import { deleteJobForSession } from "@/features/quotes/offline/outboxRepository";
 import type {
   CreateLocalCaptureInput,
   CreateLocalSyncEventInput,
@@ -176,6 +177,7 @@ export async function markCaptureStatus(
 
 export async function deleteCaptureSession(sessionId: string): Promise<void> {
   await deleteAllClipsForSession(sessionId);
+  await deleteJobForSession(sessionId);
   const db = await getDb();
   const transaction = db.transaction(CAPTURE_STORE_NAMES.captureSessions, "readwrite");
   const store = transaction.objectStore(CAPTURE_STORE_NAMES.captureSessions);

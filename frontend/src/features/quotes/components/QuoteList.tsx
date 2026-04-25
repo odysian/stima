@@ -7,6 +7,8 @@ import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { PendingCapturesSection } from "@/features/quotes/components/PendingCapturesSection";
 import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
 import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
+import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
+import { getJobForSession, updateJobStatus } from "@/features/quotes/offline/outboxRepository";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -41,6 +43,7 @@ export function QuoteList(): React.ReactElement {
     captures: recoverableCaptures,
     isLoading: isLoadingRecoverableCaptures,
     error: recoverableCapturesError,
+    refresh: refreshRecoverableCaptures,
     deleteCapture,
   } = useRecoverableCaptures(user?.id);
 
@@ -247,6 +250,32 @@ export function QuoteList(): React.ReactElement {
     }
   }
 
+  async function onRetryCapture(sessionId: string): Promise<void> {
+    if (!user?.id) {
+      return;
+    }
+
+    setPendingCaptureActionError(null);
+    try {
+      const outboxJob = await getJobForSession(sessionId);
+      if (!outboxJob || outboxJob.status === "running") {
+        return;
+      }
+
+      await updateJobStatus(outboxJob.jobId, {
+        status: "queued",
+        nextRetryAt: null,
+      });
+      await runOutboxPass(user.id);
+      await refreshRecoverableCaptures();
+    } catch (retryError) {
+      const message = retryError instanceof Error
+        ? retryError.message
+        : "Unable to retry pending capture";
+      setPendingCaptureActionError(message);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-background pb-24">
       <ScreenHeader title={headerTitle} subtitle={headerSubtitle} layout="top-level" />
@@ -331,6 +360,9 @@ export function QuoteList(): React.ReactElement {
             error={recoverableCapturesError ?? pendingCaptureActionError}
             onResume={(sessionId) => navigateToLocalCapture(sessionId)}
             onExtract={(sessionId) => navigateToLocalCapture(sessionId, { autoExtract: true })}
+            onRetry={(sessionId) => {
+              void onRetryCapture(sessionId);
+            }}
             onDelete={(sessionId) => {
               void onDeleteCapture(sessionId);
             }}

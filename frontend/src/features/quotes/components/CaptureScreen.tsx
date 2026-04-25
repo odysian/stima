@@ -9,10 +9,13 @@ import {
   isInFlightIdempotencyConflict,
   resolveExtractionRequestIdempotencyKey,
 } from "@/features/quotes/components/captureScreenIdempotency";
+import { hydrateCaptureDraftFromQuote } from "@/features/quotes/components/captureScreenDraftHydration";
+import { markOutboxJobSucceeded, queueOutboxRetryJob } from "@/features/quotes/components/captureScreenOutbox";
+import { createManualDraftForCapture } from "@/features/quotes/components/captureScreenStartBlank";
+import { CaptureScreenBody } from "@/features/quotes/components/CaptureScreenBody";
+import { CaptureScreenFooter } from "@/features/quotes/components/CaptureScreenFooter";
 import { useCaptureExtractionKeyReset } from "@/features/quotes/components/useCaptureExtractionKeyReset";
-import { buildDraftFromQuoteDetail } from "@/features/quotes/components/captureScreenDraft";
 import { pollExtractionJobUntilQuote } from "@/features/quotes/components/captureScreenPolling";
-import { CaptureInputPanel } from "@/features/quotes/components/CaptureInputPanel";
 import { classifySubmitFailure } from "@/features/quotes/offline/classifySubmitFailure";
 import { getLocalCaptureStatusCopy } from "@/features/quotes/offline/localCaptureStatusCopy";
 import { useLocalCaptureSession } from "@/features/quotes/offline/useLocalCaptureSession";
@@ -20,15 +23,12 @@ import { resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavi
 import { MAX_VOICE_CLIPS_PER_CAPTURE, useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteSourceType } from "@/features/quotes/types/quote.types";
-import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
-import { ScreenFooter } from "@/shared/components/ScreenFooter";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_AUDIO_CLIPS_PER_REQUEST, MAX_AUDIO_TOTAL_BYTES } from "@/shared/lib/inputLimits";
 import { perfMark, perfMeasure, perfMeasureSincePageLoad } from "@/shared/perf";
 import { useToast } from "@/ui/Toast";
-
 const START_BLANK_GUARD_TARGET = "__start_blank__";
 
 export function CaptureScreen(): React.ReactElement {
@@ -158,27 +158,27 @@ export function CaptureScreen(): React.ReactElement {
     });
   }, [displayedError, show]);
 
-  async function hydrateFromPersistedQuote(
-    quoteId: string,
-    sourceType: QuoteSourceType,
-  ): Promise<void> {
-    perfMark("capture:draft:hydrate_start");
-    const persistedQuote = await quoteService.getQuote(quoteId);
-    setDraft(buildDraftFromQuoteDetail({
-      sourceType,
-      quoteDetail: persistedQuote,
-      quoteId,
-      customerId,
-      launchOrigin,
-    }));
-    perfMark("capture:draft:ready");
-    perfMeasure("capture:draft:hydrate_ms", "capture:draft:hydrate_start", "capture:draft:ready");
-  }
-
   async function onExtract(): Promise<void> {
     // TODO(spec1): perfMark("capture:local:save_start") / perfMark("capture:local:save_done")
     clearActionErrors();
+    let idempotencyKey = "";
+    let extractionSessionId: string | null = null;
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      ({
+        idempotencyKey,
+        sessionId: extractionSessionId,
+      } = await resolveExtractionRequestIdempotencyKey({
+        localSessionId,
+        ensureLocalCaptureSession,
+        extractionIdempotencyKeyRef,
+      }));
+      if (extractionSessionId && user?.id) {
+        await queueOutboxRetryJob({
+          userId: user.id,
+          sessionId: extractionSessionId,
+          idempotencyKey,
+        });
+      }
       await markLocalCaptureStatus("ready_to_extract", {
         failureKind: "offline",
       });
@@ -220,14 +220,14 @@ export function CaptureScreen(): React.ReactElement {
     });
 
     try {
-      const {
+      ({
         idempotencyKey,
         sessionId: extractionSessionId,
       } = await resolveExtractionRequestIdempotencyKey({
         localSessionId,
         ensureLocalCaptureSession,
         extractionIdempotencyKeyRef,
-      });
+      }));
       const extraction = await quoteService.extract({
         clipIds: clips.map((clip) => clip.id),
         notes,
@@ -246,11 +246,22 @@ export function CaptureScreen(): React.ReactElement {
       }
       const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
       if (extraction.type === "sync") {
+        await markOutboxJobSucceeded({
+          sessionId: extractionSessionId,
+          quoteId: extraction.quoteId,
+          extractJobId: null,
+        });
         await markLocalCaptureStatus("synced", {
           serverQuoteId: extraction.quoteId,
           extractJobId: null,
         });
-        await hydrateFromPersistedQuote(extraction.quoteId, sourceType);
+        await hydrateCaptureDraftFromQuote({
+          quoteId: extraction.quoteId,
+          sourceType,
+          customerId,
+          launchOrigin,
+          setDraft,
+        });
         navigate(`/documents/${extraction.quoteId}/edit`);
         return;
       }
@@ -258,7 +269,34 @@ export function CaptureScreen(): React.ReactElement {
       void markLocalCaptureStatus("submitting", {
         extractJobId: extraction.jobId,
       });
-      await pollExtractionJob(extraction.jobId, sourceType);
+      await pollExtractionJobUntilQuote({
+        jobId: extraction.jobId,
+        isMounted: () => isMountedRef.current,
+        onQuoteReady: async (job) => {
+          if (!job.quote_id || !job.extraction_result) {
+            throw new Error(
+              "Extraction completed without a result. Please try again.",
+            );
+          }
+          await markLocalCaptureStatus("synced", {
+            serverQuoteId: job.quote_id,
+            extractJobId: job.id,
+          });
+          await hydrateCaptureDraftFromQuote({
+            quoteId: job.quote_id,
+            sourceType,
+            customerId,
+            launchOrigin,
+            setDraft,
+          });
+          navigate(`/documents/${job.quote_id}/edit`);
+        },
+      });
+      await markOutboxJobSucceeded({
+        sessionId: extractionSessionId,
+        quoteId: null,
+        extractJobId: extraction.jobId,
+      });
     } catch (submitError) {
       if (!isMountedRef.current) {
         return;
@@ -274,6 +312,20 @@ export function CaptureScreen(): React.ReactElement {
         failureKind,
         error: message,
       });
+      if (
+        extractionSessionId
+        && user?.id
+        && (failureKind === "offline"
+          || failureKind === "timeout"
+          || failureKind === "server_retryable"
+          || failureKind === "auth_required")
+      ) {
+        await queueOutboxRetryJob({
+          userId: user.id,
+          sessionId: extractionSessionId,
+          idempotencyKey,
+        });
+      }
       if (isIdempotencyInFlightConflict) {
         setIsRetryLockedByInFlightExtraction(true);
       }
@@ -290,11 +342,11 @@ export function CaptureScreen(): React.ReactElement {
     clearActionErrors();
     setIsStartingBlank(true);
     try {
-      const manualDraft = await quoteService.createManualDraft({ customerId });
+      const manualDraftId = await createManualDraftForCapture(customerId);
       if (!isMountedRef.current) {
         return;
       }
-      navigate(`/documents/${manualDraft.id}/edit`);
+      navigate(`/documents/${manualDraftId}/edit`);
     } catch (startBlankError) {
       if (!isMountedRef.current) {
         return;
@@ -310,37 +362,11 @@ export function CaptureScreen(): React.ReactElement {
       }
     }
   }
-  async function pollExtractionJob(
-    jobId: string,
-    sourceType: QuoteSourceType,
-  ): Promise<void> {
-    await pollExtractionJobUntilQuote({
-      jobId,
-      isMounted: () => isMountedRef.current,
-      onQuoteReady: async (job) => {
-        if (!job.quote_id || !job.extraction_result) {
-          throw new Error(
-            "Extraction completed without a result. Please try again.",
-          );
-        }
-        await markLocalCaptureStatus("synced", {
-          serverQuoteId: job.quote_id,
-          extractJobId: job.id,
-        });
-        await hydrateFromPersistedQuote(job.quote_id, sourceType);
-        navigate(`/documents/${job.quote_id}/edit`);
-      },
-    });
-  }
 
   const hasReachedClipLimit = clips.length >= MAX_VOICE_CLIPS_PER_CAPTURE;
-  const hasUnsavedWork = clips.length > 0
-    || (notes.trim().length > 0
-      && (localSessionId === null || localSaveState === "saving" || localSaveState === "error"));
-  const canExtract = (hasClips || hasNotes)
-    && !isExtracting
-    && !isRecording
-    && !isRetryLockedByInFlightExtraction;
+  const hasUnsavedWork = clips.length > 0 || (notes.trim().length > 0
+    && (localSessionId === null || localSaveState === "saving" || localSaveState === "error"));
+  const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording && !isRetryLockedByInFlightExtraction;
   const localStatusCopy = localSaveState === "saving"
     ? "Saving on this device..."
     : localSaveState === "error"
@@ -355,7 +381,8 @@ export function CaptureScreen(): React.ReactElement {
     }
     setHasAttemptedAutoExtract(true);
     void onExtract();
-  }, [autoExtractOnLoad, canExtract, hasAttemptedAutoExtract, isHydratingLocalSession, onExtract]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onExtract identity changes each render.
+  }, [autoExtractOnLoad, canExtract, hasAttemptedAutoExtract, isHydratingLocalSession]);
   return (
     <main className="min-h-dvh bg-background">
       <WorkflowScreenHeader
@@ -367,63 +394,38 @@ export function CaptureScreen(): React.ReactElement {
           : navigate(launchOrigin, { replace: true }))}
       />
 
-      <section className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4 pb-36 pt-20">
-        {!isSupported ? (
-          <p className="ghost-shadow mb-4 rounded-[var(--radius-document)] border-l-4 border-warning-accent bg-warning-container p-4 text-sm text-warning">
-            Voice capture is not supported in this browser. You can still type
-            notes and extract line items.
-          </p>
-        ) : null}
+      <CaptureScreenBody
+        isSupported={isSupported}
+        isExtracting={isExtracting}
+        clips={clips}
+        removeClip={removeClip}
+        notes={notes}
+        onNotesChange={handleNotesChange}
+        isRecording={isRecording}
+        elapsedSeconds={elapsedSeconds}
+        hasReachedClipLimit={hasReachedClipLimit}
+        onStartRecording={() => {
+          void (async () => {
+            const ensuredSessionId = await ensureLocalCaptureSession();
+            await startRecording(ensuredSessionId);
+          })();
+        }}
+        onStopRecording={stopRecording}
+        onStartBlank={() => (hasUnsavedWork
+          ? setPendingExitTarget(START_BLANK_GUARD_TARGET)
+          : void onStartBlank())}
+        isStartBlankDisabled={isExtracting || isRecording || isStartingBlank}
+      />
 
-        <div className="flex min-h-0 flex-1 flex-col">
-          <CaptureInputPanel
-            clips={clips}
-            isExtracting={isExtracting}
-            removeClip={removeClip}
-            notes={notes}
-            onNotesChange={handleNotesChange}
-            isRecording={isRecording}
-            elapsedSeconds={elapsedSeconds}
-            hasReachedClipLimit={hasReachedClipLimit}
-            isSupported={isSupported}
-            onStartRecording={() => {
-              void (async () => {
-                const ensuredSessionId = await ensureLocalCaptureSession();
-                await startRecording(ensuredSessionId);
-              })();
-            }}
-            onStopRecording={stopRecording}
-            onStartBlank={() => (hasUnsavedWork
-              ? setPendingExitTarget(START_BLANK_GUARD_TARGET)
-              : void onStartBlank())}
-            isStartBlankDisabled={isExtracting || isRecording || isStartingBlank}
-          />
-        </div>
-      </section>
-
-      <ScreenFooter>
-        <div className="mx-auto w-full max-w-2xl">
-          {!extractionStage && localStatusCopy ? (
-            <p className="mb-2 text-center text-sm font-medium text-on-surface-variant">
-              {localStatusCopy}
-            </p>
-          ) : null}
-          {extractionStage ? (
-            <p className="mb-2 text-center text-sm font-medium text-on-surface-variant">
-              {extractionStage}
-            </p>
-          ) : null}
-          <Button
-            variant="primary"
-            className="w-full"
-            disabled={!canExtract}
-            isLoading={isExtracting}
-            onClick={() => void onExtract()}
-          >
-            Extract Line Items
-          </Button>
-        </div>
-      </ScreenFooter>
+      <CaptureScreenFooter
+        extractionStage={extractionStage}
+        localStatusCopy={localStatusCopy}
+        canExtract={canExtract}
+        isExtracting={isExtracting}
+        onExtract={() => {
+          void onExtract();
+        }}
+      />
 
       {pendingExitTarget ? (
         <ConfirmModal

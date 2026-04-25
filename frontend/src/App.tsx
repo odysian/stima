@@ -15,6 +15,7 @@ import { ResetPasswordPage } from "@/features/auth/components/ResetPasswordPage"
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { LandingPage } from "@/features/marketing/components/LandingPage";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
+import { OutboxSyncCoordinator } from "@/features/quotes/offline/OutboxSyncCoordinator";
 import { PageTransition } from "@/ui/PageTransition";
 import { ToastProvider } from "@/ui/Toast";
 
@@ -121,6 +122,7 @@ function withRouteSuspense(node: React.ReactNode): React.ReactElement {
 export default function App(): React.ReactElement {
   return (
     <ToastProvider>
+      <OutboxSyncCoordinator />
       <Routes>
         <Route element={<PageTransition />}>
           <Route
