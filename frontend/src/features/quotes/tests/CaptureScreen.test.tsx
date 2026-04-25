@@ -643,7 +643,7 @@ describe("CaptureScreen", () => {
       sessionId: "local-session-1",
       idempotencyKey: expect.any(String),
     }));
-    expect(screen.getByText("Ready to extract when online")).toBeInTheDocument();
+    expect(screen.getByText("Ready to sync when you're online.")).toBeInTheDocument();
   });
 
   it("starts a blank draft with customer context and routes to edit", async () => {

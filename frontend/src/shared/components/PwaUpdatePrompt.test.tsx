@@ -32,10 +32,13 @@ describe("PwaUpdatePrompt", () => {
       updateServiceWorker,
     });
 
-    render(<PwaUpdatePrompt />);
+    const { container } = render(<PwaUpdatePrompt />);
     fireEvent.click(screen.getByRole("button", { name: "Reload" }));
 
     expect(screen.getByText("New version available.")).toBeInTheDocument();
+    expect(container.querySelector("aside")).toHaveClass(
+      "bottom-[calc(5rem+env(safe-area-inset-bottom))]",
+    );
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
   });
 });

@@ -178,6 +178,8 @@ describe("captureRepository", () => {
     expect(recoverable).toHaveLength(1);
     expect(recoverable[0]?.sessionId).toBe(keepOne.sessionId);
     expect(recoverable[0]?.status).toBe("local_only");
+    expect(recoverable[0]?.clipCount).toBe(0);
+    expect(recoverable[0]?.customerId).toBeNull();
   });
 
   it("applies failure metadata when marking capture status", async () => {

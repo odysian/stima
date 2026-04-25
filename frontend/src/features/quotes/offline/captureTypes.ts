@@ -50,8 +50,16 @@ export interface CreateLocalCaptureInput {
 
 export type LocalCaptureSummary = Pick<
   LocalCaptureSession,
-  "sessionId" | "status" | "notes" | "updatedAt" | "lastFailureKind" | "lastError"
+  | "sessionId"
+  | "status"
+  | "notes"
+  | "updatedAt"
+  | "lastFailureKind"
+  | "lastError"
+  | "customerId"
+  | "customerSnapshot"
 > & {
+  clipCount: number;
   outboxStatus?: OutboxJobStatus | null;
   outboxAttemptCount?: number;
   outboxMaxAttempts?: number;

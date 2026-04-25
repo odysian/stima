@@ -274,6 +274,9 @@ describe("QuoteList", () => {
           sessionId: "session-1",
           status: "ready_to_extract",
           notes: "Patio estimate",
+          customerId: null,
+          customerSnapshot: null,
+          clipCount: 2,
           updatedAt: "2026-03-20T00:00:00.000Z",
           lastFailureKind: null,
           lastError: null,
@@ -291,14 +294,18 @@ describe("QuoteList", () => {
 
     expect(screen.getByRole("region", { name: "Pending captures" })).toBeInTheDocument();
     expect(screen.getByText("Patio estimate")).toBeInTheDocument();
-    expect(screen.getByText("Ready to extract when online")).toBeInTheDocument();
+    expect(screen.getByText("2 voice clips")).toBeInTheDocument();
+    expect(screen.getByText("Status: Ready to sync when you're online.")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    fireEvent.click(screen.getByRole("button", { name: /resume pending capture/i }));
     expect(navigateMock).toHaveBeenCalledWith("/quotes/capture?localSession=session-1");
 
-    fireEvent.click(screen.getByRole("button", { name: "Extract" }));
+    fireEvent.click(screen.getByRole("button", { name: /extract pending capture/i }));
     expect(navigateMock).toHaveBeenCalledWith("/quotes/capture?localSession=session-1&autoExtract=1");
 
+    fireEvent.click(screen.getByRole("button", { name: /delete pending capture/i }));
+    expect(screen.getByText("Delete pending capture?")).toBeInTheDocument();
+    expect(screen.getByText(/2 voice clips from this device/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => {
       expect(deleteCaptureMock).toHaveBeenCalledWith("session-1");
@@ -313,6 +320,9 @@ describe("QuoteList", () => {
           sessionId: "session-1",
           status: "ready_to_extract",
           notes: "Patio estimate",
+          customerId: null,
+          customerSnapshot: null,
+          clipCount: 1,
           updatedAt: "2026-03-20T00:00:00.000Z",
           lastFailureKind: null,
           lastError: null,
@@ -328,7 +338,8 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText(/Q-001/);
 
-    expect(screen.getByRole("button", { name: "Extract" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /extract pending capture/i })).toBeDisabled();
+    expect(screen.getByText("Connect to the internet to use Extract or Retry.")).toBeInTheDocument();
   });
 
   it("shows Retry action for failed retryable outbox jobs and runs sync pass", async () => {
@@ -356,6 +367,9 @@ describe("QuoteList", () => {
           sessionId: "session-1",
           status: "extract_failed",
           notes: "Patio estimate",
+          customerId: null,
+          customerSnapshot: null,
+          clipCount: 0,
           updatedAt: "2026-03-20T00:00:00.000Z",
           lastFailureKind: "timeout",
           lastError: "Request timed out",
@@ -374,7 +388,7 @@ describe("QuoteList", () => {
     renderScreen();
     await screen.findByText(/Q-001/);
 
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByRole("button", { name: /retry pending capture/i }));
 
     await waitFor(() => {
       expect(mockedUpdateJobStatus).toHaveBeenCalledWith("job-1", expect.objectContaining({
