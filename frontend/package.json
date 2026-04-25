@@ -50,6 +50,8 @@
   "overrides": {
     "vite-plugin-pwa": {
       "vite": "$vite"
-    }
+    },
+    "serialize-javascript": "^7.0.5",
+    "postcss": "^8.5.10"
   }
 }
