@@ -1,9 +1,16 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { LineItemDraftWithFlags, QuoteSourceType } from "@/features/quotes/types/quote.types";
+import {
+  buildCaptureHandoffDraftKey,
+  CAPTURE_HANDOFF_DOCUMENT_ID,
+  deleteLocalDraft,
+  saveLocalDraft,
+} from "@/features/quotes/offline/draftRepository";
+import { readQuoteDraftFromIDB } from "@/features/quotes/hooks/quoteDraftPersistence";
 import type { DiscountType } from "@/shared/lib/pricing";
 
-const DRAFT_STORAGE_KEY = "stima_quote_draft";
+const DRAFT_PERSIST_DEBOUNCE_MS = 200;
 
 export interface QuoteDraft {
   quoteId?: string;
@@ -25,125 +32,104 @@ type QuoteDraftUpdater = QuoteDraft | ((current: QuoteDraft) => QuoteDraft);
 
 interface UseQuoteDraftResult {
   draft: QuoteDraft | null;
+  isLoading: boolean;
   setDraft: (nextDraft: QuoteDraftUpdater) => void;
   updateLineItem: (index: number, item: LineItemDraftWithFlags) => void;
   removeLineItem: (index: number) => void;
   clearDraft: () => void;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+export function useQuoteDraft(userId: string | undefined): UseQuoteDraftResult {
+  const [draft, setDraftState] = useState<QuoteDraft | null>(null);
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
+  const persistTimerRef = useRef<number | null>(null);
 
-function parseStoredDraft(raw: string | null): QuoteDraft | null {
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!isObject(parsed)) {
-      return null;
+  const persistDraft = useCallback((nextDraft: QuoteDraft) => {
+    if (!userId) {
+      return;
     }
 
-    const {
-      customerId,
-      quoteId,
-      launchOrigin,
-      title,
-      transcript,
-      lineItems,
-      total,
-      taxRate,
-      discountType,
-      discountValue,
-      depositAmount,
-      notes,
-      sourceType,
-    } = parsed;
+    void saveLocalDraft({
+      draftKey: buildCaptureHandoffDraftKey(userId),
+      userId,
+      docType: "capture_handoff",
+      documentId: CAPTURE_HANDOFF_DOCUMENT_ID,
+      payload: nextDraft,
+    }).catch((error) => {
+      console.warn("Unable to persist quote draft locally.", error);
+    });
+  }, [userId]);
 
-    if (
-      typeof customerId !== "string" ||
-      (quoteId !== undefined && typeof quoteId !== "string") ||
-      (launchOrigin !== undefined && typeof launchOrigin !== "string") ||
-      (title !== undefined && typeof title !== "string") ||
-      typeof transcript !== "string" ||
-      !Array.isArray(lineItems) ||
-      typeof notes !== "string"
-    ) {
-      return null;
+  const scheduleDraftPersist = useCallback((nextDraft: QuoteDraft) => {
+    if (!userId || typeof window === "undefined") {
+      return;
     }
 
-    if (total !== null && typeof total !== "number") {
-      return null;
-    }
-    if (taxRate !== undefined && taxRate !== null && typeof taxRate !== "number") {
-      return null;
-    }
-    if (
-      discountType !== undefined
-      && discountType !== null
-      && discountType !== "fixed"
-      && discountType !== "percent"
-    ) {
-      return null;
-    }
-    if (discountValue !== undefined && discountValue !== null && typeof discountValue !== "number") {
-      return null;
-    }
-    if (depositAmount !== undefined && depositAmount !== null && typeof depositAmount !== "number") {
-      return null;
+    if (persistTimerRef.current !== null) {
+      window.clearTimeout(persistTimerRef.current);
     }
 
-    const parsedSourceType: QuoteSourceType =
-      sourceType === "voice" || sourceType === "text" ? sourceType : "text";
+    persistTimerRef.current = window.setTimeout(() => {
+      persistTimerRef.current = null;
+      persistDraft(nextDraft);
+    }, DRAFT_PERSIST_DEBOUNCE_MS);
+  }, [persistDraft, userId]);
 
-    return {
-      customerId,
-      quoteId: typeof quoteId === "string" ? quoteId : undefined,
-      launchOrigin: typeof launchOrigin === "string" ? launchOrigin : "/",
-      title: typeof title === "string" ? title : "",
-      transcript,
-      lineItems: lineItems as LineItemDraftWithFlags[],
-      total,
-      taxRate: typeof taxRate === "number" ? taxRate : null,
-      discountType: discountType === "fixed" || discountType === "percent" ? discountType : null,
-      discountValue: typeof discountValue === "number" ? discountValue : null,
-      depositAmount: typeof depositAmount === "number" ? depositAmount : null,
-      notes,
-      sourceType: parsedSourceType,
+  useEffect(() => {
+    return () => {
+      if (persistTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(persistTimerRef.current);
+      }
     };
-  } catch {
-    return null;
-  }
-}
+  }, []);
 
-function readDraftFromStorage(): QuoteDraft | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
+  useEffect(() => {
+    if (persistTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+  }, [userId]);
 
-  return parseStoredDraft(window.sessionStorage.getItem(DRAFT_STORAGE_KEY));
-}
+  useEffect(() => {
+    let isActive = true;
 
-function persistDraftToStorage(draft: QuoteDraft): void {
-  if (typeof window === "undefined") {
-    return;
-  }
+    void Promise.resolve()
+      .then(async () => {
+        if (!userId) {
+          return {
+            nextDraft: null as QuoteDraft | null,
+            nextHydratedUserId: null as string | null,
+          };
+        }
 
-  window.sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-}
+        try {
+          const persistedDraft = await readQuoteDraftFromIDB(userId);
+          return {
+            nextDraft: persistedDraft,
+            nextHydratedUserId: userId,
+          };
+        } catch (error) {
+          console.warn("Unable to hydrate quote draft from local storage.", error);
+          return {
+            nextDraft: null as QuoteDraft | null,
+            nextHydratedUserId: userId,
+          };
+        }
+      })
+      .then(({ nextDraft, nextHydratedUserId }) => {
+        if (!isActive) {
+          return;
+        }
+        setDraftState(nextDraft);
+        setHydratedUserId(nextHydratedUserId);
+      });
 
-function removeDraftFromStorage(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
+    return () => {
+      isActive = false;
+    };
+  }, [userId]);
 
-  window.sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-}
-
-export function useQuoteDraft(): UseQuoteDraftResult {
-  const [draft, setDraftState] = useState<QuoteDraft | null>(() => readDraftFromStorage());
+  const isLoading = typeof userId === "string" && hydratedUserId !== userId;
 
   const setDraft = useCallback((nextDraft: QuoteDraftUpdater) => {
     setDraftState((currentDraft) => {
@@ -156,15 +142,23 @@ export function useQuoteDraft(): UseQuoteDraftResult {
         return currentDraft;
       }
 
-      persistDraftToStorage(resolvedDraft);
+      scheduleDraftPersist(resolvedDraft);
       return resolvedDraft;
     });
-  }, []);
+  }, [scheduleDraftPersist]);
 
   const clearDraft = useCallback(() => {
-    removeDraftFromStorage();
+    if (persistTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    if (userId) {
+      void deleteLocalDraft(buildCaptureHandoffDraftKey(userId)).catch((error) => {
+        console.warn("Unable to clear quote draft.", error);
+      });
+    }
     setDraftState(null);
-  }, []);
+  }, [userId]);
 
   const updateLineItem = useCallback((index: number, item: LineItemDraftWithFlags) => {
     setDraftState((currentDraft) => {
@@ -178,10 +172,10 @@ export function useQuoteDraft(): UseQuoteDraftResult {
           currentIndex === index ? item : existingItem,
         ),
       };
-      persistDraftToStorage(nextDraft);
+      scheduleDraftPersist(nextDraft);
       return nextDraft;
     });
-  }, []);
+  }, [scheduleDraftPersist]);
 
   const removeLineItem = useCallback((index: number) => {
     setDraftState((currentDraft) => {
@@ -193,13 +187,16 @@ export function useQuoteDraft(): UseQuoteDraftResult {
         ...currentDraft,
         lineItems: currentDraft.lineItems.filter((_, currentIndex) => currentIndex !== index),
       };
-      persistDraftToStorage(nextDraft);
+      scheduleDraftPersist(nextDraft);
       return nextDraft;
     });
-  }, []);
+  }, [scheduleDraftPersist]);
+
+  const scopedDraft = userId && hydratedUserId === userId ? draft : null;
 
   return {
-    draft,
+    draft: scopedDraft,
+    isLoading,
     setDraft,
     updateLineItem,
     removeLineItem,

@@ -31,7 +31,7 @@ export function CaptureScreen(): React.ReactElement {
   const { user } = useAuth();
   const location = useLocation();
   const { customerId } = useParams<{ customerId?: string }>();
-  const { setDraft } = useQuoteDraft();
+  const { setDraft } = useQuoteDraft(user?.id);
   const isMountedRef = useRef(true);
   const extractionStageTimerRefs = useRef<number[]>([]);
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
