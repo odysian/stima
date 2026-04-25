@@ -6,6 +6,7 @@ import {
   listRecoverableCaptures,
 } from "@/features/quotes/offline/captureRepository";
 import type { LocalCaptureSummary } from "@/features/quotes/offline/captureTypes";
+import { subscribeLocalRecoveryChanged } from "@/features/quotes/offline/localRecoveryEvents";
 import { listAllJobsForUser } from "@/features/quotes/offline/outboxRepository";
 
 const MAX_RECOVERABLE_CAPTURES = 20;
@@ -85,6 +86,16 @@ export function useRecoverableCaptures(userId: string | undefined): UseRecoverab
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    return subscribeLocalRecoveryChanged(userId, () => {
+      void refresh();
+    });
+  }, [refresh, userId]);
 
   return {
     captures,

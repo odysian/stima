@@ -5,6 +5,10 @@ import type {
   OutboxJobStatus,
   SubmitFailureKind,
 } from "@/features/quotes/offline/captureTypes";
+import {
+  dispatchLocalRecoveryChanged,
+  outboxStatusToLocalRecoveryReason,
+} from "@/features/quotes/offline/localRecoveryEvents";
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 const ACTIVE_STATUSES = new Set<OutboxJobStatus>(["queued", "running", "failed_retryable"]);
@@ -39,6 +43,13 @@ export async function enqueueJob(input: EnqueueJobInput): Promise<OutboxJob> {
     activeJob.updatedAt = new Date().toISOString();
     store.put(activeJob);
     await transactionDone(transaction);
+    if (activeJob.status === "queued") {
+      dispatchLocalRecoveryChanged({
+        userId: activeJob.userId,
+        sessionId: activeJob.sessionId,
+        reason: "outbox_queued",
+      });
+    }
     return activeJob;
   }
 
@@ -62,6 +73,11 @@ export async function enqueueJob(input: EnqueueJobInput): Promise<OutboxJob> {
 
   store.put(createdJob);
   await transactionDone(transaction);
+  dispatchLocalRecoveryChanged({
+    userId: createdJob.userId,
+    sessionId: createdJob.sessionId,
+    reason: "outbox_queued",
+  });
   return createdJob;
 }
 
@@ -138,6 +154,13 @@ export async function updateJobStatus(jobId: string, patch: Partial<OutboxJob>):
   job.updatedAt = new Date().toISOString();
   store.put(job);
   await transactionDone(transaction);
+  if (patch.status !== undefined) {
+    dispatchLocalRecoveryChanged({
+      userId: job.userId,
+      sessionId: job.sessionId,
+      reason: outboxStatusToLocalRecoveryReason(patch.status),
+    });
+  }
 }
 
 export async function listPendingJobs(userId: string): Promise<OutboxJob[]> {

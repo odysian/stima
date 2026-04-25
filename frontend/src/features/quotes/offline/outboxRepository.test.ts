@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetCaptureDbForTests } from "@/features/quotes/offline/captureDb";
 import {
+  LOCAL_RECOVERY_CHANGED_EVENT,
+  type LocalRecoveryChangedDetail,
+} from "@/features/quotes/offline/localRecoveryEvents";
+import {
   enqueueJob,
   getJob,
   listPendingJobs,
@@ -117,5 +121,34 @@ describe("outboxRepository", () => {
     expect(updatedJob?.attemptCount).toBe(2);
     expect(updatedJob?.lastFailureKind).toBe("timeout");
     expect(updatedJob?.lastError).toBe("Timed out");
+  });
+
+  it("emits outbox status change events", async () => {
+    const events: LocalRecoveryChangedDetail[] = [];
+    const eventListener = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) {
+        return;
+      }
+      events.push(event.detail as LocalRecoveryChangedDetail);
+    };
+    window.addEventListener(LOCAL_RECOVERY_CHANGED_EVENT, eventListener);
+
+    const job = await enqueueJob({
+      userId: "user-1",
+      sessionId: "session-events",
+      idempotencyKey: "idem-events",
+    });
+    await updateJobStatus(job.jobId, { status: "running" });
+    await updateJobStatus(job.jobId, { status: "failed_retryable", attemptCount: 1 });
+    await updateJobStatus(job.jobId, { status: "failed_terminal", attemptCount: 2 });
+
+    window.removeEventListener(LOCAL_RECOVERY_CHANGED_EVENT, eventListener);
+
+    expect(events.map((event) => event.reason)).toEqual([
+      "outbox_queued",
+      "outbox_running",
+      "outbox_failed_retryable",
+      "outbox_failed_terminal",
+    ]);
   });
 });

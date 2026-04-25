@@ -5,6 +5,7 @@ import { DocumentRowsSection, type DocumentRow } from "@/features/quotes/compone
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { PendingCapturesSection } from "@/features/quotes/components/PendingCapturesSection";
+import { useOutboxSuccessQuoteRefresh } from "@/features/quotes/components/useOutboxSuccessQuoteRefresh";
 import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
 import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
@@ -47,7 +48,11 @@ export function QuoteList(): React.ReactElement {
     refresh: refreshRecoverableCaptures,
     deleteCapture,
   } = useRecoverableCaptures(user?.id);
-
+  useOutboxSuccessQuoteRefresh({
+    userId: user?.id,
+    onQuotesLoaded: setQuotes,
+    onLoadError: setQuoteLoadError,
+  });
   useEffect(() => {
     let isActive = true;
 
@@ -125,7 +130,6 @@ export function QuoteList(): React.ReactElement {
       window.removeEventListener("offline", onOnlineChange);
     };
   }, []);
-
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQuotes = useMemo(
     () => quotes.filter((quote) => matchesSearch(quote, normalizedSearchQuery)),

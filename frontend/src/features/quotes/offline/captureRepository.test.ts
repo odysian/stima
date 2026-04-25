@@ -20,6 +20,10 @@ import {
   updateCaptureField,
   updateCaptureNotes,
 } from "@/features/quotes/offline/captureRepository";
+import {
+  LOCAL_RECOVERY_CHANGED_EVENT,
+  type LocalRecoveryChangedDetail,
+} from "@/features/quotes/offline/localRecoveryEvents";
 import { getAudioClip, saveAudioClip } from "@/features/quotes/offline/audioRepository";
 import type { LocalCaptureSession } from "@/features/quotes/offline/captureTypes";
 import { getStorageEstimate, isStoragePressured } from "@/features/quotes/offline/storageHealth";
@@ -213,6 +217,34 @@ describe("captureRepository", () => {
 
     expect(await getCaptureSession(session.sessionId)).toBeNull();
     expect(await getAudioClip("clip-1")).toBeNull();
+  });
+
+  it("emits local recovery events for capture save and delete", async () => {
+    const events: LocalRecoveryChangedDetail[] = [];
+    const eventListener = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) {
+        return;
+      }
+      events.push(event.detail as LocalRecoveryChangedDetail);
+    };
+    window.addEventListener(LOCAL_RECOVERY_CHANGED_EVENT, eventListener);
+
+    const session = await createCaptureSession({
+      userId: "user-events",
+      notes: "pending",
+    });
+    await updateCaptureNotes(session.sessionId, "updated");
+    await updateCaptureField(session.sessionId, { status: "ready_to_extract" });
+    await deleteCaptureSession(session.sessionId);
+
+    window.removeEventListener(LOCAL_RECOVERY_CHANGED_EVENT, eventListener);
+
+    expect(events.map((event) => event.reason)).toContain("capture_saved");
+    expect(events[events.length - 1]).toMatchObject({
+      userId: "user-events",
+      sessionId: session.sessionId,
+      reason: "capture_deleted",
+    });
   });
 
   it("deletes only empty abandoned local-only sessions", async () => {

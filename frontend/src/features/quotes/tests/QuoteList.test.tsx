@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
+import { dispatchLocalRecoveryChanged } from "@/features/quotes/offline/localRecoveryEvents";
 import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
 import { getJobForSession, updateJobStatus } from "@/features/quotes/offline/outboxRepository";
@@ -382,6 +383,32 @@ describe("QuoteList", () => {
       expect(mockedRunOutboxPass).toHaveBeenCalledWith("user-1");
       expect(refreshRecoverableCaptures).toHaveBeenCalled();
     });
+  });
+
+  it("refetches server quotes when an outbox sync succeeds", async () => {
+    mockedQuoteService.listQuotes
+      .mockResolvedValueOnce([makeQuoteListItem()])
+      .mockResolvedValueOnce([
+        makeQuoteListItem(),
+        makeQuoteListItem({
+          id: "quote-2",
+          doc_number: "Q-002",
+          customer_id: "cust-2",
+          customer_name: "Bob Brown",
+        }),
+      ]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    dispatchLocalRecoveryChanged({
+      userId: "user-1",
+      sessionId: "session-1",
+      reason: "outbox_succeeded",
+    });
+
+    expect(await screen.findByText(/Q-002/)).toBeInTheDocument();
+    expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(2);
   });
 
   it("renders quote cards from listQuotes response", async () => {
