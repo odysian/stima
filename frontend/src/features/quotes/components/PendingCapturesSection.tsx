@@ -27,24 +27,59 @@ function buildCaptureSummaryLabel(notes: string): string {
   return firstLine.length > 60 ? `${firstLine.slice(0, 57)}...` : firstLine;
 }
 
-function buildPendingCaptureStatusCopy(capture: LocalCaptureSummary): string {
+function buildClipCountLabel(clipCount: number): string {
+  return `${clipCount} voice clip${clipCount === 1 ? "" : "s"}`;
+}
+
+function buildCustomerLabel(capture: LocalCaptureSummary): string {
+  const customerName = capture.customerSnapshot?.name?.trim();
+  if (customerName) {
+    return customerName;
+  }
+  if (capture.customerId) {
+    return "Saved customer";
+  }
+  return "No customer selected";
+}
+
+function buildPendingCaptureStatusCopy(capture: LocalCaptureSummary, isOnline: boolean): string {
   if (capture.outboxStatus === "running") {
     const attemptCount = Math.max(capture.outboxAttemptCount ?? 1, 1);
     const maxAttempts = Math.max(capture.outboxMaxAttempts ?? 5, 1);
-    return `Retrying... (attempt ${attemptCount} of ${maxAttempts})`;
+    return `Syncing... attempt ${attemptCount} of ${maxAttempts}.`;
   }
 
   if (capture.outboxStatus === "failed_retryable") {
-    const attemptCount = Math.max(capture.outboxAttemptCount ?? 1, 1);
-    const maxAttempts = Math.max(capture.outboxMaxAttempts ?? 5, 1);
-    return `Could not sync. Tap Retry. (tried ${attemptCount} of ${maxAttempts})`;
+    return "Still saved. Retry now or wait for Stima to try again.";
   }
 
   if (capture.outboxStatus === "failed_terminal") {
-    return "Could not sync permanently. Open to edit or delete.";
+    return "Still saved, but automatic sync stopped. Open to review or delete.";
   }
 
-  return getLocalCaptureStatusCopy(capture.status) ?? "Saved on this device";
+  if (capture.status === "extract_failed") {
+    if (!isOnline || capture.lastFailureKind === "offline") {
+      return "Still saved. Connect to sync this capture.";
+    }
+
+    if (capture.lastFailureKind === "timeout" || capture.lastFailureKind === "server_retryable") {
+      return "Still saved. Stima will retry when the connection improves.";
+    }
+
+    if (capture.lastFailureKind === "auth_required" || capture.lastFailureKind === "csrf_failed") {
+      return "Still saved. Sign in again to sync.";
+    }
+
+    if (capture.lastFailureKind === "validation_failed") {
+      return "Still saved. Open and edit before retrying.";
+    }
+
+    if (capture.lastFailureKind === "server_terminal") {
+      return "Still saved. Open to review or delete.";
+    }
+  }
+
+  return getLocalCaptureStatusCopy(capture.status) ?? "Saved on this device.";
 }
 
 export function PendingCapturesSection({
@@ -92,7 +127,13 @@ export function PendingCapturesSection({
                   {buildCaptureSummaryLabel(capture.notes)}
                 </p>
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  {buildPendingCaptureStatusCopy(capture)}
+                  Customer: {buildCustomerLabel(capture)}
+                </p>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {buildClipCountLabel(capture.clipCount)}
+                </p>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  Status: {buildPendingCaptureStatusCopy(capture, isOnline)}
                 </p>
                 <p className="mt-1 text-xs text-outline">
                   Updated {formatDate(capture.updatedAt, timezone)}
@@ -103,6 +144,7 @@ export function PendingCapturesSection({
                     size="sm"
                     variant="tonal"
                     onClick={() => onResume(capture.sessionId)}
+                    aria-label={`Resume pending capture ${buildCaptureSummaryLabel(capture.notes)}`}
                   >
                     Resume
                   </Button>
@@ -116,9 +158,12 @@ export function PendingCapturesSection({
                         ? onRetry(capture.sessionId)
                         : onExtract(capture.sessionId)
                     )}
+                    aria-label={`${
+                      capture.outboxStatus === "failed_retryable" ? "Retry" : "Extract"
+                    } pending capture ${buildCaptureSummaryLabel(capture.notes)}`}
                   >
                     {capture.outboxStatus === "running"
-                      ? "Retrying..."
+                      ? "Syncing..."
                       : capture.outboxStatus === "failed_retryable"
                         ? "Retry"
                         : "Extract"}
@@ -128,10 +173,16 @@ export function PendingCapturesSection({
                     size="sm"
                     variant="ghost"
                     onClick={() => onDelete(capture.sessionId)}
+                    aria-label={`Delete pending capture ${buildCaptureSummaryLabel(capture.notes)}`}
                   >
                     Delete
                   </Button>
                 </div>
+                {!isOnline ? (
+                  <p className="mt-2 text-xs text-on-surface-variant">
+                    Connect to the internet to use Extract or Retry.
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>

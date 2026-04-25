@@ -4,9 +4,11 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { DocumentRowsSection, type DocumentRow } from "@/features/quotes/components/DocumentRowsSection";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
+import { PendingCaptureDeleteDialog } from "@/features/quotes/components/PendingCaptureDeleteDialog";
 import { PendingCapturesSection } from "@/features/quotes/components/PendingCapturesSection";
 import { useOutboxSuccessQuoteRefresh } from "@/features/quotes/components/useOutboxSuccessQuoteRefresh";
 import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
+import type { LocalCaptureSummary } from "@/features/quotes/offline/captureTypes";
 import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
 import { getJobForSession, updateJobStatus } from "@/features/quotes/offline/outboxRepository";
@@ -38,9 +40,8 @@ export function QuoteList(): React.ReactElement {
   const [quoteLoadError, setQuoteLoadError] = useState<string | null>(null);
   const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
   const [pendingCaptureActionError, setPendingCaptureActionError] = useState<string | null>(null);
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator === "undefined" ? true : navigator.onLine,
-  );
+  const [capturePendingDelete, setCapturePendingDelete] = useState<LocalCaptureSummary | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const {
     captures: recoverableCaptures,
     isLoading: isLoadingRecoverableCaptures,
@@ -179,10 +180,7 @@ export function QuoteList(): React.ReactElement {
       id: quote.id,
       customerLabel: quote.customer_name ?? "Unassigned",
       titleLabel: quote.title ?? null,
-      docAndDate: [
-        quote.doc_number,
-        formatDate(quote.created_at, timezone),
-      ].join(" · "),
+      docAndDate: [quote.doc_number, formatDate(quote.created_at, timezone)].join(" · "),
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/documents/${quote.id}/edit`,
@@ -198,10 +196,7 @@ export function QuoteList(): React.ReactElement {
       id: quote.id,
       customerLabel: quote.customer_name ?? "Unassigned",
       titleLabel: quote.title ?? null,
-      docAndDate: [
-        quote.doc_number,
-        formatDate(quote.created_at, timezone),
-        ].join(" · "),
+      docAndDate: [quote.doc_number, formatDate(quote.created_at, timezone)].join(" · "),
       totalAmount: quote.total_amount,
       status: quote.status,
       destination: `/quotes/${quote.id}/preview`,
@@ -214,10 +209,7 @@ export function QuoteList(): React.ReactElement {
       id: invoice.id,
       customerLabel: invoice.customer_name,
       titleLabel: invoice.title ?? null,
-      docAndDate: [
-        invoice.doc_number,
-        formatDate(invoice.created_at, timezone),
-      ].join(" · "),
+      docAndDate: [invoice.doc_number, formatDate(invoice.created_at, timezone)].join(" · "),
       totalAmount: invoice.total_amount,
       status: invoice.status,
       destination: `/invoices/${invoice.id}`,
@@ -230,13 +222,8 @@ export function QuoteList(): React.ReactElement {
     onQuoteDuplicated: (quoteId) => navigate(`/documents/${quoteId}/edit`),
   });
 
-  function navigateToLocalCapture(
-    sessionId: string,
-    options?: { autoExtract?: boolean },
-  ): void {
-    const nextSearchParams = new URLSearchParams({
-      localSession: sessionId,
-    });
+  function navigateToLocalCapture(sessionId: string, options?: { autoExtract?: boolean }): void {
+    const nextSearchParams = new URLSearchParams({ localSession: sessionId });
     if (options?.autoExtract) {
       nextSearchParams.set("autoExtract", "1");
     }
@@ -372,7 +359,10 @@ export function QuoteList(): React.ReactElement {
               onResume={(sessionId) => navigateToLocalCapture(sessionId)}
               onExtract={(sessionId) => navigateToLocalCapture(sessionId, { autoExtract: true })}
               onRetry={(sessionId) => { void onRetryCapture(sessionId); }}
-              onDelete={(sessionId) => { void onDeleteCapture(sessionId); }}
+              onDelete={(sessionId) => {
+                const capture = recoverableCaptures.find((item) => item.sessionId === sessionId) ?? null;
+                setCapturePendingDelete(capture);
+              }}
             />
           </>
         ) : null}
@@ -443,6 +433,14 @@ export function QuoteList(): React.ReactElement {
       >
         <span className="material-symbols-outlined">description</span>
       </button>
+      <PendingCaptureDeleteDialog
+        capture={capturePendingDelete}
+        onCancel={() => setCapturePendingDelete(null)}
+        onConfirm={(sessionId) => {
+          setCapturePendingDelete(null);
+          void onDeleteCapture(sessionId);
+        }}
+      />
       {quoteCreateFlow.dialogs}
       <BottomNav active="quotes" />
     </main>

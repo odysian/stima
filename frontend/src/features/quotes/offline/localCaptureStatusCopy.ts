@@ -1,11 +1,11 @@
 import type { LocalCaptureStatus } from "@/features/quotes/offline/captureTypes";
 
 const LOCAL_CAPTURE_STATUS_COPY: Record<LocalCaptureStatus, string> = {
-  local_only: "Saved on this device",
-  ready_to_extract: "Ready to extract when online",
-  submitting: "Submitting for extraction...",
-  extract_failed: "Could not extract — your notes are still saved",
-  synced: "Synced to quote draft",
+  local_only: "Saved on this device.",
+  ready_to_extract: "Ready to sync when you're online.",
+  submitting: "Syncing to a quote draft...",
+  extract_failed: "Still saved. Open to review or delete.",
+  synced: "Synced to quote draft.",
   discarded: "Discarded",
 };
 
