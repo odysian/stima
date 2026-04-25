@@ -6,6 +6,8 @@ export interface User {
   timezone: string | null;
 }
 
+export type AuthMode = "verified" | "offline_recovered" | "signed_out";
+
 export interface LoginRequest {
   email: string;
   password: string;

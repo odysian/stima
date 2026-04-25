@@ -60,6 +60,7 @@ vi.mock("@/features/profile/services/profileService", () => ({
 
 vi.mock("@/features/auth/hooks/useAuth", () => ({
   useAuth: () => ({
+    authMode: "verified",
     user: {
       id: "user-1",
       email: "user@example.com",

@@ -8,14 +8,25 @@ import {
   useState,
 } from "react";
 
+import {
+  isExplicitAuthFailure,
+  isOfflineOrNetworkFailure,
+} from "@/features/auth/offline/authBootstrapErrors";
+import {
+  clearOfflineUserSnapshot,
+  readOfflineUserSnapshot,
+  writeOfflineUserSnapshot,
+} from "@/features/auth/offline/offlineUserSnapshot";
 import { authService } from "@/features/auth/services/authService";
+import type { AuthMode, LoginRequest, RegisterRequest, User } from "@/features/auth/types/auth.types";
 import { clearDraftsForUser, deleteStaleLocalDrafts } from "@/features/quotes/offline/draftRepository";
-import type { LoginRequest, RegisterRequest, User } from "@/features/auth/types/auth.types";
+import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
 import { LoadingScreen } from "@/shared/components/LoadingScreen";
 import { hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
 
 interface AuthContextValue {
   user: User | null;
+  authMode: AuthMode;
   isLoading: boolean;
   isOnboarded: boolean;
   refreshUser: () => Promise<void>;
@@ -28,15 +39,27 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [user, setUser] = useState<User | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode>("signed_out");
   const [isLoading, setIsLoading] = useState(true);
+
+  const setVerifiedUser = useCallback((currentUser: User) => {
+    setUser(currentUser);
+    setAuthMode("verified");
+    writeOfflineUserSnapshot({
+      userId: currentUser.id,
+      isOnboarded: currentUser.is_onboarded,
+      timezone: currentUser.timezone,
+      lastVerifiedAt: new Date().toISOString(),
+    });
+  }, []);
 
   const refreshUser = useCallback(async () => {
     const currentUser = await authService.me();
-    setUser(currentUser);
+    setVerifiedUser(currentUser);
     void deleteStaleLocalDrafts(currentUser.id, 7).catch((error) => {
       console.warn("Unable to clean stale local drafts during auth refresh.", error);
     });
-  }, []);
+  }, [setVerifiedUser]);
 
   useEffect(() => {
     let active = true;
@@ -46,15 +69,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         hydrateCsrfTokenFromCookie();
         const currentUser = await authService.me();
         if (active) {
-          setUser(currentUser);
+          setVerifiedUser(currentUser);
           void deleteStaleLocalDrafts(currentUser.id, 7).catch((error) => {
             console.warn("Unable to clean stale local drafts during auth bootstrap.", error);
           });
         }
-      } catch {
-        if (active) {
-          setUser(null);
+      } catch (bootstrapError) {
+        if (!active) {
+          return;
         }
+
+        if (isExplicitAuthFailure(bootstrapError)) {
+          clearOfflineUserSnapshot();
+          setUser(null);
+          setAuthMode("signed_out");
+          return;
+        }
+
+        if (isOfflineOrNetworkFailure(bootstrapError)) {
+          const snapshot = readOfflineUserSnapshot();
+          if (snapshot) {
+            setUser({
+              id: snapshot.userId,
+              email: "",
+              is_active: true,
+              is_onboarded: snapshot.isOnboarded,
+              timezone: snapshot.timezone,
+            });
+            setAuthMode("offline_recovered");
+            return;
+          }
+        }
+
+        setUser(null);
+        setAuthMode("signed_out");
       } finally {
         if (active) {
           setIsLoading(false);
@@ -67,7 +115,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     return () => {
       active = false;
     };
-  }, []);
+  }, [setVerifiedUser]);
+
+  const reverifyOfflineRecoveredUser = useCallback(async () => {
+    if (authMode !== "offline_recovered" || !user?.id) {
+      return;
+    }
+
+    try {
+      await refreshUser();
+      await runOutboxPass(user.id, { forceAfterAuth: true });
+    } catch (error) {
+      if (isExplicitAuthFailure(error)) {
+        clearOfflineUserSnapshot();
+        setUser(null);
+        setAuthMode("signed_out");
+        return;
+      }
+
+      if (isOfflineOrNetworkFailure(error)) {
+        return;
+      }
+
+      console.warn("Unable to reverify offline-recovered auth state.", error);
+    }
+  }, [authMode, refreshUser, user?.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || authMode !== "offline_recovered") {
+      return;
+    }
+
+    const onOnline = () => {
+      if (!window.navigator.onLine) {
+        return;
+      }
+      void reverifyOfflineRecoveredUser();
+    };
+
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+    };
+  }, [authMode, reverifyOfflineRecoveredUser]);
 
   const login = useCallback(async (credentials: LoginRequest) => {
     await authService.login(credentials);
@@ -83,17 +173,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const logout = useCallback(async () => {
     const userId = user?.id;
     await authService.logout();
+    clearOfflineUserSnapshot();
     if (userId) {
       await clearDraftsForUser(userId).catch((error) => {
         console.warn("Unable to clear local drafts during logout.", error);
       });
     }
     setUser(null);
+    setAuthMode("signed_out");
   }, [user]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      authMode,
       isLoading,
       isOnboarded: user?.is_onboarded ?? false,
       refreshUser,
@@ -101,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       register,
       logout,
     }),
-    [isLoading, login, logout, refreshUser, register, user],
+    [authMode, isLoading, login, logout, refreshUser, register, user],
   );
 
   if (isLoading) {

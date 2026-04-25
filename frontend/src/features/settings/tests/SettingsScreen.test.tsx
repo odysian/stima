@@ -82,6 +82,7 @@ beforeEach(() => {
   });
   window.localStorage.clear();
   mockedUseAuth.mockReturnValue({
+    authMode: "verified",
     user: {
       id: "user-1",
       email: "test@example.com",
@@ -195,6 +196,7 @@ describe("SettingsScreen", () => {
   it("submits profile updates, refreshes auth user, and shows toast success feedback", async () => {
     const refreshUser = vi.fn(async () => undefined);
     mockedUseAuth.mockReturnValue({
+      authMode: "verified",
       user: {
         id: "user-1",
         email: "test@example.com",
@@ -320,6 +322,7 @@ describe("SettingsScreen", () => {
       throw new Error("Unable to refresh user");
     });
     mockedUseAuth.mockReturnValue({
+      authMode: "verified",
       user: {
         id: "user-1",
         email: "test@example.com",
@@ -388,6 +391,7 @@ describe("SettingsScreen", () => {
   it("requires confirmation before signing out", async () => {
     const logout = vi.fn(async () => undefined);
     mockedUseAuth.mockReturnValue({
+      authMode: "verified",
       user: {
         id: "user-1",
         email: "test@example.com",

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "@/App";
 import { AuthProvider } from "@/features/auth/hooks/useAuth";
+import { clearOfflineUserSnapshot, writeOfflineUserSnapshot } from "@/features/auth/offline/offlineUserSnapshot";
 import { authService } from "@/features/auth/services/authService";
 import { ThemeProvider } from "@/shared/components/ThemeProvider";
 
@@ -64,6 +65,7 @@ function renderApp(path: string): void {
 }
 
 afterEach(() => {
+  clearOfflineUserSnapshot();
   vi.clearAllMocks();
 });
 
@@ -131,6 +133,21 @@ describe("App routes", () => {
 
     expect(await screen.findByRole("heading", { name: /settings/i })).toBeInTheDocument();
     expect(screen.queryByText(/settings coming soon/i)).not.toBeInTheDocument();
+  });
+
+  it("allows offline_recovered users through protected routes", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    writeOfflineUserSnapshot({
+      userId: "user-offline",
+      isOnboarded: true,
+      timezone: "America/New_York",
+      lastVerifiedAt: new Date().toISOString(),
+    });
+
+    renderApp("/settings");
+
+    expect(await screen.findByRole("heading", { name: /settings/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /welcome back/i })).not.toBeInTheDocument();
   });
 
   it("renders the landing page for unauthenticated users at root", async () => {
