@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -9,6 +9,7 @@ import {
   isInFlightIdempotencyConflict,
   resolveExtractionRequestIdempotencyKey,
 } from "@/features/quotes/components/captureScreenIdempotency";
+import { useCaptureExtractionKeyReset } from "@/features/quotes/components/useCaptureExtractionKeyReset";
 import { buildDraftFromQuoteDetail } from "@/features/quotes/components/captureScreenDraft";
 import { pollExtractionJobUntilQuote } from "@/features/quotes/components/captureScreenPolling";
 import { CaptureInputPanel } from "@/features/quotes/components/CaptureInputPanel";
@@ -78,7 +79,6 @@ export function CaptureScreen(): React.ReactElement {
   const [isRetryLockedByInFlightExtraction, setIsRetryLockedByInFlightExtraction] = useState(false);
   const [hasAttemptedAutoExtract, setHasAttemptedAutoExtract] = useState(false);
   const extractionIdempotencyKeyRef = useRef<string | null>(null);
-  const previousClipSignatureRef = useRef("");
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
@@ -136,35 +136,15 @@ export function CaptureScreen(): React.ReactElement {
     void setLocalCaptureClipIds(clips.map((clip) => clip.id));
   }, [clips, setLocalCaptureClipIds]);
 
-  useEffect(() => {
-    const currentClipSignature = clips
-      .map((clip) => `${clip.id}:${clip.sizeBytes}`)
-      .join("|");
-    const hasChanged = previousClipSignatureRef.current !== currentClipSignature;
-    previousClipSignatureRef.current = currentClipSignature;
-    if (!hasChanged) {
-      return;
-    }
-    if (!isRetryLockedByInFlightExtraction && extractionIdempotencyKeyRef.current === null) {
-      return;
-    }
-    setIsRetryLockedByInFlightExtraction(false);
-    void clearExtractionRequestIdempotencyKey(localSessionId, extractionIdempotencyKeyRef);
-  }, [clips, isRetryLockedByInFlightExtraction, localSessionId]);
-
-  useEffect(() => {
-    setIsRetryLockedByInFlightExtraction(false);
-  }, [notes]);
-
-  const handleNotesChange = useCallback((value: string): void => {
-    if (value !== notes) {
-      if (isRetryLockedByInFlightExtraction || extractionIdempotencyKeyRef.current !== null) {
-        setIsRetryLockedByInFlightExtraction(false);
-        void clearExtractionRequestIdempotencyKey(localSessionId, extractionIdempotencyKeyRef);
-      }
-    }
-    setNotes(value);
-  }, [isRetryLockedByInFlightExtraction, localSessionId, notes, setNotes]);
+  const handleNotesChange = useCaptureExtractionKeyReset({
+    clips,
+    notes,
+    localSessionId,
+    isRetryLockedByInFlightExtraction,
+    setIsRetryLockedByInFlightExtraction,
+    extractionIdempotencyKeyRef,
+    setNotes,
+  });
 
   useEffect(() => {
     if (!displayedError) {
@@ -366,20 +346,16 @@ export function CaptureScreen(): React.ReactElement {
     : localSaveState === "error"
       ? "Stima could not save this capture on your device. Copy your notes before leaving this screen."
       : getLocalCaptureStatusCopy(sessionStatus);
-
   useEffect(() => {
     setHasAttemptedAutoExtract(false);
   }, [autoExtractOnLoad, localSessionQueryParam]);
-
   useEffect(() => {
     if (!autoExtractOnLoad || hasAttemptedAutoExtract || isHydratingLocalSession || !canExtract) {
       return;
     }
-
     setHasAttemptedAutoExtract(true);
     void onExtract();
   }, [autoExtractOnLoad, canExtract, hasAttemptedAutoExtract, isHydratingLocalSession, onExtract]);
-
   return (
     <main className="min-h-dvh bg-background">
       <WorkflowScreenHeader
