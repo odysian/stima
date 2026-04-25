@@ -1,5 +1,6 @@
 import { CAPTURE_STORE_NAMES, getDb } from "@/features/quotes/offline/captureDb";
 import { deleteAllClipsForSession } from "@/features/quotes/offline/audioRepository";
+import { dispatchLocalRecoveryChanged } from "@/features/quotes/offline/localRecoveryEvents";
 import { deleteJobForSession } from "@/features/quotes/offline/outboxRepository";
 import type {
   CreateLocalCaptureInput,
@@ -67,6 +68,11 @@ export async function createCaptureSession(
   const store = transaction.objectStore(CAPTURE_STORE_NAMES.captureSessions);
   store.put(session);
   await transactionDone(transaction);
+  dispatchLocalRecoveryChanged({
+    userId: session.userId,
+    sessionId: session.sessionId,
+    reason: "capture_saved",
+  });
   return session;
 }
 
@@ -88,6 +94,11 @@ export async function updateCaptureNotes(sessionId: string, notes: string): Prom
   session.updatedAt = new Date().toISOString();
   store.put(session);
   await transactionDone(transaction);
+  dispatchLocalRecoveryChanged({
+    userId: session.userId,
+    sessionId,
+    reason: "capture_saved",
+  });
 }
 
 export async function updateCaptureField(
@@ -111,6 +122,11 @@ export async function updateCaptureField(
   session.updatedAt = new Date().toISOString();
   store.put(session);
   await transactionDone(transaction);
+  dispatchLocalRecoveryChanged({
+    userId: session.userId,
+    sessionId,
+    reason: "capture_saved",
+  });
 }
 
 function validateCapturePatch(patch: Partial<LocalCaptureSession>): void {
@@ -173,9 +189,15 @@ export async function markCaptureStatus(
 
   store.put(session);
   await transactionDone(transaction);
+  dispatchLocalRecoveryChanged({
+    userId: session.userId,
+    sessionId,
+    reason: "capture_saved",
+  });
 }
 
 export async function deleteCaptureSession(sessionId: string): Promise<void> {
+  const session = await getCaptureSession(sessionId);
   await deleteAllClipsForSession(sessionId);
   await deleteJobForSession(sessionId);
   const db = await getDb();
@@ -183,6 +205,14 @@ export async function deleteCaptureSession(sessionId: string): Promise<void> {
   const store = transaction.objectStore(CAPTURE_STORE_NAMES.captureSessions);
   store.delete(sessionId);
   await transactionDone(transaction);
+  if (!session) {
+    return;
+  }
+  dispatchLocalRecoveryChanged({
+    userId: session.userId,
+    sessionId,
+    reason: "capture_deleted",
+  });
 }
 
 export async function deleteEmptyAbandonedSessions(userId: string): Promise<void> {
