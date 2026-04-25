@@ -68,6 +68,13 @@ def _assert_public_extraction_contract(payload: dict[str, object]) -> None:
         assert "confidence" not in line_item
 
 
+def _extract_headers(csrf_token: str, *, idempotency_key: str | None = None) -> dict[str, str]:
+    headers = {"X-CSRF-Token": csrf_token}
+    if idempotency_key is not None:
+        headers["Idempotency-Key"] = idempotency_key
+    return headers
+
+
 async def test_convert_notes_returns_422_for_extraction_errors(
     client: AsyncClient,
 ) -> None:
@@ -186,6 +193,143 @@ async def test_extract_combined_notes_only_success(client: AsyncClient) -> None:
     assert payload["quote_id"]
     assert payload["transcript"] == "add 10 percent travel surcharge"
     assert payload["line_items"]
+
+
+async def test_extract_combined_replays_same_idempotency_key_without_second_quote(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    first_response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch and edging"))],
+        headers=_extract_headers(csrf_token, idempotency_key="extract-replay-key"),
+    )
+    second_response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch and edging"))],
+        headers=_extract_headers(csrf_token, idempotency_key="extract-replay-key"),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert second_response.headers["Idempotency-Replayed"] == "true"
+    assert second_response.json()["quote_id"] == first_response.json()["quote_id"]
+
+    quote_count = await db_session.scalar(select(func.count(Document.id)))
+    assert quote_count == 1
+
+
+async def test_extract_combined_same_idempotency_key_with_different_content_returns_422(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    first_response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch and edging"))],
+        headers=_extract_headers(csrf_token, idempotency_key="extract-conflict-key"),
+    )
+    second_response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "different capture content"))],
+        headers=_extract_headers(csrf_token, idempotency_key="extract-conflict-key"),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 422
+    assert second_response.json() == {"detail": "Idempotency key reused with different content"}
+
+
+async def test_extract_combined_duplicate_in_progress_idempotency_key_returns_409(
+    client: AsyncClient,
+) -> None:
+    class _BlockingExtractionIntegration:
+        def __init__(self) -> None:
+            self.started = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def extract(
+            self,
+            notes: PreparedCaptureInput,
+            *,
+            mode: ExtractionMode = "initial",
+        ) -> ExtractionResult:
+            del mode
+            self.started.set()
+            await self.release.wait()
+            return ExtractionResult(
+                transcript=notes.transcript,
+                line_items=[],
+                pricing_hints=PricingHints(),
+            )
+
+    blocking_integration = _BlockingExtractionIntegration()
+
+    async def _override_get_extraction_service() -> ExtractionService:
+        return ExtractionService(
+            extraction_integration=blocking_integration,
+            audio_integration=_MockAudioIntegration(),
+            transcription_integration=_MockTranscriptionIntegration(),
+        )
+
+    app.dependency_overrides[get_extraction_service] = _override_get_extraction_service
+    app.state.arq_pool = None
+    csrf_token = await _register_and_login(client, _credentials())
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as second_client:
+        second_client.cookies.update(client.cookies)
+        first_request = asyncio.create_task(
+            client.post(
+                "/api/quotes/extract",
+                files=[("notes", (None, "mulch and edging"))],
+                headers=_extract_headers(csrf_token, idempotency_key="extract-inflight-key"),
+            )
+        )
+        await blocking_integration.started.wait()
+
+        blocked_response = await second_client.post(
+            "/api/quotes/extract",
+            files=[("notes", (None, "mulch and edging"))],
+            headers=_extract_headers(csrf_token, idempotency_key="extract-inflight-key"),
+        )
+
+        blocking_integration.release.set()
+        first_response = await first_request
+
+    assert first_response.status_code == 200
+    assert blocked_response.status_code == 409
+    assert blocked_response.json() == {"detail": "Extraction already in progress for this key"}
+
+
+async def test_extract_combined_without_idempotency_key_creates_new_quotes(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    app.state.arq_pool = None
+
+    first_response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch and edging"))],
+        headers=_extract_headers(csrf_token),
+    )
+    second_response = await client.post(
+        "/api/quotes/extract",
+        files=[("notes", (None, "mulch and edging"))],
+        headers=_extract_headers(csrf_token),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.json()["quote_id"] != second_response.json()["quote_id"]
+
+    quote_count = await db_session.scalar(select(func.count(Document.id)))
+    assert quote_count == 2
 
 
 async def test_extract_combined_keeps_null_price_rows_without_price_status_contract(

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
+import { getCaptureSession, updateCaptureField } from "@/features/quotes/offline/captureRepository";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { MAX_VOICE_CLIPS_PER_CAPTURE, useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -13,6 +14,7 @@ import type {
   JobStatusResponse,
   QuoteDetail,
 } from "@/features/quotes/types/quote.types";
+import { HttpRequestError } from "@/shared/lib/http";
 import { jobService } from "@/shared/lib/jobService";
 import {
   MAX_AUDIO_TOTAL_BYTES,
@@ -118,6 +120,10 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     shareQuote: vi.fn(),
   },
 }));
+vi.mock("@/features/quotes/offline/captureRepository", () => ({
+  getCaptureSession: vi.fn(async () => null),
+  updateCaptureField: vi.fn(async () => undefined),
+}));
 
 vi.mock("@/shared/lib/jobService", () => ({
   jobService: {
@@ -130,6 +136,8 @@ const mockedUseQuoteDraft = vi.mocked(useQuoteDraft);
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedQuoteService = vi.mocked(quoteService);
 const mockedJobService = vi.mocked(jobService);
+const mockedGetCaptureSession = vi.mocked(getCaptureSession);
+const mockedUpdateCaptureField = vi.mocked(updateCaptureField);
 
 const extractionFixture: ExtractionResult = {
   transcript: "5 yards brown mulch",
@@ -349,6 +357,8 @@ beforeEach(() => {
     updated_at: "2026-03-20T00:00:00.000Z",
   });
   mockedJobService.getJobStatus.mockReset();
+  mockedGetCaptureSession.mockResolvedValue(null);
+  mockedUpdateCaptureField.mockResolvedValue(undefined);
   useParamsMock.mockReturnValue({ customerId: "cust-1" });
 });
 
@@ -573,6 +583,7 @@ describe("CaptureScreen", () => {
         clipIds: [clipFixture.id],
         notes: "  add travel surcharge  ",
         customerId: "cust-1",
+        idempotencyKey: expect.any(String),
       });
     });
     expect(navigateMock).toHaveBeenCalledWith("/documents/quote-1/edit");
@@ -708,6 +719,7 @@ describe("CaptureScreen", () => {
         clipIds: [],
         notes: "Install sod in backyard",
         customerId: undefined,
+        idempotencyKey: expect.any(String),
       });
     });
     expect(mockedJobService.getJobStatus).toHaveBeenCalledWith("job-home");
@@ -742,6 +754,47 @@ describe("CaptureScreen", () => {
     );
   });
 
+  it("reuses the same idempotency key when retrying after a failed extraction", async () => {
+    mockedQuoteService.extract
+      .mockRejectedValueOnce(new Error("Temporary extraction failure"))
+      .mockResolvedValueOnce({
+        type: "sync",
+        quoteId: "quote-after-retry",
+        result: extractionFixture,
+      });
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    await waitFor(() => expect(mockedQuoteService.extract).toHaveBeenCalledTimes(2));
+    const firstCall = mockedQuoteService.extract.mock.calls[0]?.[0];
+    const secondCall = mockedQuoteService.extract.mock.calls[1]?.[0];
+    expect(firstCall?.idempotencyKey).toBeDefined();
+    expect(secondCall?.idempotencyKey).toBe(firstCall?.idempotencyKey);
+  });
+
+  it("clears persisted idempotency key after extraction submission succeeds", async () => {
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /extract line items/i }));
+
+    await waitFor(() => {
+      expect(mockedUpdateCaptureField).toHaveBeenCalledWith(
+        "local-session-1",
+        expect.objectContaining({ idempotencyKey: null }),
+      );
+    });
+  });
+
   it("shows persistent error toast and does not navigate when extraction fails", async () => {
     mockedQuoteService.extract.mockRejectedValueOnce(new Error("Extraction failed"));
     renderScreen();
@@ -753,6 +806,26 @@ describe("CaptureScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Extraction failed");
     expect(navigateMock).not.toHaveBeenCalledWith("/documents/quote-1/edit");
+  });
+
+  it("shows in-progress idempotency conflict message and disables retry", async () => {
+    mockedQuoteService.extract.mockRejectedValueOnce(
+      new HttpRequestError(
+        "Extraction already in progress for this key",
+        409,
+        { detail: "Extraction already in progress for this key" },
+      ),
+    );
+    renderScreen();
+
+    fireEvent.change(screen.getByLabelText(/written description/i), {
+      target: { value: "Install sod in backyard" },
+    });
+    const extractButton = screen.getByRole("button", { name: /extract line items/i });
+    fireEvent.click(extractButton);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Extraction already in progress");
+    expect(extractButton).toBeDisabled();
   });
 
   it("dismisses submission errors via local error state without clearing voice capture", async () => {

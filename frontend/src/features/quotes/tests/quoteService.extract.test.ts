@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AudioClipMissingError } from "@/features/quotes/offline/captureTypes";
 import { getAudioClip } from "@/features/quotes/offline/audioRepository";
 import { quoteService } from "@/features/quotes/services/quoteService";
+import { buildIdempotencyKey } from "@/shared/lib/idempotency";
 import { request, requestWithMetadata } from "@/shared/lib/http";
 
 vi.mock("@/shared/lib/http", () => ({
@@ -13,10 +14,14 @@ vi.mock("@/shared/lib/http", () => ({
 vi.mock("@/features/quotes/offline/audioRepository", () => ({
   getAudioClip: vi.fn(),
 }));
+vi.mock("@/shared/lib/idempotency", () => ({
+  buildIdempotencyKey: vi.fn(() => "generated-idempotency-key"),
+}));
 
 const mockedRequestWithMetadata = vi.mocked(requestWithMetadata);
 const mockedRequest = vi.mocked(request);
 const mockedGetAudioClip = vi.mocked(getAudioClip);
+const mockedBuildIdempotencyKey = vi.mocked(buildIdempotencyKey);
 
 describe("quoteService.extract", () => {
   const extractionPayload = {
@@ -38,6 +43,7 @@ describe("quoteService.extract", () => {
     mockedRequestWithMetadata.mockReset();
     mockedRequest.mockReset();
     mockedGetAudioClip.mockReset();
+    mockedBuildIdempotencyKey.mockClear();
   });
 
   it("builds multipart form data with clip IDs and trimmed notes for async extraction", async () => {
@@ -115,6 +121,7 @@ describe("quoteService.extract", () => {
     const formData = options?.body as FormData;
     expect(formData.getAll("clips")).toHaveLength(0);
     expect(formData.get("notes")).toBe("typed note only");
+    expect(options?.headers).toEqual({ "Idempotency-Key": "generated-idempotency-key" });
   });
 
   it("omits notes field for clips-only extraction", async () => {
@@ -148,6 +155,26 @@ describe("quoteService.extract", () => {
     expect((formData.getAll("clips")[0] as File).name).toBe("clip-1.webm");
     expect(formData.get("notes")).toBeNull();
     expect(formData.get("customer_id")).toBeNull();
+    expect(options?.headers).toEqual({ "Idempotency-Key": "generated-idempotency-key" });
+  });
+
+  it("uses provided idempotency key header when extract params include one", async () => {
+    mockedRequestWithMetadata.mockResolvedValue({
+      status: 200,
+      data: {
+        quote_id: "quote-31",
+        ...extractionPayload,
+      },
+    });
+
+    await quoteService.extract({
+      notes: "typed note only",
+      idempotencyKey: "provided-idempotency-key",
+    });
+
+    const [, options] = mockedRequestWithMetadata.mock.calls[0] ?? [];
+    expect(options?.headers).toEqual({ "Idempotency-Key": "provided-idempotency-key" });
+    expect(mockedBuildIdempotencyKey).not.toHaveBeenCalled();
   });
 
   it("throws AudioClipMissingError and skips submit when a clip ID is missing from IndexedDB", async () => {

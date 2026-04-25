@@ -81,13 +81,18 @@ async function buildExtractionFormDataFromIds(params: {
 
 async function submitExtraction(
   path: string,
-  params: { clipIds?: string[]; notes?: string; customerId?: string },
+  params: { clipIds?: string[]; notes?: string; customerId?: string; idempotencyKey?: string },
 ): Promise<QuoteExtractResponse> {
   const formData = await buildExtractionFormDataFromIds(params);
+  const headers: HeadersInit = {};
+  if (params.idempotencyKey) {
+    headers["Idempotency-Key"] = params.idempotencyKey;
+  }
 
   const response = await requestWithMetadata<PersistedExtractionPayload | JobStatusResponse>(path, {
     method: "POST",
     body: formData,
+    headers,
   });
 
   if (response.status === 202) {
@@ -106,8 +111,17 @@ async function submitExtraction(
   };
 }
 
-async function extract(params: { clipIds?: string[]; notes?: string; customerId?: string }): Promise<QuoteExtractResponse> {
-  return submitExtraction("/api/quotes/extract", params);
+async function extract(params: {
+  clipIds?: string[];
+  notes?: string;
+  customerId?: string;
+  idempotencyKey?: string;
+}): Promise<QuoteExtractResponse> {
+  const idempotencyKey = params.idempotencyKey ?? buildIdempotencyKey();
+  return submitExtraction("/api/quotes/extract", {
+    ...params,
+    idempotencyKey,
+  });
 }
 
 function createManualDraft(params?: { customerId?: string }): Promise<Quote> {

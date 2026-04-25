@@ -4,6 +4,11 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { EXTRACTION_STAGE_DELAY_MS, getExtractionStages } from "@/features/quotes/components/captureScreenHelpers";
+import {
+  clearExtractionRequestIdempotencyKey,
+  isInFlightIdempotencyConflict,
+  resolveExtractionRequestIdempotencyKey,
+} from "@/features/quotes/components/captureScreenIdempotency";
 import { buildDraftFromQuoteDetail } from "@/features/quotes/components/captureScreenDraft";
 import { pollExtractionJobUntilQuote } from "@/features/quotes/components/captureScreenPolling";
 import { CaptureInputPanel } from "@/features/quotes/components/CaptureInputPanel";
@@ -13,7 +18,7 @@ import { useLocalCaptureSession } from "@/features/quotes/offline/useLocalCaptur
 import { resolveCaptureLaunchOrigin } from "@/features/quotes/utils/workflowNavigation";
 import { MAX_VOICE_CLIPS_PER_CAPTURE, useVoiceCapture } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
-import type { QuoteDetail, QuoteSourceType } from "@/features/quotes/types/quote.types";
+import type { QuoteSourceType } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ScreenFooter } from "@/shared/components/ScreenFooter";
@@ -70,7 +75,9 @@ export function CaptureScreen(): React.ReactElement {
   const [pendingExitTarget, setPendingExitTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStartingBlank, setIsStartingBlank] = useState(false);
+  const [isRetryLockedByInFlightExtraction, setIsRetryLockedByInFlightExtraction] = useState(false);
   const [hasAttemptedAutoExtract, setHasAttemptedAutoExtract] = useState(false);
+  const extractionIdempotencyKeyRef = useRef<string | null>(null);
   const isExtracting = extractionStage !== null;
   const hasClips = clips.length > 0;
   const hasNotes = notes.trim().length > 0;
@@ -89,6 +96,7 @@ export function CaptureScreen(): React.ReactElement {
   function clearActionErrors(): void {
     setError(null);
     clearError();
+    setIsRetryLockedByInFlightExtraction(false);
   }
 
   const dismissActiveErrorRef = useRef<() => void>(() => {});
@@ -128,6 +136,10 @@ export function CaptureScreen(): React.ReactElement {
   }, [clips, setLocalCaptureClipIds]);
 
   useEffect(() => {
+    setIsRetryLockedByInFlightExtraction(false);
+  }, [clips, notes]);
+
+  useEffect(() => {
     if (!displayedError) {
       return;
     }
@@ -139,43 +151,21 @@ export function CaptureScreen(): React.ReactElement {
     });
   }, [displayedError, show]);
 
-  function applyDraftFromQuoteDetail(
-    sourceType: QuoteSourceType,
-    quoteDetail: QuoteDetail,
-    quoteId: string,
-  ): void {
-    setDraft(buildDraftFromQuoteDetail({
-      sourceType,
-      quoteDetail,
-      quoteId,
-      customerId,
-      launchOrigin,
-    }));
-  }
-
-  async function markSyncedLocalCaptureStatus(
-    quoteId: string,
-    extractJobId?: string | null,
-  ): Promise<void> {
-    await markLocalCaptureStatus("synced", {
-      serverQuoteId: quoteId,
-      extractJobId: extractJobId ?? null,
-    });
-  }
-
   async function hydrateFromPersistedQuote(
     quoteId: string,
     sourceType: QuoteSourceType,
   ): Promise<void> {
     perfMark("capture:draft:hydrate_start");
     const persistedQuote = await quoteService.getQuote(quoteId);
-    applyDraftFromQuoteDetail(sourceType, persistedQuote, quoteId);
+    setDraft(buildDraftFromQuoteDetail({
+      sourceType,
+      quoteDetail: persistedQuote,
+      quoteId,
+      customerId,
+      launchOrigin,
+    }));
     perfMark("capture:draft:ready");
     perfMeasure("capture:draft:hydrate_ms", "capture:draft:hydrate_start", "capture:draft:ready");
-  }
-
-  function navigateToReview(quoteId: string): void {
-    navigate(`/documents/${quoteId}/edit`);
   }
 
   async function onExtract(): Promise<void> {
@@ -223,11 +213,21 @@ export function CaptureScreen(): React.ReactElement {
     });
 
     try {
+      const {
+        idempotencyKey,
+        sessionId: extractionSessionId,
+      } = await resolveExtractionRequestIdempotencyKey({
+        localSessionId,
+        ensureLocalCaptureSession,
+        extractionIdempotencyKeyRef,
+      });
       const extraction = await quoteService.extract({
         clipIds: clips.map((clip) => clip.id),
         notes,
         customerId,
+        idempotencyKey,
       });
+      await clearExtractionRequestIdempotencyKey(extractionSessionId, extractionIdempotencyKeyRef);
       perfMark("capture:extract:response");
       perfMeasure(
         "capture:extract:submit_to_response_ms",
@@ -239,9 +239,12 @@ export function CaptureScreen(): React.ReactElement {
       }
       const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
       if (extraction.type === "sync") {
-        await markSyncedLocalCaptureStatus(extraction.quoteId, null);
+        await markLocalCaptureStatus("synced", {
+          serverQuoteId: extraction.quoteId,
+          extractJobId: null,
+        });
         await hydrateFromPersistedQuote(extraction.quoteId, sourceType);
-        navigateToReview(extraction.quoteId);
+        navigate(`/documents/${extraction.quoteId}/edit`);
         return;
       }
 
@@ -254,14 +257,19 @@ export function CaptureScreen(): React.ReactElement {
         return;
       }
       const failureKind = classifySubmitFailure(submitError);
-      const message =
-        submitError instanceof Error
+      const isIdempotencyInFlightConflict = isInFlightIdempotencyConflict(submitError);
+      const message = isIdempotencyInFlightConflict
+        ? "Extraction already in progress"
+        : submitError instanceof Error
           ? submitError.message
           : "Unable to extract line items";
       await markLocalCaptureStatus("extract_failed", {
         failureKind,
         error: message,
       });
+      if (isIdempotencyInFlightConflict) {
+        setIsRetryLockedByInFlightExtraction(true);
+      }
       setError(message);
     } finally {
       const shouldResetExtractionStage = isMountedRef.current;
@@ -308,41 +316,24 @@ export function CaptureScreen(): React.ReactElement {
             "Extraction completed without a result. Please try again.",
           );
         }
-        await markSyncedLocalCaptureStatus(job.quote_id, job.id);
+        await markLocalCaptureStatus("synced", {
+          serverQuoteId: job.quote_id,
+          extractJobId: job.id,
+        });
         await hydrateFromPersistedQuote(job.quote_id, sourceType);
-        navigateToReview(job.quote_id);
+        navigate(`/documents/${job.quote_id}/edit`);
       },
     });
   }
 
-  function hasUnsavedWork(): boolean {
-    const hasPotentiallyUnsavedNotes = notes.trim().length > 0
-      && (localSessionId === null || localSaveState === "saving" || localSaveState === "error");
-    return clips.length > 0 || hasPotentiallyUnsavedNotes;
-  }
-  function requestExit(target: string): void {
-    if (hasUnsavedWork()) {
-      setPendingExitTarget(target);
-      return;
-    }
-
-    navigate(target, { replace: true });
-  }
-
-  function onBack(): void {
-    requestExit(launchOrigin);
-  }
-
-  function onStartBlankClick(): void {
-    if (hasUnsavedWork()) {
-      setPendingExitTarget(START_BLANK_GUARD_TARGET);
-      return;
-    }
-    void onStartBlank();
-  }
-
   const hasReachedClipLimit = clips.length >= MAX_VOICE_CLIPS_PER_CAPTURE;
-  const canExtract = (hasClips || hasNotes) && !isExtracting && !isRecording;
+  const hasUnsavedWork = clips.length > 0
+    || (notes.trim().length > 0
+      && (localSessionId === null || localSaveState === "saving" || localSaveState === "error"));
+  const canExtract = (hasClips || hasNotes)
+    && !isExtracting
+    && !isRecording
+    && !isRetryLockedByInFlightExtraction;
   const localStatusCopy = localSaveState === "saving"
     ? "Saving on this device..."
     : localSaveState === "error"
@@ -368,7 +359,9 @@ export function CaptureScreen(): React.ReactElement {
         title="Capture Job Notes"
         subtitle="Describe the job and we'll extract the line items"
         backLabel="Go back"
-        onBack={onBack}
+        onBack={() => (hasUnsavedWork
+          ? setPendingExitTarget(launchOrigin)
+          : navigate(launchOrigin, { replace: true }))}
       />
 
       <section className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4 pb-36 pt-20">
@@ -397,7 +390,9 @@ export function CaptureScreen(): React.ReactElement {
               })();
             }}
             onStopRecording={stopRecording}
-            onStartBlank={onStartBlankClick}
+            onStartBlank={() => (hasUnsavedWork
+              ? setPendingExitTarget(START_BLANK_GUARD_TARGET)
+              : void onStartBlank())}
             isStartBlankDisabled={isExtracting || isRecording || isStartingBlank}
           />
         </div>

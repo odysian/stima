@@ -79,10 +79,12 @@ describe("quoteService integration (MSW)", () => {
   it("extract returns async job metadata when the backend responds with 202", async () => {
     setCsrfToken("integration-csrf-token");
     let capturedCsrfHeader: string | null = null;
+    let capturedIdempotencyHeader: string | null = null;
 
     server.use(
       http.post("/api/quotes/extract", ({ request }) => {
         capturedCsrfHeader = request.headers.get("X-CSRF-Token");
+        capturedIdempotencyHeader = request.headers.get("Idempotency-Key");
         return HttpResponse.json(
           {
             id: "job-1",
@@ -106,7 +108,35 @@ describe("quoteService integration (MSW)", () => {
     const result = await quoteService.extract({ notes: "Mulch and edging" });
 
     expect(capturedCsrfHeader).toBe("integration-csrf-token");
+    expect(capturedIdempotencyHeader).toBeTruthy();
     expect(result).toEqual({ type: "async", jobId: "job-1" });
+  });
+
+  it("extract sends provided Idempotency-Key header", async () => {
+    setCsrfToken("integration-csrf-token");
+    let capturedIdempotencyHeader: string | null = null;
+
+    server.use(
+      http.post("/api/quotes/extract", ({ request }) => {
+        capturedIdempotencyHeader = request.headers.get("Idempotency-Key");
+        return HttpResponse.json(
+          {
+            quote_id: "quote-provided-key",
+            transcript: "Mulch and edging",
+            line_items: [],
+            total: null,
+          },
+          { status: 200 },
+        );
+      }),
+    );
+
+    await quoteService.extract({
+      notes: "Mulch and edging",
+      idempotencyKey: "provided-key",
+    });
+
+    expect(capturedIdempotencyHeader).toBe("provided-key");
   });
 
   it("extract returns persisted quote id and extraction result when the backend responds with 200", async () => {
