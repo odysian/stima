@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from arq.connections import ArqRedis, create_pool
 from fastapi import Depends, FastAPI
@@ -30,9 +31,9 @@ from app.features.line_item_catalog.api import router as line_item_catalog_route
 from app.features.profile.api import router as profile_router
 from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
-from app.shared.dependencies import get_idempotency_store
 from app.shared.event_logger import configure_event_logging
 from app.shared.extraction_logger import configure_extraction_logging
+from app.shared.idempotency import IdempotencyStore, build_idempotency_store
 from app.shared.observability import (
     RequestObservabilityMiddleware,
     bind_request_context,
@@ -40,7 +41,17 @@ from app.shared.observability import (
     security_rate_limit_handler,
 )
 from app.shared.proxy_headers import TrustedProxyHeadersMiddleware
-from app.shared.rate_limit import extraction_controls, limiter
+from app.shared.rate_limit import (
+    ExtractionControlManager,
+    close_limiter_storage,
+    configure_runtime_rate_limit_state,
+    limiter,
+)
+from app.shared.redis_runtime import (
+    RedisRuntimeResolutionError,
+    RedisRuntimeState,
+    resolve_redis_runtime_state,
+)
 from app.worker.runtime import build_arq_redis_settings
 
 LOGGER = logging.getLogger(__name__)
@@ -83,6 +94,34 @@ def _resolve_allowed_hosts(allowed_hosts: list[str]) -> list[str]:
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    runtime_state = await resolve_redis_runtime_state(settings)
+    runtime_limiter_mode: Literal["redis", "memory"] = (
+        "redis" if runtime_state.mode == "redis" else "memory"
+    )
+    extraction_controls = configure_runtime_rate_limit_state(
+        settings=settings,
+        runtime_mode=runtime_limiter_mode,
+        degraded_reason=runtime_state.degraded_reason,
+    )
+    idempotency_store = build_idempotency_store(
+        settings,
+        runtime_mode=runtime_limiter_mode,
+    )
+    _bind_runtime_state(
+        app=app,
+        runtime_state=runtime_state,
+        extraction_controls=extraction_controls,
+        idempotency_store=idempotency_store,
+    )
+
+    if runtime_state.mode == "degraded_memory":
+        LOGGER.warning(
+            "Redis degraded mode active at startup: reason=%s; "
+            "rate_limiter=memory extraction_controls=memory "
+            "idempotency=memory queue_available=false",
+            runtime_state.degraded_reason or "redis_probe_failed",
+        )
+
     arq_pool: ArqRedis | None = None
     stale_job_reaper_task = asyncio.create_task(
         run_stale_extraction_job_reaper(
@@ -92,16 +131,41 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
     )
     app.state.stale_job_reaper_task = stale_job_reaper_task
-    if settings.redis_url is not None:
+    if runtime_state.mode == "redis":
         try:
             arq_pool = await create_pool(build_arq_redis_settings(settings))
         except Exception:
-            LOGGER.warning(
-                "ARQ Redis unavailable at startup; async jobs disabled "
-                "and sync extraction fallback remains enabled.",
-                exc_info=True,
-            )
+            if settings.allow_redis_degraded_mode:
+                runtime_state = RedisRuntimeState(
+                    mode="degraded_memory",
+                    degraded_reason="redis_probe_failed",
+                )
+                extraction_controls = configure_runtime_rate_limit_state(
+                    settings=settings,
+                    runtime_mode="memory",
+                    degraded_reason=runtime_state.degraded_reason,
+                )
+                await idempotency_store.aclose()
+                idempotency_store = build_idempotency_store(settings, runtime_mode="memory")
+                _bind_runtime_state(
+                    app=app,
+                    runtime_state=runtime_state,
+                    extraction_controls=extraction_controls,
+                    idempotency_store=idempotency_store,
+                )
+                LOGGER.warning(
+                    "Redis degraded mode active at startup after ARQ init failure: "
+                    "reason=%s; rate_limiter=memory extraction_controls=memory "
+                    "idempotency=memory queue_available=false",
+                    runtime_state.degraded_reason,
+                    exc_info=True,
+                )
+            else:
+                raise RedisRuntimeResolutionError(
+                    "ARQ Redis unavailable at startup and degraded mode disabled"
+                ) from None
     app.state.arq_pool = arq_pool
+    app.state.queue_available = arq_pool is not None
     yield
     stale_job_reaper_task.cancel()
     try:
@@ -110,9 +174,30 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         pass
     if arq_pool is not None:
         await arq_pool.aclose()
-    if get_idempotency_store.cache_info().currsize:
-        await get_idempotency_store().aclose()
-    await extraction_controls.aclose()
+    app.state.queue_available = False
+
+    runtime_idempotency_store = getattr(app.state, "idempotency_store", None)
+    if isinstance(runtime_idempotency_store, IdempotencyStore):
+        await runtime_idempotency_store.aclose()
+
+    runtime_extraction_controls = getattr(app.state, "extraction_controls", None)
+    if isinstance(runtime_extraction_controls, ExtractionControlManager):
+        await runtime_extraction_controls.aclose()
+
+    close_limiter_storage(limiter)
+
+
+def _bind_runtime_state(
+    *,
+    app: FastAPI,
+    runtime_state: RedisRuntimeState,
+    extraction_controls: ExtractionControlManager,
+    idempotency_store: IdempotencyStore,
+) -> None:
+    app.state.redis_runtime_mode = runtime_state.mode
+    app.state.redis_degraded_reason = runtime_state.degraded_reason
+    app.state.extraction_controls = extraction_controls
+    app.state.idempotency_store = idempotency_store
 
 
 def create_app() -> FastAPI:
@@ -129,6 +214,11 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.state.arq_pool = None
     app.state.stale_job_reaper_task = None
+    app.state.redis_runtime_mode = "pending"
+    app.state.redis_degraded_reason = None
+    app.state.extraction_controls = None
+    app.state.idempotency_store = None
+    app.state.queue_available = False
     app.add_exception_handler(RateLimitExceeded, security_rate_limit_handler)  # type: ignore[arg-type]
     app.add_middleware(
         CORSMiddleware,
@@ -177,7 +267,15 @@ def create_app() -> FastAPI:
 
     @app.get("/health", include_in_schema=False)
     async def health() -> JSONResponse:
-        return JSONResponse({"status": "ok"})
+        payload = {
+            "status": "ok",
+            "runtime_mode": str(getattr(app.state, "redis_runtime_mode", "unknown")),
+            "queue_available": bool(getattr(app.state, "queue_available", False)),
+        }
+        degraded_reason = getattr(app.state, "redis_degraded_reason", None)
+        if degraded_reason:
+            payload["degraded_reason"] = degraded_reason
+        return JSONResponse(payload)
 
     return app
 

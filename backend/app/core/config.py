@@ -63,6 +63,14 @@ class Settings(BaseSettings):
 
     environment: str = Field(default="development", validation_alias="ENVIRONMENT")
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
+    allow_redis_degraded_mode: bool = Field(
+        default=False,
+        validation_alias="ALLOW_REDIS_DEGRADED_MODE",
+    )
+    redis_startup_probe_timeout_seconds: float = Field(
+        default=2.0,
+        validation_alias="REDIS_STARTUP_PROBE_TIMEOUT_SECONDS",
+    )
     redis_key_prefix: str = Field(
         default="stima",
         validation_alias="REDIS_KEY_PREFIX",
@@ -368,6 +376,14 @@ class Settings(BaseSettings):
             raise ValueError("PROVIDER_REQUEST_TIMEOUT_SECONDS must be greater than 0")
         return value
 
+    @field_validator("redis_startup_probe_timeout_seconds")
+    @classmethod
+    def validate_redis_startup_probe_timeout_seconds(cls, value: float) -> float:
+        """Require a positive startup probe timeout."""
+        if value <= 0:
+            raise ValueError("REDIS_STARTUP_PROBE_TIMEOUT_SECONDS must be greater than 0")
+        return value
+
     @field_validator("provider_max_retries")
     @classmethod
     def validate_provider_max_retries(cls, value: int) -> int:
@@ -426,7 +442,7 @@ class Settings(BaseSettings):
         parsed_frontend_url = urlparse(self.frontend_url)
         if parsed_frontend_url.hostname in LOCALHOST_HOSTS:
             raise ValueError("FRONTEND_URL must not use localhost when ENVIRONMENT is 'production'")
-        if self.redis_url is None:
+        if self.redis_url is None and not self.allow_redis_degraded_mode:
             raise ValueError("REDIS_URL must be set when ENVIRONMENT is 'production'")
 
         return self

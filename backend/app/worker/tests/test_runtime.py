@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 import pytest
+from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
@@ -148,6 +149,7 @@ async def test_worker_startup_raises_when_redis_is_unreachable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("REDIS_URL", "redis://cache.example:6379/0")
+    get_settings.cache_clear()
 
     class _BrokenRedisClient:
         async def ping(self) -> None:
@@ -163,6 +165,8 @@ async def test_worker_startup_raises_when_redis_is_unreachable(
 
     with pytest.raises(ConnectionError, match="cannot reach redis"):
         await on_worker_startup({})
+
+    get_settings.cache_clear()
 
 
 async def _successful_handler() -> None:

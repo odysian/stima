@@ -46,7 +46,11 @@ from app.integrations.storage import StorageService
 from app.integrations.transcription import TranscriptionIntegration
 from app.shared.idempotency import IdempotencyStore, build_idempotency_store
 from app.shared.pdf_artifact_repository import PdfArtifactRepository
-from app.shared.rate_limit import limiter, reserve_extraction_capacity
+from app.shared.rate_limit import (
+    ExtractionControlManager,
+    extraction_controls,
+    reserve_extraction_capacity,
+)
 
 
 @lru_cache(maxsize=1)
@@ -105,10 +109,26 @@ def get_transcription_integration() -> TranscriptionIntegration:
     )
 
 
+def get_idempotency_store(request: Request) -> IdempotencyStore:
+    """Return the runtime-resolved idempotency store from app state."""
+    state_store = getattr(request.app.state, "idempotency_store", None)
+    if isinstance(state_store, IdempotencyStore):
+        return state_store
+    return _get_fallback_idempotency_store()
+
+
 @lru_cache(maxsize=1)
-def get_idempotency_store() -> IdempotencyStore:
-    """Return the configured idempotency store singleton."""
+def _get_fallback_idempotency_store() -> IdempotencyStore:
+    """Compatibility fallback for contexts that bypass lifespan startup."""
     return build_idempotency_store()
+
+
+def get_extraction_control_manager(request: Request) -> ExtractionControlManager:
+    """Return runtime extraction control manager from app state."""
+    manager = getattr(request.app.state, "extraction_controls", None)
+    if isinstance(manager, ExtractionControlManager):
+        return manager
+    return extraction_controls
 
 
 def get_auth_service(
@@ -273,7 +293,7 @@ def require_csrf(
 
 
 @asynccontextmanager
-async def extraction_capacity_guard(user_id: UUID) -> AsyncIterator[None]:
+async def extraction_capacity_guard(request: Request, user_id: UUID) -> AsyncIterator[None]:
     """Hold extraction quota/concurrency for the wrapped block (no-op when limiter disabled).
 
     Use inside route handlers after SlowAPI's per-route limit check so 429s from the
@@ -285,11 +305,13 @@ async def extraction_capacity_guard(user_id: UUID) -> AsyncIterator[None]:
     SlowAPI decorators independently of extraction guards, introduce a dedicated
     ``EXTRACTION_GUARDS_ENABLED`` setting rather than removing this check.
     """
-    if not limiter.enabled:
+    limiter = getattr(request.app.state, "limiter", None)
+    if limiter is not None and not limiter.enabled:
         yield
         return
 
-    async with reserve_extraction_capacity(user_id) as capacity_available:
+    manager = get_extraction_control_manager(request)
+    async with reserve_extraction_capacity(user_id, manager=manager) as capacity_available:
         if not capacity_available:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
