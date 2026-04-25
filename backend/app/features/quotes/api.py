@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import Annotated, Literal, Protocol, cast
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from arq.connections import ArqRedis
 from fastapi import (
@@ -268,14 +269,17 @@ async def extract_combined(
     db: Annotated[AsyncSession, Depends(get_db)],
     arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
     job_service: Annotated[JobService, Depends(get_job_service)],
+    idempotency_store: Annotated[IdempotencyStore, Depends(get_idempotency_store)],
     response: Response,
     clips: Annotated[list[UploadFile] | None, File()] = None,
     notes: Annotated[str, Form(max_length=NOTE_INPUT_MAX_CHARS)] = "",
     customer_id: Annotated[UUID | None, Form()] = None,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> PersistedExtractionResponse | JobRecordResponse:
     """Extract quote data, persist the draft, and return a quote id or extraction job."""
     del request
     clip_inputs = await _parse_upload_clips(clips or [])
+    clip_hashes = [sha256(clip.content).hexdigest() for clip in clip_inputs]
     capture_detail = _resolve_capture_detail(clip_inputs, notes)
     source_type = _resolve_source_type(clip_inputs)
 
@@ -287,96 +291,230 @@ async def extract_combined(
     except QuoteServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
+    normalized_idempotency_key: str | None = None
+    idempotency_resource_id: UUID | None = None
+    if idempotency_key is not None:
+        try:
+            normalized_idempotency_key = validate_idempotency_key(idempotency_key)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        idempotency_resource_id = _build_extraction_resource_id(
+            user_id=user.id,
+            notes=notes,
+            clip_hashes=clip_hashes,
+            customer_id=customer_id,
+        )
+        replay = await idempotency_store.begin(
+            endpoint_slug="quote-extract",
+            user_id=user.id,
+            resource_id=idempotency_resource_id,
+            idempotency_key=normalized_idempotency_key,
+        )
+        if replay.kind == "replay" and replay.response is not None:
+            response.headers["Idempotency-Replayed"] = "true"
+            response.status_code = replay.response.status_code
+            if replay.response.status_code == status.HTTP_202_ACCEPTED:
+                return JobRecordResponse.model_validate(replay.response.payload)
+            return PersistedExtractionResponse.model_validate(replay.response.payload)
+        if replay.kind == "in_progress":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Extraction already in progress for this key",
+            )
+        if replay.kind == "conflict":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Idempotency key reused with different content",
+            )
+
     if arq_pool is None:
-        async with extraction_capacity_guard(user.id):
-            try:
-                extraction = await extraction_service.extract_combined(
-                    clip_inputs,
-                    notes,
-                    mode="initial",
-                    user_id=user.id,
-                    allow_degraded_persist_on_retryable_failure=True,
-                )
-            except QuoteServiceError as exc:
-                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-
-            try:
-                quote = await quote_service.create_extracted_draft(
-                    user_id=user.id,
-                    customer_id=customer_id,
-                    extraction_result=extraction,
-                    source_type=source_type,
-                )
-            except QuoteServiceError as exc:
-                if exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
-                    log_draft_generation_failed_event(
+        try:
+            async with extraction_capacity_guard(user.id):
+                try:
+                    extraction = await extraction_service.extract_combined(
+                        clip_inputs,
+                        notes,
+                        mode="initial",
                         user_id=user.id,
-                        capture_detail=capture_detail,
+                        allow_degraded_persist_on_retryable_failure=True,
                     )
-                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-        log_event(
-            "quote.created",
-            user_id=user.id,
-            quote_id=quote.id,
-            customer_id=quote.customer_id,
-        )
-        log_draft_generated_event(
-            user_id=user.id,
-            quote_id=quote.id,
-            customer_id=quote.customer_id,
-            capture_detail=capture_detail,
-            extraction_result=extraction,
-        )
-        return PersistedExtractionResponse.from_internal_persisted_result(
-            quote_id=quote.id,
-            result=extraction,
-        )
+                except QuoteServiceError as exc:
+                    raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+                try:
+                    quote = await quote_service.create_extracted_draft(
+                        user_id=user.id,
+                        customer_id=customer_id,
+                        extraction_result=extraction,
+                        source_type=source_type,
+                    )
+                except QuoteServiceError as exc:
+                    if exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
+                        log_draft_generation_failed_event(
+                            user_id=user.id,
+                            capture_detail=capture_detail,
+                        )
+                    raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+            log_event(
+                "quote.created",
+                user_id=user.id,
+                quote_id=quote.id,
+                customer_id=quote.customer_id,
+            )
+            log_draft_generated_event(
+                user_id=user.id,
+                quote_id=quote.id,
+                customer_id=quote.customer_id,
+                capture_detail=capture_detail,
+                extraction_result=extraction,
+            )
+            persisted_response = PersistedExtractionResponse.from_internal_persisted_result(
+                quote_id=quote.id,
+                result=extraction,
+            )
+            if normalized_idempotency_key and idempotency_resource_id:
+                try:
+                    await idempotency_store.complete(
+                        endpoint_slug="quote-extract",
+                        user_id=user.id,
+                        resource_id=idempotency_resource_id,
+                        idempotency_key=normalized_idempotency_key,
+                        status_code=status.HTTP_200_OK,
+                        payload=persisted_response.model_dump(mode="json"),
+                    )
+                except Exception:  # pragma: no cover - degraded Redis persistence path
+                    LOGGER.warning(
+                        "quote extraction completed without persisted idempotency replay state",
+                        extra={"user_id": str(user.id)},
+                    )
+            return persisted_response
+        except Exception:
+            if normalized_idempotency_key and idempotency_resource_id:
+                try:
+                    await idempotency_store.abort(
+                        endpoint_slug="quote-extract",
+                        user_id=user.id,
+                        resource_id=idempotency_resource_id,
+                        idempotency_key=normalized_idempotency_key,
+                    )
+                except Exception:  # pragma: no cover - degraded Redis persistence path
+                    LOGGER.warning(
+                        "quote extraction idempotency abort failed after sync failure",
+                        extra={"user_id": str(user.id)},
+                    )
+            raise
 
     try:
-        prepared_capture_input = await extraction_service.prepare_capture_input(
-            clip_inputs,
-            notes,
-            user_id=user.id,
-        )
-    except QuoteServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        try:
+            prepared_capture_input = await extraction_service.prepare_capture_input(
+                clip_inputs,
+                notes,
+                user_id=user.id,
+            )
+        except QuoteServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    settings = get_settings()
-    job = await job_service.create_extraction_job_if_capacity_available(
-        user_id=user.id,
-        concurrency_limit=settings.extraction_concurrency_limit,
-    )
-    if job is None:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Extraction quota or concurrency exhausted. Please retry later.",
+        settings = get_settings()
+        job = await job_service.create_extraction_job_if_capacity_available(
+            user_id=user.id,
+            concurrency_limit=settings.extraction_concurrency_limit,
         )
-    try:
-        queued_job = await arq_pool.enqueue_job(
-            EXTRACTION_JOB_NAME,
-            str(job.id),
-            _job_id=str(job.id),
-            correlation_id=current_correlation_id(),
-            prepared_capture_input=prepared_capture_input.model_dump(mode="json"),
-            extraction_mode="initial",
-            source_type=source_type,
-            capture_detail=capture_detail,
-            customer_id=str(customer_id) if customer_id is not None else None,
-        )
-        if queued_job is None:
-            raise RuntimeError("ARQ did not accept the extraction job")
-    except Exception as exc:
-        LOGGER.warning("Failed to enqueue extraction job %s", job.id, exc_info=True)
-        await job_service.mark_enqueue_failed(job.id, job_type=JobType.EXTRACTION)
+        if job is None:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Extraction quota or concurrency exhausted. Please retry later.",
+            )
+        try:
+            queued_job = await arq_pool.enqueue_job(
+                EXTRACTION_JOB_NAME,
+                str(job.id),
+                _job_id=str(job.id),
+                correlation_id=current_correlation_id(),
+                prepared_capture_input=prepared_capture_input.model_dump(mode="json"),
+                extraction_mode="initial",
+                source_type=source_type,
+                capture_detail=capture_detail,
+                customer_id=str(customer_id) if customer_id is not None else None,
+            )
+            if queued_job is None:
+                raise RuntimeError("ARQ did not accept the extraction job")
+        except Exception as exc:
+            LOGGER.warning("Failed to enqueue extraction job %s", job.id, exc_info=True)
+            await job_service.mark_enqueue_failed(job.id, job_type=JobType.EXTRACTION)
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=_QUEUE_FAILURE_DETAIL,
+            ) from exc
+
         await db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_QUEUE_FAILURE_DETAIL,
-        ) from exc
+        response.status_code = status.HTTP_202_ACCEPTED
+        job_response = job_record_to_response(job)
+        if normalized_idempotency_key and idempotency_resource_id:
+            try:
+                await idempotency_store.complete(
+                    endpoint_slug="quote-extract",
+                    user_id=user.id,
+                    resource_id=idempotency_resource_id,
+                    idempotency_key=normalized_idempotency_key,
+                    status_code=status.HTTP_202_ACCEPTED,
+                    payload=job_response.model_dump(mode="json"),
+                )
+            except Exception:  # pragma: no cover - degraded Redis persistence path
+                LOGGER.warning(
+                    "quote extraction queued without persisted idempotency replay state",
+                    extra={"user_id": str(user.id)},
+                )
+        return job_response
+    except Exception:
+        if normalized_idempotency_key and idempotency_resource_id:
+            try:
+                await idempotency_store.abort(
+                    endpoint_slug="quote-extract",
+                    user_id=user.id,
+                    resource_id=idempotency_resource_id,
+                    idempotency_key=normalized_idempotency_key,
+                )
+            except Exception:  # pragma: no cover - degraded Redis persistence path
+                LOGGER.warning(
+                    "quote extraction idempotency abort failed after async failure",
+                    extra={"user_id": str(user.id)},
+                )
+        raise
 
-    await db.commit()
-    response.status_code = status.HTTP_202_ACCEPTED
-    return job_record_to_response(job)
+
+def _build_extraction_resource_id(
+    *,
+    user_id: UUID,
+    notes: str,
+    clip_hashes: list[str],
+    customer_id: UUID | None,
+) -> UUID:
+    fingerprint = _build_extraction_fingerprint(
+        user_id=user_id,
+        notes=notes,
+        clip_hashes=clip_hashes,
+        customer_id=customer_id,
+    )
+    return uuid5(NAMESPACE_URL, f"extract:{fingerprint}")
+
+
+def _build_extraction_fingerprint(
+    *,
+    user_id: UUID,
+    notes: str,
+    clip_hashes: list[str],
+    customer_id: UUID | None,
+) -> str:
+    normalized_parts = [
+        str(user_id),
+        notes.strip(),
+        str(len(clip_hashes)),
+        ",".join(sorted(clip_hashes)),
+        str(customer_id) if customer_id is not None else "",
+    ]
+    return sha256("|".join(normalized_parts).encode()).hexdigest()
 
 
 def _resolve_source_type(clips: list[CaptureAudioClip]) -> Literal["text", "voice"]:
