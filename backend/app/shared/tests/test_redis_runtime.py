@@ -96,7 +96,14 @@ async def test_resolve_runtime_state_rejects_unhealthy_redis_when_degraded_disab
 
 
 @pytest.mark.asyncio
-async def test_resolve_runtime_state_allows_missing_redis_in_development_default() -> None:
+async def test_resolve_runtime_state_allows_missing_redis_in_development_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TEST_REDIS_URL", raising=False)
+    monkeypatch.setenv("REDIS_URL", "")
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    get_settings.cache_clear()
+
     settings = get_settings()
 
     runtime_state = await resolve_redis_runtime_state(settings)
