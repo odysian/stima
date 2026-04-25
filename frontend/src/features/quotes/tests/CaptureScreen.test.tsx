@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CaptureScreen } from "@/features/quotes/components/CaptureScreen";
 import { useQuoteDraft } from "@/features/quotes/hooks/useQuoteDraft";
 import { getCaptureSession, updateCaptureField } from "@/features/quotes/offline/captureRepository";
+import { enqueueJob, getJobForSession, updateJobStatus } from "@/features/quotes/offline/outboxRepository";
 import { HOME_ROUTE } from "@/features/quotes/utils/workflowNavigation";
 import { MAX_VOICE_CLIPS_PER_CAPTURE, useVoiceCapture, type VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { quoteService } from "@/features/quotes/services/quoteService";
@@ -125,6 +126,27 @@ vi.mock("@/features/quotes/offline/captureRepository", () => ({
   updateCaptureField: vi.fn(async () => undefined),
 }));
 
+vi.mock("@/features/quotes/offline/outboxRepository", () => ({
+  enqueueJob: vi.fn(async ({ sessionId }: { sessionId: string }) => ({
+    jobId: "job-1",
+    userId: "user-1",
+    sessionId,
+    idempotencyKey: "idem-1",
+    status: "queued",
+    attemptCount: 0,
+    maxAttempts: 5,
+    nextRetryAt: null,
+    lastFailureKind: null,
+    lastError: null,
+    serverQuoteId: null,
+    serverJobId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })),
+  getJobForSession: vi.fn(async () => null),
+  updateJobStatus: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/shared/lib/jobService", () => ({
   jobService: {
     getJobStatus: vi.fn(),
@@ -138,6 +160,9 @@ const mockedQuoteService = vi.mocked(quoteService);
 const mockedJobService = vi.mocked(jobService);
 const mockedGetCaptureSession = vi.mocked(getCaptureSession);
 const mockedUpdateCaptureField = vi.mocked(updateCaptureField);
+const mockedEnqueueJob = vi.mocked(enqueueJob);
+const mockedGetJobForSession = vi.mocked(getJobForSession);
+const mockedUpdateJobStatus = vi.mocked(updateJobStatus);
 
 const extractionFixture: ExtractionResult = {
   transcript: "5 yards brown mulch",
@@ -359,6 +384,9 @@ beforeEach(() => {
   mockedJobService.getJobStatus.mockReset();
   mockedGetCaptureSession.mockResolvedValue(null);
   mockedUpdateCaptureField.mockResolvedValue(undefined);
+  mockedEnqueueJob.mockClear();
+  mockedGetJobForSession.mockResolvedValue(null);
+  mockedUpdateJobStatus.mockResolvedValue(undefined);
   useParamsMock.mockReturnValue({ customerId: "cust-1" });
 });
 
@@ -609,6 +637,11 @@ describe("CaptureScreen", () => {
     expect(
       await screen.findByText("Ready to extract when online. Your notes are still saved on this device."),
     ).toBeInTheDocument();
+    expect(mockedEnqueueJob).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user-1",
+      sessionId: "local-session-1",
+      idempotencyKey: expect.any(String),
+    }));
     expect(screen.getByText("Ready to extract when online")).toBeInTheDocument();
   });
 

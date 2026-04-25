@@ -6,6 +6,7 @@ import {
   listRecoverableCaptures,
 } from "@/features/quotes/offline/captureRepository";
 import type { LocalCaptureSummary } from "@/features/quotes/offline/captureTypes";
+import { listAllJobsForUser } from "@/features/quotes/offline/outboxRepository";
 
 const MAX_RECOVERABLE_CAPTURES = 20;
 
@@ -39,8 +40,36 @@ export function useRecoverableCaptures(userId: string | undefined): UseRecoverab
 
     try {
       await deleteEmptyAbandonedSessions(userId);
-      const nextCaptures = await listRecoverableCaptures(userId);
-      setCaptures(nextCaptures.slice(0, MAX_RECOVERABLE_CAPTURES));
+      const [nextCaptures, outboxJobs] = await Promise.all([
+        listRecoverableCaptures(userId),
+        listAllJobsForUser(userId),
+      ]);
+      const nextCaptureBySessionId = new Map(nextCaptures.map((capture) => [capture.sessionId, capture]));
+      const latestJobBySessionId = new Map<string, (typeof outboxJobs)[number]>();
+      for (const outboxJob of outboxJobs) {
+        if (!nextCaptureBySessionId.has(outboxJob.sessionId)) {
+          continue;
+        }
+        if (!latestJobBySessionId.has(outboxJob.sessionId)) {
+          latestJobBySessionId.set(outboxJob.sessionId, outboxJob);
+        }
+      }
+
+      const captureSummaries = nextCaptures.map((capture) => {
+        const outboxJob = latestJobBySessionId.get(capture.sessionId);
+        if (!outboxJob) {
+          return capture;
+        }
+
+        return {
+          ...capture,
+          outboxStatus: outboxJob.status,
+          outboxAttemptCount: outboxJob.attemptCount,
+          outboxMaxAttempts: outboxJob.maxAttempts,
+        } satisfies LocalCaptureSummary;
+      });
+
+      setCaptures(captureSummaries.slice(0, MAX_RECOVERABLE_CAPTURES));
     } catch (loadError) {
       setError(getErrorMessage(loadError));
     } finally {

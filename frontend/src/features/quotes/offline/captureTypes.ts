@@ -51,7 +51,11 @@ export interface CreateLocalCaptureInput {
 export type LocalCaptureSummary = Pick<
   LocalCaptureSession,
   "sessionId" | "status" | "notes" | "updatedAt" | "lastFailureKind" | "lastError"
->;
+> & {
+  outboxStatus?: OutboxJobStatus | null;
+  outboxAttemptCount?: number;
+  outboxMaxAttempts?: number;
+};
 
 export interface LocalSyncEvent {
   eventId: string;
@@ -98,14 +102,33 @@ export interface LocalDraftRecord {
   updatedAt: string;
 }
 
-export type LocalOutboxStatus = "pending" | "processing" | "failed" | "succeeded";
+export type OutboxJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed_retryable"
+  | "failed_terminal";
 
-export interface LocalOutboxJob {
+export interface OutboxJob {
   jobId: string;
-  sessionId: string;
   userId: string;
-  status: LocalOutboxStatus;
-  attempts: number;
+  sessionId: string;
+  idempotencyKey: string;
+  status: OutboxJobStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  nextRetryAt: string | null;
+  lastFailureKind: SubmitFailureKind | null;
+  lastError: string | null;
+  serverQuoteId: string | null;
+  serverJobId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EnqueueJobInput {
+  userId: string;
+  sessionId: string;
+  idempotencyKey: string;
+  maxAttempts?: number;
 }
