@@ -57,6 +57,7 @@ function profileResponse(overrides: Partial<ProfileResponse> = {}): ProfileRespo
 
 beforeEach(() => {
   mockedUseAuth.mockReturnValue({
+    authMode: "signed_out",
     user: null,
     isLoading: false,
     isOnboarded: false,
@@ -92,6 +93,7 @@ describe("OnboardingForm", () => {
   it("submits profile updates and navigates to root on success", async () => {
     const refreshUser = vi.fn(async () => undefined);
     mockedUseAuth.mockReturnValue({
+      authMode: "signed_out",
       user: null,
       isLoading: false,
       isOnboarded: false,

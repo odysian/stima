@@ -10,7 +10,7 @@ import {
 import { useToast } from "@/ui/Toast";
 
 export function OutboxSyncCoordinator(): React.ReactElement | null {
-  const { user } = useAuth();
+  const { authMode, user } = useAuth();
   const { show } = useToast();
   const previousUserIdRef = useRef<string | null>(null);
 
@@ -50,13 +50,16 @@ export function OutboxSyncCoordinator(): React.ReactElement | null {
       return;
     }
 
-    void runOutboxPass(user.id, { onEvent, forceAfterAuth: true });
+    void runOutboxPass(user.id, {
+      onEvent,
+      forceAfterAuth: authMode === "verified",
+    });
     const cleanup = registerOnlineTrigger(user.id, { onEvent });
     return () => {
       cleanup();
       clearOutboxEngineStateForUser(user.id);
     };
-  }, [onEvent, user?.id]);
+  }, [authMode, onEvent, user?.id]);
 
   return null;
 }

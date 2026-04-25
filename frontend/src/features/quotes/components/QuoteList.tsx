@@ -18,6 +18,7 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { formatDate } from "@/shared/lib/formatters";
+import { Banner } from "@/ui/Banner";
 import { EmptyState } from "@/ui/EmptyState";
 import { buildInvoiceSubtitle, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
 
@@ -25,7 +26,7 @@ type DocumentMode = "quotes" | "invoices";
 
 export function QuoteList(): React.ReactElement {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { authMode, user } = useAuth();
   const [documentMode, setDocumentMode] = useState<DocumentMode>("quotes");
   const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
@@ -352,21 +353,24 @@ export function QuoteList(): React.ReactElement {
         </div>
 
         {documentMode === "quotes" ? (
-          <PendingCapturesSection
-            captures={recoverableCaptures}
-            isLoading={isLoadingRecoverableCaptures}
-            isOnline={isOnline}
-            timezone={timezone}
-            error={recoverableCapturesError ?? pendingCaptureActionError}
-            onResume={(sessionId) => navigateToLocalCapture(sessionId)}
-            onExtract={(sessionId) => navigateToLocalCapture(sessionId, { autoExtract: true })}
-            onRetry={(sessionId) => {
-              void onRetryCapture(sessionId);
-            }}
-            onDelete={(sessionId) => {
-              void onDeleteCapture(sessionId);
-            }}
-          />
+          <>
+            {authMode === "offline_recovered" ? (
+              <div className="mb-4 px-4">
+                <Banner kind="warn" title="Offline mode" message="Showing locally saved pending captures. Reconnect to verify your account and resume sync." />
+              </div>
+            ) : null}
+            <PendingCapturesSection
+              captures={recoverableCaptures}
+              isLoading={isLoadingRecoverableCaptures}
+              isOnline={isOnline}
+              timezone={timezone}
+              error={recoverableCapturesError ?? pendingCaptureActionError}
+              onResume={(sessionId) => navigateToLocalCapture(sessionId)}
+              onExtract={(sessionId) => navigateToLocalCapture(sessionId, { autoExtract: true })}
+              onRetry={(sessionId) => { void onRetryCapture(sessionId); }}
+              onDelete={(sessionId) => { void onDeleteCapture(sessionId); }}
+            />
+          </>
         ) : null}
 
         {isLoading ? (

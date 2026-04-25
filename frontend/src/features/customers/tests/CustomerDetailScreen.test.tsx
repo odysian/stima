@@ -153,6 +153,7 @@ beforeEach(() => {
     }),
   ]);
   mockedUseAuth.mockReturnValue({
+    authMode: "verified",
     isLoading: false,
     isOnboarded: true,
     login: vi.fn(async () => undefined),

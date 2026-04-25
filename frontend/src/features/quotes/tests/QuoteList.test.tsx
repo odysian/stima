@@ -108,8 +108,9 @@ function makeInvoiceListItem(overrides: Partial<InvoiceListItem> = {}): InvoiceL
   };
 }
 
-function mockProfile(timezone: string | null = "UTC"): void {
+function mockProfile(timezone: string | null = "UTC", authMode: "verified" | "offline_recovered" = "verified"): void {
   mockedUseAuth.mockReturnValue({
+    authMode,
     isLoading: false,
     isOnboarded: true,
     login: vi.fn(async () => undefined),
@@ -251,6 +252,16 @@ describe("QuoteList", () => {
 
     expect(quotesButton).toHaveClass("ghost-shadow", "bg-surface-container-lowest", "text-primary");
     expect(createButton).toHaveClass("forest-gradient", "ghost-shadow", "text-on-primary");
+  });
+
+  it("shows an offline-mode banner for offline_recovered auth", async () => {
+    mockProfile("UTC", "offline_recovered");
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+
+    expect(await screen.findByText("Offline mode")).toBeInTheDocument();
+    expect(screen.getByText(/showing locally saved pending captures/i)).toBeInTheDocument();
   });
 
   it("renders pending captures with resume, extract, and delete actions", async () => {

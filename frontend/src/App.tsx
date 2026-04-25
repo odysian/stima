@@ -57,10 +57,10 @@ const SettingsScreen = lazy(() =>
 );
 
 function ProtectedRoute(): React.ReactElement {
-  const { user, isOnboarded } = useAuth();
+  const { authMode, isOnboarded } = useAuth();
   const location = useLocation();
 
-  if (!user) {
+  if (authMode === "signed_out") {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   if (!isOnboarded) {
@@ -71,9 +71,9 @@ function ProtectedRoute(): React.ReactElement {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }): React.ReactElement {
-  const { user } = useAuth();
+  const { authMode } = useAuth();
 
-  if (user) {
+  if (authMode !== "signed_out") {
     return <Navigate to="/" replace />;
   }
 
@@ -81,9 +81,9 @@ function PublicRoute({ children }: { children: React.ReactNode }): React.ReactEl
 }
 
 function OnboardingRoute(): React.ReactElement {
-  const { user, isOnboarded } = useAuth();
+  const { authMode, isOnboarded } = useAuth();
 
-  if (!user) {
+  if (authMode === "signed_out") {
     return <Navigate to="/login" replace />;
   }
   if (isOnboarded) {
@@ -94,9 +94,9 @@ function OnboardingRoute(): React.ReactElement {
 }
 
 function RootHome(): React.ReactElement {
-  const { user, isOnboarded } = useAuth();
+  const { authMode, isOnboarded } = useAuth();
 
-  if (!user) {
+  if (authMode === "signed_out") {
     return <LandingPage />;
   }
   if (!isOnboarded) {
