@@ -265,3 +265,17 @@ def test_production_requires_redis_url(monkeypatch) -> None:
 
     with pytest.raises(ValidationError, match="REDIS_URL must be set"):
         get_settings()
+
+
+def test_production_allows_missing_redis_url_when_degraded_mode_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+    monkeypatch.setenv("ALLOW_REDIS_DEGRADED_MODE", "true")
+    monkeypatch.setenv("REDIS_URL", "")
+
+    settings = get_settings()
+
+    assert settings.redis_url is None
+    assert settings.allow_redis_degraded_mode is True

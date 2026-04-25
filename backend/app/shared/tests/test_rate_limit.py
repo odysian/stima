@@ -19,6 +19,7 @@ from app.shared.rate_limit import (
     get_ip_key,
     get_user_key,
     resolve_limiter_backend,
+    resolve_limiter_backend_for_runtime_mode,
 )
 from limits.storage.memory import MemoryStorage
 from limits.storage.redis import RedisStorage
@@ -254,6 +255,35 @@ def test_resolve_limiter_backend_rejects_production_without_redis_url() -> None:
     settings = Settings.model_construct(environment="production", redis_url=None)
     with pytest.raises(ValueError, match="REDIS_URL must be set"):
         resolve_limiter_backend(settings)
+
+
+def test_resolve_limiter_backend_allows_production_memory_when_degraded_enabled() -> None:
+    settings = Settings.model_construct(
+        environment="production",
+        redis_url=None,
+        allow_redis_degraded_mode=True,
+    )
+
+    backend = resolve_limiter_backend(settings)
+
+    assert backend.mode == "memory"
+    assert backend.storage_uri == "memory://"
+
+
+def test_resolve_limiter_backend_for_runtime_mode_forces_memory() -> None:
+    settings = Settings.model_construct(
+        environment="production",
+        redis_url="redis://localhost:6379/0",
+    )
+
+    backend = resolve_limiter_backend_for_runtime_mode(
+        settings,
+        runtime_mode="memory",
+        degraded_reason="redis_probe_failed",
+    )
+
+    assert backend.mode == "memory"
+    assert backend.fallback_reason == "redis_probe_failed"
 
 
 @pytest.mark.asyncio

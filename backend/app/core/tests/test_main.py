@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator, Iterator
-from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
 from app.core.config import get_settings
 from app.main import create_app
+from app.shared.idempotency import IdempotencyStore, InMemoryIdempotencyStateStore
+from app.shared.rate_limit import ExtractionControlManager, InMemoryExtractionStateStore
+from app.shared.redis_runtime import RedisRuntimeState
 from httpx import ASGITransport, AsyncClient
 
 
@@ -21,6 +23,11 @@ def _required_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.delenv("ALLOWED_HOSTS", raising=False)
     monkeypatch.delenv("ENABLE_HTTPS_REDIRECT", raising=False)
     monkeypatch.delenv("TRUSTED_PROXY_IPS", raising=False)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.delenv("COOKIE_SECURE", raising=False)
+    monkeypatch.delenv("FRONTEND_URL", raising=False)
+    monkeypatch.delenv("ALLOW_REDIS_DEGRADED_MODE", raising=False)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -63,6 +70,7 @@ async def test_trusted_proxy_headers_prevent_https_redirect_loops(
     monkeypatch.setenv("COOKIE_SECURE", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://stima.odysian.dev")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("ALLOW_REDIS_DEGRADED_MODE", "true")
     monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.odysian.dev,127.0.0.1")
     monkeypatch.setenv("ENABLE_HTTPS_REDIRECT", "true")
     monkeypatch.setenv("TRUSTED_PROXY_IPS", "127.0.0.1")
@@ -170,18 +178,31 @@ async def test_missing_or_invalid_ingress_correlation_id_generates_new_value(
 async def test_app_lifespan_closes_extraction_controls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    aclose = AsyncMock()
+    extraction_controls = ExtractionControlManager(InMemoryExtractionStateStore())
+    extraction_controls_aclose = AsyncMock()
+    monkeypatch.setattr(extraction_controls, "aclose", extraction_controls_aclose)
+
+    idempotency_store = IdempotencyStore(InMemoryIdempotencyStateStore())
     idempotency_aclose = AsyncMock()
+    monkeypatch.setattr(idempotency_store, "aclose", idempotency_aclose)
 
-    class _CachedStoreFactory:
-        def __call__(self) -> object:
-            return SimpleNamespace(aclose=idempotency_aclose)
-
-        def cache_info(self) -> SimpleNamespace:
-            return SimpleNamespace(currsize=1)
-
-    monkeypatch.setattr("app.main.get_idempotency_store", _CachedStoreFactory())
-    monkeypatch.setattr("app.main.extraction_controls.aclose", aclose)
+    monkeypatch.setattr(
+        "app.main.resolve_redis_runtime_state",
+        AsyncMock(
+            return_value=RedisRuntimeState(
+                mode="degraded_memory",
+                degraded_reason="redis_missing",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "app.main.configure_runtime_rate_limit_state",
+        lambda **_: extraction_controls,
+    )
+    monkeypatch.setattr(
+        "app.main.build_idempotency_store",
+        lambda *_args, **_kwargs: idempotency_store,
+    )
 
     app = create_app()
 
@@ -189,15 +210,20 @@ async def test_app_lifespan_closes_extraction_controls(
         pass
 
     idempotency_aclose.assert_awaited_once()
-    aclose.assert_awaited_once()
+    extraction_controls_aclose.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_app_lifespan_degrades_when_arq_pool_startup_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("ALLOW_REDIS_DEGRADED_MODE", "true")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     get_settings.cache_clear()
+    monkeypatch.setattr(
+        "app.main.resolve_redis_runtime_state",
+        AsyncMock(return_value=RedisRuntimeState(mode="redis")),
+    )
     monkeypatch.setattr(
         "app.main.create_pool",
         AsyncMock(side_effect=RuntimeError("redis unavailable")),
@@ -207,6 +233,8 @@ async def test_app_lifespan_degrades_when_arq_pool_startup_fails(
 
     async with app.router.lifespan_context(app):
         assert app.state.arq_pool is None
+        assert app.state.redis_runtime_mode == "degraded_memory"
+        assert app.state.queue_available is False
 
 
 @pytest.mark.asyncio

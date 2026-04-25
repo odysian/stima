@@ -9,12 +9,14 @@ import time
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Literal, cast
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from fastapi import Request
 from jwt import InvalidTokenError
+from limits.storage import storage_from_string
+from limits.strategies import STRATEGIES
 from redis.asyncio import Redis
 from slowapi import Limiter
 
@@ -31,6 +33,7 @@ from app.shared.proxy_headers import (
 
 LOGGER = logging.getLogger(__name__)
 _MEMORY_STORAGE_URI = "memory://"
+RuntimeLimiterMode = Literal["redis", "memory"]
 
 
 def get_ip_key(request: Request) -> str:
@@ -69,7 +72,7 @@ def get_user_key(request: Request) -> str:
 @dataclass(frozen=True)
 class LimiterBackendConfig:
     storage_uri: str
-    mode: str
+    mode: RuntimeLimiterMode
     fallback_reason: str | None = None
 
 
@@ -324,6 +327,13 @@ def build_limiter(settings: Settings | None = None) -> Limiter:
     """Build a settings-backed SlowAPI limiter."""
     resolved_settings = settings if settings is not None else get_settings()
     backend = resolve_limiter_backend(resolved_settings)
+    return _build_limiter_from_backend(resolved_settings, backend)
+
+
+def _build_limiter_from_backend(
+    settings: Settings,
+    backend: LimiterBackendConfig,
+) -> Limiter:
     if backend.mode == "redis":
         LOGGER.info(
             "Redis rate limiting enabled with backend %s",
@@ -331,14 +341,14 @@ def build_limiter(settings: Settings | None = None) -> Limiter:
         )
         rate_limiter = Limiter(
             key_func=get_ip_key,
-            headers_enabled=resolved_settings.rate_limit_headers_enabled,
+            headers_enabled=settings.rate_limit_headers_enabled,
             storage_uri=backend.storage_uri,
-            storage_options={"key_prefix": resolved_settings.redis_key_prefix},
+            storage_options={"key_prefix": settings.redis_key_prefix},
         )
     else:
         rate_limiter = Limiter(
             key_func=get_ip_key,
-            headers_enabled=resolved_settings.rate_limit_headers_enabled,
+            headers_enabled=settings.rate_limit_headers_enabled,
             storage_uri=backend.storage_uri,
         )
     rate_limiter._stima_storage_mode = backend.mode  # type: ignore[attr-defined]
@@ -348,10 +358,15 @@ def build_limiter(settings: Settings | None = None) -> Limiter:
 
 def build_extraction_control_manager(
     settings: Settings | None = None,
+    *,
+    runtime_mode: RuntimeLimiterMode | None = None,
 ) -> ExtractionControlManager:
     """Build extraction quota/concurrency controls from the current settings."""
     resolved_settings = settings if settings is not None else get_settings()
-    backend = resolve_limiter_backend(resolved_settings)
+    backend = resolve_limiter_backend_for_runtime_mode(
+        resolved_settings,
+        runtime_mode=runtime_mode,
+    )
     if backend.mode == "redis" and resolved_settings.redis_url is not None:
         return ExtractionControlManager(
             RedisExtractionStateStore(resolved_settings.redis_url),
@@ -371,11 +386,34 @@ def configure_active_limiter_key_prefix(prefix: str) -> None:
 def resolve_limiter_backend(settings: Settings | None = None) -> LimiterBackendConfig:
     """Resolve whether the app should use Redis or degraded in-memory storage."""
     resolved_settings = settings if settings is not None else get_settings()
-    environment = resolved_settings.environment.lower()
-    if resolved_settings.redis_url:
-        return LimiterBackendConfig(storage_uri=resolved_settings.redis_url, mode="redis")
+    return resolve_limiter_backend_for_runtime_mode(
+        resolved_settings,
+        runtime_mode="redis" if resolved_settings.redis_url else None,
+    )
 
-    if environment == "production":
+
+def resolve_limiter_backend_for_runtime_mode(
+    settings: Settings,
+    *,
+    runtime_mode: RuntimeLimiterMode | None,
+    degraded_reason: str | None = None,
+) -> LimiterBackendConfig:
+    """Resolve limiter backend from explicit runtime mode when available."""
+    if runtime_mode == "redis":
+        if not settings.redis_url:
+            raise ValueError("REDIS_URL must be set when limiter runtime mode is redis")
+        return LimiterBackendConfig(storage_uri=settings.redis_url, mode="redis")
+    if runtime_mode == "memory":
+        return LimiterBackendConfig(
+            storage_uri=_MEMORY_STORAGE_URI,
+            mode="memory",
+            fallback_reason=degraded_reason,
+        )
+
+    if settings.redis_url:
+        return LimiterBackendConfig(storage_uri=settings.redis_url, mode="redis")
+
+    if settings.environment.lower() == "production" and not settings.allow_redis_degraded_mode:
         raise ValueError("REDIS_URL must be set when ENVIRONMENT is 'production'")
 
     fallback_reason = (
@@ -389,6 +427,64 @@ def resolve_limiter_backend(settings: Settings | None = None) -> LimiterBackendC
     )
 
 
+def configure_runtime_rate_limit_state(
+    *,
+    settings: Settings,
+    runtime_mode: RuntimeLimiterMode,
+    degraded_reason: str | None = None,
+) -> ExtractionControlManager:
+    """Rebind global limiter + extraction controls to runtime-resolved mode."""
+    backend = resolve_limiter_backend_for_runtime_mode(
+        settings,
+        runtime_mode=runtime_mode,
+        degraded_reason=degraded_reason,
+    )
+    _reconfigure_limiter_backend(limiter, backend=backend, settings=settings)
+
+    global extraction_controls
+    extraction_controls = build_extraction_control_manager(
+        settings,
+        runtime_mode=runtime_mode,
+    )
+    return extraction_controls
+
+
+def _reconfigure_limiter_backend(
+    rate_limiter: Limiter,
+    *,
+    backend: LimiterBackendConfig,
+    settings: Settings,
+) -> None:
+    old_storage = getattr(rate_limiter, "_storage", None)
+    strategy_name = getattr(rate_limiter, "_strategy", None) or "fixed-window"
+    storage_options = {"key_prefix": settings.redis_key_prefix} if backend.mode == "redis" else {}
+    storage = storage_from_string(backend.storage_uri, **storage_options)
+
+    rate_limiter._storage_uri = backend.storage_uri  # type: ignore[attr-defined]
+    rate_limiter._storage_options = storage_options  # type: ignore[attr-defined]
+    rate_limiter._storage = storage  # type: ignore[attr-defined]
+    rate_limiter._limiter = STRATEGIES[strategy_name](storage)  # type: ignore[attr-defined]
+    rate_limiter._stima_storage_mode = backend.mode  # type: ignore[attr-defined]
+    rate_limiter._stima_fallback_reason = backend.fallback_reason  # type: ignore[attr-defined]
+    _close_limiter_storage(old_storage)
+
+
+def _close_limiter_storage(storage: Any) -> None:
+    if storage is None:
+        return
+    storage_client = getattr(storage, "storage", None)
+    if storage_client is None:
+        return
+    close_sync = getattr(storage_client, "close", None)
+    if callable(close_sync):
+        close_sync()
+
+
+def close_limiter_storage(rate_limiter: Limiter) -> None:
+    """Release active limiter storage client resources when supported."""
+    _close_limiter_storage(getattr(rate_limiter, "_storage", None))
+
+
 limiter = build_limiter()
 extraction_controls = build_extraction_control_manager()
 
@@ -400,7 +496,11 @@ def reset_local_rate_limit_state() -> None:
 
 
 @asynccontextmanager
-async def reserve_extraction_capacity(user_id: UUID) -> AsyncIterator[bool]:
+async def reserve_extraction_capacity(
+    user_id: UUID,
+    *,
+    manager: ExtractionControlManager | None = None,
+) -> AsyncIterator[bool]:
     """Acquire extraction concurrency and daily quota before provider-backed work starts.
 
     Ordering: concurrency is acquired first so a provider slot is confirmed before
@@ -413,12 +513,13 @@ async def reserve_extraction_capacity(user_id: UUID) -> AsyncIterator[bool]:
     quota slot. Decide there whether retries should bypass this guard or consume
     quota per attempt.
     """
-    lease = await extraction_controls.acquire_concurrency(user_id)
+    active_manager = manager if manager is not None else extraction_controls
+    lease = await active_manager.acquire_concurrency(user_id)
     if lease is None:
         yield False
         return
 
-    quota_reserved = await extraction_controls.reserve_daily_quota(user_id)
+    quota_reserved = await active_manager.reserve_daily_quota(user_id)
     if not quota_reserved:
         await lease.release()
         yield False

@@ -17,6 +17,7 @@ from app.core.config import Settings, get_settings
 
 LOGGER = logging.getLogger(__name__)
 _IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
+RuntimeIdempotencyMode = Literal["redis", "memory"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,15 +357,29 @@ class IdempotencyStore:
         return self._settings if self._settings is not None else get_settings()
 
 
-def build_idempotency_store(settings: Settings | None = None) -> IdempotencyStore:
+def build_idempotency_store(
+    settings: Settings | None = None,
+    *,
+    runtime_mode: RuntimeIdempotencyMode | None = None,
+) -> IdempotencyStore:
     """Build a settings-backed idempotency store."""
     resolved_settings = settings if settings is not None else get_settings()
+    if runtime_mode == "redis":
+        if not resolved_settings.redis_url:
+            raise ValueError("REDIS_URL must be set when idempotency runtime mode is redis")
+        return IdempotencyStore(
+            RedisIdempotencyStateStore(resolved_settings.redis_url),
+            settings=resolved_settings,
+        )
+    if runtime_mode == "memory":
+        return IdempotencyStore(InMemoryIdempotencyStateStore(), settings=resolved_settings)
+
     if resolved_settings.redis_url:
         return IdempotencyStore(
             RedisIdempotencyStateStore(resolved_settings.redis_url),
-            settings=settings,
+            settings=resolved_settings,
         )
-    return IdempotencyStore(InMemoryIdempotencyStateStore(), settings=settings)
+    return IdempotencyStore(InMemoryIdempotencyStateStore(), settings=resolved_settings)
 
 
 def reset_local_idempotency_state(store: IdempotencyStore) -> None:

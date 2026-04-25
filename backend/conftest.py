@@ -24,15 +24,19 @@ os.environ["REDIS_URL"] = os.environ.get("TEST_REDIS_URL", "")
 from app.core.database import Base, get_db
 from app.features import registry as feature_registry  # noqa: F401
 from app.main import app
+from app.shared import dependencies as shared_dependencies
 from app.shared import event_logger
 from app.shared.dependencies import (
     get_extraction_integration,
-    get_idempotency_store,
     get_transcription_integration,
 )
 from app.shared.idempotency import reset_local_idempotency_state
 from app.shared.observability import reset_observability_state
-from app.shared.rate_limit import configure_active_limiter_key_prefix, reset_local_rate_limit_state
+from app.shared.rate_limit import (
+    configure_active_limiter_key_prefix,
+    configure_runtime_rate_limit_state,
+    reset_local_rate_limit_state,
+)
 
 TEST_SCHEMA = "stima_test"
 TEST_DATABASE_URL = os.getenv(
@@ -105,16 +109,25 @@ def _isolate_rate_limit_state(
     get_settings.cache_clear()
     get_extraction_integration.cache_clear()
     get_transcription_integration.cache_clear()
+    settings = get_settings()
+    configure_runtime_rate_limit_state(
+        settings=settings,
+        runtime_mode="redis" if settings.redis_url else "memory",
+    )
     configure_active_limiter_key_prefix(prefix)
     reset_local_rate_limit_state()
     reset_observability_state()
-    if get_idempotency_store.cache_info().currsize:
-        reset_local_idempotency_state(get_idempotency_store())
+    shared_dependencies._get_fallback_idempotency_store.cache_clear()
+    idempotency_store = getattr(app.state, "idempotency_store", None)
+    if idempotency_store is not None:
+        reset_local_idempotency_state(idempotency_store)
     yield
     reset_local_rate_limit_state()
     reset_observability_state()
-    if get_idempotency_store.cache_info().currsize:
-        reset_local_idempotency_state(get_idempotency_store())
+    idempotency_store = getattr(app.state, "idempotency_store", None)
+    if idempotency_store is not None:
+        reset_local_idempotency_state(idempotency_store)
+    shared_dependencies._get_fallback_idempotency_store.cache_clear()
     get_extraction_integration.cache_clear()
     get_transcription_integration.cache_clear()
     get_settings.cache_clear()

@@ -165,8 +165,7 @@ async def convert_notes(
     extraction_service: Annotated[ExtractionService, Depends(get_extraction_service)],
 ) -> ExtractionResponse:
     """Convert notes into extraction output without creating a persisted draft."""
-    del request
-    async with extraction_capacity_guard(user.id):
+    async with extraction_capacity_guard(request, user.id):
         try:
             extraction = await extraction_service.convert_notes(payload.notes)
             return ExtractionResponse.from_internal_result(extraction)
@@ -277,7 +276,6 @@ async def extract_combined(
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> PersistedExtractionResponse | JobRecordResponse:
     """Extract quote data, persist the draft, and return a quote id or extraction job."""
-    del request
     clip_inputs = await _parse_upload_clips(clips or [])
     clip_hashes = [sha256(clip.content).hexdigest() for clip in clip_inputs]
     capture_detail = _resolve_capture_detail(clip_inputs, notes)
@@ -330,7 +328,7 @@ async def extract_combined(
 
     if arq_pool is None:
         try:
-            async with extraction_capacity_guard(user.id):
+            async with extraction_capacity_guard(request, user.id):
                 try:
                     extraction = await extraction_service.extract_combined(
                         clip_inputs,
