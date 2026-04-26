@@ -359,6 +359,31 @@ describe("LineItemEditSheet", () => {
 
     expect(screen.getByLabelText(/price/i)).toHaveAttribute("inputmode", "decimal");
     expect(screen.getByLabelText(/details/i)).toHaveAttribute("rows", "2");
+    expect(screen.getByLabelText(/details/i)).toHaveClass("resize-none");
+  });
+
+  it("keeps a shared minimum tabpanel height in add mode across Manual and Catalog", async () => {
+    const user = userEvent.setup();
+    const onLoadCatalogItems = vi.fn().mockResolvedValue([]);
+
+    render(
+      <LineItemEditSheet
+        open
+        mode="add"
+        initialLineItem={makeLineItem({ description: "", details: null, price: null })}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onLoadCatalogItems={onLoadCatalogItems}
+      />,
+    );
+
+    expect(screen.getByRole("tabpanel")).toHaveClass("min-h-72");
+
+    await user.click(screen.getByRole("tab", { name: /catalog/i }));
+    await waitFor(() => {
+      expect(onLoadCatalogItems).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole("tabpanel")).toHaveClass("min-h-72");
   });
 
   it("fires delete callback from top-right trash action", () => {

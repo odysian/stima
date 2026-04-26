@@ -353,7 +353,11 @@ export function LineItemEditSheet({
                 </div>
               ) : null}
               {showManualFields ? (
-                <div id="line-item-tabpanel-manual" role={mode === "add" ? "tabpanel" : undefined} className="space-y-4">
+                <div
+                  id="line-item-tabpanel-manual"
+                  role={mode === "add" ? "tabpanel" : undefined}
+                  className={`space-y-4 ${mode === "add" ? "min-h-72" : ""}`.trim()}
+                >
                   <section className="space-y-2">
                     <div className="flex items-end justify-between">
                       <label htmlFor="line-item-sheet-description" className="font-headline text-sm font-bold text-on-surface">
@@ -419,7 +423,7 @@ export function LineItemEditSheet({
                           setFormError(null);
                         }
                       }}
-                      className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
+                      className="w-full resize-none rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
                     />
                   </section>
                 </div>
@@ -428,6 +432,7 @@ export function LineItemEditSheet({
                   loadState={catalogLoadState}
                   loadError={catalogLoadError}
                   items={catalogItems}
+                  panelClassName={mode === "add" ? "min-h-72" : undefined}
                   onRetry={() => {
                     setCatalogLoadState("idle");
                     void loadCatalogItems();
