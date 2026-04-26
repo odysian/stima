@@ -216,7 +216,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
       <section
         aria-live="polite"
         aria-atomic="false"
-        className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+var(--bottom-nav-offset,0px))] left-0 right-0 z-50 flex flex-col items-center gap-2 px-4"
+        className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+var(--bottom-nav-offset,0px))] left-0 right-0 z-[60] flex flex-col items-center gap-2 px-4"
       >
         {toasts.map((toast) => (
           <Toast key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
