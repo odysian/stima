@@ -44,6 +44,12 @@ describe("classifySubmitFailure", () => {
     expect(classifySubmitFailure(new HttpRequestError("Invalid payload", 422, null))).toBe("validation_failed");
   });
 
+  it("keeps explicit http auth failures even when navigator reports offline", () => {
+    setNavigatorOnline(false);
+
+    expect(classifySubmitFailure(new HttpRequestError("Unauthorized", 401, null))).toBe("auth_required");
+  });
+
   it("treats 409 with in-progress detail as retryable", () => {
     setNavigatorOnline(true);
 

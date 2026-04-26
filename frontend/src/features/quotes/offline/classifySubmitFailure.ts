@@ -28,35 +28,35 @@ function readPayloadDetail(payload: unknown): string {
 }
 
 export function classifySubmitFailure(error: unknown): SubmitFailureKind {
-  if (isOfflineEnvironment()) {
-    return "offline";
-  }
-
   if (isTimeoutLikeError(error)) {
     return "timeout";
   }
 
-  if (!isHttpRequestError(error)) {
-    return "server_retryable";
+  if (isHttpRequestError(error)) {
+    if (error.status === 401) {
+      return "auth_required";
+    }
+    if (error.status === 403) {
+      return "csrf_failed";
+    }
+    if (error.status === 422) {
+      return "validation_failed";
+    }
+    if (error.status === 409) {
+      return readPayloadDetail(error.payload).includes("already in progress")
+        ? "server_retryable"
+        : "csrf_failed";
+    }
+    if (error.status >= 500) {
+      return "server_retryable";
+    }
+
+    return "server_terminal";
   }
 
-  if (error.status === 401) {
-    return "auth_required";
-  }
-  if (error.status === 403) {
-    return "csrf_failed";
-  }
-  if (error.status === 422) {
-    return "validation_failed";
-  }
-  if (error.status === 409) {
-    return readPayloadDetail(error.payload).includes("already in progress")
-      ? "server_retryable"
-      : "csrf_failed";
-  }
-  if (error.status >= 500) {
-    return "server_retryable";
+  if (isOfflineEnvironment()) {
+    return "offline";
   }
 
-  return "server_terminal";
+  return "server_retryable";
 }

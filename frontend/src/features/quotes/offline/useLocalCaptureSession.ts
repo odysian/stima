@@ -102,6 +102,7 @@ export function useLocalCaptureSession({
   const persistTimerRef = useRef<number | null>(null);
   const notesRef = useRef(notes);
   const sessionRef = useRef<LocalCaptureSession | null>(session);
+  const pendingSessionCreationRef = useRef<Promise<LocalCaptureSession> | null>(null);
 
   const clearPersistTimer = useCallback((): void => {
     if (persistTimerRef.current !== null) {
@@ -126,6 +127,46 @@ export function useLocalCaptureSession({
     sessionRef.current = session;
   }, [session]);
 
+  const createSessionOnce = useCallback(async (
+    noteSnapshot: string,
+    customerSnapshot: string | null,
+  ): Promise<LocalCaptureSession> => {
+    if (!userId) {
+      throw new Error("Cannot create a local capture session without a user.");
+    }
+
+    const existingSession = sessionRef.current;
+    if (existingSession) {
+      return existingSession;
+    }
+
+    const pendingCreation = pendingSessionCreationRef.current;
+    if (pendingCreation) {
+      return pendingCreation;
+    }
+
+    const creationPromise = createCaptureSession({
+      userId,
+      notes: noteSnapshot,
+      customerId: customerSnapshot,
+    });
+    pendingSessionCreationRef.current = creationPromise;
+
+    try {
+      const createdSession = await creationPromise;
+      if (isMountedRef.current) {
+        setSession(createdSession);
+        setSaveState("saved");
+        setSaveError(null);
+      }
+      return createdSession;
+    } finally {
+      if (pendingSessionCreationRef.current === creationPromise) {
+        pendingSessionCreationRef.current = null;
+      }
+    }
+  }, [userId]);
+
   const ensureSessionRecord = useCallback(async (): Promise<LocalCaptureSession | null> => {
     if (!userId) {
       return null;
@@ -136,20 +177,10 @@ export function useLocalCaptureSession({
       return targetSession;
     }
 
-    targetSession = await createCaptureSession({
-      userId,
-      notes: notesRef.current,
-      customerId: customerId ?? null,
-    });
-
-    if (isMountedRef.current) {
-      setSession(targetSession);
-      setSaveState("saved");
-      setSaveError(null);
-    }
+    targetSession = await createSessionOnce(notesRef.current, customerId ?? null);
 
     return targetSession;
-  }, [customerId, userId]);
+  }, [createSessionOnce, customerId, userId]);
 
   const ensureSession = useCallback(async (): Promise<string | null> => {
     const targetSession = await ensureSessionRecord();
@@ -265,16 +296,11 @@ export function useLocalCaptureSession({
           const customerSnapshot = customerId ?? null;
 
           if (!targetSession) {
-            targetSession = await createCaptureSession({
-              userId,
-              notes: noteSnapshot,
-              customerId: customerSnapshot,
-            });
+            targetSession = await createSessionOnce(noteSnapshot, customerSnapshot);
 
             if (!isMountedRef.current) {
               return;
             }
-            setSession(targetSession);
           }
 
           if ((targetSession.customerId ?? null) !== customerSnapshot) {
@@ -306,7 +332,7 @@ export function useLocalCaptureSession({
     }, NOTES_PERSIST_DEBOUNCE_MS);
 
     return clearPersistTimer;
-  }, [clearPersistTimer, customerId, isHydrating, notes, userId]);
+  }, [clearPersistTimer, createSessionOnce, customerId, isHydrating, notes, userId]);
 
   const setClipIds = useCallback(async (clipIds: string[]): Promise<void> => {
     const normalizedClipIds = Array.from(new Set(clipIds));
