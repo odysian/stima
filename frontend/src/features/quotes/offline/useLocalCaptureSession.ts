@@ -4,6 +4,7 @@ import {
   createCaptureSession,
   deleteEmptyAbandonedSessions,
   getCaptureSession,
+  listRecoverableCaptures,
   markCaptureStatus,
   updateCaptureField,
   updateCaptureNotes,
@@ -179,7 +180,13 @@ export function useLocalCaptureSession({
       try {
         await deleteEmptyAbandonedSessions(userId);
 
-        if (!initialSessionId) {
+        let targetSessionId = initialSessionId;
+        if (!targetSessionId) {
+          const recoverableCaptures = await listRecoverableCaptures(userId);
+          targetSessionId = recoverableCaptures[0]?.sessionId ?? null;
+        }
+
+        if (!targetSessionId) {
           if (!isActive) {
             return;
           }
@@ -189,7 +196,7 @@ export function useLocalCaptureSession({
           return;
         }
 
-        const loadedSession = await getCaptureSession(initialSessionId);
+        const loadedSession = await getCaptureSession(targetSessionId);
         if (!isActive) {
           return;
         }
