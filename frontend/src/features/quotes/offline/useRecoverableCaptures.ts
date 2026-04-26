@@ -5,6 +5,7 @@ import {
   deleteEmptyAbandonedSessions,
   listRecoverableCaptures,
 } from "@/features/quotes/offline/captureRepository";
+import { getStorageErrorMessage } from "@/features/quotes/offline/captureDb";
 import type { LocalCaptureSummary } from "@/features/quotes/offline/captureTypes";
 import { subscribeLocalRecoveryChanged } from "@/features/quotes/offline/localRecoveryEvents";
 import { listAllJobsForUser } from "@/features/quotes/offline/outboxRepository";
@@ -20,7 +21,7 @@ interface UseRecoverableCapturesResult {
 }
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unable to load pending captures.";
+  return getStorageErrorMessage(error, "Unable to load pending captures.");
 }
 
 export function useRecoverableCaptures(userId: string | undefined): UseRecoverableCapturesResult {

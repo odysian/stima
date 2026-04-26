@@ -23,7 +23,7 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { formatDate } from "@/shared/lib/formatters";
 import { Banner } from "@/ui/Banner";
 import { EmptyState } from "@/ui/EmptyState";
-import { buildInvoiceSubtitle, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
+import { buildInvoiceSubtitle, buildPendingCaptureError, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
 type DocumentMode = "quotes" | "invoices";
 
 export function QuoteList(): React.ReactElement {
@@ -55,7 +55,6 @@ export function QuoteList(): React.ReactElement {
   });
   useEffect(() => {
     let isActive = true;
-
     async function fetchDocuments(): Promise<void> {
       if (documentMode === "quotes") {
         setIsLoadingQuotes(true);
@@ -77,7 +76,6 @@ export function QuoteList(): React.ReactElement {
         }
         return;
       }
-
       setIsLoadingInvoices(true);
       setInvoiceLoadError(null);
       try {
@@ -103,7 +101,6 @@ export function QuoteList(): React.ReactElement {
       isActive = false;
     };
   }, [authMode, documentMode, isOnline]);
-
   useEffect(() => {
     if (!isSearchOpen) {
       return;
@@ -220,6 +217,11 @@ export function QuoteList(): React.ReactElement {
     timezone,
     onCreateNew: () => navigate("/quotes/capture"),
     onQuoteDuplicated: (quoteId) => navigate(`/documents/${quoteId}/edit`),
+  });
+  const pendingCaptureError = buildPendingCaptureError({
+    authMode,
+    recoverableCapturesError,
+    pendingCaptureActionError,
   });
 
   function navigateToLocalCapture(sessionId: string, options?: { autoExtract?: boolean }): void {
@@ -355,7 +357,7 @@ export function QuoteList(): React.ReactElement {
               isLoading={isLoadingRecoverableCaptures}
               isOnline={isOnline}
               timezone={timezone}
-              error={recoverableCapturesError ?? pendingCaptureActionError}
+              error={pendingCaptureError}
               onResume={(sessionId) => navigateToLocalCapture(sessionId)}
               onExtract={(sessionId) => navigateToLocalCapture(sessionId, { autoExtract: true })}
               onRetry={(sessionId) => { void onRetryCapture(sessionId); }}

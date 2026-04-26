@@ -10,6 +10,7 @@ import {
   updateCaptureNotes,
 } from "@/features/quotes/offline/captureRepository";
 import { deleteAllClipsForSession } from "@/features/quotes/offline/audioRepository";
+import { getStorageErrorMessage } from "@/features/quotes/offline/captureDb";
 import type {
   LocalCaptureSession,
   LocalCaptureStatus,
@@ -50,7 +51,7 @@ interface UseLocalCaptureSessionResult {
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return getStorageErrorMessage(error, fallback);
 }
 
 function clearSyncedAudioCleanupTimer(sessionId: string): void {
