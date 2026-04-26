@@ -77,8 +77,8 @@ describe("useLocalCaptureSession", () => {
     });
   });
 
-  it("auto-restores the most recent recoverable session when query param is missing", async () => {
-    const existingSession = await createCaptureSession({
+  it("starts fresh when query param is missing even when recoverable sessions exist", async () => {
+    await createCaptureSession({
       userId: "user-1",
       notes: "Most recent pending capture",
       customerId: "cust-1",
@@ -92,8 +92,8 @@ describe("useLocalCaptureSession", () => {
 
     await waitFor(() => {
       expect(result.current.isHydrating).toBe(false);
-      expect(result.current.sessionId).toBe(existingSession.sessionId);
-      expect(result.current.notes).toBe("Most recent pending capture");
+      expect(result.current.sessionId).toBeNull();
+      expect(result.current.notes).toBe("");
     });
   });
 
