@@ -77,6 +77,26 @@ describe("useLocalCaptureSession", () => {
     });
   });
 
+  it("starts fresh when query param is missing even when recoverable sessions exist", async () => {
+    await createCaptureSession({
+      userId: "user-1",
+      notes: "Most recent pending capture",
+      customerId: "cust-1",
+    });
+
+    const { result } = renderHook(() => useLocalCaptureSession({
+      userId: "user-1",
+      customerId: "cust-1",
+      initialSessionId: null,
+    }));
+
+    await waitFor(() => {
+      expect(result.current.isHydrating).toBe(false);
+      expect(result.current.sessionId).toBeNull();
+      expect(result.current.notes).toBe("");
+    });
+  });
+
   it("hides local sessions that belong to another user", async () => {
     const otherUsersSession = await createCaptureSession({
       userId: "user-a",

@@ -37,7 +37,7 @@ describe("PwaUpdatePrompt", () => {
 
     expect(screen.getByText("New version available.")).toBeInTheDocument();
     expect(container.querySelector("aside")).toHaveClass(
-      "bottom-[calc(5rem+env(safe-area-inset-bottom))]",
+      "top-[calc(4rem+env(safe-area-inset-top)+0.75rem)]",
     );
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
   });

@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
+import { LOCAL_STORAGE_RESET_MESSAGE } from "@/features/quotes/offline/captureDb";
 import { dispatchLocalRecoveryChanged } from "@/features/quotes/offline/localRecoveryEvents";
 import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
@@ -265,6 +266,59 @@ describe("QuoteList", () => {
     expect(screen.getByText(/showing locally saved pending captures/i)).toBeInTheDocument();
   });
 
+  it("refetches quotes when auth recovers from offline_recovered to verified while online", async () => {
+    setNavigatorOnline(true);
+    let authMode: "verified" | "offline_recovered" = "offline_recovered";
+    mockedUseAuth.mockImplementation(() => ({
+      authMode,
+      isLoading: false,
+      isOnboarded: true,
+      login: vi.fn(async () => undefined),
+      logout: vi.fn(async () => undefined),
+      refreshUser: vi.fn(async () => undefined),
+      register: vi.fn(async () => undefined),
+      user: {
+        id: "user-1",
+        email: "test@example.com",
+        is_active: true,
+        is_onboarded: true,
+        timezone: "UTC",
+      },
+    }));
+
+    mockedQuoteService.listQuotes
+      .mockResolvedValueOnce([makeQuoteListItem()])
+      .mockResolvedValueOnce([
+        makeQuoteListItem({
+          id: "quote-2",
+          doc_number: "Q-002",
+          customer_id: "cust-2",
+          customer_name: "Bob Brown",
+        }),
+      ]);
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <QuoteList />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Offline mode")).toBeInTheDocument();
+    expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(1);
+
+    authMode = "verified";
+    rerender(
+      <MemoryRouter>
+        <QuoteList />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByText(/Q-002/)).toBeInTheDocument();
+  });
+
   it("renders pending captures with resume, extract, and delete actions", async () => {
     const deleteCaptureMock = vi.fn(async () => undefined);
     setNavigatorOnline(true);
@@ -310,6 +364,40 @@ describe("QuoteList", () => {
     await waitFor(() => {
       expect(deleteCaptureMock).toHaveBeenCalledWith("session-1");
     });
+  });
+
+  it("sanitizes IndexedDB errors from pending-capture delete actions", async () => {
+    const deleteCaptureMock = vi.fn(async () => {
+      throw new Error("Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.");
+    });
+    mockedUseRecoverableCaptures.mockReturnValue({
+      captures: [
+        {
+          sessionId: "session-1",
+          status: "ready_to_extract",
+          notes: "Patio estimate",
+          customerId: null,
+          customerSnapshot: null,
+          clipCount: 1,
+          updatedAt: "2026-03-20T00:00:00.000Z",
+          lastFailureKind: null,
+          lastError: null,
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(async () => undefined),
+      deleteCapture: deleteCaptureMock,
+    });
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    fireEvent.click(screen.getByRole("button", { name: /delete pending capture/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(await screen.findByText(LOCAL_STORAGE_RESET_MESSAGE)).toBeInTheDocument();
   });
 
   it("disables pending-capture extract action while offline", async () => {
@@ -871,5 +959,26 @@ describe("QuoteList", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load quotes");
     expect(screen.queryByText(/active\s*·\s*\d+\s*pending/i)).not.toBeInTheDocument();
+  });
+
+  it("skips document fetches while signed out", async () => {
+    mockedUseAuth.mockReturnValue({
+      authMode: "signed_out",
+      isLoading: false,
+      isOnboarded: false,
+      login: vi.fn(async () => undefined),
+      logout: vi.fn(async () => undefined),
+      refreshUser: vi.fn(async () => undefined),
+      register: vi.fn(async () => undefined),
+      user: null,
+    });
+
+    renderScreen();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status", { name: /loading quotes/i })).not.toBeInTheDocument();
+    });
+    expect(mockedQuoteService.listQuotes).not.toHaveBeenCalled();
+    expect(mockedInvoiceService.listInvoices).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,7 @@ import { PendingCaptureDeleteDialog } from "@/features/quotes/components/Pending
 import { PendingCapturesSection } from "@/features/quotes/components/PendingCapturesSection";
 import { useOutboxSuccessQuoteRefresh } from "@/features/quotes/components/useOutboxSuccessQuoteRefresh";
 import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
+import { getStorageErrorMessage } from "@/features/quotes/offline/captureDb";
 import type { LocalCaptureSummary } from "@/features/quotes/offline/captureTypes";
 import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
@@ -23,8 +24,7 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { formatDate } from "@/shared/lib/formatters";
 import { Banner } from "@/ui/Banner";
 import { EmptyState } from "@/ui/EmptyState";
-import { buildInvoiceSubtitle, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
-
+import { buildInvoiceSubtitle, buildPendingCaptureError, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
 type DocumentMode = "quotes" | "invoices";
 
 export function QuoteList(): React.ReactElement {
@@ -56,8 +56,18 @@ export function QuoteList(): React.ReactElement {
   });
   useEffect(() => {
     let isActive = true;
-
     async function fetchDocuments(): Promise<void> {
+      if (authMode === "signed_out") {
+        if (isActive) {
+          setQuotes([]);
+          setInvoices([]);
+          setQuoteLoadError(null);
+          setInvoiceLoadError(null);
+          setIsLoadingQuotes(false);
+          setIsLoadingInvoices(false);
+        }
+        return;
+      }
       if (documentMode === "quotes") {
         setIsLoadingQuotes(true);
         setQuoteLoadError(null);
@@ -78,7 +88,6 @@ export function QuoteList(): React.ReactElement {
         }
         return;
       }
-
       setIsLoadingInvoices(true);
       setInvoiceLoadError(null);
       try {
@@ -99,11 +108,10 @@ export function QuoteList(): React.ReactElement {
     }
 
     void fetchDocuments();
-
     return () => {
       isActive = false;
     };
-  }, [documentMode]);
+  }, [authMode, documentMode, isOnline]);
 
   useEffect(() => {
     if (!isSearchOpen) {
@@ -114,16 +122,13 @@ export function QuoteList(): React.ReactElement {
       inputElement.focus();
     }
   }, [isSearchOpen]);
-
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
-
     function onOnlineChange(): void {
       setIsOnline(window.navigator.onLine);
     }
-
     window.addEventListener("online", onOnlineChange);
     window.addEventListener("offline", onOnlineChange);
     return () => {
@@ -131,17 +136,16 @@ export function QuoteList(): React.ReactElement {
       window.removeEventListener("offline", onOnlineChange);
     };
   }, []);
+
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQuotes = useMemo(
     () => quotes.filter((quote) => matchesSearch(quote, normalizedSearchQuery)),
     [normalizedSearchQuery, quotes],
   );
-
   const filteredInvoices = useMemo(
     () => invoices.filter((invoice) => matchesSearch(invoice, normalizedSearchQuery)),
     [invoices, normalizedSearchQuery],
   );
-
   const timezone = user?.timezone ?? null;
   const quoteSubtitle = useMemo(
     () => buildQuoteSubtitle(quotes, isLoadingQuotes, quoteLoadError),
@@ -151,7 +155,6 @@ export function QuoteList(): React.ReactElement {
     () => buildInvoiceSubtitle(invoices, isLoadingInvoices, invoiceLoadError),
     [invoiceLoadError, invoices, isLoadingInvoices],
   );
-
   const isLoading = documentMode === "quotes" ? isLoadingQuotes : isLoadingInvoices;
   const loadError = documentMode === "quotes" ? quoteLoadError : invoiceLoadError;
   const filteredRows = documentMode === "quotes" ? filteredQuotes : filteredInvoices;
@@ -190,7 +193,6 @@ export function QuoteList(): React.ReactElement {
     })),
     [draftQuotes, timezone],
   );
-
   const nonDraftQuoteRows = useMemo<DocumentRow[]>(
     () => nonDraftQuotes.map((quote) => ({
       id: quote.id,
@@ -221,7 +223,11 @@ export function QuoteList(): React.ReactElement {
     onCreateNew: () => navigate("/quotes/capture"),
     onQuoteDuplicated: (quoteId) => navigate(`/documents/${quoteId}/edit`),
   });
-
+  const pendingCaptureError = buildPendingCaptureError({
+    authMode,
+    recoverableCapturesError,
+    pendingCaptureActionError,
+  });
   function navigateToLocalCapture(sessionId: string, options?: { autoExtract?: boolean }): void {
     const nextSearchParams = new URLSearchParams({ localSession: sessionId });
     if (options?.autoExtract) {
@@ -235,9 +241,7 @@ export function QuoteList(): React.ReactElement {
     try {
       await deleteCapture(sessionId);
     } catch (deleteError) {
-      const message = deleteError instanceof Error
-        ? deleteError.message
-        : "Unable to delete pending capture";
+      const message = getStorageErrorMessage(deleteError, "Unable to delete pending capture.");
       setPendingCaptureActionError(message);
     }
   }
@@ -261,9 +265,7 @@ export function QuoteList(): React.ReactElement {
       await runOutboxPass(user.id);
       await refreshRecoverableCaptures();
     } catch (retryError) {
-      const message = retryError instanceof Error
-        ? retryError.message
-        : "Unable to retry pending capture";
+      const message = getStorageErrorMessage(retryError, "Unable to retry pending capture.");
       setPendingCaptureActionError(message);
     }
   }
@@ -355,7 +357,7 @@ export function QuoteList(): React.ReactElement {
               isLoading={isLoadingRecoverableCaptures}
               isOnline={isOnline}
               timezone={timezone}
-              error={recoverableCapturesError ?? pendingCaptureActionError}
+              error={pendingCaptureError}
               onResume={(sessionId) => navigateToLocalCapture(sessionId)}
               onExtract={(sessionId) => navigateToLocalCapture(sessionId, { autoExtract: true })}
               onRetry={(sessionId) => { void onRetryCapture(sessionId); }}

@@ -10,7 +10,7 @@ export function PwaUpdatePrompt(): React.ReactElement | null {
   }
 
   return (
-    <aside className="pointer-events-none fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 md:left-auto md:right-4 md:w-[22rem]">
+    <aside className="pointer-events-none fixed inset-x-4 top-[calc(4rem+env(safe-area-inset-top)+0.75rem)] z-[60] md:left-auto md:right-4 md:top-4 md:w-[22rem]">
       <div className="pointer-events-auto ghost-shadow rounded-[var(--radius-document)] border border-outline-variant bg-surface-container p-4">
         <p className="text-sm font-semibold text-on-surface">New version available.</p>
         <p className="mt-1 text-xs text-on-surface-variant">Reload to apply the latest offline shell updates.</p>

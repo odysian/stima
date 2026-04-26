@@ -73,9 +73,16 @@ export class LocalStorageUnavailableError extends Error {
   }
 }
 
+export const LOCAL_STORAGE_RESET_MESSAGE =
+  "Local device storage was reset or became unavailable. Sign in again to continue.";
+
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 export async function getDb(): Promise<IDBDatabase> {
+  return getDbWithRetry(false);
+}
+
+async function getDbWithRetry(retried: boolean): Promise<IDBDatabase> {
   if (!dbPromise) {
     dbPromise = openDb().catch((error) => {
       dbPromise = null;
@@ -83,7 +90,23 @@ export async function getDb(): Promise<IDBDatabase> {
     });
   }
 
-  return dbPromise;
+  const db = await dbPromise;
+  if (isDbConnectionUsable(db)) {
+    return db;
+  }
+
+  try {
+    db.close();
+  } catch {
+    // Ignore close errors while resetting stale handles.
+  }
+  dbPromise = null;
+
+  if (!retried) {
+    return getDbWithRetry(true);
+  }
+
+  throw new LocalStorageUnavailableError("IndexedDB connection is unavailable.");
 }
 
 async function openDb(): Promise<IDBDatabase> {
@@ -184,4 +207,49 @@ export async function resetCaptureDbForTests(): Promise<void> {
     request.onblocked = () => resolve();
     request.onsuccess = () => resolve();
   });
+}
+
+function isDbConnectionUsable(db: IDBDatabase): boolean {
+  if (db.objectStoreNames.length === 0) {
+    return true;
+  }
+
+  try {
+    const firstStoreName = db.objectStoreNames.item(0);
+    if (!firstStoreName) {
+      return true;
+    }
+    const transaction = db.transaction(firstStoreName, "readonly");
+    transaction.abort();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isStorageResetError(error: unknown): boolean {
+  if (error instanceof LocalStorageUnavailableError) {
+    return true;
+  }
+  if (error instanceof DOMException && (error.name === "InvalidStateError" || error.name === "AbortError")) {
+    return true;
+  }
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("database connection is closing") ||
+    message.includes("connection is closing") ||
+    message.includes("invalidstateerror") ||
+    message.includes("indexeddb is unavailable") ||
+    message.includes("idbdatabase")
+  );
+}
+
+export function getStorageErrorMessage(error: unknown, fallback: string): string {
+  if (isStorageResetError(error)) {
+    return LOCAL_STORAGE_RESET_MESSAGE;
+  }
+  return error instanceof Error ? error.message : fallback;
 }
