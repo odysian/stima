@@ -10,6 +10,7 @@ interface LineItemCatalogTabPanelProps {
   items: LineItemCatalogItem[];
   onRetry: () => void;
   onInsertItem: (item: LineItemCatalogItem) => void;
+  panelClassName?: string;
 }
 
 function formatCatalogPrice(value: number | null): string {
@@ -25,9 +26,11 @@ export function LineItemCatalogTabPanel({
   items,
   onRetry,
   onInsertItem,
+  panelClassName,
 }: LineItemCatalogTabPanelProps): React.ReactElement {
+  const className = ["space-y-3", panelClassName].filter(Boolean).join(" ");
   return (
-    <div id="line-item-tabpanel-catalog" role="tabpanel" className="space-y-3">
+    <div id="line-item-tabpanel-catalog" role="tabpanel" className={className}>
       {loadState === "loading" ? (
         <p role="status" className="text-sm text-on-surface-variant">Loading catalog items...</p>
       ) : null}
