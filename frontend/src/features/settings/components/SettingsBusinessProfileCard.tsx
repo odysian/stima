@@ -83,7 +83,7 @@ export function SettingsBusinessProfileCard({
             type="button"
             variant="ghost"
             size="sm"
-            className="border border-outline-variant/30 px-3 text-xs text-on-surface"
+            className="min-h-0 border border-outline-variant/30 px-3 py-1 text-xs text-on-surface"
             onClick={onOpenEditor}
             aria-label="Edit business profile"
           >
@@ -92,43 +92,43 @@ export function SettingsBusinessProfileCard({
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-col gap-4">
-        <div
-          data-testid="settings-logo-block"
-          className="rounded-[var(--radius-document)] bg-surface-container-low p-4"
-        >
-          <div className="flex flex-col gap-3">
-            <Eyebrow>Logo</Eyebrow>
-            <div
-              data-testid="settings-logo-content-row"
-              className="flex flex-col gap-3 min-[360px]:grid min-[360px]:grid-cols-[128px_minmax(0,1fr)] min-[360px]:items-start min-[360px]:gap-4"
-            >
+      <div className="mt-2 flex flex-col gap-4">
+        {isEditingBusinessProfile ? (
+          <div
+            data-testid="settings-logo-block"
+            className="rounded-[var(--radius-document)] bg-surface-container-low p-4"
+          >
+            <div className="flex flex-col gap-3">
+              <Eyebrow>Logo</Eyebrow>
               <div
-                data-testid="settings-logo-preview-tile"
-                className="flex h-[128px] w-[128px] rounded-[var(--radius-document)] bg-surface-container-lowest p-2"
+                data-testid="settings-logo-content-row"
+                className="flex flex-col gap-3 min-[360px]:grid min-[360px]:grid-cols-[128px_minmax(0,1fr)] min-[360px]:items-start min-[360px]:gap-4"
               >
-                <div className="flex h-full w-full items-center justify-center rounded-[var(--radius-document)] bg-surface-container p-2">
-                  {hasLogo ? (
-                    <img
-                      key={logoPreviewVersion}
-                      src={logoPreviewSrc}
-                      alt="Business logo preview"
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  ) : (
-                    <p className="text-xs text-on-surface-variant">No logo</p>
-                  )}
+                <div
+                  data-testid="settings-logo-preview-tile"
+                  className="flex h-[128px] w-[128px] rounded-[var(--radius-document)] bg-surface-container-lowest p-2"
+                >
+                  <div className="flex h-full w-full items-center justify-center rounded-[var(--radius-document)] bg-surface-container p-2">
+                    {hasLogo ? (
+                      <img
+                        key={logoPreviewVersion}
+                        src={logoPreviewSrc}
+                        alt="Business logo preview"
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <p className="text-xs text-on-surface-variant">No logo</p>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div
-                data-testid="settings-logo-actions"
-                className="flex min-w-0 flex-col gap-2"
-              >
-                <p className="text-xs text-on-surface-variant">
-                  {`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`}
-                </p>
-                {isEditingBusinessProfile ? (
+                <div
+                  data-testid="settings-logo-actions"
+                  className="flex min-w-0 flex-col gap-2"
+                >
+                  <p className="text-xs text-on-surface-variant">
+                    {`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`}
+                  </p>
                   <div className="flex flex-col items-start gap-2">
                     <Button
                       type="button"
@@ -163,14 +163,12 @@ export function SettingsBusinessProfileCard({
                       </Button>
                     ) : null}
                   </div>
-                ) : (
-                  <p className="text-xs text-on-surface-variant">Tap Edit to update logo.</p>
-                )}
-                {logoError ? <p role="alert" className="text-xs text-error">{logoError}</p> : null}
+                  {logoError ? <p role="alert" className="text-xs text-error">{logoError}</p> : null}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         {isEditingBusinessProfile ? (
           <>
@@ -274,42 +272,42 @@ export function SettingsBusinessProfileCard({
             </div>
           </>
         ) : (
-          <div className="space-y-3" data-testid="settings-business-profile-display">
-            <div>
-              <Eyebrow>Business name</Eyebrow>
-              <p className="text-sm text-on-surface">{businessName || "Not set"}</p>
-            </div>
-            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
-              <div>
-                <Eyebrow>First name</Eyebrow>
-                <p className="text-sm text-on-surface">{firstName || "Not set"}</p>
+          <div className="space-y-4" data-testid="settings-business-profile-display">
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-document)] bg-surface-container-low">
+                {hasLogo ? (
+                  <img
+                    key={logoPreviewVersion}
+                    src={logoPreviewSrc}
+                    alt="Business logo"
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-2xl text-on-surface-variant">business</span>
+                )}
               </div>
-              <div>
-                <Eyebrow>Last name</Eyebrow>
-                <p className="text-sm text-on-surface">{lastName || "Not set"}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
-              <div>
-                <Eyebrow>Trade type</Eyebrow>
-                <p className="text-sm text-on-surface">{tradeType}</p>
-              </div>
-              <div>
-                <Eyebrow>Tax rate (%)</Eyebrow>
-                <p className="text-sm text-on-surface">{defaultTaxRate || "Not set"}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
-              <div>
-                <Eyebrow>Timezone</Eyebrow>
-                <p className="text-sm text-on-surface">{timezone}</p>
-              </div>
-              <div>
-                <Eyebrow>Theme</Eyebrow>
-                <p className="text-sm text-on-surface">
-                  {themeOptions.find((option) => option.value === themePreference)?.label ?? "System default"}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base font-bold text-on-surface">{businessName || "Not set"}</p>
+                <p className="text-sm text-on-surface-variant">
+                  {firstName} {lastName}
                 </p>
               </div>
+            </div>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <span className="text-on-surface-variant">
+                <span className="text-on-surface">{tradeType}</span>
+                <span className="mx-1.5 text-outline">·</span>
+                {defaultTaxRate ? `${defaultTaxRate}% tax` : "No tax set"}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <span className="text-on-surface-variant">
+                {timezone}
+                <span className="mx-1.5 text-outline">·</span>
+                {themeOptions.find((option) => option.value === themePreference)?.label ?? "System default"}
+              </span>
             </div>
           </div>
         )}

@@ -132,10 +132,9 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Bright Lawn Care")).toBeInTheDocument();
-    expect(screen.getByText("Jordan")).toBeInTheDocument();
-    expect(screen.getByText("Hill")).toBeInTheDocument();
+    expect(screen.getByText("Jordan Hill")).toBeInTheDocument();
     expect(screen.getByText("Plumber")).toBeInTheDocument();
-    expect(screen.getByText("America/New_York")).toBeInTheDocument();
+    expect(screen.getByText(/America\/New_York/)).toBeInTheDocument();
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.getByText("Email")).toHaveClass(
       "font-bold",
@@ -143,10 +142,6 @@ describe("SettingsScreen", () => {
       "tracking-[0.12em]",
       "text-outline",
     );
-    expect(screen.getByText("Stima")).toBeInTheDocument();
-    expect(
-      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
-    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit business profile/i })).toBeInTheDocument();
     expect(screen.queryByLabelText(/upload logo/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save changes/i })).not.toBeInTheDocument();
@@ -277,7 +272,7 @@ describe("SettingsScreen", () => {
 
     expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
     expect(screen.getByText("Summit Exterior Care")).toBeInTheDocument();
-    expect(screen.getByText("Alex")).toBeInTheDocument();
+    expect(screen.getByText("Alex Stone")).toBeInTheDocument();
     expect(mockedProfileService.updateProfile).not.toHaveBeenCalled();
   });
 
@@ -461,7 +456,7 @@ describe("SettingsScreen", () => {
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
   });
 
-  it("renders logo preview and remove action when profile has a logo", async () => {
+  it("renders compact logo preview in display mode and full controls in edit mode", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({ has_logo: true }),
     );
@@ -469,88 +464,40 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Business Profile")).toBeInTheDocument();
-    expect(screen.getByTestId("settings-logo-block")).toHaveClass(
-      "rounded-[var(--radius-document)]",
-      "bg-surface-container-low",
-      "p-4",
-    );
-    expect(screen.getByTestId("settings-logo-content-row")).toHaveClass(
-      "flex",
-      "flex-col",
-      "gap-3",
-      "min-[360px]:grid",
-      "min-[360px]:grid-cols-[128px_minmax(0,1fr)]",
-      "min-[360px]:items-start",
-      "min-[360px]:gap-4",
-    );
-    expect(screen.getByTestId("settings-logo-actions")).toHaveClass(
-      "flex",
-      "min-w-0",
-      "flex-col",
-      "gap-2",
-    );
-    const previewTile = await screen.findByTestId("settings-logo-preview-tile");
-    expect(previewTile).toHaveClass(
-      "h-[128px]",
-      "w-[128px]",
-      "rounded-[var(--radius-document)]",
-      "bg-surface-container-lowest",
-    );
-    expect(
-      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
-    ).toBeInTheDocument();
-    expect(await screen.findByAltText(/business logo preview/i)).toHaveClass(
-      "max-h-full",
-      "max-w-full",
+    expect(screen.queryByTestId("settings-logo-block")).not.toBeInTheDocument();
+    expect(await screen.findByAltText(/business logo/i)).toHaveClass(
+      "h-full",
+      "w-full",
       "object-contain",
     );
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/upload logo/i)).not.toBeInTheDocument();
     await openBusinessProfileEditMode();
-    expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
-    expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
-  });
-
-  it("renders a fixed no-logo preview frame with the updated upload label", async () => {
-    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
-
-    renderScreen();
-
-    expect(await screen.findByText("Business Profile")).toBeInTheDocument();
     expect(screen.getByTestId("settings-logo-block")).toHaveClass(
       "rounded-[var(--radius-document)]",
       "bg-surface-container-low",
       "p-4",
     );
-    expect(screen.getByTestId("settings-logo-content-row")).toHaveClass(
-      "flex",
-      "flex-col",
-      "gap-3",
-      "min-[360px]:grid",
-      "min-[360px]:grid-cols-[128px_minmax(0,1fr)]",
-      "min-[360px]:items-start",
-      "min-[360px]:gap-4",
-    );
-    expect(screen.getByTestId("settings-logo-actions")).toHaveClass(
-      "flex",
-      "min-w-0",
-      "flex-col",
-      "gap-2",
-    );
-    const previewTile = await screen.findByTestId("settings-logo-preview-tile");
-    expect(previewTile).toHaveClass(
-      "h-[128px]",
-      "w-[128px]",
-      "rounded-[var(--radius-document)]",
-      "bg-surface-container-lowest",
-    );
-    expect(
-      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
-    ).toBeInTheDocument();
-    expect(within(previewTile).getByText("No logo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a business icon placeholder in display mode and full upload controls in edit mode", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+
+    renderScreen();
+
+    expect(await screen.findByText("Business Profile")).toBeInTheDocument();
+    expect(screen.queryByTestId("settings-logo-block")).not.toBeInTheDocument();
+    expect(screen.getByText("business")).toBeInTheDocument();
     expect(screen.queryByLabelText(/upload logo/i)).not.toBeInTheDocument();
     await openBusinessProfileEditMode();
+    expect(screen.getByTestId("settings-logo-block")).toHaveClass(
+      "rounded-[var(--radius-document)]",
+      "bg-surface-container-low",
+      "p-4",
+    );
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
