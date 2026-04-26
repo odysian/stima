@@ -184,7 +184,7 @@ describe("QuoteList", () => {
     expect(screen.getByRole("button", { name: "Open search" })).toBeInTheDocument();
   });
 
-  it("opens search, focuses the input, and hides the open-search button", async () => {
+  it("opens search, focuses the input, and keeps the search toggle visible as active", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
     renderScreen();
@@ -195,7 +195,7 @@ describe("QuoteList", () => {
       expect(searchInput).toHaveFocus();
     });
     expect(screen.queryByRole("button", { name: "Open search" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Close search" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close search" })).toHaveClass("bg-primary", "text-on-primary");
   });
 
   it("closes search and clears the query, and reopening starts empty", async () => {
@@ -214,6 +214,23 @@ describe("QuoteList", () => {
 
     const reopenedSearchInput = await openSearch();
     expect(reopenedSearchInput).toHaveValue("");
+  });
+
+  it("clears the query from input-end control and keeps search open", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    const searchInput = await openSearch();
+    fireEvent.change(searchInput, { target: { value: "alice" } });
+    expect(searchInput).toHaveValue("alice");
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear search text" }));
+
+    expect(screen.getByLabelText("Search quotes")).toBeInTheDocument();
+    expect(screen.getByLabelText("Search quotes")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Close search" })).toBeInTheDocument();
   });
 
   it("preserves open search state and query when switching tabs", async () => {

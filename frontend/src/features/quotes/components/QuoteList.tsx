@@ -170,9 +170,7 @@ export function QuoteList(): React.ReactElement {
   const headerTitle = documentMode === "quotes" ? "Quotes" : "Invoices";
   const headerSubtitle = documentMode === "quotes" ? quoteSubtitle : invoiceSubtitle;
   const searchLabel = documentMode === "quotes" ? "Search quotes" : "Search invoices";
-  const searchPlaceholder = documentMode === "quotes"
-    ? "Search customer, title, or quote ID..."
-    : "Search customer, title, or invoice ID...";
+  const searchPlaceholder = documentMode === "quotes" ? "Search customer, title, or quote ID..." : "Search customer, title, or invoice ID...";
   const emptyStateMessage = totalRows === 0
     ? documentMode === "quotes"
       ? "No quotes yet. Tap New Quote to create your first."
@@ -205,7 +203,6 @@ export function QuoteList(): React.ReactElement {
     })),
     [nonDraftQuotes, timezone],
   );
-
   const invoiceRows = useMemo<DocumentRow[]>(
     () => filteredInvoices.map((invoice) => ({
       id: invoice.id,
@@ -305,18 +302,23 @@ export function QuoteList(): React.ReactElement {
                 Invoices
               </button>
             </div>
-            {!isSearchOpen ? (
-              <Button
-                type="button"
-                variant="iconButton"
-                size="sm"
-                aria-label="Open search"
-                className="border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow"
-                onClick={() => setIsSearchOpen(true)}
-              >
-                <span className="material-symbols-outlined block text-[1.125rem] leading-none">search</span>
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="iconButton"
+              size="sm"
+              aria-label={isSearchOpen ? "Close search" : "Open search"}
+              className={isSearchOpen
+                ? "border border-primary/70 bg-primary text-on-primary ghost-shadow hover:bg-primary/90"
+                : "border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow"}
+              onClick={() => {
+                if (isSearchOpen) {
+                  setSearchQuery("");
+                }
+                setIsSearchOpen((open) => !open);
+              }}
+            >
+              <span className="material-symbols-outlined block text-[1.125rem] leading-none">search</span>
+            </Button>
           </div>
           {isSearchOpen ? (
             <Input
@@ -331,12 +333,9 @@ export function QuoteList(): React.ReactElement {
                   type="button"
                   variant="iconButton"
                   size="xs"
-                  aria-label="Close search"
+                  aria-label="Clear search text"
                   className="text-outline"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setIsSearchOpen(false);
-                  }}
+                  onClick={() => setSearchQuery("")}
                 >
                   <span className="material-symbols-outlined block text-base leading-none">close</span>
                 </Button>
