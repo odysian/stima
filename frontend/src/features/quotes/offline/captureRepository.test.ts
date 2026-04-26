@@ -315,6 +315,65 @@ describe("captureRepository", () => {
     expect(recoverable[0]?.sessionId).toBe("good-session");
   });
 
+  it("removes recoverable sessions older than 90 days during scheduled cleanup", async () => {
+    const now = Date.now();
+    const staleTimestamp = new Date(now - 91 * 24 * 60 * 60 * 1000).toISOString();
+    const freshTimestamp = new Date(now - 4 * 60 * 60 * 1000).toISOString();
+
+    await putCaptureSessionRecord({
+      sessionId: "stale-recoverable",
+      userId: "cleanup-user",
+      status: "local_only",
+      notes: "old work",
+      clipIds: [],
+      createdAt: staleTimestamp,
+      updatedAt: staleTimestamp,
+    });
+    await putCaptureSessionRecord({
+      sessionId: "fresh-recoverable",
+      userId: "cleanup-user",
+      status: "ready_to_extract",
+      notes: "new work",
+      clipIds: [],
+      createdAt: freshTimestamp,
+      updatedAt: freshTimestamp,
+    });
+
+    const recoverable = await listRecoverableCaptures("cleanup-user");
+
+    expect(recoverable.map((record) => record.sessionId)).toEqual(["fresh-recoverable"]);
+    expect(await getCaptureSession("stale-recoverable")).toBeNull();
+  });
+
+  it("clears synced audio blobs older than the retention window", async () => {
+    const staleTimestamp = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    await putCaptureSessionRecord({
+      sessionId: "synced-stale",
+      userId: "cleanup-synced-user",
+      status: "synced",
+      notes: "already synced",
+      clipIds: ["clip-stale"],
+      createdAt: staleTimestamp,
+      updatedAt: staleTimestamp,
+    });
+    await saveAudioClip({
+      clipId: "clip-stale",
+      sessionId: "synced-stale",
+      userId: "cleanup-synced-user",
+      blob: new Blob(["clip-a"], { type: "audio/webm" }),
+      mimeType: "audio/webm",
+      sizeBytes: 6,
+      durationSeconds: 3,
+      sequenceNumber: 1,
+    });
+
+    await listRecoverableCaptures("cleanup-synced-user");
+
+    const syncedSession = await getCaptureSession("synced-stale");
+    expect(syncedSession?.clipIds).toEqual([]);
+    expect(await getAudioClip("clip-stale")).toBeNull();
+  });
+
   it("appends and lists sync events per session", async () => {
     await appendSyncEvent({
       sessionId: "session-a",

@@ -1,8 +1,9 @@
 import "fake-indexeddb/auto";
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as captureRepository from "@/features/quotes/offline/captureRepository";
 import { createCaptureSession, getCaptureSession, listRecoverableCaptures } from "@/features/quotes/offline/captureRepository";
 import { resetCaptureDbForTests } from "@/features/quotes/offline/captureDb";
 import { useLocalCaptureSession } from "@/features/quotes/offline/useLocalCaptureSession";
@@ -118,4 +119,64 @@ describe("useLocalCaptureSession", () => {
     expect(result.current.notes).toBe("");
     expect(result.current.hydrationError).toBe("Pending capture was not found for this account.");
   });
+
+  it("creates only one local session when ensureSession and notes persistence race", async () => {
+    const releaseCreation = createDeferred<void>();
+    const realCreateCaptureSession = captureRepository.createCaptureSession;
+    const createCaptureSessionSpy = vi.spyOn(captureRepository, "createCaptureSession");
+    createCaptureSessionSpy.mockImplementation(async (input) => {
+      await releaseCreation.promise;
+      return realCreateCaptureSession(input);
+    });
+
+    try {
+      const { result } = renderHook(() => useLocalCaptureSession({
+        userId: "race-user",
+        customerId: "race-customer",
+        initialSessionId: null,
+      }));
+
+      await waitFor(() => {
+        expect(result.current.isHydrating).toBe(false);
+      });
+
+      act(() => {
+        result.current.setNotes("Concurrent notes");
+      });
+
+      const ensureSessionPromise = result.current.ensureSession();
+      await waitFor(() => {
+        expect(createCaptureSessionSpy).toHaveBeenCalledTimes(1);
+      });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(createCaptureSessionSpy).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        releaseCreation.resolve();
+        await expect(ensureSessionPromise).resolves.not.toBeNull();
+      });
+      await waitFor(() => {
+        expect(result.current.sessionId).not.toBeNull();
+        expect(result.current.saveState).toBe("saved");
+      });
+      await expect(listRecoverableCaptures("race-user")).resolves.toHaveLength(1);
+    } finally {
+      createCaptureSessionSpy.mockRestore();
+    }
+  });
 });
+
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}

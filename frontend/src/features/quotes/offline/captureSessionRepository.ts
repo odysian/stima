@@ -20,12 +20,16 @@ import type {
 } from "@/features/quotes/offline/captureTypes";
 
 const ABANDONED_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const RECOVERABLE_SESSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+const SYNCED_AUDIO_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const CAPTURE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const RECOVERABLE_CAPTURE_STATUSES = new Set<LocalCaptureStatus>([
   "local_only",
   "ready_to_extract",
   "submitting",
   "extract_failed",
 ]);
+const lastCleanupRunAtByUser = new Map<string, number>();
 
 export async function createCaptureSession(
   input: CreateLocalCaptureInput,
@@ -123,9 +127,13 @@ export async function listRecoverableCaptures(userId: string): Promise<LocalCapt
   const records = await requestToPromise(userIndex.getAll(IDBKeyRange.only(userId)));
   await transactionDone(transaction);
 
-  return records
+  const parsedRecords = records
     .map(parseStoredCapture)
-    .filter((record): record is LocalCaptureSession => record !== null)
+    .filter((record): record is LocalCaptureSession => record !== null);
+
+  const retainedRecords = await runScheduledCaptureCleanup(userId, parsedRecords);
+
+  return retainedRecords
     .filter((record) => record.userId === userId && RECOVERABLE_CAPTURE_STATUSES.has(record.status))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .map((record) => ({
@@ -249,4 +257,75 @@ async function getWritableCaptureSession(
   }
 
   return parsedRecord;
+}
+
+async function runScheduledCaptureCleanup(
+  userId: string,
+  records: LocalCaptureSession[],
+): Promise<LocalCaptureSession[]> {
+  const nowMs = Date.now();
+  const lastCleanupRunAt = lastCleanupRunAtByUser.get(userId);
+  if (
+    lastCleanupRunAt !== undefined &&
+    nowMs - lastCleanupRunAt < CAPTURE_CLEANUP_INTERVAL_MS
+  ) {
+    return records;
+  }
+
+  lastCleanupRunAtByUser.set(userId, nowMs);
+  return cleanupExpiredCaptures(userId, records, nowMs);
+}
+
+async function cleanupExpiredCaptures(
+  userId: string,
+  records: LocalCaptureSession[],
+  nowMs: number,
+): Promise<LocalCaptureSession[]> {
+  const staleRecoverableSessionIds = new Set<string>();
+  const syncedSessionsNeedingAudioCleanup: LocalCaptureSession[] = [];
+
+  for (const record of records) {
+    if (record.userId !== userId) {
+      continue;
+    }
+
+    const updatedAtMs = Date.parse(record.updatedAt);
+    if (Number.isNaN(updatedAtMs)) {
+      continue;
+    }
+
+    const ageMs = nowMs - updatedAtMs;
+    if (ageMs >= RECOVERABLE_SESSION_MAX_AGE_MS) {
+      staleRecoverableSessionIds.add(record.sessionId);
+      continue;
+    }
+
+    if (
+      record.status === "synced" &&
+      record.clipIds.length > 0 &&
+      ageMs >= SYNCED_AUDIO_RETENTION_MS
+    ) {
+      syncedSessionsNeedingAudioCleanup.push(record);
+    }
+  }
+
+  for (const sessionId of staleRecoverableSessionIds) {
+    try {
+      await deleteCaptureSession(sessionId);
+    } catch {
+      // Best-effort cleanup should not block capture listing.
+    }
+  }
+
+  for (const syncedSession of syncedSessionsNeedingAudioCleanup) {
+    try {
+      await deleteAllClipsForSession(syncedSession.sessionId);
+      await updateCaptureField(syncedSession.sessionId, { clipIds: [] });
+      syncedSession.clipIds = [];
+    } catch {
+      // Best-effort cleanup should not block capture listing.
+    }
+  }
+
+  return records.filter((record) => !staleRecoverableSessionIds.has(record.sessionId));
 }
