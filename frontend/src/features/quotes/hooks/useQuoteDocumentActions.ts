@@ -16,6 +16,7 @@ interface UseQuoteDocumentActionsArgs {
   quote: QuoteDetail | null;
   setQuote: Dispatch<SetStateAction<QuoteDetail | null>>;
   refetchQuote: (quoteId: string) => Promise<void>;
+  onSuccess: (message: string) => void;
 }
 
 interface UseQuoteDocumentActionsResult {
@@ -24,7 +25,6 @@ interface UseQuoteDocumentActionsResult {
   isSharing: boolean;
   isRevokingShare: boolean;
   isSendingEmail: boolean;
-  shareMessage: string | null;
   shareError: string | null;
   manualCopyUrl: string | null;
   showSendEmailConfirm: boolean;
@@ -45,20 +45,19 @@ export function useQuoteDocumentActions({
   quote,
   setQuote,
   refetchQuote,
+  onSuccess,
 }: UseQuoteDocumentActionsArgs): UseQuoteDocumentActionsResult {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [isRevokingShare, setIsRevokingShare] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
 
   function clearShareFeedback(): void {
     setShareError(null);
-    setShareMessage(null);
     setManualCopyUrl(null);
   }
 
@@ -156,7 +155,7 @@ export function useQuoteDocumentActions({
             title: shareTitle,
             url: nextSharedUrl,
           });
-          setShareMessage("Quote link shared.");
+          onSuccess("Quote link shared.");
           setManualCopyUrl(null);
           return;
         } catch (error) {
@@ -169,13 +168,12 @@ export function useQuoteDocumentActions({
 
       if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
         setManualCopyUrl(nextSharedUrl);
-        setShareMessage("Copy this share link manually.");
         return;
       }
 
       await navigator.clipboard.writeText(nextSharedUrl);
       setManualCopyUrl(null);
-      setShareMessage("Share link copied to clipboard.");
+      onSuccess("Share link copied to clipboard.");
     } catch (error) {
       setManualCopyUrl(null);
       const message = error instanceof Error ? error.message : "Unable to copy share link";
@@ -196,7 +194,7 @@ export function useQuoteDocumentActions({
     try {
       await quoteService.revokeShare(quoteId);
       await refetchQuote(quoteId);
-      setShareMessage("Share link revoked.");
+      onSuccess("Share link revoked.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to revoke share link";
       setShareError(message);
@@ -231,7 +229,6 @@ export function useQuoteDocumentActions({
     try {
       const job = await quoteService.sendQuoteEmail(quoteId);
       await refetchQuote(quoteId);
-      setShareMessage("Quote email is sending. We’ll update this status shortly.");
       await pollJobUntilSuccess({
         jobId: job.id,
         getJobStatus: jobService.getJobStatus,
@@ -239,7 +236,7 @@ export function useQuoteDocumentActions({
         timeoutErrorMessage: "Quote email is taking longer than expected. Refresh to check delivery status.",
       });
       await refetchQuote(quoteId);
-      setShareMessage("Quote email sent.");
+      onSuccess("Quote email sent.");
     } catch (error) {
       setShareError(getSendEmailErrorMessage(error));
     } finally {
@@ -253,7 +250,6 @@ export function useQuoteDocumentActions({
     isSharing,
     isRevokingShare,
     isSendingEmail,
-    shareMessage,
     shareError,
     manualCopyUrl,
     showSendEmailConfirm,

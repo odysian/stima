@@ -7,6 +7,7 @@ import { quoteService } from "@/features/quotes/services/quoteService";
 import type { JobStatusResponse, Quote, QuoteDetail } from "@/features/quotes/types/quote.types";
 import { HttpRequestError } from "@/shared/lib/http";
 import { jobService } from "@/shared/lib/jobService";
+import { ToastProvider } from "@/ui/Toast";
 
 vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
@@ -129,14 +130,16 @@ function renderScreen(
   },
 ): void {
   render(
-    <MemoryRouter initialEntries={options?.initialEntries ?? [path]} initialIndex={options?.initialIndex}>
-      <Routes>
-        <Route path="/quotes/:id/preview" element={<QuotePreview />} />
-        <Route path="/documents/:id/edit" element={<div>Document Edit Screen</div>} />
-        <Route path="/invoices/:id" element={<div>Invoice Detail Screen</div>} />
-        <Route path="/" element={<div>Quote List Screen</div>} />
-      </Routes>
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={options?.initialEntries ?? [path]} initialIndex={options?.initialIndex}>
+        <Routes>
+          <Route path="/quotes/:id/preview" element={<QuotePreview />} />
+          <Route path="/documents/:id/edit" element={<div>Document Edit Screen</div>} />
+          <Route path="/invoices/:id" element={<div>Invoice Detail Screen</div>} />
+          <Route path="/" element={<div>Quote List Screen</div>} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>,
   );
 }
 
@@ -608,6 +611,7 @@ describe("QuotePreview", () => {
     expect(screen.queryByLabelText(/quote status/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
+    expect(await screen.findByText("Quote marked as won.")).toBeInTheDocument();
   });
 
   it("shows the lost confirmation modal and refetches the declined state after confirmation", async () => {
@@ -643,9 +647,10 @@ describe("QuotePreview", () => {
     expect(screen.queryByLabelText(/quote status/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /more actions/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit quote/i })).toBeInTheDocument();
+    expect(await screen.findByText("Quote marked as lost.")).toBeInTheDocument();
   });
 
-  it("clears existing share feedback before marking the quote won", async () => {
+  it("shows success toasts for copy-link and mark-won actions", async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -679,7 +684,7 @@ describe("QuotePreview", () => {
     await waitFor(() => {
       expect(mockedQuoteService.markQuoteWon).toHaveBeenCalledWith("quote-1");
     });
-    expect(screen.queryByText("Share link copied to clipboard.")).not.toBeInTheDocument();
+    expect(await screen.findByText("Quote marked as won.")).toBeInTheDocument();
   });
 
   it("navigates to the canonical review route from the header action", async () => {

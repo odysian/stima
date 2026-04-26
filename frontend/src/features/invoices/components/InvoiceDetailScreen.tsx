@@ -14,7 +14,6 @@ import {
   DocumentActionHint,
   DocumentActionManualCopyField,
   DocumentActionStatus,
-  DocumentActionSuccessMessage,
   DocumentActionSurface,
   documentActionPrimaryLinkClassName,
 } from "@/shared/components/DocumentActionSurface";
@@ -24,9 +23,11 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { DocumentHeroCard } from "@/ui/DocumentHeroCard";
 import { Eyebrow } from "@/ui/Eyebrow";
 import { canNavigateBack } from "@/shared/lib/navigation";
+import { useToast } from "@/ui/Toast";
 
 export function InvoiceDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
+  const { show } = useToast();
   const { id } = useParams<{ id: string }>();
   const [showRevokeShareConfirm, setShowRevokeShareConfirm] = useState(false);
   const {
@@ -42,14 +43,12 @@ export function InvoiceDetailScreen(): React.ReactElement {
     isSharing,
     isRevokingShare,
     shareError,
-    shareMessage,
     manualCopyUrl,
     showSendEmailConfirm,
     isSendingEmail,
     isMarkingPaid,
     isMarkingVoid,
     emailError,
-    emailMessage,
     outcomeError,
     setShowSendEmailConfirm,
     onGeneratePdf,
@@ -64,6 +63,9 @@ export function InvoiceDetailScreen(): React.ReactElement {
     invoice,
     setInvoice,
     loadInvoiceDetail,
+    onSuccess: (message) => {
+      show({ message, variant: "success" });
+    },
   });
   const openPdfUrl = invoice?.pdf_artifact.download_url ?? null;
   const hasSourceQuote = Boolean(invoice?.source_document_id && invoice.source_quote_number);
@@ -120,18 +122,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
     },
   });
 
-  const outcomeBanner = invoice?.status === "paid"
-    ? {
-      className: "mx-4 mt-4 rounded-[var(--radius-document)] border border-success/30 bg-success-container p-4 text-sm text-success",
-      message: "This invoice is marked as paid.",
-    }
-    : invoice?.status === "void"
-      ? {
-        className: "mx-4 mt-4 rounded-[var(--radius-document)] border border-outline/40 bg-surface-container-low p-4 text-sm text-on-surface-variant",
-        message: "This invoice is marked as void.",
-      }
-      : null;
-
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
       <ScreenHeader
@@ -171,12 +161,6 @@ export function InvoiceDetailScreen(): React.ReactElement {
 
         {!isLoadingInvoice && !loadError && invoice ? (
           <>
-            {outcomeBanner ? (
-              <div className={outcomeBanner.className}>
-                {outcomeBanner.message}
-              </div>
-            ) : null}
-
             <DocumentHeroCard
               documentLabel="INVOICE"
               status={invoice.status}
@@ -293,13 +277,10 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   {outcomeError ? <DocumentActionError>{outcomeError}</DocumentActionError> : null}
                   {shareError ? <DocumentActionError>{shareError}</DocumentActionError> : null}
                   {manualCopyUrl ? (
-                    <DocumentActionManualCopyField url={manualCopyUrl} />
-                  ) : null}
-                  {emailMessage ? (
-                    <DocumentActionSuccessMessage>{emailMessage}</DocumentActionSuccessMessage>
-                  ) : null}
-                  {shareMessage ? (
-                    <DocumentActionSuccessMessage>{shareMessage}</DocumentActionSuccessMessage>
+                    <>
+                      <DocumentActionHint>Copy this share link manually.</DocumentActionHint>
+                      <DocumentActionManualCopyField url={manualCopyUrl} />
+                    </>
                   ) : null}
                 </>
               )}

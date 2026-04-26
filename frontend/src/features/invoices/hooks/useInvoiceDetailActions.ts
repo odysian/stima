@@ -13,6 +13,7 @@ interface UseInvoiceDetailActionsArgs {
   invoice: InvoiceDetail | null;
   setInvoice: Dispatch<SetStateAction<InvoiceDetail | null>>;
   loadInvoiceDetail: (invoiceId: string) => Promise<void>;
+  onSuccess: (message: string) => void;
 }
 
 interface UseInvoiceDetailActionsResult {
@@ -21,14 +22,12 @@ interface UseInvoiceDetailActionsResult {
   isSharing: boolean;
   isRevokingShare: boolean;
   shareError: string | null;
-  shareMessage: string | null;
   manualCopyUrl: string | null;
   showSendEmailConfirm: boolean;
   isSendingEmail: boolean;
   isMarkingPaid: boolean;
   isMarkingVoid: boolean;
   emailError: string | null;
-  emailMessage: string | null;
   outcomeError: string | null;
   setShowSendEmailConfirm: Dispatch<SetStateAction<boolean>>;
   onGeneratePdf: () => Promise<void>;
@@ -49,20 +48,19 @@ export function useInvoiceDetailActions({
   invoice,
   setInvoice,
   loadInvoiceDetail,
+  onSuccess,
 }: UseInvoiceDetailActionsArgs): UseInvoiceDetailActionsResult {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [isRevokingShare, setIsRevokingShare] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const [showSendEmailConfirm, setShowSendEmailConfirm] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
   const [isMarkingVoid, setIsMarkingVoid] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const [outcomeError, setOutcomeError] = useState<string | null>(null);
 
   function getErrorMessage(error: unknown, fallback: string): string {
@@ -74,10 +72,8 @@ export function useInvoiceDetailActions({
       setPdfError(null);
     }
     setEmailError(null);
-    setEmailMessage(null);
     setOutcomeError(null);
     setShareError(null);
-    setShareMessage(null);
     setManualCopyUrl(null);
   }
 
@@ -159,13 +155,12 @@ export function useInvoiceDetailActions({
       const nextShareUrl = `${apiBase}/share/${updatedInvoice.share_token}`;
       if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
         setManualCopyUrl(nextShareUrl);
-        setShareMessage("Copy this share link manually.");
         return;
       }
 
       await navigator.clipboard.writeText(nextShareUrl);
       setManualCopyUrl(null);
-      setShareMessage("Invoice link copied to clipboard.");
+      onSuccess("Invoice link copied to clipboard.");
     } catch (error) {
       setManualCopyUrl(null);
       setShareError(getErrorMessage(error, "Unable to copy invoice link"));
@@ -183,7 +178,7 @@ export function useInvoiceDetailActions({
     try {
       await invoiceService.revokeShare(invoiceId);
       await loadInvoiceDetail(invoiceId);
-      setShareMessage("Share link revoked.");
+      onSuccess("Share link revoked.");
     } catch (error) {
       setShareError(getErrorMessage(error, "Unable to revoke share link"));
     } finally {
@@ -218,7 +213,6 @@ export function useInvoiceDetailActions({
     try {
       const job = await invoiceService.sendInvoiceEmail(invoiceId);
       await loadInvoiceDetail(invoiceId);
-      setEmailMessage("Invoice email is sending. We’ll update this status shortly.");
       await pollJobUntilSuccess({
         jobId: job.id,
         getJobStatus: jobService.getJobStatus,
@@ -226,7 +220,7 @@ export function useInvoiceDetailActions({
         timeoutErrorMessage: "Invoice email is taking longer than expected. Refresh to check delivery status.",
       });
       await loadInvoiceDetail(invoiceId);
-      setEmailMessage("Invoice sent by email.");
+      onSuccess("Invoice sent by email.");
     } catch (error) {
       setEmailError(getErrorMessage(error, "Unable to send invoice email"));
     } finally {
@@ -243,6 +237,7 @@ export function useInvoiceDetailActions({
     try {
       const updatedInvoice = await invoiceService.markInvoicePaid(invoiceId);
       applyInvoiceUpdate(updatedInvoice);
+      onSuccess("Invoice marked as paid.");
     } catch (error) {
       setOutcomeError(getErrorMessage(error, "Unable to mark invoice as paid"));
     } finally {
@@ -259,6 +254,7 @@ export function useInvoiceDetailActions({
     try {
       const updatedInvoice = await invoiceService.markInvoiceVoid(invoiceId);
       applyInvoiceUpdate(updatedInvoice);
+      onSuccess("Invoice marked as void.");
     } catch (error) {
       setOutcomeError(getErrorMessage(error, "Unable to mark invoice as void"));
     } finally {
@@ -272,14 +268,12 @@ export function useInvoiceDetailActions({
     isSharing,
     isRevokingShare,
     shareError,
-    shareMessage,
     manualCopyUrl,
     showSendEmailConfirm,
     isSendingEmail,
     isMarkingPaid,
     isMarkingVoid,
     emailError,
-    emailMessage,
     outcomeError,
     setShowSendEmailConfirm,
     onGeneratePdf,

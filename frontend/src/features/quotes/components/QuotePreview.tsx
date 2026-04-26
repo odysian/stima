@@ -24,9 +24,11 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { canNavigateBack } from "@/shared/lib/navigation";
 import { DocumentHeroCard } from "@/ui/DocumentHeroCard";
+import { useToast } from "@/ui/Toast";
 
 export function QuotePreview(): React.ReactElement {
   const navigate = useNavigate();
+  const { show } = useToast();
   const { id } = useParams<{ id: string }>();
   const {
     setQuote,
@@ -74,7 +76,6 @@ export function QuotePreview(): React.ReactElement {
     isSharing,
     isRevokingShare,
     isSendingEmail,
-    shareMessage,
     shareError,
     manualCopyUrl,
     showSendEmailConfirm,
@@ -90,6 +91,9 @@ export function QuotePreview(): React.ReactElement {
     quote,
     setQuote,
     refetchQuote,
+    onSuccess: (message) => {
+      show({ message, variant: "success" });
+    },
   });
   const {
     isMarkingWon,
@@ -113,6 +117,9 @@ export function QuotePreview(): React.ReactElement {
     navigate,
     clearInvoiceError,
     clearShareFeedback,
+    onSuccess: (message) => {
+      show({ message, variant: "success" });
+    },
   });
   const resolvedPdfError = pdfError ?? (
     quote?.pdf_artifact.status === "failed"
@@ -241,7 +248,6 @@ export function QuotePreview(): React.ReactElement {
               pdfError={resolvedPdfError}
               shareError={shareError}
               outcomeError={outcomeError}
-              shareMessage={shareMessage}
             />
 
             {deleteError ? (
