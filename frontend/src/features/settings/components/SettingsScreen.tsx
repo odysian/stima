@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getTimezoneOptions } from "@/features/profile/lib/timezones";
 import { profileService } from "@/features/profile/services/profileService";
+import { SettingsBusinessProfileCard } from "@/features/settings/components/SettingsBusinessProfileCard";
 import { SettingsCatalogShortcutCard } from "@/features/settings/components/SettingsCatalogShortcutCard";
 import {
   TRADE_TYPES,
@@ -14,15 +15,12 @@ import { BottomNav } from "@/shared/components/BottomNav";
 import { Button } from "@/shared/components/Button";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
-import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { useTheme } from "@/shared/hooks/useTheme";
 import { formatByteLimit } from "@/shared/lib/formatters";
 import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
 import { parseTaxPercentInput, toTaxPercentDisplay } from "@/shared/lib/pricing";
 import type { ThemePreference } from "@/shared/lib/theme";
-import { NumericField } from "@/ui/NumericField";
-import { Select } from "@/ui/Select";
 import { useToast } from "@/ui/Toast";
 import { Card } from "@/ui/Card";
 import { Eyebrow } from "@/ui/Eyebrow";
@@ -32,6 +30,15 @@ const THEME_OPTIONS: ReadonlyArray<{ label: string; value: ThemePreference }> = 
   { label: "Light", value: "light" },
   { label: "Dark", value: "dark" },
 ];
+
+interface BusinessProfileDraft {
+  businessName: string;
+  firstName: string;
+  lastName: string;
+  tradeType: TradeType;
+  timezone: string;
+  defaultTaxRate: string;
+}
 
 export function SettingsScreen(): React.ReactElement {
   const navigate = useNavigate();
@@ -53,22 +60,42 @@ export function SettingsScreen(): React.ReactElement {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [savedProfileDraft, setSavedProfileDraft] = useState<BusinessProfileDraft | null>(null);
+  const [isEditingBusinessProfile, setIsEditingBusinessProfile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLogoSubmitting, setIsLogoSubmitting] = useState(false);
   const [isRemoveLogoOpen, setIsRemoveLogoOpen] = useState(false);
   const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
   const [logoPreviewVersion, setLogoPreviewVersion] = useState(0);
   const logoUploadInputRef = useRef<HTMLInputElement>(null);
-  function applyProfile(profile: ProfileResponse): void {
-    setBusinessName(profile.business_name ?? "");
-    setFirstName(profile.first_name ?? "");
-    setLastName(profile.last_name ?? "");
-    setTradeType(profile.trade_type ?? TRADE_TYPES[0]);
-    setTimezone(profile.timezone ?? "UTC");
-    setDefaultTaxRate(toTaxPercentDisplay(profile.default_tax_rate));
+
+  const applyDraft = useCallback((draft: BusinessProfileDraft): void => {
+    setBusinessName(draft.businessName);
+    setFirstName(draft.firstName);
+    setLastName(draft.lastName);
+    setTradeType(draft.tradeType);
+    setTimezone(draft.timezone);
+    setDefaultTaxRate(draft.defaultTaxRate);
+  }, []);
+
+  const toDraft = useCallback((profile: ProfileResponse): BusinessProfileDraft => {
+    return {
+      businessName: profile.business_name ?? "",
+      firstName: profile.first_name ?? "",
+      lastName: profile.last_name ?? "",
+      tradeType: profile.trade_type ?? TRADE_TYPES[0],
+      timezone: profile.timezone ?? "UTC",
+      defaultTaxRate: toTaxPercentDisplay(profile.default_tax_rate),
+    };
+  }, []);
+
+  const applyProfile = useCallback((profile: ProfileResponse): void => {
+    const nextDraft = toDraft(profile);
+    applyDraft(nextDraft);
+    setSavedProfileDraft(nextDraft);
     setEmail(profile.email);
     setHasLogo(profile.has_logo);
-  }
+  }, [applyDraft, toDraft]);
 
   useEffect(() => {
     let isActive = true;
@@ -95,7 +122,7 @@ export function SettingsScreen(): React.ReactElement {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [applyProfile]);
 
   useEffect(() => {
     if (!saveSuccess) {
@@ -153,6 +180,23 @@ export function SettingsScreen(): React.ReactElement {
     await logout();
   };
 
+  const openBusinessProfileEditor = () => {
+    if (savedProfileDraft) {
+      applyDraft(savedProfileDraft);
+    }
+    setSaveError(null);
+    setIsEditingBusinessProfile(true);
+  };
+
+  const cancelBusinessProfileEditor = () => {
+    if (savedProfileDraft) {
+      applyDraft(savedProfileDraft);
+    }
+    setSaveError(null);
+    setLogoError(null);
+    setIsEditingBusinessProfile(false);
+  };
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaveError(null);
@@ -172,6 +216,15 @@ export function SettingsScreen(): React.ReactElement {
       } catch {
         // Ignore refresh failures because profile save already succeeded.
       }
+      setSavedProfileDraft({
+        businessName,
+        firstName,
+        lastName,
+        tradeType,
+        timezone,
+        defaultTaxRate,
+      });
+      setIsEditingBusinessProfile(false);
       setSaveSuccess("Saved");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save settings";
@@ -180,6 +233,7 @@ export function SettingsScreen(): React.ReactElement {
       setIsSubmitting(false);
     }
   };
+  const timezoneOptions = getTimezoneOptions(timezone);
 
   return (
     <main className="min-h-screen bg-background pb-24 pt-16">
@@ -199,166 +253,38 @@ export function SettingsScreen(): React.ReactElement {
               <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
             ) : null}
 
-            <Card className="p-6">
-              <Eyebrow className="mb-4">Business Profile</Eyebrow>
-
-              <div className="mt-4 flex flex-col gap-4">
-                <div
-                  data-testid="settings-logo-block"
-                  className="rounded-[var(--radius-document)] bg-surface-container-low p-4"
-                >
-                  <div className="flex flex-col gap-3">
-                    <Eyebrow>Logo</Eyebrow>
-                    <div
-                      data-testid="settings-logo-content-row"
-                      className="flex flex-col gap-3 min-[360px]:grid min-[360px]:grid-cols-[128px_minmax(0,1fr)] min-[360px]:items-start min-[360px]:gap-4"
-                    >
-                      <div
-                        data-testid="settings-logo-preview-tile"
-                        className="flex h-[128px] w-[128px] rounded-[var(--radius-document)] bg-surface-container-lowest p-2"
-                      >
-                        <div className="flex h-full w-full items-center justify-center rounded-[var(--radius-document)] bg-surface-container p-2">
-                          {hasLogo ? (
-                            <img
-                              key={logoPreviewVersion}
-                              src={logoPreviewSrc}
-                              alt="Business logo preview"
-                              className="max-h-full max-w-full object-contain"
-                            />
-                          ) : (
-                            <p className="text-xs text-on-surface-variant">No logo</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div
-                        data-testid="settings-logo-actions"
-                        className="flex min-w-0 flex-col gap-2"
-                      >
-                        <p className="text-xs text-on-surface-variant">
-                          {`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`}
-                        </p>
-                        <div className="flex flex-col items-start gap-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="min-h-10 border border-outline-variant/30 px-3 text-xs text-on-surface"
-                            disabled={isLogoSubmitting}
-                            onClick={() => logoUploadInputRef.current?.click()}
-                          >
-                            Upload Logo
-                          </Button>
-                          <input
-                            ref={logoUploadInputRef}
-                            id="settings-logo-upload"
-                            aria-label="Upload logo"
-                            type="file"
-                            accept="image/jpeg,image/png"
-                            className="sr-only"
-                            disabled={isLogoSubmitting}
-                            onChange={onLogoUpload}
-                          />
-                          {hasLogo ? (
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              className="min-h-10 px-3 text-xs"
-                              disabled={isLogoSubmitting}
-                              onClick={() => setIsRemoveLogoOpen(true)}
-                            >
-                              Remove
-                            </Button>
-                          ) : null}
-                        </div>
-                        {logoError ? <FeedbackMessage variant="error">{logoError}</FeedbackMessage> : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <Input
-                  id="settings-business-name"
-                  label="Business name"
-                  value={businessName}
-                  onChange={(event) => setBusinessName(event.target.value)}
-                />
-
-                <div
-                  data-testid="settings-name-row"
-                  className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"
-                >
-                  <Input
-                    id="settings-first-name"
-                    label="First name"
-                    value={firstName}
-                    onChange={(event) => setFirstName(event.target.value)}
-                  />
-                  <Input
-                    id="settings-last-name"
-                    label="Last name"
-                    value={lastName}
-                    onChange={(event) => setLastName(event.target.value)}
-                  />
-                </div>
-
-                <div
-                  data-testid="settings-profile-meta-row"
-                  className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"
-                >
-                  <Select
-                    id="settings-trade-type"
-                    label="Trade type"
-                    value={tradeType}
-                    onChange={(event) => setTradeType(event.target.value as TradeType)}
-                  >
-                    {TRADE_TYPES.map((tradeTypeOption) => (
-                      <option key={tradeTypeOption} value={tradeTypeOption}>
-                        {tradeTypeOption}
-                      </option>
-                    ))}
-                  </Select>
-
-                  <NumericField
-                    id="settings-default-tax-rate"
-                    label="Tax rate (%)"
-                    step={0.01}
-                    value={defaultTaxRate}
-                    onChange={setDefaultTaxRate}
-                    placeholder="8.25"
-                    showStepControls={false}
-                    formatOnBlur={false}
-                  />
-                </div>
-
-                <Select
-                  id="settings-timezone"
-                  label="Timezone"
-                  value={timezone}
-                  onChange={(event) => setTimezone(event.target.value)}
-                >
-                  {getTimezoneOptions(timezone).map((timezoneOption) => (
-                    <option key={timezoneOption} value={timezoneOption}>
-                      {timezoneOption}
-                    </option>
-                  ))}
-                </Select>
-
-                <Select
-                  id="settings-theme"
-                  label="Theme"
-                  value={themePreference}
-                  onChange={(event) => setThemePreference(event.target.value as ThemePreference)}
-                >
-                  {THEME_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </Card>
+            <SettingsBusinessProfileCard
+              logoSizeLimitLabel={logoSizeLimitLabel}
+              hasLogo={hasLogo}
+              logoPreviewVersion={logoPreviewVersion}
+              logoPreviewSrc={logoPreviewSrc}
+              logoError={logoError}
+              isLogoSubmitting={isLogoSubmitting}
+              isEditingBusinessProfile={isEditingBusinessProfile}
+              businessName={businessName}
+              firstName={firstName}
+              lastName={lastName}
+              tradeType={tradeType}
+              timezone={timezone}
+              defaultTaxRate={defaultTaxRate}
+              themePreference={themePreference}
+              tradeTypeOptions={TRADE_TYPES}
+              timezoneOptions={timezoneOptions}
+              themeOptions={THEME_OPTIONS}
+              logoUploadInputRef={logoUploadInputRef}
+              isSubmitting={isSubmitting}
+              onOpenEditor={openBusinessProfileEditor}
+              onCancelEditor={cancelBusinessProfileEditor}
+              onOpenRemoveLogo={() => setIsRemoveLogoOpen(true)}
+              onLogoUpload={onLogoUpload}
+              onBusinessNameChange={setBusinessName}
+              onFirstNameChange={setFirstName}
+              onLastNameChange={setLastName}
+              onTradeTypeChange={setTradeType}
+              onTaxRateChange={setDefaultTaxRate}
+              onTimezoneChange={setTimezone}
+              onThemeChange={setThemePreference}
+            />
 
             <SettingsCatalogShortcutCard
               onOpenLineItemCatalog={() => navigate("/settings/line-item-catalog")}
@@ -384,16 +310,6 @@ export function SettingsScreen(): React.ReactElement {
               </div>
             </Card>
 
-            <div className="pt-2">
-              <Button
-                type="submit"
-                variant="primary"
-                className="w-full md:min-w-[13rem] md:w-auto md:px-8"
-                isLoading={isSubmitting}
-              >
-                Save Changes
-              </Button>
-            </div>
           </form>
         ) : null}
       </section>

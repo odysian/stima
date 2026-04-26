@@ -66,6 +66,11 @@ function renderScreen() {
   );
 }
 
+async function openBusinessProfileEditMode(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: /edit business profile/i }));
+  await screen.findByLabelText(/business name/i);
+}
+
 beforeEach(() => {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -113,7 +118,7 @@ afterEach(() => {
 describe("SettingsScreen", () => {
   const logoSizeLimitLabel = formatByteLimit(MAX_LOGO_SIZE_BYTES);
 
-  it("renders the top-level settings shell with grouped fields and inline save", async () => {
+  it("renders business profile in read-only mode by default and reveals form on edit", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({
         email: "owner@example.com",
@@ -126,11 +131,10 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByDisplayValue("Bright Lawn Care")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Hill")).toBeInTheDocument();
-    expect(screen.getByLabelText(/trade type/i)).toHaveValue("Plumber");
-    expect(screen.getByLabelText(/timezone/i)).toHaveValue("America/New_York");
+    expect(await screen.findByText("Bright Lawn Care")).toBeInTheDocument();
+    expect(screen.getByText("Jordan Hill")).toBeInTheDocument();
+    expect(screen.getByText("Plumber")).toBeInTheDocument();
+    expect(screen.getByText(/America\/New_York/)).toBeInTheDocument();
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.getByText("Email")).toHaveClass(
       "font-bold",
@@ -138,30 +142,23 @@ describe("SettingsScreen", () => {
       "tracking-[0.12em]",
       "text-outline",
     );
-    expect(screen.getByText("Stima")).toBeInTheDocument();
-    expect(
-      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("settings-name-row")).toHaveClass(
-      "grid",
-      "grid-cols-1",
-      "gap-4",
-      "min-[360px]:grid-cols-2",
-    );
-    expect(screen.getByTestId("settings-profile-meta-row")).toHaveClass(
-      "grid",
-      "grid-cols-1",
-      "gap-4",
-      "min-[360px]:grid-cols-2",
-    );
-    expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save changes/i }).closest("footer")).toBeNull();
+    expect(screen.getByRole("button", { name: /edit business profile/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/upload logo/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save changes/i })).not.toBeInTheDocument();
     expect(screen.getByText("Account").closest("div")).toHaveClass("bg-surface-container-low");
     expect(screen.queryByText("Session")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^email$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /back/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /settings/i })).toHaveClass("text-primary");
     expect(screen.queryByText("Appearance")).not.toBeInTheDocument();
+
+    await openBusinessProfileEditMode();
+    expect(screen.getByDisplayValue("Bright Lawn Care")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Jordan")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Hill")).toBeInTheDocument();
+    expect(screen.getByLabelText(/trade type/i)).toHaveValue("Plumber");
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue("America/New_York");
+    expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
   });
 
   it("normalizes null profile values before binding to controlled inputs", async () => {
@@ -178,7 +175,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    await screen.findByLabelText(/business name/i);
+    await openBusinessProfileEditMode();
 
     expect((screen.getByLabelText(/business name/i) as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText(/first name/i) as HTMLInputElement).value).toBe("");
@@ -218,7 +215,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    await screen.findByLabelText(/business name/i);
+    await openBusinessProfileEditMode();
 
     fireEvent.change(screen.getByLabelText(/business name/i), {
       target: { value: "North Star Lawn" },
@@ -254,12 +251,37 @@ describe("SettingsScreen", () => {
     expect(savedToast).not.toHaveClass("bg-success-container");
   });
 
+  it("restores last saved values when leaving edit mode without saving", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse({
+      business_name: "Summit Exterior Care",
+      first_name: "Alex",
+      last_name: "Stone",
+    }));
+
+    renderScreen();
+    await openBusinessProfileEditMode();
+
+    fireEvent.change(screen.getByLabelText(/business name/i), {
+      target: { value: "Unsaved Name" },
+    });
+    fireEvent.change(screen.getByLabelText(/first name/i), {
+      target: { value: "Unsaved First" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Summit Exterior Care")).toBeInTheDocument();
+    expect(screen.getByText("Alex Stone")).toBeInTheDocument();
+    expect(mockedProfileService.updateProfile).not.toHaveBeenCalled();
+  });
+
   it("updates the theme preference immediately from the dropdown", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
 
     renderScreen();
 
-    await screen.findByLabelText(/business name/i);
+    await openBusinessProfileEditMode();
 
     const themeSelect = screen.getByRole("combobox", { name: "Theme" });
 
@@ -299,6 +321,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
+    await openBusinessProfileEditMode();
     expect(await screen.findByDisplayValue("8.25")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/tax rate/i), {
       target: { value: "7.5" },
@@ -342,7 +365,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    await screen.findByLabelText(/business name/i);
+    await openBusinessProfileEditMode();
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => expect(mockedProfileService.updateProfile).toHaveBeenCalledTimes(1));
@@ -359,7 +382,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    await screen.findByLabelText(/business name/i);
+    await openBusinessProfileEditMode();
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to save settings");
@@ -377,7 +400,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    await screen.findByLabelText(/business name/i);
+    await openBusinessProfileEditMode();
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     const submitButton = screen.getByRole("button", { name: /save changes/i });
@@ -385,7 +408,9 @@ describe("SettingsScreen", () => {
     expect(within(submitButton).getByTestId("button-spinner")).toHaveClass("animate-spin");
 
     resolveUpdate?.(makeProfileResponse());
-    await waitFor(() => expect(screen.getByRole("button", { name: /save changes/i })).toBeEnabled());
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /edit business profile/i })).toBeInTheDocument();
+    });
   });
 
   it("requires confirmation before signing out", async () => {
@@ -431,7 +456,7 @@ describe("SettingsScreen", () => {
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
   });
 
-  it("renders logo preview and remove action when profile has a logo", async () => {
+  it("renders compact logo preview in display mode and full controls in edit mode", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(
       makeProfileResponse({ has_logo: true }),
     );
@@ -439,83 +464,40 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Business Profile")).toBeInTheDocument();
+    expect(screen.queryByTestId("settings-logo-block")).not.toBeInTheDocument();
+    expect(await screen.findByAltText(/business logo/i)).toHaveClass(
+      "h-full",
+      "w-full",
+      "object-contain",
+    );
+    expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/upload logo/i)).not.toBeInTheDocument();
+    await openBusinessProfileEditMode();
     expect(screen.getByTestId("settings-logo-block")).toHaveClass(
       "rounded-[var(--radius-document)]",
       "bg-surface-container-low",
       "p-4",
-    );
-    expect(screen.getByTestId("settings-logo-content-row")).toHaveClass(
-      "flex",
-      "flex-col",
-      "gap-3",
-      "min-[360px]:grid",
-      "min-[360px]:grid-cols-[128px_minmax(0,1fr)]",
-      "min-[360px]:items-start",
-      "min-[360px]:gap-4",
-    );
-    expect(screen.getByTestId("settings-logo-actions")).toHaveClass(
-      "flex",
-      "min-w-0",
-      "flex-col",
-      "gap-2",
-    );
-    const previewTile = await screen.findByTestId("settings-logo-preview-tile");
-    expect(previewTile).toHaveClass(
-      "h-[128px]",
-      "w-[128px]",
-      "rounded-[var(--radius-document)]",
-      "bg-surface-container-lowest",
-    );
-    expect(
-      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
-    ).toBeInTheDocument();
-    expect(await screen.findByAltText(/business logo preview/i)).toHaveClass(
-      "max-h-full",
-      "max-w-full",
-      "object-contain",
     );
     expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
   });
 
-  it("renders a fixed no-logo preview frame with the updated upload label", async () => {
+  it("shows a business icon placeholder in display mode and full upload controls in edit mode", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
 
     renderScreen();
 
     expect(await screen.findByText("Business Profile")).toBeInTheDocument();
+    expect(screen.queryByTestId("settings-logo-block")).not.toBeInTheDocument();
+    expect(screen.getByText("business")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/upload logo/i)).not.toBeInTheDocument();
+    await openBusinessProfileEditMode();
     expect(screen.getByTestId("settings-logo-block")).toHaveClass(
       "rounded-[var(--radius-document)]",
       "bg-surface-container-low",
       "p-4",
     );
-    expect(screen.getByTestId("settings-logo-content-row")).toHaveClass(
-      "flex",
-      "flex-col",
-      "gap-3",
-      "min-[360px]:grid",
-      "min-[360px]:grid-cols-[128px_minmax(0,1fr)]",
-      "min-[360px]:items-start",
-      "min-[360px]:gap-4",
-    );
-    expect(screen.getByTestId("settings-logo-actions")).toHaveClass(
-      "flex",
-      "min-w-0",
-      "flex-col",
-      "gap-2",
-    );
-    const previewTile = await screen.findByTestId("settings-logo-preview-tile");
-    expect(previewTile).toHaveClass(
-      "h-[128px]",
-      "w-[128px]",
-      "rounded-[var(--radius-document)]",
-      "bg-surface-container-lowest",
-    );
-    expect(
-      screen.getByText(`JPEG or PNG, up to ${logoSizeLimitLabel}. Appears on quote PDFs.`),
-    ).toBeInTheDocument();
-    expect(within(previewTile).getByText("No logo")).toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
     expect(screen.queryByText(/upload new/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
@@ -529,6 +511,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
+    await openBusinessProfileEditMode();
     const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
     const file = new File(["fake-logo"], "logo.png", { type: "image/png" });
     fireEvent.change(input, { target: { files: [file] } });
@@ -545,6 +528,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
+    await openBusinessProfileEditMode();
     const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
     const file = new File(["fake-logo"], "logo.png");
     fireEvent.change(input, { target: { files: [file] } });
@@ -561,6 +545,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
+    await openBusinessProfileEditMode();
     const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
     const file = new File(["fake-logo"], "logo.txt", { type: "text/plain" });
     fireEvent.change(input, { target: { files: [file] } });
@@ -574,6 +559,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
+    await openBusinessProfileEditMode();
     const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
     const file = new File(["fake-logo"], "logo.png", { type: "image/png" });
     Object.defineProperty(file, "size", { value: MAX_LOGO_SIZE_BYTES + 1 });
@@ -593,7 +579,8 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /remove/i }));
+    await openBusinessProfileEditMode();
+    fireEvent.click(screen.getByRole("button", { name: /remove/i }));
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Remove logo?")).toBeInTheDocument();
@@ -613,7 +600,8 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /remove/i }));
+    await openBusinessProfileEditMode();
+    fireEvent.click(screen.getByRole("button", { name: /remove/i }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: /^remove$/i }));
 
@@ -636,6 +624,7 @@ describe("SettingsScreen", () => {
 
     renderScreen();
 
+    await openBusinessProfileEditMode();
     const input = (await screen.findByLabelText(/upload logo/i)) as HTMLInputElement;
     const file = new File(["fake-logo"], "logo.png", { type: "image/png" });
     fireEvent.change(input, { target: { files: [file] } });
@@ -658,7 +647,8 @@ describe("SettingsScreen", () => {
     expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
 
     resolveProfile?.(makeProfileResponse());
-    expect(await screen.findByLabelText(/business name/i)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /edit business profile/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
   });
 
   it("shows an error state when profile fetch fails and does not render the form", async () => {
