@@ -35,6 +35,7 @@ export function Select({
   const errorId = error ? `${accessibilityBaseId}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   const hasError = invalid || Boolean(error);
+  const selectSizeClass = size === "md" ? "min-h-[var(--tap-target-min)]" : "min-h-9";
 
   const fieldClassName = [
     "relative rounded-[var(--radius-document)] bg-surface-container-high px-4 font-body text-sm text-on-surface transition-all",
@@ -69,7 +70,8 @@ export function Select({
           aria-invalid={hasError}
           aria-describedby={describedBy}
           className={[
-            "h-full w-full appearance-none bg-transparent py-2 pr-6 text-sm text-on-surface outline-none",
+            "w-full appearance-none bg-transparent py-0 pr-6 text-sm leading-normal text-on-surface outline-none",
+            selectSizeClass,
             className,
           ]
             .filter(Boolean)

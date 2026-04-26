@@ -14,6 +14,7 @@ describe("Select", () => {
 
     const select = screen.getByLabelText("Theme");
     expect(select).toHaveValue("light");
+    expect(select).toHaveClass("min-h-[var(--tap-target-min)]", "py-0");
     expect(select).toHaveAttribute("aria-describedby", "theme-hint");
     expect(screen.getByText("Choose your app theme")).toHaveAttribute("id", "theme-hint");
   });
