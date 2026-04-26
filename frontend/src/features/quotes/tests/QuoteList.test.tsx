@@ -265,6 +265,59 @@ describe("QuoteList", () => {
     expect(screen.getByText(/showing locally saved pending captures/i)).toBeInTheDocument();
   });
 
+  it("refetches quotes when auth recovers from offline_recovered to verified while online", async () => {
+    setNavigatorOnline(true);
+    let authMode: "verified" | "offline_recovered" = "offline_recovered";
+    mockedUseAuth.mockImplementation(() => ({
+      authMode,
+      isLoading: false,
+      isOnboarded: true,
+      login: vi.fn(async () => undefined),
+      logout: vi.fn(async () => undefined),
+      refreshUser: vi.fn(async () => undefined),
+      register: vi.fn(async () => undefined),
+      user: {
+        id: "user-1",
+        email: "test@example.com",
+        is_active: true,
+        is_onboarded: true,
+        timezone: "UTC",
+      },
+    }));
+
+    mockedQuoteService.listQuotes
+      .mockResolvedValueOnce([makeQuoteListItem()])
+      .mockResolvedValueOnce([
+        makeQuoteListItem({
+          id: "quote-2",
+          doc_number: "Q-002",
+          customer_id: "cust-2",
+          customer_name: "Bob Brown",
+        }),
+      ]);
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <QuoteList />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Offline mode")).toBeInTheDocument();
+    expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(1);
+
+    authMode = "verified";
+    rerender(
+      <MemoryRouter>
+        <QuoteList />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByText(/Q-002/)).toBeInTheDocument();
+  });
+
   it("renders pending captures with resume, extract, and delete actions", async () => {
     const deleteCaptureMock = vi.fn(async () => undefined);
     setNavigatorOnline(true);

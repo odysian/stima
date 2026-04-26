@@ -24,7 +24,6 @@ import { formatDate } from "@/shared/lib/formatters";
 import { Banner } from "@/ui/Banner";
 import { EmptyState } from "@/ui/EmptyState";
 import { buildInvoiceSubtitle, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
-
 type DocumentMode = "quotes" | "invoices";
 
 export function QuoteList(): React.ReactElement {
@@ -103,7 +102,7 @@ export function QuoteList(): React.ReactElement {
     return () => {
       isActive = false;
     };
-  }, [documentMode]);
+  }, [authMode, documentMode, isOnline]);
 
   useEffect(() => {
     if (!isSearchOpen) {
@@ -131,6 +130,7 @@ export function QuoteList(): React.ReactElement {
       window.removeEventListener("offline", onOnlineChange);
     };
   }, []);
+
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQuotes = useMemo(
     () => quotes.filter((quote) => matchesSearch(quote, normalizedSearchQuery)),
