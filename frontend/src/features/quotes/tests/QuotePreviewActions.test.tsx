@@ -23,7 +23,6 @@ function makeProps(overrides: Partial<ComponentProps<typeof QuotePreviewActions>
     pdfError: null,
     shareError: null,
     outcomeError: null,
-    shareMessage: null,
     ...overrides,
   };
 }

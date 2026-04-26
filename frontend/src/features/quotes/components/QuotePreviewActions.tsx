@@ -4,7 +4,6 @@ import {
   DocumentActionHint,
   DocumentActionManualCopyField,
   DocumentActionStatus,
-  DocumentActionSuccessMessage,
   DocumentActionSurface,
   documentActionPrimaryLinkClassName,
 } from "@/shared/components/DocumentActionSurface";
@@ -27,7 +26,6 @@ interface QuotePreviewActionsProps {
   pdfError: string | null;
   shareError: string | null;
   outcomeError: string | null;
-  shareMessage: string | null;
 }
 
 export function QuotePreviewActions({
@@ -48,7 +46,6 @@ export function QuotePreviewActions({
   pdfError,
   shareError,
   outcomeError,
-  shareMessage,
 }: QuotePreviewActionsProps): React.ReactElement {
   let statusCopy: string | null = null;
   if (isGeneratingPdf) {
@@ -174,13 +171,13 @@ export function QuotePreviewActions({
           {shareError ? <DocumentActionError>{shareError}</DocumentActionError> : null}
           {outcomeError ? <DocumentActionError>{outcomeError}</DocumentActionError> : null}
           {manualCopyUrl ? (
-            <DocumentActionManualCopyField
-              url={manualCopyUrl}
-              label={shareUrl ? "Share URL" : "Generated share URL"}
-            />
-          ) : null}
-          {shareMessage ? (
-            <DocumentActionSuccessMessage>{shareMessage}</DocumentActionSuccessMessage>
+            <>
+              <DocumentActionHint>Copy this share link manually.</DocumentActionHint>
+              <DocumentActionManualCopyField
+                url={manualCopyUrl}
+                label={shareUrl ? "Share URL" : "Generated share URL"}
+              />
+            </>
           ) : null}
         </>
       )}

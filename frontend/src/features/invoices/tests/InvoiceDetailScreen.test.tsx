@@ -7,6 +7,7 @@ import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { JobStatusResponse } from "@/features/quotes/types/quote.types";
 import type { Invoice, InvoiceDetail } from "@/features/invoices/types/invoice.types";
 import { jobService } from "@/shared/lib/jobService";
+import { ToastProvider } from "@/ui/Toast";
 
 vi.mock("@/features/invoices/services/invoiceService", () => ({
   invoiceService: {
@@ -119,14 +120,16 @@ function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
 
 function renderScreen(path = "/invoices/invoice-1"): void {
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
-        <Route path="/documents/:id/edit" element={<div>Document Edit Screen</div>} />
-        <Route path="/quotes/:id/preview" element={<div>Quote Preview Screen</div>} />
-        <Route path="/" element={<div>Quote List Screen</div>} />
-      </Routes>
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/invoices/:id" element={<InvoiceDetailScreen />} />
+          <Route path="/documents/:id/edit" element={<div>Document Edit Screen</div>} />
+          <Route path="/quotes/:id/preview" element={<div>Quote Preview Screen</div>} />
+          <Route path="/" element={<div>Quote List Screen</div>} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>,
   );
 }
 
@@ -344,7 +347,7 @@ describe("InvoiceDetailScreen", () => {
     expect(screen.getByRole("menuitem", { name: /mark as void/i })).toBeInTheDocument();
   });
 
-  it("shows paid banner and only Mark as Void in overflow for paid invoices", async () => {
+  it("keeps paid invoice overflow actions without showing a top paid banner", async () => {
     mockedInvoiceService.getInvoice.mockResolvedValueOnce(
       makeInvoiceDetail({
         status: "paid",
@@ -355,14 +358,15 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByText("This invoice is marked as paid.")).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Invoice Preview" });
+    expect(screen.queryByText("This invoice is marked as paid.")).not.toBeInTheDocument();
     await openOverflowMenu();
 
     expect(screen.queryByRole("menuitem", { name: /mark as paid/i })).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /mark as void/i })).toBeInTheDocument();
   });
 
-  it("shows void banner and only Mark as Paid in overflow for void invoices", async () => {
+  it("keeps void invoice overflow actions without showing a top void banner", async () => {
     mockedInvoiceService.getInvoice.mockResolvedValueOnce(
       makeInvoiceDetail({
         status: "void",
@@ -373,7 +377,8 @@ describe("InvoiceDetailScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByText("This invoice is marked as void.")).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Invoice Preview" });
+    expect(screen.queryByText("This invoice is marked as void.")).not.toBeInTheDocument();
     await openOverflowMenu();
 
     expect(screen.getByRole("menuitem", { name: /mark as paid/i })).toBeInTheDocument();
@@ -422,7 +427,8 @@ describe("InvoiceDetailScreen", () => {
       expect(mockedInvoiceService.markInvoicePaid).toHaveBeenCalledWith("invoice-1");
     });
 
-    expect(await screen.findByText("This invoice is marked as paid.")).toBeInTheDocument();
+    expect(await screen.findByText("Invoice marked as paid.")).toBeInTheDocument();
+    expect(screen.queryByText("This invoice is marked as paid.")).not.toBeInTheDocument();
   });
 
   it("marks a paid invoice as void from overflow and updates visible state", async () => {
@@ -443,7 +449,8 @@ describe("InvoiceDetailScreen", () => {
       expect(mockedInvoiceService.markInvoiceVoid).toHaveBeenCalledWith("invoice-1");
     });
 
-    expect(await screen.findByText("This invoice is marked as void.")).toBeInTheDocument();
+    expect(await screen.findByText("Invoice marked as void.")).toBeInTheDocument();
+    expect(screen.queryByText("This invoice is marked as void.")).not.toBeInTheDocument();
   });
 
   it("hides the email action for draft invoices", async () => {

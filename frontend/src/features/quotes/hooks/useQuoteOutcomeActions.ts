@@ -12,6 +12,7 @@ interface UseQuoteOutcomeActionsArgs {
   navigate: NavigateFunction;
   clearInvoiceError: () => void;
   clearShareFeedback: () => void;
+  onSuccess: (message: string) => void;
 }
 
 interface UseQuoteOutcomeActionsResult {
@@ -38,6 +39,7 @@ export function useQuoteOutcomeActions({
   navigate,
   clearInvoiceError,
   clearShareFeedback,
+  onSuccess,
 }: UseQuoteOutcomeActionsArgs): UseQuoteOutcomeActionsResult {
   const [isMarkingWon, setIsMarkingWon] = useState(false);
   const [isMarkingLost, setIsMarkingLost] = useState(false);
@@ -61,6 +63,7 @@ export function useQuoteOutcomeActions({
     try {
       await quoteService.markQuoteWon(quoteId);
       await refetchQuote(quoteId);
+      onSuccess("Quote marked as won.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to mark quote as won";
       setOutcomeError(message);
@@ -82,6 +85,7 @@ export function useQuoteOutcomeActions({
     try {
       await quoteService.markQuoteLost(quoteId);
       await refetchQuote(quoteId);
+      onSuccess("Quote marked as lost.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to mark quote as lost";
       setOutcomeError(message);
