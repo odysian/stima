@@ -3,6 +3,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Location } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import {
+  AUTH_SESSION_EXPIRED_FLASH_KEY,
+  AUTH_SESSION_EXPIRED_FLASH_MESSAGE,
+} from "@/features/auth/sessionFlash";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
 import { PasswordField } from "@/ui/PasswordField";
@@ -22,9 +26,22 @@ export function LoginForm(): React.ReactElement {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
   const [flashMessage, setFlashMessage] = useState(
     (location.state as LoginLocationState | undefined)?.flashMessage ?? null,
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const sessionExpiredSignal = window.sessionStorage.getItem(AUTH_SESSION_EXPIRED_FLASH_KEY);
+    if (sessionExpiredSignal) {
+      setSessionExpiredMessage(AUTH_SESSION_EXPIRED_FLASH_MESSAGE);
+      window.sessionStorage.removeItem(AUTH_SESSION_EXPIRED_FLASH_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     if (!flashMessage) {
@@ -66,6 +83,11 @@ export function LoginForm(): React.ReactElement {
       <section className="w-full max-w-sm rounded-[var(--radius-document)] bg-surface-container-lowest p-6 ghost-shadow">
         <h2 className="mb-6 font-headline text-2xl font-bold text-on-surface">Welcome Back</h2>
         <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+          {sessionExpiredMessage ? (
+            <div className="rounded-[var(--radius-document)] border-l-4 border-secondary bg-secondary-container p-4">
+              <p className="text-sm font-medium text-on-secondary-container">{sessionExpiredMessage}</p>
+            </div>
+          ) : null}
           <Input
             id="email"
             label="Email"
