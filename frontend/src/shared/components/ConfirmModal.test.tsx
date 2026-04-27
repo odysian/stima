@@ -125,7 +125,7 @@ describe("ConfirmModal", () => {
     expect(screen.getByRole("dialog", { name: "Leave this screen?" })).toHaveClass(
       "ghost-shadow",
       "bg-surface-container-lowest",
-      "border-outline-variant/20",
+      "border-outline-variant/40",
     );
   });
 

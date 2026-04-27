@@ -377,13 +377,13 @@ describe("LineItemEditSheet", () => {
       />,
     );
 
-    expect(screen.getByRole("tabpanel")).toHaveClass("min-h-72");
+    expect(screen.getByRole("tabpanel")).toHaveClass("min-h-80");
 
     await user.click(screen.getByRole("tab", { name: /catalog/i }));
     await waitFor(() => {
       expect(onLoadCatalogItems).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByRole("tabpanel")).toHaveClass("min-h-72");
+    expect(screen.getByRole("tabpanel")).toHaveClass("min-h-80");
   });
 
   it("fires delete callback from top-right trash action", () => {
