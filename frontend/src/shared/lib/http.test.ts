@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/features/auth/types/auth.types";
 import { captureException } from "@/sentry";
 import {
+  AUTH_FAILURE_EVENT,
   clearCsrfToken,
   request,
   requestBlob,
@@ -135,6 +136,25 @@ describe("http request helper", () => {
       (call) => call[0] === "/api/auth/refresh",
     );
     expect(refreshCalls).toHaveLength(1);
+  });
+
+  it("emits one explicit-auth-failure signal for parallel auth failures", async () => {
+    const fetchMock = vi.mocked(fetch);
+    const onAuthFailure = vi.fn();
+    window.addEventListener(AUTH_FAILURE_EVENT, onAuthFailure);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ detail: "CSRF token missing" }, 403))
+      .mockResolvedValueOnce(jsonResponse({ detail: "Missing access token" }, 401));
+
+    await Promise.allSettled([
+      request("/api/quotes", { method: "POST", body: { name: "one" }, skipRefresh: true }),
+      request("/api/quotes", { method: "POST", body: { name: "two" }, skipRefresh: true }),
+    ]);
+
+    await Promise.resolve();
+
+    expect(onAuthFailure).toHaveBeenCalledTimes(1);
+    window.removeEventListener(AUTH_FAILURE_EVENT, onAuthFailure);
   });
 
   it("uses the rotated CSRF token from refresh on the replayed request", async () => {

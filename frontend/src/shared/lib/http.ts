@@ -4,9 +4,25 @@ import { captureException } from "@/sentry";
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 const CSRF_COOKIE_NAME = "stima_csrf_token";
+const AUTH_ERROR_MESSAGE_SNIPPETS = [
+  "csrf token missing",
+  "missing csrf",
+  "missing access token",
+  "access token missing",
+  "refresh token expired",
+  "invalid refresh token",
+  "invalid access token",
+  "authentication required",
+  "not authenticated",
+  "unauthorized",
+  "forbidden",
+] as const;
 
 let csrfToken: string | null = null;
 let refreshInFlight: Promise<void> | null = null;
+let authFailureDispatchQueued = false;
+
+export const AUTH_FAILURE_EVENT = "stima:auth-failure";
 
 export function setCsrfToken(token: string): void {
   csrfToken = token;
@@ -150,6 +166,35 @@ function getErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function shouldSignalAuthFailure(status: number, message: string): boolean {
+  if (status === 401 || status === 403) {
+    return true;
+  }
+
+  const normalizedMessage = message.toLowerCase();
+  return AUTH_ERROR_MESSAGE_SNIPPETS.some((snippet) => normalizedMessage.includes(snippet));
+}
+
+function signalExplicitAuthFailure(status: number, message: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (!shouldSignalAuthFailure(status, message)) {
+    return;
+  }
+
+  if (authFailureDispatchQueued) {
+    return;
+  }
+
+  authFailureDispatchQueued = true;
+  queueMicrotask(() => {
+    authFailureDispatchQueued = false;
+    window.dispatchEvent(new CustomEvent(AUTH_FAILURE_EVENT));
+  });
+}
+
 async function requestRefresh(): Promise<void> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
@@ -219,7 +264,14 @@ async function requestWithParser<T>(
   }
 
   if (response.status === 401 && !options.skipRefresh && url !== "/api/auth/refresh") {
-    await requestRefresh();
+    try {
+      await requestRefresh();
+    } catch (refreshError) {
+      if (isHttpRequestError(refreshError)) {
+        signalExplicitAuthFailure(refreshError.status, refreshError.message);
+      }
+      throw refreshError;
+    }
 
     return requestWithParser(url, {
       ...options,
@@ -236,6 +288,7 @@ async function requestWithParser<T>(
       response.status,
       payload,
     );
+    signalExplicitAuthFailure(error.status, error.message);
     if (response.status >= 500) {
       captureException(error);
     }
