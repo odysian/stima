@@ -92,7 +92,7 @@ export function TotalAmountSection({
             trailingAdornment={(
               <AppIcon name="edit" className="pointer-events-none !text-base leading-none text-on-surface-variant" />
             )}
-            fieldClassName="!min-h-[72px] !border-2 !border-primary !bg-surface-container-high !px-4 !py-3 focus-within:!ring-2 focus-within:!ring-primary/20"
+            fieldClassName="!min-h-[72px] !border-2 !border-primary !bg-surface-container-high !px-4 !py-3 focus-within:!ring-2 focus-within:!ring-focus-ring"
             className="!font-headline !text-3xl !font-bold !tracking-tight text-primary"
           />
         </div>
@@ -166,7 +166,8 @@ export function TotalAmountSection({
                       value={discountType ?? "fixed"}
                       disabled={disabled}
                       onChange={(event) => onDiscountTypeChange(event.target.value as DiscountType)}
-                      className="w-full appearance-none rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 pr-12 text-sm text-on-surface transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary/25"
+                      style={{ colorScheme: "var(--select-color-scheme)" }}
+                      className="w-full appearance-none rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 pr-12 text-sm text-on-surface transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-focus-ring"
                     >
                       <option value="fixed">Fixed $</option>
                       <option value="percent">Percent %</option>

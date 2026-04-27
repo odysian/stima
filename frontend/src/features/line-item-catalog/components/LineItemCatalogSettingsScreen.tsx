@@ -241,7 +241,7 @@ export function LineItemCatalogSettingsScreen(): React.ReactElement {
                     rows={3}
                     value={details}
                     onChange={(event) => setDetails(event.target.value)}
-                    className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-focus-ring"
                   />
                 </div>
 

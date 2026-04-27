@@ -69,7 +69,7 @@ export function Sheet({
     containerClassName,
   );
   const contentClassName = joinClasses(
-    "pointer-events-auto w-full border border-outline-variant/20 glass-surface ghost-shadow backdrop-blur-md rounded-[var(--radius-document)] p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] outline-none overflow-y-auto md:pb-6",
+    "pointer-events-auto w-full border border-outline-variant/40 glass-surface ghost-shadow backdrop-blur-md rounded-[var(--radius-document)] p-6 pb-[max(env(safe-area-inset-bottom),1.25rem)] outline-none overflow-y-auto md:pb-6",
     sheetSizeClasses[size],
     contentProps?.className,
   );

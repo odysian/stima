@@ -623,8 +623,7 @@ describe("QuoteList", () => {
     expect(unassignedDraftRow).toHaveClass(
       "border-l-4",
       "border-warning-accent",
-      "glass-surface",
-      "backdrop-blur-md",
+      "bg-surface-container-low",
       "ghost-shadow",
     );
 

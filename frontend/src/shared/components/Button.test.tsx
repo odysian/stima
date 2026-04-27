@@ -26,7 +26,7 @@ describe("Button", () => {
     );
 
     expect(screen.getByRole("button", { name: "Secondary" })).toHaveClass("bg-surface-container-high");
-    expect(screen.getByRole("button", { name: "Tonal" })).toHaveClass("bg-primary/15");
+    expect(screen.getByRole("button", { name: "Tonal" })).toHaveClass("bg-selection-bg");
     expect(screen.getByRole("button", { name: "Delete" })).toHaveClass("border-secondary", "text-secondary");
     expect(screen.getByRole("button", { name: "Back" })).toHaveClass("text-on-surface-variant");
     expect(screen.getByRole("button", { name: "Close dialog" })).toHaveClass("rounded-full", "min-h-12");

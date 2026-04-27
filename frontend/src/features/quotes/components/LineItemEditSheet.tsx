@@ -239,7 +239,7 @@ export function LineItemEditSheet({
                     variant="iconButton"
                     size="sm"
                     aria-label="Save to catalog"
-                    className="border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
+                    className="border border-selection-ring bg-selection-bg text-primary hover:bg-primary/20"
                     disabled={isCatalogMutationInFlight || (!canSaveToCatalog && !canDeleteSavedCatalogItem)}
                     onClick={() => {
                       if (savedCatalogItem) {
@@ -262,7 +262,7 @@ export function LineItemEditSheet({
                     variant="iconButton"
                     size="sm"
                     aria-label="Add line item"
-                    className="border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
+                    className="border border-selection-ring bg-selection-bg text-primary hover:bg-primary/20"
                     onClick={addLineItemAndClose}
                   >
                     <AppIcon name="check" className="text-[1.125rem] leading-none" />
@@ -356,7 +356,7 @@ export function LineItemEditSheet({
                 <div
                   id="line-item-tabpanel-manual"
                   role={mode === "add" ? "tabpanel" : undefined}
-                  className={`space-y-4 ${mode === "add" ? "min-h-72" : ""}`.trim()}
+                  className={`space-y-4 ${mode === "add" ? "min-h-80" : ""}`.trim()}
                 >
                   <section className="space-y-2">
                     <div className="flex items-end justify-between">
@@ -423,7 +423,7 @@ export function LineItemEditSheet({
                           setFormError(null);
                         }
                       }}
-                      className="w-full resize-none rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
+                      className="w-full resize-none rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-focus-ring"
                     />
                   </section>
                 </div>
@@ -432,7 +432,7 @@ export function LineItemEditSheet({
                   loadState={catalogLoadState}
                   loadError={catalogLoadError}
                   items={catalogItems}
-                  panelClassName={mode === "add" ? "min-h-72" : undefined}
+                  panelClassName={mode === "add" ? "min-h-80" : undefined}
                   onRetry={() => {
                     setCatalogLoadState("idle");
                     void loadCatalogItems();

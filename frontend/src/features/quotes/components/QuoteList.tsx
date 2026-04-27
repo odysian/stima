@@ -283,7 +283,7 @@ export function QuoteList(): React.ReactElement {
                 aria-pressed={documentMode === "quotes"}
                 className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
                   documentMode === "quotes"
-                    ? "ghost-shadow bg-surface-container-lowest text-primary"
+                    ? "ghost-shadow bg-surface-container-lowest text-primary ring-1 ring-selection-ring"
                     : "text-on-surface-variant"
                 }`}
                 onClick={() => setDocumentMode("quotes")}
@@ -295,7 +295,7 @@ export function QuoteList(): React.ReactElement {
                 aria-pressed={documentMode === "invoices"}
                 className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
                   documentMode === "invoices"
-                    ? "ghost-shadow bg-surface-container-lowest text-primary"
+                    ? "ghost-shadow bg-surface-container-lowest text-primary ring-1 ring-selection-ring"
                     : "text-on-surface-variant"
                 }`}
                 onClick={() => setDocumentMode("invoices")}

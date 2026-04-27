@@ -17,16 +17,19 @@
   --color-error: #ba1a1a;
   --color-on-error: #ffffff;
   --color-error-container: #ffdad6;
-  --color-background: #f8f9ff;
-  --color-surface: #f8f9ff;
-  --color-surface-bright: #f8f9ff;
+  --color-background: #f0f4f8;
+  --color-surface: #f0f4f8;
+  --color-surface-bright: #f0f4f8;
   --color-surface-dim: #ccdbf3;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #eff4ff;
-  --color-surface-container: #e6eeff;
-  --color-surface-container-high: #dce9ff;
-  --color-surface-container-highest: #d5e3fc;
-  --color-surface-variant: #d5e3fc;
+  --color-surface-container-low: #e2e8f0;
+  --color-surface-container: #dbe4ee;
+  --color-surface-container-high: #cbd5e1;
+  --color-surface-container-highest: #b8c9dc;
+  --color-surface-variant: #b8c9dc;
+  --color-selection-ring: rgb(0 69 50 / 0.5);
+  --color-selection-bg: rgb(0 69 50 / 0.25);
+  --color-focus-ring: rgb(0 69 50 / 0.5);
   --color-surface-tint: #1b6b51;
   --color-on-surface: #0d1c2e;
   --color-on-surface-variant: #3f4944;
@@ -79,6 +82,7 @@
   --shadow-glass-top: 0 0 24px rgba(13, 28, 46, 0.04);
   --shadow-glass-bottom: 0 -4px 24px rgba(0, 0, 0, 0.04);
   --shadow-modal: 0 24px 64px rgba(13, 28, 46, 0.24);
+  --select-color-scheme: light;
 }
 
 [data-theme="light"] {
@@ -97,6 +101,10 @@
     --shadow-glass-top: 0 0 24px rgba(0, 0, 0, 0.2);
     --shadow-glass-bottom: 0 -4px 24px rgba(0, 0, 0, 0.24);
     --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.45);
+    --select-color-scheme: dark;
+    --color-selection-ring: rgb(27 142 108 / 0.3);
+    --color-selection-bg: rgb(27 142 108 / 0.15);
+    --color-focus-ring: rgb(27 142 108 / 0.3);
     --color-primary: #1b8e6c;
     --color-primary-container: #0f7a5d;
     --color-on-primary: #ffffff;
@@ -163,6 +171,10 @@
   --shadow-glass-top: 0 0 24px rgba(0, 0, 0, 0.2);
   --shadow-glass-bottom: 0 -4px 24px rgba(0, 0, 0, 0.24);
   --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.45);
+  --select-color-scheme: dark;
+  --color-selection-ring: rgb(27 142 108 / 0.3);
+  --color-selection-bg: rgb(27 142 108 / 0.15);
+  --color-focus-ring: rgb(27 142 108 / 0.3);
   --color-primary: #1b8e6c;
   --color-primary-container: #0f7a5d;
   --color-on-primary: #ffffff;

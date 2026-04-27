@@ -45,7 +45,7 @@ export function BottomNav({ active }: BottomNavProps): React.ReactElement {
           >
             <span
               className={`flex items-center justify-center rounded-full px-4 py-0.5 transition-colors ${
-                isActive ? "bg-primary/20" : ""
+                isActive ? "bg-selection-bg" : ""
               }`}
             >
               <AppIcon name={tab.icon} className="text-xl" strokeWidth={isActive ? 2.5 : 2} />

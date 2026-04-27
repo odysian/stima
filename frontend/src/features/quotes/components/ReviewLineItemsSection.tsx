@@ -127,8 +127,8 @@ export function ReviewLineItemsSection({
           disabled={isInteractionLocked || (!isReorderModeActive && lineItems.length < 2)}
           className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
             isReorderModeActive
-              ? "border-primary/30 bg-primary/15 text-primary ghost-shadow"
-              : "border-outline-variant/35 bg-surface-container-high/80 text-on-surface-variant hover:border-outline-variant/50 hover:bg-surface-container-high"
+              ? "border-selection-ring bg-selection-bg text-primary ghost-shadow"
+              : "border-outline-variant/50 bg-surface-container-high/80 text-on-surface-variant hover:border-outline-variant/70 hover:bg-surface-container-high"
           } disabled:cursor-not-allowed disabled:opacity-60`}
           onClick={() => {
             clearDragState();
@@ -178,7 +178,7 @@ export function ReviewLineItemsSection({
             );
           })
         ) : (
-          <p className="rounded-[var(--radius-document)] bg-surface-container-lowest p-4 text-sm text-outline">
+          <p className="rounded-[var(--radius-document)] bg-surface-container-lowest p-4 text-sm text-on-surface-variant">
             No line items on this quote yet.
           </p>
         )}
@@ -187,7 +187,7 @@ export function ReviewLineItemsSection({
       <div className="grid gap-3 sm:grid-cols-1">
         <button
           type="button"
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-document)] border-2 border-dashed border-outline-variant/30 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-document)] border-2 border-dashed border-outline-variant/50 py-3 text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isInteractionLocked || hasReachedLineItemLimit || isReorderModeActive}
           onClick={onAddLineItem}
         >

@@ -47,7 +47,7 @@ export function CaptureInputPanel({
         </div>
 
         {clips.length === 0 ? (
-          <div className="ghost-shadow flex h-28 flex-col items-center justify-center gap-2 rounded-[var(--radius-document)] border-2 border-dashed border-outline-variant/30 bg-surface-container-lowest p-4">
+          <div className="ghost-shadow flex h-28 flex-col items-center justify-center gap-2 rounded-[var(--radius-document)] border-2 border-dashed border-outline-variant/50 bg-surface-container-lowest p-4">
             <AppIcon name="mic_off" className="text-4xl text-outline" />
             <p className="text-sm text-outline">No clips recorded yet</p>
           </div>
@@ -101,7 +101,7 @@ export function CaptureInputPanel({
           value={notes}
           onChange={(event) => onNotesChange(event.target.value)}
           placeholder="Add any typed details here..."
-          className="w-full resize-none rounded-[var(--radius-document)] border border-outline-variant/25 bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/30 focus:outline-none"
+          className="w-full resize-none rounded-[var(--radius-document)] border border-outline-variant/25 bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:ring-2 focus:ring-focus-ring focus:outline-none"
         />
         {onStartBlank ? (
           <Button

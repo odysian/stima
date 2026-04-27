@@ -60,7 +60,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({
 
   const fieldWrapperClassName = [
     "flex items-center gap-2 rounded-[var(--radius-document)] bg-surface-container-high px-4 font-body text-sm text-on-surface transition-all",
-    "focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/30",
+    "focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-focus-ring",
     size === "md" ? "min-h-[var(--tap-target-min)] py-2" : "min-h-9 py-1.5",
     hasError ? "border border-error" : "border border-transparent",
     disabled ? "cursor-not-allowed opacity-70" : "",

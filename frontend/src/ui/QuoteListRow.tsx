@@ -16,7 +16,7 @@ interface QuoteListRowProps {
 const baseRowClasses =
   "w-full cursor-pointer rounded-[var(--radius-document)] bg-surface-container-lowest px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
 const draftRowClasses =
-  "glass-surface w-full cursor-pointer rounded-[var(--radius-document)] border-l-4 border-warning-accent px-4 py-3 text-left backdrop-blur-md ghost-shadow transition active:scale-[0.98] active:bg-surface-container-low";
+  "bg-surface-container-low w-full cursor-pointer rounded-[var(--radius-document)] border-l-4 border-warning-accent px-4 py-3 text-left ghost-shadow transition active:scale-[0.98] active:bg-surface-container-high";
 export function QuoteListRow({
   customerLabel,
   titleLabel,
