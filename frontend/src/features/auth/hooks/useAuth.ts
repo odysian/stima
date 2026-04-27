@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -37,11 +38,14 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const RECONNECT_REVERIFY_DEBOUNCE_MS = 1_500;
 
 export function AuthProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [user, setUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>("signed_out");
   const [isLoading, setIsLoading] = useState(true);
+  const isReverifyInFlightRef = useRef(false);
+  const lastReverifyAtRef = useRef(0);
 
   const setVerifiedUser = useCallback((currentUser: User) => {
     setUser(currentUser);
@@ -173,7 +177,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       if (!window.navigator.onLine) {
         return;
       }
-      void reverifyOfflineRecoveredUser();
+      const now = Date.now();
+      if (isReverifyInFlightRef.current || now - lastReverifyAtRef.current < RECONNECT_REVERIFY_DEBOUNCE_MS) {
+        return;
+      }
+
+      isReverifyInFlightRef.current = true;
+      lastReverifyAtRef.current = now;
+      void reverifyOfflineRecoveredUser().finally(() => {
+        isReverifyInFlightRef.current = false;
+      });
     };
 
     window.addEventListener("online", onOnline);
