@@ -69,9 +69,8 @@ export function Select({
           aria-required={required}
           aria-invalid={hasError}
           aria-describedby={describedBy}
-          style={{ colorScheme: "var(--select-color-scheme)" }}
           className={[
-            "w-full appearance-none bg-transparent py-0 pr-6 text-sm leading-normal text-on-surface outline-none",
+            "w-full appearance-none bg-surface-container-high py-0 pr-6 text-sm leading-normal text-on-surface outline-none transition-colors focus:bg-surface-container-lowest",
             selectSizeClass,
             className,
           ]
