@@ -41,7 +41,7 @@ export function ScreenHeader({
             aria-label={backLabel}
             className="text-primary"
           >
-            <AppIcon name="arrow_back" className="block text-[1.125rem] leading-none" />
+            <AppIcon name="arrow_back" className="block text-xl leading-none" />
           </Button>
         ) : null}
         {isTopLevelLayout ? (

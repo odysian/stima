@@ -36,7 +36,7 @@ export function WorkflowScreenHeader({
         aria-label={exitHomeLabel}
         className="border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow"
       >
-        <AppIcon name="close" className="block text-[1.125rem] leading-none" />
+        <AppIcon name="close" className="block text-xl leading-none" />
       </Button>
     </div>
   ) : trailing;

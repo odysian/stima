@@ -161,7 +161,7 @@ export function SheetCloseButton({
       <Button
         type="button"
         variant="iconButton"
-        size="xs"
+        size="sm"
         aria-label={label}
         className={joinClasses(
           "shrink-0 border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low",
