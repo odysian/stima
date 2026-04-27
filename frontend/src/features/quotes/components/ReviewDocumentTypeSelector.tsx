@@ -51,7 +51,7 @@ export function ReviewDocumentTypeSelector({
                 "w-full cursor-pointer py-3 text-center font-headline text-lg font-bold tracking-tight transition-all",
                 "disabled:cursor-not-allowed disabled:opacity-60",
                 isSelected
-                  ? "ghost-shadow rounded-[var(--radius-document)] bg-surface-container-lowest ring-2 ring-primary/30 text-on-surface"
+                  ? "ghost-shadow rounded-[var(--radius-document)] bg-surface-container-lowest ring-2 ring-selection-ring text-on-surface"
                   : "rounded-[var(--radius-document)] bg-surface-container-low text-on-surface hover:bg-surface-container-lowest",
               ].join(" ")}
               onClick={() => onChange(option.value)}

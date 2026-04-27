@@ -23,8 +23,8 @@ export function TradeTypeSelector({
             className={[
               "cursor-pointer py-3 rounded-[var(--radius-document)] font-label text-sm",
               isSelected
-                ? "ghost-shadow border border-primary/30 bg-surface-container-lowest text-on-surface font-semibold"
-                : "border border-outline-variant/30 bg-surface-container-low text-on-surface-variant",
+                ? "ghost-shadow border border-selection-ring bg-surface-container-lowest text-on-surface font-semibold"
+                : "border border-outline-variant/50 bg-surface-container-low text-on-surface-variant",
             ].join(" ")}
           >
             {option}

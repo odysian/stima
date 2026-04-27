@@ -33,7 +33,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   secondary:
     "rounded-[var(--radius-document)] bg-surface-container-high text-on-surface hover:bg-surface-container",
   tonal:
-    "rounded-[var(--radius-document)] bg-primary/15 text-primary hover:bg-primary/20",
+    "rounded-[var(--radius-document)] bg-selection-bg text-primary hover:bg-primary/30",
   destructive:
     "rounded-[var(--radius-document)] border border-secondary text-secondary hover:bg-secondary/10",
   ghost:

@@ -201,7 +201,7 @@ export function ReviewFormContent({
           value={draft.notes}
           disabled={isInteractionLocked}
           onChange={(event) => onNotesChange(event.target.value)}
-          className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
+          className="w-full rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high p-4 text-sm text-on-surface placeholder:text-outline/70 outline-none transition-all focus:border-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-focus-ring"
           placeholder="Any notes to include for the customer."
         />
       </section>

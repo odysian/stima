@@ -106,7 +106,7 @@ export function OverflowMenu({
           id={menuId}
           role="menu"
           aria-label={triggerLabel}
-          className="absolute right-0 top-full z-50 mt-2 w-52 max-w-[calc(100vw-2rem)] rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-lowest p-1.5 ghost-shadow"
+          className="absolute right-0 top-full z-50 mt-2 w-52 max-w-[calc(100vw-2rem)] rounded-[var(--radius-document)] border border-outline-variant/50 bg-surface-container-low p-1.5 ghost-shadow"
         >
           {items.map((item) => {
             const toneClassName = item.tone === "destructive" ? "text-error" : "text-on-surface";

@@ -23,12 +23,12 @@ describe("TradeTypeSelector", () => {
 
     expect(screen.getByRole("button", { name: "Builder" })).toHaveClass(
       "ghost-shadow",
-      "border-primary/30",
+      "border-selection-ring",
       "bg-surface-container-lowest",
       "text-on-surface",
     );
     expect(screen.getByRole("button", { name: "Plumber" })).toHaveClass(
-      "border-outline-variant/30",
+      "border-outline-variant/50",
       "bg-surface-container-low",
       "text-on-surface-variant",
     );

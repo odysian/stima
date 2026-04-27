@@ -47,10 +47,10 @@ export function LineItemCard({
           : "transition-colors"
       } ${
         isDragging
-          ? "-translate-y-0.5 scale-[1.01] bg-surface-container-low ring-2 ring-primary/35"
+          ? "-translate-y-0.5 scale-[1.01] bg-surface-container-low ring-2 ring-selection-ring"
           : ""
       } ${
-        isDropSettling ? "ring-2 ring-primary/20" : ""
+        isDropSettling ? "ring-2 ring-focus-ring" : ""
       }`}
     >
       {showDragHandle ? (
