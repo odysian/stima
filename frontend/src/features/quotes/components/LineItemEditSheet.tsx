@@ -251,7 +251,7 @@ export function LineItemEditSheet({
                   >
                     <AppIcon
                       name={bookmarkIcon}
-                      className="text-base leading-none"
+                      className="text-[1.125rem] leading-none"
                       strokeWidth={canDeleteSavedCatalogItem ? 2.6 : 2}
                     />
                   </Button>
@@ -265,7 +265,7 @@ export function LineItemEditSheet({
                     className="border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
                     onClick={addLineItemAndClose}
                   >
-                    <AppIcon name="check" className="text-base leading-none" />
+                    <AppIcon name="check" className="text-[1.125rem] leading-none" />
                   </Button>
                 ) : null}
                 {mode === "edit" && onRequestDelete ? (

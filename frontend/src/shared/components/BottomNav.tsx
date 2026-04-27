@@ -31,7 +31,7 @@ export function BottomNav({ active }: BottomNavProps): React.ReactElement {
   const navigate = useNavigate();
 
   return (
-    <nav className="safe-bottom glass-surface-strong glass-shadow-bottom fixed bottom-0 z-50 flex w-full justify-around border-t border-outline-variant/20 py-3 backdrop-blur-md">
+    <nav className="safe-bottom glass-surface-strong glass-shadow-bottom fixed bottom-0 z-50 flex w-full justify-around border-t border-outline-variant/20 py-2.5 backdrop-blur-md">
       {tabs.map((tab) => {
         const isActive = active === tab.key;
         return (
@@ -44,11 +44,11 @@ export function BottomNav({ active }: BottomNavProps): React.ReactElement {
             }`}
           >
             <span
-              className={`flex items-center justify-center rounded-full px-4 py-1 transition-colors ${
+              className={`flex items-center justify-center rounded-full px-4 py-0.5 transition-colors ${
                 isActive ? "bg-primary/20" : ""
               }`}
             >
-              <AppIcon name={tab.icon} strokeWidth={isActive ? 2.5 : 2} />
+              <AppIcon name={tab.icon} className="text-xl" strokeWidth={isActive ? 2.5 : 2} />
             </span>
             <span>{tab.label}</span>
           </button>
