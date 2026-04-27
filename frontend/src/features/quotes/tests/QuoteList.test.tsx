@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -334,6 +334,48 @@ describe("QuoteList", () => {
     await waitFor(() => {
       expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(2);
     });
+    expect(await screen.findByText(/Q-002/)).toBeInTheDocument();
+  });
+
+  it("refreshes quotes and pending captures once on rapid reconnect flaps", async () => {
+    setNavigatorOnline(true);
+    const refreshRecoverableCaptures = vi.fn(async () => undefined);
+    mockedUseRecoverableCaptures.mockReturnValue({
+      captures: [],
+      isLoading: false,
+      error: null,
+      refresh: refreshRecoverableCaptures,
+      deleteCapture: vi.fn(async () => undefined),
+    });
+    mockedQuoteService.listQuotes
+      .mockResolvedValueOnce([makeQuoteListItem()])
+      .mockResolvedValueOnce([
+        makeQuoteListItem({
+          id: "quote-2",
+          doc_number: "Q-002",
+        }),
+      ]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+    expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      setNavigatorOnline(false);
+      window.dispatchEvent(new Event("offline"));
+      setNavigatorOnline(true);
+      window.dispatchEvent(new Event("online"));
+
+      setNavigatorOnline(false);
+      window.dispatchEvent(new Event("offline"));
+      setNavigatorOnline(true);
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => {
+      expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(2);
+    });
+    expect(refreshRecoverableCaptures).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(/Q-002/)).toBeInTheDocument();
   });
 

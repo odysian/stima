@@ -6,6 +6,7 @@ import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { PendingCaptureDeleteDialog } from "@/features/quotes/components/PendingCaptureDeleteDialog";
 import { PendingCapturesSection } from "@/features/quotes/components/PendingCapturesSection";
+import { useReconnectRefresh } from "@/features/quotes/components/useReconnectRefresh";
 import { useOutboxSuccessQuoteRefresh } from "@/features/quotes/components/useOutboxSuccessQuoteRefresh";
 import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
 import { getStorageErrorMessage } from "@/features/quotes/offline/captureDb";
@@ -42,7 +43,6 @@ export function QuoteList(): React.ReactElement {
   const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
   const [pendingCaptureActionError, setPendingCaptureActionError] = useState<string | null>(null);
   const [capturePendingDelete, setCapturePendingDelete] = useState<LocalCaptureSummary | null>(null);
-  const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const {
     captures: recoverableCaptures,
     isLoading: isLoadingRecoverableCaptures,
@@ -50,6 +50,7 @@ export function QuoteList(): React.ReactElement {
     refresh: refreshRecoverableCaptures,
     deleteCapture,
   } = useRecoverableCaptures(user?.id);
+  const { isOnline, reconnectTick } = useReconnectRefresh(refreshRecoverableCaptures);
   useOutboxSuccessQuoteRefresh({
     userId: user?.id,
     onQuotesLoaded: setQuotes,
@@ -112,7 +113,7 @@ export function QuoteList(): React.ReactElement {
     return () => {
       isActive = false;
     };
-  }, [authMode, documentMode, isOnline]);
+  }, [authMode, documentMode, reconnectTick]);
 
   useEffect(() => {
     if (!isSearchOpen) {
@@ -123,21 +124,6 @@ export function QuoteList(): React.ReactElement {
       inputElement.focus();
     }
   }, [isSearchOpen]);
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    function onOnlineChange(): void {
-      setIsOnline(window.navigator.onLine);
-    }
-    window.addEventListener("online", onOnlineChange);
-    window.addEventListener("offline", onOnlineChange);
-    return () => {
-      window.removeEventListener("online", onOnlineChange);
-      window.removeEventListener("offline", onOnlineChange);
-    };
-  }, []);
-
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQuotes = useMemo(
     () => quotes.filter((quote) => matchesSearch(quote, normalizedSearchQuery)),

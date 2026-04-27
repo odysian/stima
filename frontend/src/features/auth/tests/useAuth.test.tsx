@@ -330,6 +330,65 @@ describe("useAuth", () => {
     });
   });
 
+  it("deduplicates rapid online events while offline_recovered reverify is in flight", async () => {
+    let resolveReverify: ((value: {
+      id: string;
+      email: string;
+      is_active: boolean;
+      is_onboarded: boolean;
+      timezone: string;
+    }) => void) | undefined;
+    const pendingReverify = new Promise<{
+      id: string;
+      email: string;
+      is_active: boolean;
+      is_onboarded: boolean;
+      timezone: string;
+    }>((resolve) => {
+      resolveReverify = resolve;
+    });
+
+    mockedAuthService.me
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockReturnValueOnce(pendingReverify);
+    mockedReadOfflineUserSnapshot.mockReturnValue({
+      userId: "user-9",
+      isOnboarded: true,
+      timezone: "America/New_York",
+      lastVerifiedAt: new Date().toISOString(),
+    });
+
+    render(
+      <AuthProvider>
+        <AuthHarness />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-mode")).toHaveTextContent("offline_recovered");
+    });
+
+    window.dispatchEvent(new Event("online"));
+    window.dispatchEvent(new Event("online"));
+
+    await waitFor(() => {
+      expect(mockedAuthService.me).toHaveBeenCalledTimes(2);
+    });
+
+    resolveReverify?.({
+      id: "user-9",
+      email: "user9@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "America/New_York",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-mode")).toHaveTextContent("verified");
+      expect(mockedRunOutboxPass).toHaveBeenCalledWith("user-9", { forceAfterAuth: true });
+    });
+  });
+
   it("forces signed_out when explicit auth-failure event is broadcast", async () => {
     mockedAuthService.me.mockResolvedValueOnce({
       id: "user-1",
