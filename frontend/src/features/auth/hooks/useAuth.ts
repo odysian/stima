@@ -18,6 +18,7 @@ import {
   writeOfflineUserSnapshot,
 } from "@/features/auth/offline/offlineUserSnapshot";
 import { authService } from "@/features/auth/services/authService";
+import { AUTH_SESSION_EXPIRED_FLASH_KEY } from "@/features/auth/sessionFlash";
 import type { AuthMode, LoginRequest, RegisterRequest, User } from "@/features/auth/types/auth.types";
 import { clearDraftsForUser, deleteStaleLocalDrafts } from "@/features/quotes/offline/draftRepository";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
@@ -150,6 +151,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     }
 
     const handleAuthFailure = () => {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(AUTH_SESSION_EXPIRED_FLASH_KEY, "1");
+      }
       setIsLoading(false);
       forceSignedOut();
     };

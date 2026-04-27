@@ -5,6 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { AuthProvider } from "@/features/auth/hooks/useAuth";
 import { authService } from "@/features/auth/services/authService";
+import {
+  AUTH_SESSION_EXPIRED_FLASH_KEY,
+  AUTH_SESSION_EXPIRED_FLASH_MESSAGE,
+} from "@/features/auth/sessionFlash";
 import { clearCsrfToken } from "@/shared/lib/http";
 import { ToastProvider } from "@/ui/Toast";
 
@@ -43,6 +47,7 @@ function renderLogin(initialEntry: string | { pathname: string; state?: unknown 
 afterEach(() => {
   vi.clearAllMocks();
   clearCsrfToken();
+  window.sessionStorage.clear();
 });
 
 describe("LoginForm", () => {
@@ -168,6 +173,49 @@ describe("LoginForm", () => {
       state: { flashMessage: "Password reset successful. Please sign in." },
     });
 
+    expect(
+      await screen.findByText("Password reset successful. Please sign in."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows inline session-expired banner when auth-failure flash key is present", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+    window.sessionStorage.setItem(AUTH_SESSION_EXPIRED_FLASH_KEY, "1");
+
+    renderLogin();
+
+    expect(await screen.findByText(AUTH_SESSION_EXPIRED_FLASH_MESSAGE)).toBeInTheDocument();
+  });
+
+  it("clears session-expired flash key after showing the inline banner", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+    window.sessionStorage.setItem(AUTH_SESSION_EXPIRED_FLASH_KEY, "1");
+
+    renderLogin();
+
+    await screen.findByText(AUTH_SESSION_EXPIRED_FLASH_MESSAGE);
+    expect(window.sessionStorage.getItem(AUTH_SESSION_EXPIRED_FLASH_KEY)).toBeNull();
+  });
+
+  it("does not show session-expired banner for manual navigation to login", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+
+    renderLogin();
+
+    await screen.findByRole("main");
+    expect(screen.queryByText(AUTH_SESSION_EXPIRED_FLASH_MESSAGE)).not.toBeInTheDocument();
+  });
+
+  it("keeps flashMessage toast behavior when session-expired banner also exists", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+    window.sessionStorage.setItem(AUTH_SESSION_EXPIRED_FLASH_KEY, "1");
+
+    renderLogin({
+      pathname: "/login",
+      state: { flashMessage: "Password reset successful. Please sign in." },
+    });
+
+    expect(await screen.findByText(AUTH_SESSION_EXPIRED_FLASH_MESSAGE)).toBeInTheDocument();
     expect(
       await screen.findByText("Password reset successful. Please sign in."),
     ).toBeInTheDocument();

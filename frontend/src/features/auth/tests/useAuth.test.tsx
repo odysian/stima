@@ -8,6 +8,7 @@ import {
   writeOfflineUserSnapshot,
 } from "@/features/auth/offline/offlineUserSnapshot";
 import { authService } from "@/features/auth/services/authService";
+import { AUTH_SESSION_EXPIRED_FLASH_KEY } from "@/features/auth/sessionFlash";
 import { clearDraftsForUser, deleteStaleLocalDrafts } from "@/features/quotes/offline/draftRepository";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
 import { AUTH_FAILURE_EVENT, HttpRequestError, hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
@@ -97,6 +98,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  window.sessionStorage.clear();
   if (ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR) {
     Object.defineProperty(window.navigator, "onLine", ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR);
     return;
@@ -354,7 +356,33 @@ describe("useAuth", () => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("none");
       expect(screen.getByTestId("auth-mode")).toHaveTextContent("signed_out");
     });
+    expect(window.sessionStorage.getItem(AUTH_SESSION_EXPIRED_FLASH_KEY)).toBe("1");
     expect(mockedClearOfflineUserSnapshot).toHaveBeenCalled();
+  });
+
+  it("does not set session-expired flash key on manual logout", async () => {
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-2",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "America/New_York",
+    });
+    mockedAuthService.logout.mockResolvedValueOnce();
+
+    render(
+      <AuthProvider>
+        <AuthHarness />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("user@example.com")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Logout" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-mode")).toHaveTextContent("signed_out");
+    });
+    expect(window.sessionStorage.getItem(AUTH_SESSION_EXPIRED_FLASH_KEY)).toBeNull();
   });
 
   it("throws when used outside AuthProvider", () => {
