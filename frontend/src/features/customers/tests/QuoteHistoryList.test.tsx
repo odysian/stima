@@ -74,10 +74,10 @@ describe("QuoteHistoryList", () => {
   });
 
   it("renders the empty state when no quotes exist", () => {
-    render(<QuoteHistoryList quotes={[]} onQuoteClick={vi.fn()} timezone="UTC" />);
+    const { container } = render(<QuoteHistoryList quotes={[]} onQuoteClick={vi.fn()} timezone="UTC" />);
 
     expect(screen.getByText("No quotes yet.")).toBeInTheDocument();
-    expect(screen.getByText("description")).toHaveClass("material-symbols-outlined");
+    expect(container.querySelector("svg")).toBeInTheDocument();
   });
 
   it("renders dates using the provided timezone", () => {

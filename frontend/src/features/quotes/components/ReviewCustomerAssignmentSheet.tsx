@@ -6,6 +6,7 @@ import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 import { Sheet, SheetBody, SheetCloseButton, SheetDescription, SheetHeader, SheetTitle } from "@/ui/Sheet";
 
 interface ReviewCustomerAssignmentSheetProps {
@@ -210,7 +211,7 @@ export function ReviewCustomerAssignmentSheet({
                   disabled={isSubmitting}
                   onClick={() => setIsCreateExpanded((isExpanded) => !isExpanded)}
                 >
-                  <span className="material-symbols-outlined text-base">person_add</span>
+                  <AppIcon name="person_add" className="text-base" />
                   {isCreateExpanded ? "Hide New Customer Form" : "Create New Customer"}
                 </Button>
 

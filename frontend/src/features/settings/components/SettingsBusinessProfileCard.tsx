@@ -8,6 +8,7 @@ import { NumericField } from "@/ui/NumericField";
 import { Select } from "@/ui/Select";
 import { Card } from "@/ui/Card";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 
 interface SettingsBusinessProfileCardProps {
   logoSizeLimitLabel: string;
@@ -283,7 +284,7 @@ export function SettingsBusinessProfileCard({
                     className="h-full w-full object-contain"
                   />
                 ) : (
-                  <span className="material-symbols-outlined text-2xl text-on-surface-variant">business</span>
+                  <AppIcon name="business" className="text-2xl text-on-surface-variant" />
                 )}
               </div>
               <div className="min-w-0 flex-1">

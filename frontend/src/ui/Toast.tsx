@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
+import { AppIcon } from "@/ui/Icon";
+
 export type ToastVariant = "success" | "error" | "info" | "warning";
 
 export interface ToastShowOptions {
@@ -78,9 +80,7 @@ export function Toast({ toast, onDismiss }: ToastProps): React.ReactElement {
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
-        <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem] leading-none">
-          {variantStyle.icon}
-        </span>
+        <AppIcon name={variantStyle.icon} className="text-[1.125rem] leading-none" />
         <p className="min-w-0 flex-1">{toast.message}</p>
         <button
           type="button"

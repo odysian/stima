@@ -2,6 +2,7 @@ import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
 import { resolveLineItemFlagMessage } from "@/features/quotes/utils/lineItemFlags";
+import { AppIcon } from "@/ui/Icon";
 import { NumericField } from "@/ui/NumericField";
 
 interface LineItemRowProps {
@@ -88,7 +89,7 @@ export function LineItemRow({
           className="shrink-0 border border-error/30 bg-error-container/40 text-error hover:bg-error-container/60"
           onClick={onDelete}
         >
-          <span className="material-symbols-outlined text-[1.125rem] leading-none">delete</span>
+          <AppIcon name="delete" className="text-[1.125rem] leading-none" />
         </Button>
       </div>
     </div>

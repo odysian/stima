@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { LineItemCard } from "@/features/quotes/components/LineItemCard";
 import type { LineItemDraftWithFlags } from "@/features/quotes/types/quote.types";
 import { DOCUMENT_LINE_ITEMS_MAX_ITEMS } from "@/shared/lib/inputLimits";
+import { AppIcon } from "@/ui/Icon";
 
 interface ReviewLineItemsSectionProps {
   lineItems: LineItemDraftWithFlags[];
@@ -190,7 +191,7 @@ export function ReviewLineItemsSection({
           disabled={isInteractionLocked || hasReachedLineItemLimit || isReorderModeActive}
           onClick={onAddLineItem}
         >
-          <span className="material-symbols-outlined text-base">add</span>
+          <AppIcon name="add" className="text-base" />
           Add Line Item
         </button>
       </div>

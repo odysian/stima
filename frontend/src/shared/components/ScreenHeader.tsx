@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@/shared/components/Button";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 
 interface ScreenHeaderProps {
   title: string;
@@ -40,7 +41,7 @@ export function ScreenHeader({
             aria-label={backLabel}
             className="text-primary"
           >
-            <span className="material-symbols-outlined block text-[1.125rem] leading-none">arrow_back</span>
+            <AppIcon name="arrow_back" className="block text-[1.125rem] leading-none" />
           </Button>
         ) : null}
         {isTopLevelLayout ? (

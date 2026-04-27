@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 
 import { Button } from "@/shared/components/Button";
+import { AppIcon } from "@/ui/Icon";
 
 type SheetSize = "sm" | "md" | "lg" | "full";
 type DataAttributes = { [key in `data-${string}`]?: string | number | boolean | undefined };
@@ -167,7 +168,7 @@ export function SheetCloseButton({
           className,
         )}
       >
-        <span className="material-symbols-outlined text-base leading-none">close</span>
+        <AppIcon name="close" className="text-base leading-none" />
       </Button>
     </Dialog.Close>
   );

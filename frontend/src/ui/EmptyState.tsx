@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Card } from "@/ui/Card";
+import { AppIcon } from "@/ui/Icon";
 
 interface EmptyStateProps {
   icon?: string;
@@ -33,7 +34,7 @@ export function EmptyState({
       <div className="flex flex-col items-center">
         {icon ? (
           <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-surface-container-high">
-            <span className="material-symbols-outlined text-3xl text-outline">{icon}</span>
+            <AppIcon name={icon} className="text-3xl text-outline" />
           </div>
         ) : null}
         <h3 className="text-base font-semibold text-on-surface">{title}</h3>

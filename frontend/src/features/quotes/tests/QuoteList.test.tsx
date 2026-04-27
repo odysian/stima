@@ -266,7 +266,8 @@ describe("QuoteList", () => {
 
     renderScreen();
 
-    const quotesButton = await screen.findByRole("button", { name: "Quotes" });
+    const filter = await screen.findByLabelText("Document type filter");
+    const quotesButton = within(filter).getByRole("button", { name: "Quotes" });
     const createButton = screen.getByRole("button", { name: "New quote" });
 
     expect(quotesButton).toHaveClass("ghost-shadow", "bg-surface-container-lowest", "text-primary");

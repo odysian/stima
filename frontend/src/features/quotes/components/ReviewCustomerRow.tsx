@@ -1,4 +1,5 @@
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 
 interface ReviewCustomerRowProps {
   customerName: string | null;
@@ -43,7 +44,7 @@ export function ReviewCustomerRow({
           {requiresCustomerAssignment ? "Customer: Unassigned" : customerName ?? "Assigned customer"}
         </span>
         {canOpenSheet ? (
-          <span className="material-symbols-outlined text-outline">chevron_right</span>
+          <AppIcon name="chevron_right" className="text-outline" />
         ) : null}
       </button>
 

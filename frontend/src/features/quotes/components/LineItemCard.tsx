@@ -1,5 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 
 interface LineItemCardProps {
   description: string;
@@ -60,7 +61,7 @@ export function LineItemCard({
           className="mt-1 inline-flex h-9 w-9 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-full border border-outline-variant/30 text-outline transition-colors hover:bg-surface-container-low active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-60"
           onPointerDown={onDragHandlePointerDown}
         >
-          <span className="material-symbols-outlined text-[1.125rem] leading-none">drag_indicator</span>
+          <AppIcon name="drag_indicator" className="text-[1.125rem] leading-none" />
         </button>
       ) : null}
 

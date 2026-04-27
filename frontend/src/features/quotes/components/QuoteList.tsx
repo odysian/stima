@@ -24,6 +24,7 @@ import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { formatDate } from "@/shared/lib/formatters";
 import { Banner } from "@/ui/Banner";
 import { EmptyState } from "@/ui/EmptyState";
+import { AppIcon } from "@/ui/Icon";
 import { buildInvoiceSubtitle, buildPendingCaptureError, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
 type DocumentMode = "quotes" | "invoices";
 
@@ -317,7 +318,7 @@ export function QuoteList(): React.ReactElement {
                 setIsSearchOpen((open) => !open);
               }}
             >
-              <span className="material-symbols-outlined block text-[1.125rem] leading-none">search</span>
+              <AppIcon name="search" className="block text-[1.125rem] leading-none" />
             </Button>
           </div>
           {isSearchOpen ? (
@@ -337,7 +338,7 @@ export function QuoteList(): React.ReactElement {
                   className="text-outline"
                   onClick={() => setSearchQuery("")}
                 >
-                  <span className="material-symbols-outlined block text-base leading-none">close</span>
+                  <AppIcon name="close" className="block text-base leading-none" />
                 </Button>
               )}
             />
@@ -432,7 +433,7 @@ export function QuoteList(): React.ReactElement {
         className="fixed bottom-20 right-4 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
         onClick={quoteCreateFlow.openCreateEntry}
       >
-        <span className="material-symbols-outlined">description</span>
+        <AppIcon name="description" />
       </button>
       <PendingCaptureDeleteDialog
         capture={capturePendingDelete}

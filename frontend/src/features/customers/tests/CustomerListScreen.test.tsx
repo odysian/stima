@@ -115,8 +115,8 @@ describe("CustomerListScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("No customers yet.")).toBeInTheDocument();
-    const icons = screen.getAllByText("group");
-    expect(icons.some((icon) => icon.classList.contains("text-3xl"))).toBe(true);
+    const emptyState = screen.getByText("No customers yet.").closest("section");
+    expect(emptyState?.querySelector("svg.text-3xl")).toBeInTheDocument();
   });
 
   it("renders the search-empty icon with the compact token size", async () => {
@@ -130,8 +130,8 @@ describe("CustomerListScreen", () => {
     });
 
     expect(await screen.findByText("No customers match your search.")).toBeInTheDocument();
-    const icons = screen.getAllByText("group");
-    expect(icons.some((icon) => icon.classList.contains("text-3xl"))).toBe(true);
+    const emptyState = screen.getByText("No customers match your search.").closest("section");
+    expect(emptyState?.querySelector("svg.text-3xl")).toBeInTheDocument();
   });
 
   it("navigates to customer detail when a row is clicked", async () => {

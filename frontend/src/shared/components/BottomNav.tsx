@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
+import { AppIcon } from "@/ui/Icon";
+
 interface BottomNavProps {
   active: "quotes" | "customers" | "settings";
 }
@@ -46,9 +48,7 @@ export function BottomNav({ active }: BottomNavProps): React.ReactElement {
                 isActive ? "bg-primary/20" : ""
               }`}
             >
-              <span className={`material-symbols-outlined ${isActive ? "material-symbols-filled" : ""}`}>
-                {tab.icon}
-              </span>
+              <AppIcon name={tab.icon} strokeWidth={isActive ? 2.5 : 2} />
             </span>
             <span>{tab.label}</span>
           </button>
