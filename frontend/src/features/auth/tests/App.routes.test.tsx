@@ -22,12 +22,14 @@ const mockedAuthService = vi.mocked(authService);
 interface RouteLocationState {
   from?: {
     pathname?: string;
+    search?: string;
   };
 }
 
 function LocationProbe(): React.ReactElement {
   const location = useLocation();
-  const fromPathname = (location.state as RouteLocationState | undefined)?.from?.pathname ?? "";
+  const from = (location.state as RouteLocationState | undefined)?.from;
+  const fromPathname = from ? `${from.pathname ?? ""}${from.search ?? ""}` : "";
 
   return (
     <>
@@ -177,11 +179,11 @@ describe("App routes", () => {
   it("preserves the protected route in login state so users return after sign-in", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
 
-    renderApp("/settings");
+    renderApp("/settings?tab=drafts");
 
     expect(await screen.findByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
     expect(screen.getByTestId("location-pathname")).toHaveTextContent("/login");
-    expect(screen.getByTestId("location-from-pathname")).toHaveTextContent("/settings");
+    expect(screen.getByTestId("location-from-pathname")).toHaveTextContent("/settings?tab=drafts");
   });
 
   it("routes retired quote line-item edit deep links to the default fallback", async () => {

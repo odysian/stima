@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm } from "@/features/auth/components/LoginForm";
@@ -19,6 +19,11 @@ vi.mock("@/features/auth/services/authService", () => ({
 
 const mockedAuthService = vi.mocked(authService);
 
+function DashboardProbe(): React.ReactElement {
+  const location = useLocation();
+  return <div>{`Dashboard${location.search}`}</div>;
+}
+
 function renderLogin(initialEntry: string | { pathname: string; state?: unknown } = "/login") {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -27,7 +32,7 @@ function renderLogin(initialEntry: string | { pathname: string; state?: unknown 
           <Routes>
             <Route path="/login" element={<LoginForm />} />
             <Route path="/" element={<div>Home</div>} />
-            <Route path="/dashboard" element={<div>Dashboard</div>} />
+            <Route path="/dashboard" element={<DashboardProbe />} />
           </Routes>
         </AuthProvider>
       </ToastProvider>
@@ -99,6 +104,33 @@ describe("LoginForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(await screen.findByText("Dashboard")).toBeInTheDocument();
+  });
+
+  it("preserves query params when redirecting to state.from", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(new Error("Not authenticated"));
+    mockedAuthService.login.mockResolvedValueOnce();
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-2",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "America/New_York",
+    });
+
+    renderLogin({
+      pathname: "/login",
+      state: { from: { pathname: "/dashboard", search: "?tab=drafts" } },
+    });
+
+    fireEvent.change(await screen.findByLabelText(/email/i), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.change(await screen.findByLabelText(/^password$/i), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(await screen.findByText("Dashboard?tab=drafts")).toBeInTheDocument();
   });
 
   it("renders an alert when login fails", async () => {

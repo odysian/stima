@@ -22,7 +22,7 @@ import type { AuthMode, LoginRequest, RegisterRequest, User } from "@/features/a
 import { clearDraftsForUser, deleteStaleLocalDrafts } from "@/features/quotes/offline/draftRepository";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
 import { LoadingScreen } from "@/shared/components/LoadingScreen";
-import { hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
+import { AUTH_FAILURE_EVENT, clearCsrfToken, hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
 
 interface AuthContextValue {
   user: User | null;
@@ -53,6 +53,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     });
   }, []);
 
+  const forceSignedOut = useCallback(() => {
+    clearCsrfToken();
+    clearOfflineUserSnapshot();
+    setUser(null);
+    setAuthMode("signed_out");
+  }, []);
+
   const refreshUser = useCallback(async () => {
     const currentUser = await authService.me();
     setVerifiedUser(currentUser);
@@ -80,9 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         }
 
         if (isExplicitAuthFailure(bootstrapError)) {
-          clearOfflineUserSnapshot();
-          setUser(null);
-          setAuthMode("signed_out");
+          forceSignedOut();
           return;
         }
 
@@ -115,7 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     return () => {
       active = false;
     };
-  }, [setVerifiedUser]);
+  }, [forceSignedOut, setVerifiedUser]);
 
   const reverifyOfflineRecoveredUser = useCallback(async () => {
     if (authMode !== "offline_recovered" || !user?.id) {
@@ -127,9 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       await runOutboxPass(user.id, { forceAfterAuth: true });
     } catch (error) {
       if (isExplicitAuthFailure(error)) {
-        clearOfflineUserSnapshot();
-        setUser(null);
-        setAuthMode("signed_out");
+        forceSignedOut();
         return;
       }
 
@@ -139,7 +142,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
 
       console.warn("Unable to reverify offline-recovered auth state.", error);
     }
-  }, [authMode, refreshUser, user?.id]);
+  }, [authMode, forceSignedOut, refreshUser, user?.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleAuthFailure = () => {
+      setIsLoading(false);
+      forceSignedOut();
+    };
+
+    window.addEventListener(AUTH_FAILURE_EVENT, handleAuthFailure);
+    return () => {
+      window.removeEventListener(AUTH_FAILURE_EVENT, handleAuthFailure);
+    };
+  }, [forceSignedOut]);
 
   useEffect(() => {
     if (typeof window === "undefined" || authMode !== "offline_recovered") {

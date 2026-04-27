@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "@/features/auth/hooks/useAuth";
@@ -10,7 +10,7 @@ import {
 import { authService } from "@/features/auth/services/authService";
 import { clearDraftsForUser, deleteStaleLocalDrafts } from "@/features/quotes/offline/draftRepository";
 import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
-import { HttpRequestError, hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
+import { AUTH_FAILURE_EVENT, HttpRequestError, hydrateCsrfTokenFromCookie } from "@/shared/lib/http";
 
 vi.mock("@/features/auth/services/authService", () => ({
   authService: {
@@ -56,7 +56,7 @@ const mockedRunOutboxPass = vi.mocked(runOutboxPass);
 const ORIGINAL_NAVIGATOR_ONLINE_DESCRIPTOR = Object.getOwnPropertyDescriptor(window.navigator, "onLine");
 
 function AuthHarness(): React.ReactElement {
-  const { authMode, user, register, logout } = useAuth();
+  const { authMode, user, refreshUser, register, logout } = useAuth();
 
   return (
     <div>
@@ -73,6 +73,9 @@ function AuthHarness(): React.ReactElement {
         }
       >
         Register
+      </button>
+      <button type="button" onClick={() => void refreshUser()}>
+        Refresh
       </button>
       <button type="button" onClick={() => void logout()}>
         Logout
@@ -197,6 +200,31 @@ describe("useAuth", () => {
     expect(mockedReadOfflineUserSnapshot).not.toHaveBeenCalled();
   });
 
+  it("treats missing access-token errors as explicit auth failures", async () => {
+    mockedAuthService.me.mockRejectedValueOnce(
+      new HttpRequestError("Missing access token", 400, { detail: "Missing access token" }),
+    );
+    mockedReadOfflineUserSnapshot.mockReturnValue({
+      userId: "user-stale",
+      isOnboarded: true,
+      timezone: "UTC",
+      lastVerifiedAt: new Date().toISOString(),
+    });
+
+    render(
+      <AuthProvider>
+        <AuthHarness />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("none");
+    });
+    expect(screen.getByTestId("auth-mode")).toHaveTextContent("signed_out");
+    expect(mockedClearOfflineUserSnapshot).toHaveBeenCalledTimes(1);
+    expect(mockedReadOfflineUserSnapshot).not.toHaveBeenCalled();
+  });
+
   it("restores offline snapshot for failed-fetch bootstrap failures", async () => {
     mockedAuthService.me.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     mockedReadOfflineUserSnapshot.mockReturnValue({
@@ -298,6 +326,35 @@ describe("useAuth", () => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("user9@example.com");
       expect(mockedRunOutboxPass).toHaveBeenCalledWith("user-9", { forceAfterAuth: true });
     });
+  });
+
+  it("forces signed_out when explicit auth-failure event is broadcast", async () => {
+    mockedAuthService.me.mockResolvedValueOnce({
+      id: "user-1",
+      email: "user@example.com",
+      is_active: true,
+      is_onboarded: true,
+      timezone: "America/New_York",
+    });
+
+    render(
+      <AuthProvider>
+        <AuthHarness />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("user@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("auth-mode")).toHaveTextContent("verified");
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(AUTH_FAILURE_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("none");
+      expect(screen.getByTestId("auth-mode")).toHaveTextContent("signed_out");
+    });
+    expect(mockedClearOfflineUserSnapshot).toHaveBeenCalled();
   });
 
   it("throws when used outside AuthProvider", () => {

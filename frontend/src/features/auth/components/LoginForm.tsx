@@ -42,7 +42,16 @@ export function LoginForm(): React.ReactElement {
     try {
       await login({ email, password });
       const from = (location.state as LoginLocationState | undefined)?.from;
-      navigate(from?.pathname ?? "/", { replace: true });
+      navigate(
+        from
+          ? {
+            pathname: from.pathname,
+            search: from.search,
+            hash: from.hash,
+          }
+          : "/",
+        { replace: true },
+      );
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Login failed";
       setError(message);
