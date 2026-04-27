@@ -166,6 +166,7 @@ export function TotalAmountSection({
                       value={discountType ?? "fixed"}
                       disabled={disabled}
                       onChange={(event) => onDiscountTypeChange(event.target.value as DiscountType)}
+                      style={{ colorScheme: "var(--select-color-scheme)" }}
                       className="w-full appearance-none rounded-[var(--radius-document)] border border-outline-variant/30 bg-surface-container-high px-4 py-3 pr-12 text-sm text-on-surface transition-all focus:border-primary/40 focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-focus-ring"
                     >
                       <option value="fixed">Fixed $</option>
