@@ -5,11 +5,11 @@ import { EmptyState } from "@/ui/EmptyState";
 
 describe("EmptyState", () => {
   it("renders icon, title, and body", () => {
-    render(<EmptyState icon="inbox_out" title="No items" body="Try adding one." />);
+    const { container } = render(<EmptyState icon="inbox_out" title="No items" body="Try adding one." />);
 
     expect(screen.getByText("No items")).toBeInTheDocument();
     expect(screen.getByText("Try adding one.")).toBeInTheDocument();
-    expect(screen.getByText("inbox_out")).toHaveClass("material-symbols-outlined");
+    expect(container.querySelector("svg")).toBeInTheDocument();
   });
 
   it("renders action content when provided", () => {

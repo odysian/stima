@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/shared/components/Button";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
+import { AppIcon } from "@/ui/Icon";
 
 interface WorkflowScreenHeaderProps {
   title: string;
@@ -35,7 +36,7 @@ export function WorkflowScreenHeader({
         aria-label={exitHomeLabel}
         className="border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow"
       >
-        <span className="material-symbols-outlined block text-[1.125rem] leading-none">close</span>
+        <AppIcon name="close" className="block text-[1.125rem] leading-none" />
       </Button>
     </div>
   ) : trailing;

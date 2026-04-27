@@ -22,6 +22,7 @@ import { OverflowMenu } from "@/shared/components/OverflowMenu";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { DocumentHeroCard } from "@/ui/DocumentHeroCard";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 import { canNavigateBack } from "@/shared/lib/navigation";
 import { useToast } from "@/ui/Toast";
 
@@ -138,7 +139,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                 aria-label="Edit invoice"
                 className="border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow"
               >
-                <span className="material-symbols-outlined block text-[1.125rem] leading-none">edit</span>
+                <AppIcon name="edit" className="block text-[1.125rem] leading-none" />
               </Button>
             ) : null}
             <OverflowMenu items={overflowItems} />
@@ -203,7 +204,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                   rel="noopener noreferrer"
                   className={documentActionPrimaryLinkClassName}
                 >
-                  <span className="material-symbols-outlined text-base leading-none">open_in_new</span>
+                  <AppIcon name="open_in_new" className="text-base leading-none" />
                   Open PDF
                 </a>
               ) : (
@@ -217,11 +218,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     void onGeneratePdf();
                   }}
                   isLoading={isPdfBusy}
-                  leadingIcon={(
-                    <span className="material-symbols-outlined text-base leading-none">
-                      picture_as_pdf
-                    </span>
-                  )}
+                  leadingIcon={<AppIcon name="picture_as_pdf" className="text-base leading-none" />}
                 >
                   Generate PDF
                 </Button>
@@ -236,7 +233,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                       className="w-full"
                       disabled={!hasCustomerEmail || isBusy}
                       isLoading={isSendingEmail}
-                      leadingIcon={<span className="material-symbols-outlined text-base leading-none">mail</span>}
+                      leadingIcon={<AppIcon name="mail" className="text-base leading-none" />}
                       onClick={() => onRequestSendEmail({ emailActionLabel, hasCustomerEmail, isPdfBusy })}
                     >
                       {emailActionLabel}
@@ -249,11 +246,7 @@ export function InvoiceDetailScreen(): React.ReactElement {
                     size="lg"
                     className="w-full"
                     disabled={isBusy}
-                    leadingIcon={(
-                      <span className="material-symbols-outlined text-base leading-none">
-                        content_copy
-                      </span>
-                    )}
+                    leadingIcon={<AppIcon name="content_copy" className="text-base leading-none" />}
                     onClick={() => {
                       void onCopyLink();
                     }}

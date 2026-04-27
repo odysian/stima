@@ -3,6 +3,7 @@ import type { VoiceClip } from "@/features/quotes/hooks/useVoiceCapture";
 import { NOTE_INPUT_MAX_CHARS } from "@/shared/lib/inputLimits";
 import { Button } from "@/shared/components/Button";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 
 interface CaptureInputPanelProps {
   clips: VoiceClip[];
@@ -47,9 +48,7 @@ export function CaptureInputPanel({
 
         {clips.length === 0 ? (
           <div className="ghost-shadow flex h-28 flex-col items-center justify-center gap-2 rounded-[var(--radius-document)] border-2 border-dashed border-outline-variant/30 bg-surface-container-lowest p-4">
-            <span className="material-symbols-outlined text-4xl text-outline">
-              mic_off
-            </span>
+            <AppIcon name="mic_off" className="text-4xl text-outline" />
             <p className="text-sm text-outline">No clips recorded yet</p>
           </div>
         ) : (
@@ -65,9 +64,7 @@ export function CaptureInputPanel({
                   className="ghost-shadow flex items-center justify-between rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-lowest p-3"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-outline">
-                      play_arrow
-                    </span>
+                    <AppIcon name="play_arrow" className="text-outline" />
                     <p className="text-sm text-on-surface">
                       Clip {clipNumber} · {clip.durationSeconds}s
                     </p>
@@ -81,9 +78,7 @@ export function CaptureInputPanel({
                     onClick={() => removeClip(clip.id)}
                     disabled={isExtracting}
                   >
-                    <span className="material-symbols-outlined text-base">
-                      close
-                    </span>
+                    <AppIcon name="close" className="text-base" />
                   </Button>
                 </div>
               );
@@ -132,10 +127,11 @@ export function CaptureInputPanel({
           </div>
           <button
             type="button"
+            aria-label="Stop recording"
             className="ghost-shadow flex h-20 w-20 cursor-pointer items-center justify-center rounded-full bg-secondary text-on-secondary transition-all active:scale-95"
             onClick={onStopRecording}
           >
-            <span className="material-symbols-outlined text-4xl">stop</span>
+            <AppIcon name="stop" className="text-4xl" />
           </button>
         </div>
       ) : (
@@ -148,11 +144,12 @@ export function CaptureInputPanel({
           ) : null}
           <button
             type="button"
+            aria-label="Start recording"
             className="forest-gradient ghost-shadow flex h-20 w-20 cursor-pointer items-center justify-center rounded-full text-on-primary transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={onStartRecording}
             disabled={!isSupported || hasReachedClipLimit}
           >
-            <span className="material-symbols-outlined text-4xl">mic</span>
+            <AppIcon name="mic" className="text-4xl" />
           </button>
         </div>
       )}

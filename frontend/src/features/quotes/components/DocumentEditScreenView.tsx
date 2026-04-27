@@ -12,6 +12,7 @@ import { hasUndismissedCaptureDetailsItems, resolveCaptureDetailsActionableItems
 import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lineItemCatalog.types";
 import { Button } from "@/shared/components/Button";
 import { WorkflowScreenHeader } from "@/shared/components/WorkflowScreenHeader";
+import { AppIcon } from "@/ui/Icon";
 
 interface DocumentEditScreenViewProps {
   document: PersistedEditableDocument;
@@ -162,9 +163,7 @@ export function DocumentEditScreenView({
                 : "border-outline-variant/30 bg-surface-container-lowest text-on-surface hover:bg-surface-container-low",
             ].join(" ")}
           >
-            <span className="material-symbols-outlined text-[1.125rem] leading-none">
-              info
-            </span>
+            <AppIcon name="info" className="text-[1.125rem] leading-none" />
           </Button>
         ) : null}
       />

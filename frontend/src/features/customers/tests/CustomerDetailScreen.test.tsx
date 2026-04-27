@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -108,7 +108,8 @@ async function openEditForm(): Promise<void> {
 
 async function switchToInvoicesTab(): Promise<void> {
   await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
-  fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
+  const modeButtons = screen.getAllByRole("button", { name: "Invoices" });
+  fireEvent.click(modeButtons[0]);
 }
 
 async function openDeleteCustomerModal(): Promise<void> {
@@ -206,11 +207,11 @@ describe("CustomerDetailScreen", () => {
     expect(
       screen.queryByRole("button", { name: /^delete customer$/i }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute(
+    expect(screen.getAllByRole("button", { name: "Quotes" })[0]).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "Invoices" })).toHaveAttribute(
+    expect(screen.getAllByRole("button", { name: "Invoices" })[0]).toHaveAttribute(
       "aria-pressed",
       "false",
     );
@@ -434,11 +435,11 @@ describe("CustomerDetailScreen", () => {
     await switchToInvoicesTab();
 
     expect(await screen.findByText("I-001")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Invoices" })).toHaveAttribute(
+    expect(screen.getAllByRole("button", { name: "Invoices" })[0]).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "Quotes" })).toHaveAttribute(
+    expect(screen.getAllByRole("button", { name: "Quotes" })[0]).toHaveAttribute(
       "aria-pressed",
       "false",
     );
@@ -459,8 +460,8 @@ describe("CustomerDetailScreen", () => {
     await switchToInvoicesTab();
 
     expect(await screen.findByText("No invoices yet.")).toBeInTheDocument();
-    const icons = screen.getAllByText("description");
-    expect(icons.some((icon) => icon.classList.contains("text-3xl"))).toBe(true);
+    const emptyState = screen.getByText("No invoices yet.").closest("section");
+    expect(emptyState?.querySelector("svg.text-3xl")).toBeInTheDocument();
   });
 
   it("renders invoice history error state without hiding the customer details", async () => {
@@ -500,17 +501,16 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("No quotes yet.")).toBeInTheDocument();
-    const icons = screen.getAllByText("description");
-    expect(icons.some((icon) => icon.classList.contains("text-3xl"))).toBe(true);
+    const emptyState = screen.getByText("No quotes yet.").closest("section");
+    expect(emptyState?.querySelector("svg.text-3xl")).toBeInTheDocument();
   });
 
   it("renders BottomNav with customers tab active", async () => {
     renderScreen();
     await screen.findByText("Q-001");
 
-    expect(
-      screen.getByRole("button", { name: /group customers/i }),
-    ).toHaveClass("text-primary");
+    const nav = screen.getByRole("navigation");
+    expect(within(nav).getByRole("button", { name: "Customers" })).toHaveClass("text-primary");
   });
 
   it("requires exact typed confirmation before enabling customer deletion", async () => {

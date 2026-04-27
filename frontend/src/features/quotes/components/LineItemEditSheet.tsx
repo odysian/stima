@@ -12,6 +12,7 @@ import {
 } from "@/shared/lib/inputLimits";
 import { Card } from "@/ui/Card";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 import { NumericField } from "@/ui/NumericField";
 import { Sheet, SheetDescription, SheetTitle } from "@/ui/Sheet";
 interface LineItemEditSheetProps {
@@ -248,12 +249,11 @@ export function LineItemEditSheet({
                       void saveToCatalog();
                     }}
                   >
-                    <span
-                      className="material-symbols-outlined text-base leading-none"
-                      style={canDeleteSavedCatalogItem ? { fontVariationSettings: '"FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24' } : undefined}
-                    >
-                      {bookmarkIcon}
-                    </span>
+                    <AppIcon
+                      name={bookmarkIcon}
+                      className="text-base leading-none"
+                      strokeWidth={canDeleteSavedCatalogItem ? 2.6 : 2}
+                    />
                   </Button>
                 ) : null}
                 {mode === "add" && showManualFields ? (
@@ -265,7 +265,7 @@ export function LineItemEditSheet({
                     className="border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
                     onClick={addLineItemAndClose}
                   >
-                    <span className="material-symbols-outlined text-base leading-none">check</span>
+                    <AppIcon name="check" className="text-base leading-none" />
                   </Button>
                 ) : null}
                 {mode === "edit" && onRequestDelete ? (
@@ -277,7 +277,7 @@ export function LineItemEditSheet({
                     className="shrink-0 border border-error/30 bg-error-container/40 text-error hover:bg-error-container/60"
                     onClick={onRequestDelete}
                   >
-                    <span className="material-symbols-outlined text-[1.125rem] leading-none">delete</span>
+                    <AppIcon name="delete" className="text-[1.125rem] leading-none" />
                   </Button>
                 ) : null}
               </div>

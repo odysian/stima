@@ -8,6 +8,7 @@ import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { EmptyState } from "@/ui/EmptyState";
+import { AppIcon } from "@/ui/Icon";
 import { useToast } from "@/ui/Toast";
 
 interface CustomerListLocationState {
@@ -128,7 +129,7 @@ export function CustomerListScreen(): React.ReactElement {
                       <p className="font-bold text-on-surface">{customer.name}</p>
                       <p className="text-sm text-on-surface-variant">{contactLine(customer)}</p>
                     </div>
-                    <span className="material-symbols-outlined text-outline">chevron_right</span>
+                    <AppIcon name="chevron_right" className="text-outline" />
                   </button>
                 </li>
               ))}
@@ -155,7 +156,7 @@ export function CustomerListScreen(): React.ReactElement {
         className="fixed right-4 bottom-20 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
         onClick={() => navigate("/customers/new")}
       >
-        <span className="material-symbols-outlined">person_add</span>
+        <AppIcon name="person_add" />
       </button>
 
       <BottomNav active="customers" />

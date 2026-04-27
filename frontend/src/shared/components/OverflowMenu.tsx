@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
+import { AppIcon } from "@/ui/Icon";
+
 export interface OverflowMenuItem {
   label: string;
   icon: string;
@@ -96,7 +98,7 @@ export function OverflowMenu({
           setIsOpen((current) => !current);
         }}
       >
-        <span className="material-symbols-outlined block text-[1.125rem] leading-none">more_horiz</span>
+        <AppIcon name="more_horiz" className="block text-[1.125rem] leading-none" />
       </button>
 
       {isOpen ? (
@@ -125,7 +127,7 @@ export function OverflowMenu({
                     item.onSelect?.();
                   }}
                 >
-                  <span className="material-symbols-outlined block text-[1.125rem] leading-none">{item.icon}</span>
+                  <AppIcon name={item.icon} className="block text-[1.125rem] leading-none" />
                   <span className="whitespace-nowrap leading-none">{item.label}</span>
                 </a>
               );
@@ -144,7 +146,7 @@ export function OverflowMenu({
                   item.onSelect?.();
                 }}
               >
-                <span className="material-symbols-outlined block text-[1.125rem] leading-none">{item.icon}</span>
+                <AppIcon name={item.icon} className="block text-[1.125rem] leading-none" />
                 <span className="whitespace-nowrap leading-none">{item.label}</span>
               </button>
             );

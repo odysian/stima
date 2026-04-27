@@ -7,6 +7,7 @@ import {
   DocumentActionSurface,
   documentActionPrimaryLinkClassName,
 } from "@/shared/components/DocumentActionSurface";
+import { AppIcon } from "@/ui/Icon";
 
 interface QuotePreviewActionsProps {
   emailActionLabel: string | null;
@@ -73,7 +74,7 @@ export function QuotePreviewActions({
           rel="noopener noreferrer"
           className={documentActionPrimaryLinkClassName}
         >
-          <span className="material-symbols-outlined text-base leading-none">open_in_new</span>
+          <AppIcon name="open_in_new" className="text-base leading-none" />
           Open PDF
         </a>
       );
@@ -96,11 +97,7 @@ export function QuotePreviewActions({
         onClick={() => {
           void onGeneratePdf();
         }}
-        leadingIcon={(
-          <span className="material-symbols-outlined text-base leading-none">
-            picture_as_pdf
-          </span>
-        )}
+        leadingIcon={<AppIcon name="picture_as_pdf" className="text-base leading-none" />}
       >
         Generate PDF
       </Button>
@@ -129,7 +126,7 @@ export function QuotePreviewActions({
                 || isMarkingLost
               }
               isLoading={isSendingEmail}
-              leadingIcon={<span className="material-symbols-outlined text-base leading-none">mail</span>}
+              leadingIcon={<AppIcon name="mail" className="text-base leading-none" />}
               onClick={onRequestSendEmail}
             >
               {emailActionLabel}
@@ -149,7 +146,7 @@ export function QuotePreviewActions({
               || isMarkingWon
               || isMarkingLost
             }
-            leadingIcon={<span className="material-symbols-outlined text-base leading-none">content_copy</span>}
+            leadingIcon={<AppIcon name="content_copy" className="text-base leading-none" />}
             onClick={() => {
               void onCopyLink();
             }}

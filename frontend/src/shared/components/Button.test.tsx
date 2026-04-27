@@ -20,7 +20,7 @@ describe("Button", () => {
         <Button variant="destructive">Delete</Button>
         <Button variant="ghost">Back</Button>
         <Button variant="iconButton" aria-label="Close dialog">
-          <span className="material-symbols-outlined">close</span>
+          <span>close</span>
         </Button>
       </>,
     );
@@ -43,7 +43,7 @@ describe("Button", () => {
   it("supports xs iconButton size for inline dismiss affordances", () => {
     render(
       <Button variant="iconButton" size="xs" aria-label="Dismiss banner">
-        <span className="material-symbols-outlined">close</span>
+        <span>close</span>
       </Button>,
     );
 
@@ -100,7 +100,7 @@ describe("Button", () => {
       render(
         // @ts-expect-error: this intentionally exercises runtime guardrails for missing aria-label.
         <Button variant="iconButton">
-          <span className="material-symbols-outlined">close</span>
+          <span>close</span>
         </Button>,
       ),
     ).toThrow("requires an aria-label");

@@ -428,7 +428,7 @@ describe("LineItemEditSheet", () => {
     );
 
     const bookmarkButton = screen.getByRole("button", { name: /save to catalog/i });
-    expect(within(bookmarkButton).getByText("bookmark_add")).toBeInTheDocument();
+    expect(bookmarkButton.querySelector("svg.lucide-bookmark-plus")).toBeInTheDocument();
     expect(within(bookmarkButton).queryByText(/^save$/i)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "  Garden edging  " } });
@@ -444,7 +444,7 @@ describe("LineItemEditSheet", () => {
         defaultPrice: 95.5,
       });
     });
-    expect(within(bookmarkButton).getByText("bookmark")).toBeInTheDocument();
+    expect(bookmarkButton.querySelector("svg.lucide-bookmark")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /catalog/i }));
     await waitFor(() => {
@@ -483,13 +483,13 @@ describe("LineItemEditSheet", () => {
     await waitFor(() => {
       expect(onSaveToCatalog).toHaveBeenCalledTimes(1);
     });
-    expect(within(bookmarkButton).getByText("bookmark")).toBeInTheDocument();
+    expect(bookmarkButton.querySelector("svg.lucide-bookmark")).toBeInTheDocument();
 
     await user.click(bookmarkButton);
     await waitFor(() => {
       expect(onDeleteFromCatalog).toHaveBeenCalledWith("catalog-9");
     });
-    expect(within(bookmarkButton).getByText("bookmark_add")).toBeInTheDocument();
+    expect(bookmarkButton.querySelector("svg.lucide-bookmark-plus")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /catalog/i }));
     await waitFor(() => {
@@ -523,11 +523,11 @@ describe("LineItemEditSheet", () => {
     await waitFor(() => {
       expect(onSaveToCatalog).toHaveBeenCalledTimes(1);
     });
-    expect(within(bookmarkButton).getByText("bookmark")).toBeInTheDocument();
+    expect(bookmarkButton.querySelector("svg.lucide-bookmark")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/description/i), { target: { value: "Updated description" } });
 
-    expect(within(bookmarkButton).getByText("bookmark_add")).toBeInTheDocument();
+    expect(bookmarkButton.querySelector("svg.lucide-bookmark-plus")).toBeInTheDocument();
     expect(onDeleteFromCatalog).not.toHaveBeenCalled();
   });
 

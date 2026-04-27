@@ -4,6 +4,7 @@ import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromSubtotal, parseTaxPercentInput, toTaxPercentDisplay, type DiscountType } from "@/shared/lib/pricing";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 import { NumericField } from "@/ui/NumericField";
 
 interface TotalAmountSectionProps {
@@ -89,9 +90,7 @@ export function TotalAmountSection({
             currencySymbol="$"
             currencySymbolClassName="!text-2xl !font-bold text-primary"
             trailingAdornment={(
-              <span className="pointer-events-none material-symbols-outlined !text-base leading-none text-on-surface-variant">
-                edit
-              </span>
+              <AppIcon name="edit" className="pointer-events-none !text-base leading-none text-on-surface-variant" />
             )}
             fieldClassName="!min-h-[72px] !border-2 !border-primary !bg-surface-container-high !px-4 !py-3 focus-within:!ring-2 focus-within:!ring-primary/20"
             className="!font-headline !text-3xl !font-bold !tracking-tight text-primary"
@@ -108,9 +107,7 @@ export function TotalAmountSection({
                 Tax, discount, and deposit
               </p>
             </div>
-            <span className="material-symbols-outlined text-on-surface-variant">
-              expand_more
-            </span>
+            <AppIcon name="expand_more" className="text-on-surface-variant" />
           </div>
         ) : (
           <button
@@ -126,9 +123,10 @@ export function TotalAmountSection({
                 Tax, discount, and deposit
               </p>
             </div>
-            <span className="material-symbols-outlined text-on-surface-variant">
-              {isOptionalPricingOpen ? "expand_less" : "expand_more"}
-            </span>
+            <AppIcon
+              name={isOptionalPricingOpen ? "expand_less" : "expand_more"}
+              className="text-on-surface-variant"
+            />
           </button>
         )}
 
@@ -174,7 +172,7 @@ export function TotalAmountSection({
                       <option value="percent">Percent %</option>
                     </select>
                     <span className="pointer-events-none absolute inset-y-0 right-3 inline-flex items-center text-sm text-outline">
-                      <span className="material-symbols-outlined block text-sm leading-none">expand_more</span>
+                      <AppIcon name="expand_more" className="block text-sm leading-none" />
                     </span>
                   </div>
                   <NumericField

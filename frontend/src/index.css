@@ -290,14 +290,6 @@
   box-shadow: var(--shadow-modal);
 }
 
-.material-symbols-outlined {
-  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
-}
-
-.material-symbols-filled {
-  font-variation-settings: "FILL" 1, "wght" 600, "GRAD" 0, "opsz" 24;
-}
-
 @keyframes shimmer {
   0% {
     background-position: 200% 0;

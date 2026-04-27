@@ -486,11 +486,11 @@ describe("SettingsScreen", () => {
   it("shows a business icon placeholder in display mode and full upload controls in edit mode", async () => {
     mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
 
-    renderScreen();
+    const { container } = renderScreen();
 
     expect(await screen.findByText("Business Profile")).toBeInTheDocument();
     expect(screen.queryByTestId("settings-logo-block")).not.toBeInTheDocument();
-    expect(screen.getByText("business")).toBeInTheDocument();
+    expect(container.querySelector("svg.lucide-building2, svg.lucide-building-2")).toBeInTheDocument();
     expect(screen.queryByLabelText(/upload logo/i)).not.toBeInTheDocument();
     await openBusinessProfileEditMode();
     expect(screen.getByTestId("settings-logo-block")).toHaveClass(

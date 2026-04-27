@@ -19,14 +19,12 @@ afterEach(() => {
 
 describe("BottomNav", () => {
   it("renders quotes, customers, and settings tabs", () => {
-    render(<BottomNav active="quotes" />);
+    const { container } = render(<BottomNav active="quotes" />);
 
     expect(screen.getByRole("button", { name: /quotes/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /customers/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /settings/i })).toBeInTheDocument();
-    expect(screen.getByText("description")).toBeInTheDocument();
-    expect(screen.getByText("group")).toBeInTheDocument();
-    expect(screen.getByText("settings")).toBeInTheDocument();
+    expect(container.querySelectorAll("svg")).toHaveLength(3);
   });
 
   it("applies active tab styling using the active prop", () => {

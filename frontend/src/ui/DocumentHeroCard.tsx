@@ -3,6 +3,7 @@ import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 import { StatusPill, type StatusPillVariant } from "@/ui/StatusPill";
 
 interface DocumentHeroCardProps {
@@ -78,7 +79,7 @@ export function DocumentHeroCard({
                 onClick={linkedDocument.onClick}
               >
                 {linkedDocument.actionLabel}
-                <span className="material-symbols-outlined text-base">arrow_forward</span>
+                <AppIcon name="arrow_forward" className="text-base" />
               </button>
             ) : null}
           </div>

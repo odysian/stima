@@ -10,6 +10,7 @@ import { PricingRow } from "@/shared/components/PricingRow";
 import { formatCurrency } from "@/shared/lib/formatters";
 import { calculatePricingFromPersisted, resolveLineItemSum } from "@/shared/lib/pricing";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 import { StatusPill, type StatusPillVariant } from "@/ui/StatusPill";
 
 type LoadState = "loading" | "ready" | "invalid" | "error";
@@ -237,9 +238,7 @@ export function PublicQuotePage(): React.ReactElement {
             {banner ? (
               <div className={`flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-document)] px-4 py-3 text-sm font-medium ${banner.className}`}>
                 <div className="flex min-w-0 items-center gap-2">
-                  <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem] leading-none">
-                    {banner.icon}
-                  </span>
+                  <AppIcon name={banner.icon} className="text-[1.125rem] leading-none" />
                   <p>{banner.title}</p>
                 </div>
                 <StatusPill variant={banner.pillVariant} />

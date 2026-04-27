@@ -1,5 +1,6 @@
 import { Button } from "@/shared/components/Button";
 import { Eyebrow } from "@/ui/Eyebrow";
+import { AppIcon } from "@/ui/Icon";
 
 type BannerKind = "warn" | "info" | "success" | "error";
 
@@ -60,7 +61,7 @@ export function Banner({
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
-        <span className={["material-symbols-outlined", style.body].join(" ")}>{style.icon}</span>
+        <AppIcon name={style.icon} className={style.body} />
         <div className="min-w-0 flex-1">
           <Eyebrow className={style.title}>{title}</Eyebrow>
           <p className={["text-sm font-medium leading-snug", style.body].join(" ")}>{message}</p>
@@ -74,7 +75,7 @@ export function Banner({
             className={["shrink-0 hover:bg-current/10", style.body].join(" ")}
             onClick={onDismiss}
           >
-            <span className="material-symbols-outlined text-base">close</span>
+            <AppIcon name="close" className="text-base" />
           </Button>
         ) : null}
       </div>

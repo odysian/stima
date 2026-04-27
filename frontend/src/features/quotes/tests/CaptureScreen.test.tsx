@@ -470,7 +470,7 @@ describe("CaptureScreen", () => {
     expect(
       screen.getByText("Maximum clips reached."),
     ).toBeInTheDocument();
-    const startButton = screen.getByText("mic").closest("button");
+    const startButton = screen.getByRole("button", { name: /start recording/i });
     expect(startButton).toBeDisabled();
   });
 
@@ -507,16 +507,13 @@ describe("CaptureScreen", () => {
     renderScreen();
 
     expect(screen.getByText("Recording... 00:03")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /stop recording/i })).toBeInTheDocument();
   });
 
   it("uses token-backed styles for the start recording control", () => {
     renderScreen();
 
-    const startButton = screen.getByText("mic").closest("button");
-    if (!startButton) {
-      throw new Error("Expected start recording button to render");
-    }
+    const startButton = screen.getByRole("button", { name: /start recording/i });
 
     expect(startButton).toHaveClass("forest-gradient", "ghost-shadow", "text-on-primary");
   });
@@ -525,7 +522,7 @@ describe("CaptureScreen", () => {
     mockVoiceCapture({ isRecording: true, elapsedSeconds: 3 });
     renderScreen();
 
-    const stopButton = screen.getByRole("button", { name: /stop/i });
+    const stopButton = screen.getByRole("button", { name: /stop recording/i });
     expect(stopButton).toHaveClass("ghost-shadow", "bg-secondary", "text-on-secondary");
   });
 
