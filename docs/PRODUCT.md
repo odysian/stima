@@ -91,10 +91,8 @@ screen, PDF generation, public share link, quote history, pilot event logging.
 branded landing page → contractor knows the outcome → converts to an invoice.
 
 V0 ends at "quote shared via native share." V1 makes that moment mean something.
-V1 is partially shipped: branding, quote status expansion, the read-only public quote
-landing page, and operational visibility are already live. The remaining forward build path
-is email delivery + always-visible Copy Link (M3), PDF refinement (M4), linked invoice
-conversion (M5), and optional pricing controls (M7).
+V1 shipped: branding, quote status expansion, the read-only public quote landing page,
+operational visibility, email delivery, PDF refinement, and quote-to-invoice conversion.
 
 **Core scope:**
 
@@ -118,15 +116,13 @@ quote to invoice.
 
 ---
 
-### P0 — Field-Resilient Capture (active)
+### P0 — Field-Resilient Capture ✓ complete
 
 **Goal:** Make Stima dependable in the field — when signal is bad, the browser refreshes,
 or AI extraction has to wait. The product wedge is local-first quote capture: capture now,
 clean up later.
 
-**Why before V2:** Field resilience is a prerequisite for real-world daily use. V2 "Speed
-and Memory" features (templates, customer notes, context-aware extraction) require users
-to trust that work does not vanish. That trust comes from P0.
+**Status:** Complete. QA evidence: `docs/qa/P0_FIELD_RESILIENT_CAPTURE_QA.md`
 
 **Core scope:**
 
@@ -144,15 +140,27 @@ Full spec: `docs/roadmaps/P0_FIELD_RESILIENT_CAPTURE.md`
 
 ---
 
-### V2 — Speed and Memory (deferred — resumes after P0)
+### P1 — Pilot-Ready Product & Founder GTM (active)
+
+**Goal:** Make Stima ready for real pilot users and founder-led validation.
+
+**Thesis:** Stima becomes a pilot-ready quoting assistant for solo landscapers: fast enough
+for repeat work, trustworthy enough for field use, polished enough to show customers, and
+instrumented enough for the founder to learn what users actually do.
+
+Full spec: `docs/roadmaps/P1_PILOT_READY_PRODUCT_GTM.md`
+
+---
+
+### V2 — Speed and Memory (deferred — resumes after P1)
 
 **Goal:** Make repeat quoting dramatically faster. Turn Stima into a business memory
 layer — not just a generator for one-off quotes.
 
-**Deferred pending P0 completion.** The V2 direction (templates, quote duplication,
+**Deferred pending P1 completion and pilot learning.** The V2 direction (templates, quote duplication,
 customer detail rebuild, gallery/photos, context-aware extraction, revision history,
-stronger search) remains the correct next build after P0 ships. Exact scope will be
-adjusted based on P0 and pilot usage data.
+stronger search) remains the correct next build after P1 ships. Exact scope will be
+adjusted based on P1 pilot usage data.
 
 Historical directional context: `docs/archive/roadmaps/V2.1_ROADMAP.md`
 
