@@ -63,6 +63,17 @@ Label selection rules:
 
 Guiding principle: be strict about scope, contracts, acceptance criteria, verification, and layer boundaries. Be flexible about internal decomposition and helper structure as long as the implementation stays readable, testable, and consistent with repo patterns.
 
+## CI Policy Snapshot (Deferred Controller)
+
+Current simplified CI policy on `main`:
+
+- `backend-test.yml` and `frontend-test.yml` are the normal direct PR checks.
+- `backend-test.yml` is reusable (`workflow_call`) for deploy and does not run independently on `push: main`.
+- `backend-deploy.yml` is path-gated so docs-only pushes to `main` do not trigger backend deployment.
+- `dependency-audit.yml` is separate and runs on schedule/manual, or explicit invocation.
+- Docs-only PRs may still run backend/frontend CI for now.
+- `ci.yml` controller migration is intentionally deferred and must be handled only by a new explicit task.
+
 ## Execution Modes (Choose Before Opening Issues)
 
 Use `single` by default. Use `gated` or `fast` only when explicitly requested.

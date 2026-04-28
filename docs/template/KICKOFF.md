@@ -17,6 +17,7 @@ Use these prompts to start work on already-scoped tasks without reloading unnece
 - After `ACTIONABLE`, patch listed findings only unless scope expands.
 - Verification follows tiers from `docs/workflow/VERIFY.md`.
 - For backend code changes, run the targeted behavior check plus `make backend-static-verify` before push/PR update.
+- CI policy guardrail: unless a task explicitly says otherwise, treat `.github/workflows/backend-test.yml` and `.github/workflows/frontend-test.yml` as direct PR checks, treat `ci.yml` controller migration as deferred, and do not remove backend/frontend `pull_request` triggers.
 
 ## When To Load Which Asset
 
