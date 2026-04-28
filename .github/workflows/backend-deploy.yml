@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+      - backend/**
+      - ops/**
+      - .github/workflows/backend-deploy.yml
+      - .github/workflows/backend-test.yml
   workflow_dispatch:
 
 concurrency:
