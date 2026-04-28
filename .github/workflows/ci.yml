@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      shared: ${{ steps.filter.outputs.shared }}
+      audit: ${{ steps.filter.outputs.audit }}
+      backend_dependencies: ${{ steps.filter.outputs.backend_dependencies }}
+      frontend_dependencies: ${{ steps.filter.outputs.frontend_dependencies }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'pyproject.toml'
+              - 'scripts/check_backend_boundaries.sh'
+              - 'scripts/check-unresolved-template-tokens.sh'
+              - '.github/workflows/backend-test.yml'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/frontend-test.yml'
+              - '.github/workflows/ci.yml'
+            shared:
+              - 'Makefile'
+              - 'scripts/check_file_sizes.sh'
+            audit:
+              - 'scripts/validate_dependency_audit_exceptions.py'
+              - '.github/workflows/dependency-audit.yml'
+            backend_dependencies:
+              - 'backend/requirements*.txt'
+              - 'pyproject.toml'
+            frontend_dependencies:
+              - 'frontend/package.json'
+              - 'frontend/package-lock.json'
+            docs:
+              - 'docs/**'
+              - '*.md'
+              - '**/*.md'
+
+  backend:
+    name: Backend Verification
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.shared == 'true'
+    uses: ./.github/workflows/backend-test.yml
+
+  frontend:
+    name: Frontend Verification
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared == 'true'
+    uses: ./.github/workflows/frontend-test.yml
+
+  dependency-audit:
+    name: Dependency Audit
+    needs: changes
+    if: needs.changes.outputs.audit == 'true' || needs.changes.outputs.backend_dependencies == 'true' || needs.changes.outputs.frontend_dependencies == 'true'
+    uses: ./.github/workflows/dependency-audit.yml
+
+  ci-required:
+    name: ci-required
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - backend
+      - frontend
+      - dependency-audit
+    if: always()
+    steps:
+      - name: Validate required workflow results
+        run: |
+          backend_result="${{ needs.backend.result }}"
+          frontend_result="${{ needs.frontend.result }}"
+          audit_result="${{ needs.dependency-audit.result }}"
+
+          echo "backend: ${backend_result}"
+          echo "frontend: ${frontend_result}"
+          echo "dependency-audit: ${audit_result}"
+
+          if [[ "${backend_result}" == "failure" || "${backend_result}" == "cancelled" ]]; then
+            exit 1
+          fi
+
+          if [[ "${frontend_result}" == "failure" || "${frontend_result}" == "cancelled" ]]; then
+            exit 1
+          fi
+
+          if [[ "${audit_result}" == "failure" || "${audit_result}" == "cancelled" ]]; then
+            exit 1
+          fi
