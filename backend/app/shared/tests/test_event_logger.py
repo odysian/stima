@@ -361,5 +361,7 @@ def test_pilot_event_whitelist_matches_v1_analytics_contract() -> None:
         "quote_viewed",
         "email_sent",
         "invoice_created",
+        "invoice_shared",
         "invoice_viewed",
+        "invoice_paid",
     }

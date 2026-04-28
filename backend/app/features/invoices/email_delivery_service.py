@@ -214,8 +214,8 @@ class InvoiceEmailDeliveryService:
         log_event(
             "email_sent",
             user_id=context.user_id,
+            invoice_id=context.invoice_id,
             customer_id=context.customer_id,
-            persist_async=False,
         )
 
     async def _enforce_duplicate_send_guard(self, context: InvoiceEmailContext) -> None:
