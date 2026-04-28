@@ -116,6 +116,12 @@ class InvoiceShareService:
             invoice.share_token_created_at = now
             invoice.share_token_expires_at = _build_share_token_expiry(now)
             invoice.share_token_revoked_at = None
+            log_event(
+                "invoice_shared",
+                user_id=user_id,
+                invoice_id=invoice.id,
+                customer_id=invoice.customer_id,
+            )
 
         if invoice.status not in _OUTCOME_SHARE_NON_REGRESSION_STATUSES:
             invoice.shared_at = now

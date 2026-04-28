@@ -233,3 +233,40 @@ async def test_invoice_outcome_labels_remain_editable_shareable_and_public(
     public_response = await client.get(f"/api/public/doc/{original_share_token}")
     assert public_response.status_code == 200
     assert public_response.json()["doc_type"] == "invoice"
+
+
+async def test_invoice_share_emits_invoice_shared_event_with_id_only_payload(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted_events: list[dict[str, str]] = []
+
+    def _capture(message: str) -> None:
+        emitted_events.append(json.loads(message))
+
+    monkeypatch.setattr(event_logger._EVENT_LOGGER, "info", _capture)  # noqa: SLF001
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Invoice",
+        transcript="invoice transcript",
+        total_amount=120,
+    )
+
+    response = await client.post(
+        f"/api/invoices/{invoice['id']}/share",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    matching_events = [
+        payload
+        for payload in emitted_events
+        if payload.get("event") == "invoice_shared" and payload.get("invoice_id") == invoice["id"]
+    ]
+    assert len(matching_events) == 1
+    assert matching_events[0]["customer_id"] == customer_id
+    assert "share_token" not in matching_events[0]

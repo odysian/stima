@@ -223,7 +223,6 @@ class QuoteEmailDeliveryService:
             user_id=context.user_id,
             quote_id=context.quote_id,
             customer_id=context.customer_id,
-            persist_async=False,
         )
 
     async def _enforce_duplicate_send_guard(self, context: QuoteEmailContext) -> None:

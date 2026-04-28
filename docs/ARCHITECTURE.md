@@ -201,6 +201,7 @@ Pilot event set:
 - `quote_viewed`
 - `email_sent`
 - `invoice_created`
+- `invoice_shared`
 - `invoice_viewed`
 - `invoice_paid`
 - `invoice_voided`
@@ -208,6 +209,8 @@ Pilot event set:
 `draft_generated` event metadata includes `extraction_outcome` with canonical values `primary` or `degraded`.
 
 These underscore names are the canonical quote-flow vocabulary for pilot instrumentation; dot-notation events such as `quote.created`, `quote.updated`, `quote.deleted`, and `customer.created` remain separate operational logs outside the pilot analytics scope.
+
+`manual_draft_created` remains in use until `quote.created` is persist-allowlisted (or another equivalent persisted intake event exists) so manual draft creation stays visible in pilot reporting.
 
 Internal analytics access:
 - `GET /api/admin/events?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&event_name?=...`

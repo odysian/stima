@@ -33,7 +33,9 @@ _PILOT_EVENT_NAMES = frozenset(
         "quote_viewed",
         "email_sent",
         "invoice_created",
+        "invoice_shared",
         "invoice_viewed",
+        "invoice_paid",
     }
 )
 _PENDING_EVENT_TASKS: set[asyncio.Task[None]] = set()
