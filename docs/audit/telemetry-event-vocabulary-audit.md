@@ -6,12 +6,12 @@
 
 ## 1. Summary of Findings
 
-- **21 distinct backend event names** are emitted via `log_event(...)` across 15 Python modules.
+- **20 distinct backend event names** are emitted via `log_event(...)` across 15 Python modules.
 - Only **12 events** are in the `_PILOT_EVENT_NAMES` allowlist; of those, **11 are actually persisted** under normal conditions and **1 is intentionally skipped** (`email_sent` uses `persist_async=False`).
-- **9 events** are stdout-only because they are outside the allowlist.
+- **8 events** are stdout-only because they are outside the allowlist.
 - **No frontend telemetry** exists; there are zero `log_event`, analytics, or telemetry calls in the frontend codebase.
 - A **confirmed sensitive payload risk** exists in `backend/app/integrations/extraction.py` where `log_extraction_trace` passes `raw_transcript` and `raw_tool_payload` into the logger. These fields are currently stripped by a global `_INCLUDE_RAW_CONTENT = False` toggle, but the surface remains exposed.
-- The **existing backend events are sufficient for core P1 pilot visibility** (quote intake → draft → share → view → outcome, plus invoice creation and viewing). The smallest founder visibility path is a SQL/query doc or tiny report script against the existing `event_logs` table.
+- The **existing backend events are sufficient for core P1 pilot visibility** (quote intake → draft → share → view → outcome, plus invoice creation and viewing). **However, `email_sent` for invoices currently omits `invoice_id`**, so invoice email traceability is incomplete until this is fixed. The smallest founder visibility path is a SQL/query doc or tiny report script against the existing `event_logs` table.
 - No client-event endpoint is required for P1.
 
 ## 2. Event Vocabulary Table
@@ -35,7 +35,8 @@
 | `quote_approved` | `app/features/quotes/outcomes/service.py` | **Yes** | `user_id`, `quote_id`, `customer_id` | Low | `_PILOT_EVENT_NAMES` allowlist | Outcome — contractor marks won | Keep |
 | `quote_marked_lost` | `app/features/quotes/outcomes/service.py` | **Yes** | `user_id`, `quote_id`, `customer_id` | Low | `_PILOT_EVENT_NAMES` allowlist | Outcome — contractor marks lost | Keep |
 | `quote_viewed` | `app/features/quotes/share/service.py` | **Yes** | `user_id`, `quote_id`, `customer_id` | Low | `_PILOT_EVENT_NAMES` allowlist | Outcome — customer first view | Keep |
-| `email_sent` | `app/features/quotes/email_delivery_service.py`, `app/features/invoices/email_delivery_service.py` | **NO** (intentionally skipped via `persist_async=False`) | `user_id`, `quote_id` or `invoice_id`, `customer_id` | Low | In `_PILOT_EVENT_NAMES`, but `persist_async=False` | Delivery — email dispatched | **Add to PR 2: either persist it or remove from allowlist** |
+| `email_sent` (quote) | `app/features/quotes/email_delivery_service.py` | **NO** (intentionally skipped via `persist_async=False`) | `user_id`, `quote_id`, `customer_id` | Low | In `_PILOT_EVENT_NAMES`, but `persist_async=False` | Delivery — quote email dispatched | **Add to PR 2: either persist it or remove from allowlist** |
+| `email_sent` (invoice) | `app/features/invoices/email_delivery_service.py` | **NO** (intentionally skipped via `persist_async=False`) | `user_id`, `customer_id` (**no `invoice_id`**) | Low | In `_PILOT_EVENT_NAMES`, but `persist_async=False` | Delivery — invoice email dispatched | **Add `invoice_id=context.invoice_id` in PR 2; persist or remove from allowlist** |
 | `invoice_created` | `app/features/invoices/creation/service.py` | **Yes** | `user_id`, `customer_id`, `quote_id` (on conversion) | Low | `_PILOT_EVENT_NAMES` allowlist | Invoice lifecycle — created | Keep |
 | `invoice_viewed` | `app/features/invoices/share/service.py` | **Yes** | `user_id`, `invoice_id`, `customer_id` | Low | `_PILOT_EVENT_NAMES` allowlist | Invoice lifecycle — customer first view | Keep |
 | `quote.created` | `app/features/quotes/api.py`, `app/features/quotes/creation/service.py`, `app/worker/job_registry.py` | **NO** (not in allowlist) | `user_id`, `quote_id`, `customer_id` | Low | stdout-only | Intake — document persisted | **Consider adding to allowlist in PR 2 if quote creation volume is needed from events** |
@@ -52,7 +53,7 @@
 | Event | Expected Callsite | Funnel Stage | Action |
 |---|---|---|---|
 | `invoice_shared` | `app/features/invoices/share/service.py` (missing) | Invoice lifecycle — share token created | **Add `log_event` callsite and add to `_PILOT_EVENT_NAMES` in PR 2** |
-| `invoice_sent` | `app/features/invoices/email_delivery_service.py` (uses generic `email_sent`) | Invoice lifecycle — email dispatched | **Defer: generic `email_sent` covers this if persisted in PR 2** |
+| `invoice_sent` | `app/features/invoices/email_delivery_service.py` (uses generic `email_sent`) | Invoice lifecycle — email dispatched | **Defer: generic `email_sent` covers this if persisted in PR 2, but note that `invoice_id` is not currently passed — add `invoice_id` before relying on this for invoice email traceability** |
 
 ### Duplicated / Stale Events
 
@@ -66,12 +67,12 @@
 **Location:** `backend/app/integrations/extraction.py`
 
 `log_extraction_trace` is called with `raw_transcript` and `raw_tool_payload` at the following stages:
-- `stage=tier.tier, outcome="started"` (line 522)
-- `stage=tier.tier, outcome="provider_response"` (lines 577–578)
-- `stage="repair", outcome="started"` (lines 619–620)
-- `stage="repair", outcome="failed"` (line 698)
-- `stage="repair", outcome="succeeded"` (lines 739–740)
-- `_log_result_trace` → `stage="result", outcome="succeeded"` (line 1473)
+- `stage=tier.tier, outcome="started"` (lines 514–522: `raw_transcript` at line 522)
+- `stage=tier.tier, outcome="provider_response"` (lines 559–579: `raw_transcript` at 577, `raw_tool_payload` at 578)
+- `stage="repair", outcome="started"` (lines 610–621: `raw_transcript` at 619, `raw_tool_payload` at 620)
+- `stage="repair", outcome="failed"` (lines 685–699: `raw_transcript` at 697, `raw_tool_payload` at 698)
+- `stage="repair", outcome="succeeded"` (lines 719–740: `raw_transcript` at 738, `raw_tool_payload` at 739)
+- `_log_result_trace` → `stage="result", outcome="succeeded"` (lines 1459–1474: `raw_transcript` at 1472, `raw_tool_payload` at 1473)
 
 **Current mitigation:** `app/shared/extraction_logger.py` defaults `_INCLUDE_RAW_CONTENT = False`, so these fields are stripped from the JSON payload before logging.
 
@@ -96,6 +97,7 @@ PR 2 should be the smallest code change that closes the persistence gaps blockin
 
 1. **Persist `email_sent`**
    - Remove `persist_async=False` from both `QuoteEmailDeliveryService` and `InvoiceEmailDeliveryService`.
+   - **Add `invoice_id=context.invoice_id`** to the invoice `email_sent` call in `InvoiceEmailDeliveryService` — currently only `user_id` and `customer_id` are passed, so invoice emails lose traceability to the specific invoice. This must be fixed before or alongside persisting.
    - Rationale: Email volume is a key delivery signal; it is already in `_PILOT_EVENT_NAMES` and low-risk.
 
 2. **Add `invoice_paid` to `_PILOT_EVENT_NAMES`**
@@ -170,6 +172,7 @@ The founder can run these against the production read replica or via a simple `p
 - **Sensitive payload audit:** Reviewed `backend/app/integrations/extraction.py` and `backend/app/shared/extraction_logger.py` for raw content leakage paths.
 - **Frontend audit:** Confirmed zero telemetry calls in `frontend/` via glob/grep.
 - **No code changes were made**, so no backend static verification or pytest runs were required.
+- **Reviewer-verified recount:** Independent scripted enumeration of all `log_event(` callsites in `backend/app/` (excluding test files) confirmed 20 distinct event names across 15 modules. Original audit count of 21 was corrected to 20; the derived "9 stdout-only" count was corrected to 8. Invoice `email_sent` was confirmed to lack `invoice_id` in its payload.
 
 ## 8. Decision Section
 
