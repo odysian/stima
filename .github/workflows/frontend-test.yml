@@ -15,9 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
       - uses: actions/setup-node@v6
         with:
           node-version: '24.0.0'
@@ -25,9 +22,5 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: npm ci --prefix frontend
-      - name: Validate dependency audit exceptions
-        run: python3 scripts/validate_dependency_audit_exceptions.py
-      - name: Frontend dependency audit
-        run: npm audit --prefix frontend --audit-level=high
       - name: Frontend verify
         run: make frontend-verify

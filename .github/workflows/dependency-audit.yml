@@ -1,0 +1,48 @@
+name: Dependency Audit
+
+on:
+  workflow_call:
+  schedule:
+    - cron: "0 10 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.0.0'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install --upgrade pip
+          backend/.venv/bin/pip install -r backend/requirements.txt
+          backend/.venv/bin/pip install pip-audit==2.10.0
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Validate dependency audit exceptions
+        run: python3 scripts/validate_dependency_audit_exceptions.py
+
+      - name: Backend dependency audit
+        run: backend/.venv/bin/pip-audit -r backend/requirements.txt
+
+      - name: Frontend dependency audit
+        run: npm audit --prefix frontend --audit-level=high
