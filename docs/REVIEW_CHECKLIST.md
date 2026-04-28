@@ -42,3 +42,8 @@
 
 ## CI
 - [ ] CI status checked (`GitHub Actions: .github/workflows/backend-test.yml and .github/workflows/frontend-test.yml`)
+- [ ] CI policy alignment confirmed for CI/docs tasks:
+  - `backend-test.yml` and `frontend-test.yml` remain direct PR checks
+  - `backend-deploy.yml` is path-gated (docs-only pushes to `main` should not deploy backend)
+  - `dependency-audit.yml` is separate scheduled/manual (or explicit `workflow_call`), not default PR-blocking while controller migration is deferred
+  - `ci.yml` controller migration remains deferred unless a new explicit task says otherwise
