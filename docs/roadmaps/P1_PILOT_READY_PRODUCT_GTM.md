@@ -267,6 +267,8 @@ These decisions should not be reopened by child tasks without an explicit produc
 18. **Design adoption closeout gates broad pilot QA/outreach.** PR-S audit closeout and PR-G regression must complete before Spec 8 Pilot QA and broad external outreach. PR-DOC must complete or be explicitly deferred with no pilot-facing risk.
 19. **No general-purpose client analytics SDK in P1.** Use existing backend events and/or the smallest authenticated pilot event endpoint only if a required signal cannot be observed server-side.
 20. **Do not promise P2 features in pilot materials.** Demos and landing copy must describe what exists today, not future memory/options/margins/photos.
+21. **Production safety is a P1 release gate.** Before real pilot users or broad outreach, Stima must pass a focused security/LLM-safety remediation pass covering sensitive logging, production configuration, auth/tenant isolation, upload/audio/PDF/public-share surfaces, and extraction prompt/output safety.
+22. **Architecture-modularity findings are handled as a parallel maintainability/discoverability track under Spec 7.** They do not block P1 unless the audit identifies a concrete pilot-safety, data-leakage, release-blocking, or user-facing reliability issue.
 
 ---
 
@@ -309,11 +311,14 @@ P1 explicitly does **not** include:
 | 1 | Product Telemetry & Pilot Funnel Events | backend/frontend/docs | Let founder see real funnel behavior and failure points |
 | 2 | Quote Quality Feedback Loop | frontend/backend/support | Capture quote-quality signals without slowing the quote flow |
 | 3 | Review & Delivery Trust Polish | frontend/backend/PDF | Make review, public quote, PDF, share/send, and invoice handoff pilot-ready |
+| 3A | Structured Business & Customer Contact Info | backend/frontend/PDF | Add structured address/phone fields for professional PDF and settings output (child of Spec 3) |
 | 4 | Repeat Quote Speed Audit & Reuse Polish | frontend/backend | Verify and polish existing quote reuse + line-item catalog flows |
 | 5 | Founder GTM Pilot Kit | docs/frontend optional | ICP, outreach assets, landing/onboarding copy, demo script, feedback loop |
 | 6 | Support & Feedback Intake | frontend/backend/docs | Give users a simple way to report issues/friction |
 | 7 | Maintenance & Design Closeout Parallel Track | backend/frontend/docs | Close open reliability/design/test work without derailing product learning |
 | 8 | P1 Pilot QA & Launch Readiness | QA/docs | End-to-end pilot release checklist and known-limitations doc |
+| 9 | Production Security & LLM Safety Gate | backend/frontend/infra/docs | Final pre-pilot gate: prove Stima is safe enough for real pilot users and real customer/job data |
+| 9A | Lightweight Production Observability & Security Alerting | backend/infra/docs | Production logging runbook, targeted Sentry alerts, suspicious-path detection (child of Spec 9) |
 
 ---
 
@@ -321,13 +326,16 @@ P1 explicitly does **not** include:
 
 1. **Gate 0 — P0 Evidence & Product Docs Closeout**
 2. **Spec 1 — Product Telemetry & Pilot Funnel Events**
-3. **Spec 5 — Founder GTM Pilot Kit** can start in parallel after Gate 0, because it is mostly docs.
-4. **Spec 6 — Support & Feedback Intake** should land before or alongside any real pilot outreach.
-5. **Spec 2 — Quote Quality Feedback Loop** should land after telemetry/event vocabulary is stable. Spec 6 may precede Spec 2 if the first quote-quality feedback path is a general support/feedback mechanism.
-6. **Spec 3 — Review & Delivery Trust Polish** can be sliced into audit-first tasks while Spec 2 is underway.
-7. **Spec 4 — Repeat Quote Speed Audit & Reuse Polish** should begin with an audit task, because much of the infrastructure already exists.
-8. **Spec 7 — Maintenance & Design Closeout Parallel Track** runs in parallel with strict scope limits.
-9. **Spec 8 — P1 Pilot QA & Launch Readiness** closes the umbrella and depends on design closeout/regression gates.
+3. **Spec 9 PR 1 — Production Security & LLM Safety Inventory** should begin early so blocker classification informs later specs.
+4. **Spec 5 — Founder GTM Pilot Kit** can start in parallel after Gate 0, because it is mostly docs.
+5. **Spec 6 — Support & Feedback Intake** should land before or alongside any real pilot outreach.
+6. **Spec 2 — Quote Quality Feedback Loop** should land after telemetry/event vocabulary is stable. Spec 6 may precede Spec 2 if the first quote-quality feedback path is a general support/feedback mechanism.
+7. **Spec 3 — Review & Delivery Trust Polish** can be sliced into audit-first tasks while Spec 2 is underway. **Spec 3A** (structured contact info) can run as a child implementation task once the Spec 3 audit confirms the gap.
+8. **Spec 4 — Repeat Quote Speed Audit & Reuse Polish** should begin with an audit task, because much of the infrastructure already exists.
+9. **Spec 7 — Maintenance & Design Closeout Parallel Track** runs in parallel with strict scope limits, including architecture-discoverability planning.
+10. **Spec 9 blocker fixes** complete before Spec 8 begins.
+11. **Spec 9A — Production Observability & Security Alerting** runs in parallel after Spec 9 PR 1 (security inventory). Adds logging runbook, Sentry alerts, and suspicious-path detection.
+12. **Spec 8 — P1 Pilot QA & Launch Readiness** closes the umbrella and depends on design closeout/regression gates and Spec 9 completion.
 
 ---
 
@@ -1039,8 +1047,9 @@ Do not begin Spec 8 until:
 
 ## 9. Dependency gates
 
-- Do not start broad pilot outreach until **Gate 0**, **Spec 1**, **Spec 6**, and required design adoption closeout/regression gates are complete enough to observe, support, and confidently show the app to users.
+- Do not start broad pilot outreach until **Gate 0**, **Spec 1**, **Spec 6**, **Spec 9**, and required design adoption closeout/regression gates are complete enough to observe, support, and confidently show the app to users.
 - Do not begin **Spec 8 Pilot QA** until PR-S audit closeout and PR-G regression pass are complete or all blockers are resolved.
+- **Spec 9 must complete before Spec 8 can close and before real pilot users are invited, unless the founder explicitly documents accepted risk.**
 - Do not close P1 while PR-DOC UI system documentation is unresolved unless it is explicitly deferred with no pilot-facing risk.
 - Do not add new reuse models until **Spec 4 audit** proves existing quote reuse and catalog flows are insufficient.
 - Do not implement billing/payment in P1.
@@ -1049,6 +1058,7 @@ Do not begin Spec 8 until:
 - Do not make large review/editor refactors in the same PR as delivery/public/PDF polish.
 - Do not mix founder docs and product code in one PR unless the code change is a tiny landing/onboarding copy update.
 - Do not close P1 without a QA/readiness artifact.
+- Do not close P1 without the Production Security & LLM Safety Gate complete or any remaining risks explicitly documented and accepted before pilot outreach.
 
 ---
 
@@ -1067,11 +1077,14 @@ Task: P1 Gate 0 — P0 evidence and product docs closeout
 Task: P1 Spec 1 — Product telemetry and pilot funnel events
 Task: P1 Spec 2 — Quote quality feedback loop
 Task: P1 Spec 3 — Review and delivery trust polish
+Task: P1 Spec 3A — Structured business and customer contact info
 Task: P1 Spec 4 — Repeat quote speed audit and reuse polish
 Task: P1 Spec 5 — Founder GTM pilot kit
 Task: P1 Spec 6 — Support and feedback intake
 Task: P1 Spec 7 — Maintenance and design closeout parallel track
 Task: P1 Spec 8 — Pilot QA and launch readiness
+Task: P1 Spec 9 — Production security and LLM safety gate
+Task: P1 Spec 9A — Lightweight production observability and security alerting
 ```
 
 Use gated execution: PRs close child tasks, not the umbrella, unless the PR is an umbrella-doc-only PR.
@@ -1096,6 +1109,8 @@ Focus on:
 8. Whether design adoption closeout is correctly gated before Spec 8 and broad pilot outreach.
 9. Whether any currently open repo issues should be pulled into or excluded from P1.
 10. Whether dependency gates and acceptance criteria are strong enough to prevent feature creep.
+11. Whether the Production Security & LLM Safety Gate is correctly scoped as a pre-pilot blocker without turning P1 into an enterprise security program.
+12. Whether architecture-modularity work is correctly treated as parallel planning under Spec 7 and does not block pilot outreach unless it uncovers a concrete P1 blocker.
 
 Return APPROVED or ACTIONABLE with concrete changes.
 ```
