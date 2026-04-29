@@ -42,6 +42,7 @@ export function TotalAmountSection({
   const [taxToggleOverride, setTaxToggleOverride] = useState<boolean | null>(null);
   const [depositToggleOverride, setDepositToggleOverride] = useState<boolean | null>(null);
   const [isOptionalPricingOpen, setIsOptionalPricingOpen] = useState(false);
+  const [totalInputDraft, setTotalInputDraft] = useState<string | null>(null);
   const isDiscountEnabled = discountToggleOverride ?? (
     discountType !== null || hasActivePricingValue(discountValue)
   );
@@ -59,6 +60,8 @@ export function TotalAmountSection({
   const hasPricingBreakdown = pricingBreakdown.hasPricingBreakdown;
   const shouldShowOptionalPricingPanel = hasActiveOptionalPricing || isOptionalPricingOpen;
 
+  const totalInputValue = totalInputDraft ?? toTwoDecimalInputValue(total);
+
   return (
     <section className="rounded-[var(--radius-document)] bg-surface-container-low p-4">
       <div className="flex items-center justify-between text-sm text-outline">
@@ -74,8 +77,9 @@ export function TotalAmountSection({
             hideLabel
             step={0.01}
             disabled={disabled}
-            value={total === null ? "" : total.toString()}
+            value={totalInputValue}
             onChange={(rawValue) => {
+              setTotalInputDraft(rawValue);
               const normalizedValue = rawValue.replaceAll(",", "").trim();
               if (normalizedValue.length === 0) {
                 onTotalChange(null);
@@ -84,6 +88,9 @@ export function TotalAmountSection({
 
               const parsedValue = Number(normalizedValue);
               onTotalChange(Number.isFinite(parsedValue) ? parsedValue : null);
+            }}
+            onBlur={() => {
+              setTotalInputDraft(null);
             }}
             showStepControls={false}
             formatOnBlur={false}
@@ -295,4 +302,12 @@ export function TotalAmountSection({
 
 function hasActivePricingValue(value: number | null): boolean {
   return value !== null;
+}
+
+function toTwoDecimalInputValue(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) {
+    return "";
+  }
+
+  return value.toFixed(2);
 }
