@@ -416,6 +416,9 @@
                 {% if contractor_email %}
                 <p class="header-contact">{{ contractor_email }}</p>
                 {% endif %}
+                {% for line in business_address_lines %}
+                <p class="header-contact">{{ line }}</p>
+                {% endfor %}
               </td>
               <td class="header-logo-cell">
                 {% if logo_data_uri %}
@@ -434,11 +437,11 @@
             <td>
               <p class="label">Prepared For</p>
               <p class="value">{{ customer_name }}</p>
-              {% if customer_address %}
+              {% for line in customer_address_lines %}
+              <p class="value">{{ line }}</p>
+              {% endfor %}
+              {% if not customer_address_lines and customer_address %}
               <p class="value value--multiline">{{ customer_address }}</p>
-              {% endif %}
-              {% if customer_phone %}
-              <p class="value">{{ customer_phone }}</p>
               {% endif %}
             </td>
             <td class="meta-right">

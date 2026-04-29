@@ -30,6 +30,18 @@ class ProfileRepository:
         first_name: str,
         last_name: str,
         trade_type: str,
+        phone_number: str | None,
+        update_phone_number: bool,
+        business_address_line1: str | None,
+        update_business_address_line1: bool,
+        business_address_line2: str | None,
+        update_business_address_line2: bool,
+        business_city: str | None,
+        update_business_city: bool,
+        business_state: str | None,
+        update_business_state: bool,
+        business_postal_code: str | None,
+        update_business_postal_code: bool,
         timezone: str | None,
         update_timezone: bool,
         default_tax_rate: Decimal | None,
@@ -44,6 +56,18 @@ class ProfileRepository:
         }
         if update_timezone:
             values["timezone"] = timezone
+        if update_phone_number:
+            values["phone_number"] = phone_number
+        if update_business_address_line1:
+            values["business_address_line1"] = business_address_line1
+        if update_business_address_line2:
+            values["business_address_line2"] = business_address_line2
+        if update_business_city:
+            values["business_city"] = business_city
+        if update_business_state:
+            values["business_state"] = business_state
+        if update_business_postal_code:
+            values["business_postal_code"] = business_postal_code
         if update_default_tax_rate:
             values["default_tax_rate"] = default_tax_rate
 

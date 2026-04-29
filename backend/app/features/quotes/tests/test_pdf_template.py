@@ -39,6 +39,8 @@ def _make_context(
     customer_phone: str | None = None,
     customer_email: str | None = None,
     customer_address: str | None = None,
+    business_address_lines: list[str] | None = None,
+    customer_address_lines: list[str] | None = None,
     notes: str | None = None,
     line_item_details: str | None = None,
     line_items: list[QuoteRenderLineItem] | None = None,
@@ -94,6 +96,8 @@ def _make_context(
         created_at=created_at,
         updated_at=updated_at or datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
         issued_date="Mar 01, 2026",
+        business_address_lines=business_address_lines or [],
+        customer_address_lines=customer_address_lines or [],
     )
 
 
@@ -259,7 +263,7 @@ def test_render_omits_internal_quote_title_from_pdf(
     assert 'class="quote-title"' not in rendered_html
 
 
-def test_render_orders_customer_details_as_name_address_phone_and_omits_email(
+def test_render_orders_customer_details_as_name_and_address_and_omits_phone_email(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured_html: list[str] = []
@@ -281,7 +285,7 @@ def test_render_orders_customer_details_as_name_address_phone_and_omits_email(
             updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
             line_item_price=Decimal("120.00"),
             total=Decimal("120.00"),
-            customer_address="123 Main St",
+            customer_address_lines=["123 Main St"],
             customer_phone="+1-555-000-1111",
             customer_email="customer@example.com",
         )
@@ -294,12 +298,12 @@ def test_render_orders_customer_details_as_name_address_phone_and_omits_email(
         (
             r"<p class=\"label\">Prepared For</p>\s*"
             r"<p class=\"value\">Jamie Customer</p>\s*"
-            r"<p class=\"value value--multiline\">123 Main St</p>\s*"
-            r"<p class=\"value\">\+1-555-000-1111</p>"
+            r"<p class=\"value\">123 Main St</p>"
         ),
         rendered_html,
         re.DOTALL,
     )
+    assert "+1-555-000-1111" not in rendered_html
 
 
 def test_render_stacks_line_item_details_in_description_column(
@@ -988,12 +992,22 @@ def test_build_render_context_formats_dates_in_business_timezone() -> None:
             phone=None,
             email=None,
             address=None,
+            address_line1="456 Oak Ave",
+            address_line2=None,
+            city="Cleveland",
+            state="OH",
+            postal_code="44113",
         ),
         user=User(
             id=uuid4(),
             email="owner@example.com",
             password_hash="hashed",
             business_name="Acme Landscaping",
+            business_address_line1="123 Main St",
+            business_address_line2="Suite 200",
+            business_city="Cleveland",
+            business_state="OH",
+            business_postal_code="44113",
             first_name="Taylor",
             last_name="Owner",
             trade_type="Landscaper",
@@ -1005,6 +1019,15 @@ def test_build_render_context_formats_dates_in_business_timezone() -> None:
     assert context.title == "Front Yard Refresh"
     assert context.phone_number is None
     assert context.contractor_email == "owner@example.com"
+    assert context.business_address_lines == [  # nosec B101 - pytest assertion
+        "123 Main St",
+        "Suite 200",
+        "Cleveland, OH 44113",
+    ]
+    assert context.customer_address_lines == [  # nosec B101 - pytest assertion
+        "456 Oak Ave",
+        "Cleveland, OH 44113",
+    ]
 
 
 def test_build_render_context_keeps_invoice_due_date_calendar_day_in_non_utc_timezone() -> None:

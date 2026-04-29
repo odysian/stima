@@ -38,6 +38,12 @@ async def test_post_customers_creates_customer_with_required_name_only(
     assert payload["phone"] is None
     assert payload["email"] is None
     assert payload["address"] is None
+    assert payload["address_line1"] is None
+    assert payload["address_line2"] is None
+    assert payload["city"] is None
+    assert payload["state"] is None
+    assert payload["postal_code"] is None
+    assert payload["formatted_address"] is None
 
 
 async def test_post_customers_creates_customer_with_all_fields(client: AsyncClient) -> None:
@@ -50,6 +56,11 @@ async def test_post_customers_creates_customer_with_all_fields(client: AsyncClie
             "phone": "555-0102",
             "email": "bob@example.com",
             "address": "10 Main St",
+            "address_line1": "123 Elm St",
+            "address_line2": "Suite 200",
+            "city": "Cleveland",
+            "state": "OH",
+            "postal_code": "44113",
         },
         headers={"X-CSRF-Token": csrf_token},
     )
@@ -60,6 +71,33 @@ async def test_post_customers_creates_customer_with_all_fields(client: AsyncClie
     assert payload["phone"] == "555-0102"
     assert payload["email"] == "bob@example.com"
     assert payload["address"] == "10 Main St"
+    assert payload["address_line1"] == "123 Elm St"
+    assert payload["address_line2"] == "Suite 200"
+    assert payload["city"] == "Cleveland"
+    assert payload["state"] == "OH"
+    assert payload["postal_code"] == "44113"
+    assert payload["formatted_address"] == "123 Elm St\nSuite 200\nCleveland, OH 44113"
+
+
+async def test_post_customers_formatted_address_falls_back_to_legacy_address(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/customers",
+        json={
+            "name": "Legacy Address Customer",
+            "address": "10 Main St\nSuite 200",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["address"] == "10 Main St\nSuite 200"
+    assert payload["address_line1"] is None
+    assert payload["formatted_address"] == "10 Main St\nSuite 200"
 
 
 async def test_get_customers_returns_only_authenticated_users_customers(
@@ -216,6 +254,51 @@ async def test_patch_customer_updates_only_provided_fields(client: AsyncClient) 
     assert payload["phone"] == "555-9999"
     assert payload["email"] == "alice@example.com"
     assert payload["address"] == "10 Main St"
+
+
+async def test_customer_optional_contact_fields_normalize_blank_strings_to_null(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+
+    create_response = await client.post(
+        "/api/customers",
+        json={
+            "name": "Blank Field Customer",
+            "phone": "   ",
+            "address_line1": "  123 Main St  ",
+            "city": "  Cleveland  ",
+            "state": "  OH ",
+            "postal_code": " 44113  ",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert create_response.status_code == 201
+    created = create_response.json()
+    assert created["phone"] is None
+    assert created["address_line1"] == "123 Main St"
+    assert created["city"] == "Cleveland"
+    assert created["state"] == "OH"
+    assert created["postal_code"] == "44113"
+    assert created["formatted_address"] == "123 Main St\nCleveland, OH 44113"
+
+    update_response = await client.patch(
+        f"/api/customers/{created['id']}",
+        json={
+            "address_line1": "   ",
+            "city": "   ",
+            "state": "   ",
+            "postal_code": "   ",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["address_line1"] is None
+    assert updated["city"] is None
+    assert updated["state"] is None
+    assert updated["postal_code"] is None
+    assert updated["formatted_address"] is None
 
 
 async def test_patch_customer_rejects_null_name(client: AsyncClient) -> None:

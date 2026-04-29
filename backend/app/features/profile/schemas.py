@@ -9,6 +9,13 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
+def _normalize_optional_text(value: object) -> object:
+    if value is None or not isinstance(value, str):
+        return value
+    normalized = value.strip()
+    return normalized or None
+
+
 class TradeType(enum.StrEnum):
     """Allowed trade types for onboarding profile completion."""
 
@@ -29,7 +36,13 @@ class ProfileResponse(BaseModel):
     email: EmailStr
     first_name: str | None
     last_name: str | None
+    phone_number: str | None
     business_name: str | None
+    business_address_line1: str | None
+    business_address_line2: str | None
+    business_city: str | None
+    business_state: str | None
+    business_postal_code: str | None
     trade_type: TradeType | None
     timezone: str | None
     default_tax_rate: float | None
@@ -45,8 +58,27 @@ class ProfileUpdateRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     trade_type: TradeType
+    phone_number: str | None = Field(default=None, max_length=30)
+    business_address_line1: str | None = Field(default=None, max_length=255)
+    business_address_line2: str | None = Field(default=None, max_length=255)
+    business_city: str | None = Field(default=None, max_length=100)
+    business_state: str | None = Field(default=None, max_length=64)
+    business_postal_code: str | None = Field(default=None, max_length=20)
     timezone: str | None = Field(default=None, max_length=64)
     default_tax_rate: float | None = None
+
+    @field_validator(
+        "phone_number",
+        "business_address_line1",
+        "business_address_line2",
+        "business_city",
+        "business_state",
+        "business_postal_code",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_text_fields(cls, value: object) -> object:
+        return _normalize_optional_text(value)
 
     @field_validator("timezone")
     @classmethod

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, tzinfo
 from decimal import Decimal
 from typing import Any, cast
@@ -19,6 +19,7 @@ from app.features.event_logs.models import EventLog
 from app.features.jobs.models import JobRecord, JobStatus
 from app.features.quotes.models import Document, LineItem, QuoteStatus
 from app.features.quotes.schemas import LineItemDraft
+from app.shared.address_formatting import format_address, format_address_lines
 from app.shared.pricing import (
     DiscountType,
     PricingInput,
@@ -100,6 +101,8 @@ class QuoteRenderContext:
     created_at: datetime
     updated_at: datetime
     issued_date: str
+    business_address_lines: list[str] = field(default_factory=list)
+    customer_address_lines: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -984,6 +987,31 @@ def _build_render_context(
     customer: Customer,
     user: User,
 ) -> QuoteRenderContext:
+    business_address_lines = format_address_lines(
+        user.business_address_line1,
+        user.business_address_line2,
+        user.business_city,
+        user.business_state,
+        user.business_postal_code,
+    )
+    customer_address_lines = format_address_lines(
+        customer.address_line1,
+        customer.address_line2,
+        customer.city,
+        customer.state,
+        customer.postal_code,
+    )
+    customer_address = format_address(
+        customer.address_line1,
+        customer.address_line2,
+        customer.city,
+        customer.state,
+        customer.postal_code,
+    )
+    if customer_address is None and customer.address is not None:
+        normalized_legacy_address = customer.address.strip()
+        customer_address = normalized_legacy_address or None
+
     pricing_breakdown = calculate_breakdown_from_persisted(
         PricingInput(
             total_amount=document.total_amount,
@@ -1008,7 +1036,7 @@ def _build_render_context(
         customer_name=customer.name,
         customer_phone=customer.phone,
         customer_email=customer.email,
-        customer_address=customer.address,
+        customer_address=customer_address,
         doc_number=document.doc_number,
         doc_label="Quote",
         title=document.title,
@@ -1037,6 +1065,8 @@ def _build_render_context(
         created_at=document.created_at,
         updated_at=document.updated_at,
         issued_date=_format_quote_date(document.created_at, user.timezone),
+        business_address_lines=business_address_lines,
+        customer_address_lines=customer_address_lines,
     )
 
 
