@@ -6,7 +6,13 @@ import type { CustomerCreateRequest } from "@/features/customers/types/customer.
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
-import { CUSTOMER_ADDRESS_MAX_CHARS } from "@/shared/lib/inputLimits";
+import {
+  ADDRESS_CITY_MAX_CHARS,
+  ADDRESS_LINE_MAX_CHARS,
+  ADDRESS_POSTAL_CODE_MAX_CHARS,
+  ADDRESS_STATE_MAX_CHARS,
+  PHONE_NUMBER_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 
 export function CustomerCreateScreen(): React.ReactElement {
@@ -14,7 +20,11 @@ export function CustomerCreateScreen(): React.ReactElement {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -35,9 +45,11 @@ export function CustomerCreateScreen(): React.ReactElement {
     if (email.trim()) {
       payload.email = email.trim();
     }
-    if (address.trim()) {
-      payload.address = address.trim();
-    }
+    if (addressLine1.trim()) payload.address_line1 = addressLine1.trim();
+    if (addressLine2.trim()) payload.address_line2 = addressLine2.trim();
+    if (city.trim()) payload.city = city.trim();
+    if (state.trim()) payload.state = state.trim();
+    if (postalCode.trim()) payload.postal_code = postalCode.trim();
 
     setIsCreating(true);
     try {
@@ -78,6 +90,7 @@ export function CustomerCreateScreen(): React.ReactElement {
               id="customer-phone"
               label="Phone Number"
               value={phone}
+              maxLength={PHONE_NUMBER_MAX_CHARS}
               onChange={(event) => setPhone(event.target.value)}
             />
             <Input
@@ -88,17 +101,41 @@ export function CustomerCreateScreen(): React.ReactElement {
               onChange={(event) => setEmail(event.target.value)}
             />
 
-            <div className="flex flex-col gap-1">
-              <label htmlFor="customer-address" className="text-sm font-medium text-on-surface">
-                Address
-              </label>
-              <textarea
-                id="customer-address"
-                rows={4}
-                maxLength={CUSTOMER_ADDRESS_MAX_CHARS}
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-                className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-focus-ring focus:outline-none"
+            <Input
+              id="customer-address-line1"
+              label="Address Line 1"
+              value={addressLine1}
+              maxLength={ADDRESS_LINE_MAX_CHARS}
+              onChange={(event) => setAddressLine1(event.target.value)}
+            />
+            <Input
+              id="customer-address-line2"
+              label="Address Line 2"
+              value={addressLine2}
+              maxLength={ADDRESS_LINE_MAX_CHARS}
+              onChange={(event) => setAddressLine2(event.target.value)}
+            />
+            <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-3">
+              <Input
+                id="customer-city"
+                label="City"
+                value={city}
+                maxLength={ADDRESS_CITY_MAX_CHARS}
+                onChange={(event) => setCity(event.target.value)}
+              />
+              <Input
+                id="customer-state"
+                label="State"
+                value={state}
+                maxLength={ADDRESS_STATE_MAX_CHARS}
+                onChange={(event) => setState(event.target.value)}
+              />
+              <Input
+                id="customer-postal-code"
+                label="Postal Code"
+                value={postalCode}
+                maxLength={ADDRESS_POSTAL_CODE_MAX_CHARS}
+                onChange={(event) => setPostalCode(event.target.value)}
               />
             </div>
 

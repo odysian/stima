@@ -14,7 +14,13 @@ export interface ProfileResponse {
   email: string;
   first_name: string | null;
   last_name: string | null;
+  phone_number: string | null;
   business_name: string | null;
+  business_address_line1: string | null;
+  business_address_line2: string | null;
+  business_city: string | null;
+  business_state: string | null;
+  business_postal_code: string | null;
   trade_type: TradeType | null;
   timezone: string | null;
   default_tax_rate: number | null;
@@ -28,6 +34,12 @@ export interface ProfileUpdateRequest {
   first_name: string;
   last_name: string;
   trade_type: TradeType;
+  phone_number?: string | null;
+  business_address_line1?: string | null;
+  business_address_line2?: string | null;
+  business_city?: string | null;
+  business_state?: string | null;
+  business_postal_code?: string | null;
   timezone?: string | null;
   default_tax_rate?: number | null;
 }

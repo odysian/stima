@@ -4,6 +4,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { CustomerDeleteConfirmModal } from "@/features/customers/components/CustomerDeleteConfirmModal";
 import { CustomerInfoForm } from "@/features/customers/components/CustomerInfoForm";
 import { CustomerDetailLoadingSkeleton } from "@/features/customers/components/CustomerDetailLoadingSkeleton";
+import { CustomerSummaryCard } from "@/features/customers/components/CustomerSummaryCard";
 import { InvoiceHistoryList } from "@/features/customers/components/InvoiceHistoryList";
 import { QuoteHistoryList } from "@/features/customers/components/QuoteHistoryList";
 import { customerService } from "@/features/customers/services/customerService";
@@ -15,7 +16,6 @@ import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
-import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { OverflowMenu } from "@/shared/components/OverflowMenu";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
@@ -27,15 +27,37 @@ function getCustomerDraftValues(nextCustomer: Customer): {
   name: string;
   phone: string;
   email: string;
-  address: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  postalCode: string;
 } {
   return {
     name: nextCustomer.name,
     phone: nextCustomer.phone ?? "",
     email: nextCustomer.email ?? "",
-    address: nextCustomer.address ?? "",
+    addressLine1: nextCustomer.address_line1 ?? "",
+    addressLine2: nextCustomer.address_line2 ?? "",
+    city: nextCustomer.city ?? "",
+    state: nextCustomer.state ?? "",
+    postalCode: nextCustomer.postal_code ?? "",
   };
 }
+
+function normalizeOptionalText(value: string): string | null {
+  const trimmedValue = value.trim();
+  return trimmedValue || null;
+}
+
+function getPreferredCustomerAddress(customer: Customer): string | null {
+  const formattedAddress = customer.formatted_address?.trim();
+  if (formattedAddress) {
+    return formattedAddress;
+  }
+  return customer.address;
+}
+
 export function CustomerDetailScreen(): React.ReactElement {
   const navigate = useNavigate();
   const { show } = useToast();
@@ -47,7 +69,11 @@ export function CustomerDetailScreen(): React.ReactElement {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
@@ -66,7 +92,11 @@ export function CustomerDetailScreen(): React.ReactElement {
     setName(draftValues.name);
     setPhone(draftValues.phone);
     setEmail(draftValues.email);
-    setAddress(draftValues.address);
+    setAddressLine1(draftValues.addressLine1);
+    setAddressLine2(draftValues.addressLine2);
+    setCity(draftValues.city);
+    setState(draftValues.state);
+    setPostalCode(draftValues.postalCode);
   }
 
   function resetEditState(nextCustomer: Customer): void {
@@ -113,7 +143,11 @@ export function CustomerDetailScreen(): React.ReactElement {
         setName(draftValues.name);
         setPhone(draftValues.phone);
         setEmail(draftValues.email);
-        setAddress(draftValues.address);
+        setAddressLine1(draftValues.addressLine1);
+        setAddressLine2(draftValues.addressLine2);
+        setCity(draftValues.city);
+        setState(draftValues.state);
+        setPostalCode(draftValues.postalCode);
         setCustomerQuotes(nextQuotes);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to load customer";
@@ -188,9 +222,13 @@ export function CustomerDetailScreen(): React.ReactElement {
     }
 
     const payload: CustomerUpdateRequest = { name: trimmedName };
-    payload.phone = phone.trim() || null;
-    payload.email = email.trim() || null;
-    payload.address = address.trim() || null;
+    payload.phone = normalizeOptionalText(phone);
+    payload.email = normalizeOptionalText(email);
+    payload.address_line1 = normalizeOptionalText(addressLine1);
+    payload.address_line2 = normalizeOptionalText(addressLine2);
+    payload.city = normalizeOptionalText(city);
+    payload.state = normalizeOptionalText(state);
+    payload.postal_code = normalizeOptionalText(postalCode);
 
     setSaveError(null);
     setIsSaving(true);
@@ -250,14 +288,6 @@ export function CustomerDetailScreen(): React.ReactElement {
     }
   }
 
-  function formatSummaryValue(value: string | null | undefined, fallback: string): string {
-    if (!value) {
-      return fallback;
-    }
-    const trimmedValue = value.trim();
-    return trimmedValue || fallback;
-  }
-
   const activeHistoryCount = historyMode === "quotes" ? customerQuotes.length : customerInvoices.length;
   const activeHistoryCountLabel = `${activeHistoryCount} ${activeHistoryCount === 1 ? "ITEM" : "ITEMS"}`;
   const deleteConfirmationMatches = customer ? deleteConfirmationName === customer.name : false;
@@ -309,65 +339,30 @@ export function CustomerDetailScreen(): React.ReactElement {
         {!isLoading && !loadError && customer ? (
           <>
             {!isEditing ? (
-              <section className="rounded-[var(--radius-document)] bg-surface-container-lowest p-4 ghost-shadow">
-                <div className="flex flex-col gap-3">
-                  <dl className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-3">
-                      <dt className="w-16 shrink-0">
-                        <Eyebrow>Phone</Eyebrow>
-                      </dt>
-                      <dd className="text-sm text-on-surface">
-                        {formatSummaryValue(customer.phone, "—")}
-                      </dd>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <dt className="w-16 shrink-0">
-                        <Eyebrow>Email</Eyebrow>
-                      </dt>
-                      <dd className="min-w-0 truncate text-sm text-on-surface">
-                        {formatSummaryValue(customer.email, "—")}
-                      </dd>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <dt className="w-16 shrink-0 pt-0.5">
-                        <Eyebrow>Address</Eyebrow>
-                      </dt>
-                      <dd className="whitespace-pre-wrap text-sm text-on-surface">
-                        {formatSummaryValue(customer.address, "—")}
-                      </dd>
-                    </div>
-                  </dl>
-
-                  <div className="flex flex-col gap-2 pt-1">
-                    <Button
-                      type="button"
-                      variant="primary"
-                      className="w-full"
-                      onClick={quoteCreateFlow.openCreateEntry}
-                    >
-                      Create Document
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={openEditMode}
-                    >
-                      Edit
-                    </Button>
-                  </div>
-                </div>
-              </section>
+              <CustomerSummaryCard
+                customer={customer}
+                preferredAddress={getPreferredCustomerAddress(customer)}
+                onCreateDocument={quoteCreateFlow.openCreateEntry}
+                onEdit={openEditMode}
+              />
             ) : (
               <CustomerInfoForm
                 name={name}
                 phone={phone}
                 email={email}
-                address={address}
+                addressLine1={addressLine1}
+                addressLine2={addressLine2}
+                city={city}
+                state={state}
+                postalCode={postalCode}
                 onNameChange={(event) => setName(event.target.value)}
                 onPhoneChange={(event) => setPhone(event.target.value)}
                 onEmailChange={(event) => setEmail(event.target.value)}
-                onAddressChange={(event) => setAddress(event.target.value)}
+                onAddressLine1Change={(event) => setAddressLine1(event.target.value)}
+                onAddressLine2Change={(event) => setAddressLine2(event.target.value)}
+                onCityChange={(event) => setCity(event.target.value)}
+                onStateChange={(event) => setState(event.target.value)}
+                onPostalCodeChange={(event) => setPostalCode(event.target.value)}
                 onSubmit={onSaveChanges}
                 onCancel={() => resetEditState(customer)}
                 isSaving={isSaving}

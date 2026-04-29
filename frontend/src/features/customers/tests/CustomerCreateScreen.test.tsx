@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerCreateScreen } from "@/features/customers/components/CustomerCreateScreen";
 import { customerService } from "@/features/customers/services/customerService";
-import { CUSTOMER_ADDRESS_MAX_CHARS } from "@/shared/lib/inputLimits";
+import {
+  ADDRESS_CITY_MAX_CHARS,
+  ADDRESS_LINE_MAX_CHARS,
+  ADDRESS_POSTAL_CODE_MAX_CHARS,
+  ADDRESS_STATE_MAX_CHARS,
+  PHONE_NUMBER_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
 
 const navigateMock = vi.fn();
 
@@ -46,11 +52,31 @@ describe("CustomerCreateScreen", () => {
     expect(screen.getByRole("heading", { name: /new customer/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/full name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^address$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^address$/i)).toHaveAttribute(
+    expect(screen.getByLabelText(/phone number/i)).toHaveAttribute(
       "maxLength",
-      CUSTOMER_ADDRESS_MAX_CHARS.toString(),
+      PHONE_NUMBER_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/address line 1/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/address line 1/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_LINE_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/address line 2/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_LINE_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/^city$/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_CITY_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/^state$/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_STATE_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/postal code/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_POSTAL_CODE_MAX_CHARS.toString(),
     );
   });
 
@@ -70,6 +96,12 @@ describe("CustomerCreateScreen", () => {
       phone: "555-0109",
       email: "new@example.com",
       address: "100 River Rd",
+      address_line1: "100 River Rd",
+      address_line2: null,
+      city: null,
+      state: null,
+      postal_code: null,
+      formatted_address: "100 River Rd",
       created_at: "2026-03-20T00:00:00.000Z",
       updated_at: "2026-03-20T00:00:00.000Z",
     });
@@ -85,8 +117,17 @@ describe("CustomerCreateScreen", () => {
     fireEvent.change(screen.getByLabelText(/email address/i), {
       target: { value: " new@example.com " },
     });
-    fireEvent.change(screen.getByLabelText(/^address$/i), {
+    fireEvent.change(screen.getByLabelText(/address line 1/i), {
       target: { value: " 100 River Rd " },
+    });
+    fireEvent.change(screen.getByLabelText(/^city$/i), {
+      target: { value: "  Denver " },
+    });
+    fireEvent.change(screen.getByLabelText(/^state$/i), {
+      target: { value: " CO " },
+    });
+    fireEvent.change(screen.getByLabelText(/postal code/i), {
+      target: { value: " 80210 " },
     });
 
     fireEvent.click(screen.getByRole("button", { name: /create customer/i }));
@@ -96,7 +137,10 @@ describe("CustomerCreateScreen", () => {
         name: "New Customer",
         phone: "555-0109",
         email: "new@example.com",
-        address: "100 River Rd",
+        address_line1: "100 River Rd",
+        city: "Denver",
+        state: "CO",
+        postal_code: "80210",
       });
     });
     expect(navigateMock).toHaveBeenCalledWith("/customers/cust-new");

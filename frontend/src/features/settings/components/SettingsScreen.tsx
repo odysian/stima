@@ -35,9 +35,20 @@ interface BusinessProfileDraft {
   businessName: string;
   firstName: string;
   lastName: string;
+  phoneNumber: string;
+  businessAddressLine1: string;
+  businessAddressLine2: string;
+  businessCity: string;
+  businessState: string;
+  businessPostalCode: string;
   tradeType: TradeType;
   timezone: string;
   defaultTaxRate: string;
+}
+
+function normalizeOptionalText(value: string): string | null {
+  const trimmedValue = value.trim();
+  return trimmedValue || null;
 }
 
 export function SettingsScreen(): React.ReactElement {
@@ -50,6 +61,12 @@ export function SettingsScreen(): React.ReactElement {
   const [businessName, setBusinessName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [businessAddressLine1, setBusinessAddressLine1] = useState("");
+  const [businessAddressLine2, setBusinessAddressLine2] = useState("");
+  const [businessCity, setBusinessCity] = useState("");
+  const [businessState, setBusinessState] = useState("");
+  const [businessPostalCode, setBusinessPostalCode] = useState("");
   const [tradeType, setTradeType] = useState<TradeType>(TRADE_TYPES[0]);
   const [timezone, setTimezone] = useState("UTC");
   const [defaultTaxRate, setDefaultTaxRate] = useState("");
@@ -73,6 +90,12 @@ export function SettingsScreen(): React.ReactElement {
     setBusinessName(draft.businessName);
     setFirstName(draft.firstName);
     setLastName(draft.lastName);
+    setPhoneNumber(draft.phoneNumber);
+    setBusinessAddressLine1(draft.businessAddressLine1);
+    setBusinessAddressLine2(draft.businessAddressLine2);
+    setBusinessCity(draft.businessCity);
+    setBusinessState(draft.businessState);
+    setBusinessPostalCode(draft.businessPostalCode);
     setTradeType(draft.tradeType);
     setTimezone(draft.timezone);
     setDefaultTaxRate(draft.defaultTaxRate);
@@ -83,6 +106,12 @@ export function SettingsScreen(): React.ReactElement {
       businessName: profile.business_name ?? "",
       firstName: profile.first_name ?? "",
       lastName: profile.last_name ?? "",
+      phoneNumber: profile.phone_number ?? "",
+      businessAddressLine1: profile.business_address_line1 ?? "",
+      businessAddressLine2: profile.business_address_line2 ?? "",
+      businessCity: profile.business_city ?? "",
+      businessState: profile.business_state ?? "",
+      businessPostalCode: profile.business_postal_code ?? "",
       tradeType: profile.trade_type ?? TRADE_TYPES[0],
       timezone: profile.timezone ?? "UTC",
       defaultTaxRate: toTaxPercentDisplay(profile.default_tax_rate),
@@ -207,6 +236,12 @@ export function SettingsScreen(): React.ReactElement {
         business_name: businessName,
         first_name: firstName,
         last_name: lastName,
+        phone_number: normalizeOptionalText(phoneNumber),
+        business_address_line1: normalizeOptionalText(businessAddressLine1),
+        business_address_line2: normalizeOptionalText(businessAddressLine2),
+        business_city: normalizeOptionalText(businessCity),
+        business_state: normalizeOptionalText(businessState),
+        business_postal_code: normalizeOptionalText(businessPostalCode),
         trade_type: tradeType,
         timezone,
         default_tax_rate: parseTaxPercentInput(defaultTaxRate),
@@ -220,6 +255,12 @@ export function SettingsScreen(): React.ReactElement {
         businessName,
         firstName,
         lastName,
+        phoneNumber,
+        businessAddressLine1,
+        businessAddressLine2,
+        businessCity,
+        businessState,
+        businessPostalCode,
         tradeType,
         timezone,
         defaultTaxRate,
@@ -264,6 +305,12 @@ export function SettingsScreen(): React.ReactElement {
               businessName={businessName}
               firstName={firstName}
               lastName={lastName}
+              phoneNumber={phoneNumber}
+              businessAddressLine1={businessAddressLine1}
+              businessAddressLine2={businessAddressLine2}
+              businessCity={businessCity}
+              businessState={businessState}
+              businessPostalCode={businessPostalCode}
               tradeType={tradeType}
               timezone={timezone}
               defaultTaxRate={defaultTaxRate}
@@ -280,6 +327,12 @@ export function SettingsScreen(): React.ReactElement {
               onBusinessNameChange={setBusinessName}
               onFirstNameChange={setFirstName}
               onLastNameChange={setLastName}
+              onPhoneNumberChange={setPhoneNumber}
+              onBusinessAddressLine1Change={setBusinessAddressLine1}
+              onBusinessAddressLine2Change={setBusinessAddressLine2}
+              onBusinessCityChange={setBusinessCity}
+              onBusinessStateChange={setBusinessState}
+              onBusinessPostalCodeChange={setBusinessPostalCode}
               onTradeTypeChange={setTradeType}
               onTaxRateChange={setDefaultTaxRate}
               onTimezoneChange={setTimezone}

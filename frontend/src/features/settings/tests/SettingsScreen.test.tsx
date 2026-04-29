@@ -12,7 +12,14 @@ import {
 import { SettingsScreen } from "@/features/settings/components/SettingsScreen";
 import { ThemeProvider } from "@/shared/components/ThemeProvider";
 import { formatByteLimit } from "@/shared/lib/formatters";
-import { MAX_LOGO_SIZE_BYTES } from "@/shared/lib/inputLimits";
+import {
+  ADDRESS_CITY_MAX_CHARS,
+  ADDRESS_LINE_MAX_CHARS,
+  ADDRESS_POSTAL_CODE_MAX_CHARS,
+  ADDRESS_STATE_MAX_CHARS,
+  MAX_LOGO_SIZE_BYTES,
+  PHONE_NUMBER_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
 import { THEME_STORAGE_KEY } from "@/shared/lib/theme";
 import { ToastProvider } from "@/ui/Toast";
 
@@ -46,6 +53,12 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
     business_name: "Summit Exterior Care",
     first_name: "Alex",
     last_name: "Stone",
+    phone_number: null,
+    business_address_line1: null,
+    business_address_line2: null,
+    business_city: null,
+    business_state: null,
+    business_postal_code: null,
     trade_type: "Landscaper",
     timezone: "America/New_York",
     default_tax_rate: null,
@@ -158,6 +171,30 @@ describe("SettingsScreen", () => {
     expect(screen.getByDisplayValue("Hill")).toBeInTheDocument();
     expect(screen.getByLabelText(/trade type/i)).toHaveValue("Plumber");
     expect(screen.getByLabelText(/timezone/i)).toHaveValue("America/New_York");
+    expect(screen.getByLabelText(/business phone/i)).toHaveAttribute(
+      "maxLength",
+      PHONE_NUMBER_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/address line 1/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_LINE_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/address line 2/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_LINE_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/^city$/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_CITY_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/^state$/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_STATE_MAX_CHARS.toString(),
+    );
+    expect(screen.getByLabelText(/postal code/i)).toHaveAttribute(
+      "maxLength",
+      ADDRESS_POSTAL_CODE_MAX_CHARS.toString(),
+    );
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
   });
 
@@ -239,6 +276,12 @@ describe("SettingsScreen", () => {
         business_name: "North Star Lawn",
         first_name: "Jamie",
         last_name: "Reed",
+        phone_number: null,
+        business_address_line1: null,
+        business_address_line2: null,
+        business_city: null,
+        business_state: null,
+        business_postal_code: null,
         trade_type: "Builder",
         timezone: "UTC",
         default_tax_rate: null,
@@ -333,6 +376,12 @@ describe("SettingsScreen", () => {
         business_name: "Summit Exterior Care",
         first_name: "Alex",
         last_name: "Stone",
+        phone_number: null,
+        business_address_line1: null,
+        business_address_line2: null,
+        business_city: null,
+        business_state: null,
+        business_postal_code: null,
         trade_type: "Landscaper",
         timezone: "America/New_York",
         default_tax_rate: 0.075,
