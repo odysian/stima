@@ -58,6 +58,7 @@ function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileR
     business_city: null,
     business_state: null,
     business_postal_code: null,
+    formatted_address: null,
     trade_type: "Landscaper",
     timezone: "America/New_York",
     default_tax_rate: null,
@@ -137,7 +138,10 @@ describe("SettingsScreen", () => {
         business_name: "Bright Lawn Care",
         first_name: "Jordan",
         last_name: "Hill",
+        phone_number: "(555) 123-4567",
+        formatted_address: "123 Main St\nApt 4\nCleveland, OH 44113",
         trade_type: "Plumber",
+        default_tax_rate: 0.08,
       }),
     );
 
@@ -145,8 +149,24 @@ describe("SettingsScreen", () => {
 
     expect(await screen.findByText("Bright Lawn Care")).toBeInTheDocument();
     expect(screen.getByText("Jordan Hill")).toBeInTheDocument();
+    expect(screen.getByText("Contact")).toBeInTheDocument();
+    expect(screen.getByText("Business Defaults")).toBeInTheDocument();
+    expect(screen.getByText("Preferences")).toBeInTheDocument();
+    expect(screen.getByText("Business phone")).toBeInTheDocument();
+    expect(screen.getByText("(555) 123-4567")).toBeInTheDocument();
+    expect(screen.getByText("Business address")).toBeInTheDocument();
+    const addressElement = screen.getByText((content) =>
+      content.includes("123 Main St") && content.includes("Cleveland, OH 44113"),
+    );
+    expect(addressElement).toHaveClass("whitespace-pre-wrap");
+    expect(screen.getByText("Trade")).toBeInTheDocument();
     expect(screen.getByText("Plumber")).toBeInTheDocument();
-    expect(screen.getByText(/America\/New_York/)).toBeInTheDocument();
+    expect(screen.getByText("Tax rate")).toBeInTheDocument();
+    expect(screen.getByText("8% tax")).toBeInTheDocument();
+    expect(screen.getByText("Timezone")).toBeInTheDocument();
+    expect(screen.getByText("America/New_York")).toBeInTheDocument();
+    expect(screen.getByText("Theme")).toBeInTheDocument();
+    expect(screen.getByText("Dark")).toBeInTheDocument();
     expect(screen.getByText("owner@example.com")).toBeInTheDocument();
     expect(screen.getByText("Email")).toHaveClass(
       "font-bold",
@@ -203,6 +223,27 @@ describe("SettingsScreen", () => {
     );
     expect(screen.queryByText(/postal code/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
+  });
+
+  it("shows fallback placeholders when optional contact values are missing", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(
+      makeProfileResponse({
+        phone_number: null,
+        formatted_address: null,
+      }),
+    );
+
+    renderScreen();
+
+    await screen.findByText("Summit Exterior Care");
+
+    const businessPhoneRow = screen.getByText("Business phone").closest("dl");
+    expect(businessPhoneRow).not.toBeNull();
+    expect(within(businessPhoneRow!).getByText("—")).toBeInTheDocument();
+
+    const businessAddressRow = screen.getByText("Business address").closest("dl");
+    expect(businessAddressRow).not.toBeNull();
+    expect(within(businessAddressRow!).getByText("—")).toBeInTheDocument();
   });
 
   it("normalizes null profile values before binding to controlled inputs", async () => {

@@ -43,6 +43,7 @@ class ProfileResponse(BaseModel):
     business_city: str | None
     business_state: str | None
     business_postal_code: str | None
+    formatted_address: str | None
     trade_type: TradeType | None
     timezone: str | None
     default_tax_rate: float | None

@@ -58,6 +58,7 @@ function profileResponse(overrides: Partial<ProfileResponse> = {}): ProfileRespo
     default_tax_rate: null,
     has_logo: false,
     ...overrides,
+    formatted_address: overrides.formatted_address ?? null,
   };
 }
 

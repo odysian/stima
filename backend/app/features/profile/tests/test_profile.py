@@ -30,6 +30,7 @@ async def test_get_profile_returns_authenticated_user_profile(client: AsyncClien
     assert payload["business_city"] is None
     assert payload["business_state"] is None
     assert payload["business_postal_code"] is None
+    assert payload["formatted_address"] is None
     assert payload["trade_type"] is None
     assert payload["timezone"] is None
     assert payload["default_tax_rate"] is None
@@ -84,6 +85,7 @@ async def test_patch_profile_updates_onboarding_fields(client: AsyncClient) -> N
     assert body["business_city"] == "Cleveland"
     assert body["business_state"] == "OH"
     assert body["business_postal_code"] == "44113"
+    assert body["formatted_address"] == "123 Main St\nSuite 200\nCleveland, OH 44113"
     assert body["timezone"] == payload["timezone"]
     assert body["default_tax_rate"] == payload["default_tax_rate"]
     assert body["has_logo"] is False
@@ -93,6 +95,7 @@ async def test_patch_profile_updates_onboarding_fields(client: AsyncClient) -> N
     assert get_response.status_code == 200
     assert get_response.json()["timezone"] == "America/New_York"
     assert get_response.json()["default_tax_rate"] == 0.0825
+    assert get_response.json()["formatted_address"] == "123 Main St\nSuite 200\nCleveland, OH 44113"
 
 
 async def test_patch_profile_normalizes_blank_optional_contact_fields_to_null(
@@ -128,6 +131,7 @@ async def test_patch_profile_normalizes_blank_optional_contact_fields_to_null(
     assert body["business_city"] is None
     assert body["business_state"] is None
     assert body["business_postal_code"] is None
+    assert body["formatted_address"] is None
 
 
 async def test_patch_profile_requires_business_name(client: AsyncClient) -> None:

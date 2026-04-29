@@ -206,6 +206,7 @@ beforeEach(() => {
     business_city: null,
     business_state: null,
     business_postal_code: null,
+    formatted_address: null,
     trade_type: "Landscaper",
     timezone: "UTC",
     default_tax_rate: null,

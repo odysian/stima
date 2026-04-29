@@ -1,6 +1,11 @@
 import type { ChangeEvent } from "react";
 
 import type { TradeType } from "@/features/profile/types/profile.types";
+import {
+  ProfileDisplaySection,
+  ProfileValueRow,
+  resolveDisplayValue,
+} from "@/features/settings/components/SettingsProfileDisplayParts";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
 import {
@@ -34,6 +39,7 @@ interface SettingsBusinessProfileCardProps {
   businessCity: string;
   businessState: string;
   businessPostalCode: string;
+  formattedAddress: string | null;
   tradeType: TradeType;
   timezone: string;
   defaultTaxRate: string;
@@ -79,6 +85,7 @@ export function SettingsBusinessProfileCard({
   businessCity,
   businessState,
   businessPostalCode,
+  formattedAddress,
   tradeType,
   timezone,
   defaultTaxRate,
@@ -106,6 +113,10 @@ export function SettingsBusinessProfileCard({
   onTimezoneChange,
   onThemeChange,
 }: SettingsBusinessProfileCardProps): React.ReactElement {
+  const ownerName = `${firstName} ${lastName}`.trim();
+  const resolvedThemePreference =
+    themeOptions.find((option) => option.value === themePreference)?.label ?? "System default";
+
   return (
     <Card className="p-6">
       <div className="flex items-start justify-between gap-3">
@@ -385,27 +396,35 @@ export function SettingsBusinessProfileCard({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-bold text-on-surface">{businessName || "Not set"}</p>
-                <p className="text-sm text-on-surface-variant">
-                  {firstName} {lastName}
-                </p>
+                <p className="text-sm text-on-surface-variant">{ownerName || "Name not set"}</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              <span className="text-on-surface-variant">
-                <span className="text-on-surface">{tradeType}</span>
-                <span className="mx-1.5 text-outline">·</span>
-                {defaultTaxRate ? `${defaultTaxRate}% tax` : "No tax set"}
-              </span>
-            </div>
+            <ProfileDisplaySection heading="Contact">
+              <ProfileValueRow label="Business phone" value={resolveDisplayValue(phoneNumber)} />
+              <ProfileValueRow
+                label="Business address"
+                value={resolveDisplayValue(formattedAddress)}
+                preserveWhitespace
+              />
+            </ProfileDisplaySection>
 
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              <span className="text-on-surface-variant">
-                {timezone}
-                <span className="mx-1.5 text-outline">·</span>
-                {themeOptions.find((option) => option.value === themePreference)?.label ?? "System default"}
-              </span>
-            </div>
+            <ProfileDisplaySection heading="Business Defaults">
+              <ProfileValueRow label="Trade" value={resolveDisplayValue(tradeType)} />
+              <ProfileValueRow
+                label="Tax rate"
+                value={
+                  defaultTaxRate.trim()
+                    ? `${defaultTaxRate.trim()}% tax`
+                    : "—"
+                }
+              />
+            </ProfileDisplaySection>
+
+            <ProfileDisplaySection heading="Preferences">
+              <ProfileValueRow label="Timezone" value={resolveDisplayValue(timezone)} />
+              <ProfileValueRow label="Theme" value={resolvedThemePreference} />
+            </ProfileDisplaySection>
           </div>
         )}
       </div>

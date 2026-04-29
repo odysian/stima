@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.shared.address_formatting import format_address
 
 
 class User(Base):
@@ -68,6 +69,17 @@ class User(Base):
     def has_logo(self) -> bool:
         """Return true when the user currently has a stored logo path."""
         return bool(self.logo_path)
+
+    @property
+    def formatted_address(self) -> str | None:
+        """Return normalized business address lines when any structured field exists."""
+        return format_address(
+            self.business_address_line1,
+            self.business_address_line2,
+            self.business_city,
+            self.business_state,
+            self.business_postal_code,
+        )
 
 
 class RefreshToken(Base):
