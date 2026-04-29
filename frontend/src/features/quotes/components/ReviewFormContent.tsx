@@ -1,6 +1,7 @@
 import { ReviewCustomerRow } from "@/features/quotes/components/ReviewCustomerRow";
 import { ReviewDocumentTypeSelector, type ReviewDocumentType } from "@/features/quotes/components/ReviewDocumentTypeSelector";
 import { ReviewLineItemsSection } from "@/features/quotes/components/ReviewLineItemsSection";
+import { resolveExtractionDegradedCopyFromReasonCode } from "@/features/quotes/components/quotePreview.helpers";
 import { TotalAmountSection } from "@/features/quotes/components/TotalAmountSection";
 import type { ExtractionTier } from "@/features/quotes/types/quote.types";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
@@ -90,8 +91,10 @@ export function ReviewFormContent({
   onNotesChange,
 }: ReviewFormContentProps): React.ReactElement {
   const showDueDateField = documentType === "invoice";
-  const showSevereDegradedMarker = extractionTier === "degraded"
-    && draft.lineItems.length === 0;
+  const extractionDegradedCopy = resolveExtractionDegradedCopyFromReasonCode(
+    extractionTier,
+    extractionDegradedReasonCode,
+  );
 
   return (
     <form
@@ -113,12 +116,10 @@ export function ReviewFormContent({
         <FeedbackMessage variant="error">{saveError}</FeedbackMessage>
       ) : null}
 
-      {showSevereDegradedMarker ? (
+      {extractionDegradedCopy ? (
         <Banner
           title="Review Required"
-          message={extractionDegradedReasonCode
-            ? "Extraction degraded and no line items were found. Review capture details before continuing."
-            : "No line items were found from this capture. Review capture details before continuing."}
+          message={extractionDegradedCopy}
         />
       ) : null}
 
