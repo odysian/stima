@@ -13,6 +13,12 @@ from app.shared.observability import log_provider_quota_exhausted, log_provider_
 
 _RETRY_BASE_DELAY_SECONDS = 0.25
 _RETRY_MAX_DELAY_SECONDS = 2.0
+TRANSCRIPTION_PROMPT_CONTRACTOR_PRICE_SHORTHAND = (
+    "Transcribe contractor quote notes verbatim. Preserve spoken price shorthand as words. "
+    'Write contractor shorthand like "four fifty" and "one twenty five" as words, '
+    'not as "$4.50" or "$1.25". Only write "$4.50" when the speaker explicitly '
+    'says "four dollars and fifty cents".'
+)
 
 
 class TranscriptionError(Exception):
@@ -30,12 +36,14 @@ class TranscriptionIntegration:
         timeout_seconds: float = 30.0,
         max_attempts: int = 3,
         client: object | None = None,
+        prompt: str = TRANSCRIPTION_PROMPT_CONTRACTOR_PRICE_SHORTHAND,
     ) -> None:
         self._api_key = api_key
         self._model = model
         self._timeout_seconds = timeout_seconds
         self._max_attempts = max_attempts
         self._client = client
+        self._prompt = prompt
 
     async def transcribe(self, audio_wav: bytes) -> str:
         """Return normalized transcript text from WAV bytes."""
@@ -72,6 +80,7 @@ class TranscriptionIntegration:
                 return await typed_client.audio.transcriptions.create(
                     model=self._model,
                     file=("audio.wav", audio_wav, "audio/wav"),
+                    prompt=self._prompt,
                 )
             except Exception as exc:
                 last_error = exc

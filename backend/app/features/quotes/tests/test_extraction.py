@@ -1171,6 +1171,64 @@ async def test_guard_noops_when_provider_price_already_matches_spoken_hint() -> 
     assert result.line_items[0].flag_reason is None
 
 
+async def test_guard_does_not_correct_explicit_dollars_and_cents_phrase() -> None:
+    transcript = "Add three dollars and twenty five cents for a small hardware fee."
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Small hardware fee",
+                                "details": transcript,
+                                "price": 3.25,
+                            }
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].price == 3.25
+    assert result.line_items[0].flag_reason is None
+
+
+async def test_guard_leaves_provider_normalized_decimal_failure_shape_unchanged() -> None:
+    transcript = "River Rock price is $4.50, Mulch price is $1.25, Mow Grass price is $3.75."
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {"description": "River Rock", "details": None, "price": 4.5},
+                            {"description": "Mulch", "details": None, "price": 1.25},
+                            {"description": "Mow Grass", "details": None, "price": 3.75},
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert [item.price for item in result.line_items] == [4.5, 1.25, 3.75]
+    assert all(item.flag_reason is None for item in result.line_items)
+
+
 async def test_guard_applies_at_most_one_correction_per_spoken_hint() -> None:
     transcript = "Price is four fifty for front mulch."
     client = _FakeClient(
@@ -1206,3 +1264,56 @@ async def test_guard_applies_at_most_one_correction_per_spoken_hint() -> None:
     assert result.line_items[0].flag_reason == SPOKEN_MONEY_CORRECTION_FLAG_REASON
     assert result.line_items[1].price == 4.5
     assert result.line_items[1].flagged is False
+
+
+async def test_result_trace_includes_spoken_money_counts_when_guard_corrects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transcript = "Price is four fifty for front mulch."
+    trace_calls: list[dict[str, object]] = []
+
+    def _capture_trace(
+        event: str,
+        *,
+        stage: str,
+        outcome: str,
+        **fields: object,
+    ) -> None:
+        trace_calls.append(
+            {
+                "event": event,
+                "stage": stage,
+                "outcome": outcome,
+                **fields,
+            }
+        )
+
+    monkeypatch.setattr(extraction_module, "log_extraction_trace", _capture_trace)
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Front mulch",
+                                "details": "price is four fifty for front mulch",
+                                "price": 4.5,
+                            }
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    await integration.extract(transcript)
+
+    result_calls = [call for call in trace_calls if call["stage"] == "result"]
+    assert len(result_calls) == 1
+    assert result_calls[0]["spoken_money_hint_count"] == 1
+    assert result_calls[0]["spoken_money_correction_count"] == 1

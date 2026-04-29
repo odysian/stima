@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
@@ -21,6 +22,7 @@ from app.integrations.audio import AudioClip, AudioError
 from app.integrations.extraction import ExtractionError
 from app.integrations.transcription import TranscriptionError
 from app.shared.event_logger import log_event
+from app.shared.extraction_logger import log_extraction_trace
 from app.shared.input_limits import (
     AUDIO_TRANSCRIPT_MAX_CHARS,
     EXTRACTION_TRANSCRIPT_MAX_CHARS,
@@ -68,10 +70,14 @@ class ExtractionService:
         extraction_integration: ExtractionIntegrationProtocol,
         audio_integration: AudioIntegrationProtocol,
         transcription_integration: TranscriptionIntegrationProtocol,
+        transcription_model: str | None = None,
+        transcription_prompt_enabled: bool = True,
     ) -> None:
         self._extraction = extraction_integration
         self._audio = audio_integration
         self._transcription = transcription_integration
+        self._transcription_model = transcription_model
+        self._transcription_prompt_enabled = transcription_prompt_enabled
 
     async def convert_notes(self, notes: str) -> ExtractionResult:
         """Extract structured line items from freeform notes."""
@@ -123,6 +129,16 @@ class ExtractionService:
             source_type = "voice"
         else:
             source_type = "text"
+
+        log_extraction_trace(
+            "extraction.trace",
+            stage="capture_input",
+            outcome="prepared",
+            source_type=source_type,
+            transcription_model=self._transcription_model,
+            transcription_prompt_enabled=self._transcription_prompt_enabled if has_clips else None,
+            raw_transcript_currency_decimal_count=_count_currency_decimals(raw_transcript),
+        )
         return PreparedCaptureInput(
             transcript=combined_text,
             source_type=source_type,
@@ -238,3 +254,12 @@ def _validate_transcript_length(transcript: str, *, max_chars: int) -> None:
         detail=f"Transcript exceeds maximum length of {max_chars} characters",
         status_code=422,
     )
+
+
+_CURRENCY_DECIMAL_PATTERN = re.compile(r"\$\s*\d+(?:,\d{3})*\.\d{2}\b")
+
+
+def _count_currency_decimals(raw_transcript: str | None) -> int:
+    if not raw_transcript:
+        return 0
+    return len(_CURRENCY_DECIMAL_PATTERN.findall(raw_transcript))

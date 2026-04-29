@@ -252,10 +252,13 @@ def get_invoice_email_delivery_service(
 
 def get_extraction_service() -> ExtractionService:
     """Build a request-scoped extraction service wired to external integrations."""
+    settings = get_settings()
     return ExtractionService(
         extraction_integration=get_extraction_integration(),
         audio_integration=AudioIntegration(),
         transcription_integration=get_transcription_integration(),
+        transcription_model=settings.transcription_model,
+        transcription_prompt_enabled=True,
     )
 
 

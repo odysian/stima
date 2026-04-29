@@ -1456,6 +1456,13 @@ def _log_result_trace(
     model_id: str,
     prompt_variant: str,
 ) -> None:
+    capture_segments = _segment_capture_input(result.transcript)
+    spoken_money_hint_count = sum(
+        len(segment.hints.spoken_money_hints) for segment in capture_segments
+    )
+    spoken_money_correction_count = sum(
+        1 for item in result.line_items if item.flag_reason == SPOKEN_MONEY_CORRECTION_FLAG_REASON
+    )
     log_extraction_trace(
         _TRACE_EVENT_NAME,
         stage="result",
@@ -1467,6 +1474,8 @@ def _log_result_trace(
         extraction_degraded_reason_code=result.extraction_degraded_reason_code,
         line_item_count=len(result.line_items),
         flagged_line_item_count=sum(1 for item in result.line_items if item.flagged),
+        spoken_money_hint_count=spoken_money_hint_count,
+        spoken_money_correction_count=spoken_money_correction_count,
         unresolved_segment_count=len(result.unresolved_segments),
         total_present=result.pricing_hints.explicit_total is not None,
         raw_transcript=result.transcript,
