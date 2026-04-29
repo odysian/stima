@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 from app.features.quotes.models import Document, QuoteStatus
 from app.features.quotes.tests import test_quotes as quotes_test_module
@@ -136,6 +138,33 @@ async def test_create_direct_invoice_sets_default_due_date_and_keeps_quote_list_
     )
     assert quote_count == 0
     assert invoice_count == 1
+
+
+async def test_create_direct_invoice_accepts_mixed_source_type(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    create_response = await client.post(
+        "/api/invoices",
+        json={
+            "customer_id": customer_id,
+            "transcript": "mixed capture transcript",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": "typed notes",
+            "source_type": "voice+text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert create_response.status_code == 201
+    invoice_id = create_response.json()["id"]
+    persisted_invoice = await db_session.get(Document, UUID(invoice_id))
+    assert persisted_invoice is not None
+    assert persisted_invoice.source_type == "voice+text"
 
 
 async def test_list_invoices_returns_direct_and_quote_derived_summaries_newest_first(

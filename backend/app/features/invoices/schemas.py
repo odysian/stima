@@ -45,7 +45,7 @@ class InvoiceCreateRequest(BaseModel):
     discount_value: float | None = None
     deposit_amount: float | None = None
     notes: str | None = Field(default=None, max_length=DOCUMENT_NOTES_MAX_CHARS)
-    source_type: Literal["text", "voice"]
+    source_type: Literal["text", "voice", "voice+text"]
 
     _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
 
