@@ -125,6 +125,12 @@ beforeEach(() => {
     phone: "555-0101",
     email: "alice@example.com",
     address: "1 Main St",
+    address_line1: "1 Main St",
+    address_line2: null,
+    city: null,
+    state: null,
+    postal_code: null,
+    formatted_address: null,
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-20T00:00:00.000Z",
   });
@@ -175,6 +181,12 @@ beforeEach(() => {
     phone: "555-9999",
     email: "alice+new@example.com",
     address: "2 Main St",
+    address_line1: "2 Main St",
+    address_line2: null,
+    city: null,
+    state: null,
+    postal_code: null,
+    formatted_address: null,
     created_at: "2026-03-20T00:00:00.000Z",
     updated_at: "2026-03-21T00:00:00.000Z",
   });
@@ -257,8 +269,17 @@ describe("CustomerDetailScreen", () => {
     fireEvent.change(screen.getByLabelText(/^email$/i), {
       target: { value: " alice+new@example.com " },
     });
-    fireEvent.change(screen.getByLabelText(/^address$/i), {
+    fireEvent.change(screen.getByLabelText(/address line 1/i), {
       target: { value: " 2 Main St " },
+    });
+    fireEvent.change(screen.getByLabelText(/^city$/i), {
+      target: { value: "  Denver " },
+    });
+    fireEvent.change(screen.getByLabelText(/^state$/i), {
+      target: { value: " CO " },
+    });
+    fireEvent.change(screen.getByLabelText(/postal code/i), {
+      target: { value: " 80210 " },
     });
 
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
@@ -270,7 +291,11 @@ describe("CustomerDetailScreen", () => {
           name: "Alice A. Johnson",
           phone: "555-9999",
           email: "alice+new@example.com",
-          address: "2 Main St",
+          address_line1: "2 Main St",
+          address_line2: null,
+          city: "Denver",
+          state: "CO",
+          postal_code: "80210",
         },
       );
     });
@@ -307,6 +332,12 @@ describe("CustomerDetailScreen", () => {
       phone: null,
       email: "alice@example.com",
       address: "1 Main St",
+      address_line1: "1 Main St",
+      address_line2: null,
+      city: null,
+      state: null,
+      postal_code: null,
+      formatted_address: null,
       created_at: "2026-03-20T00:00:00.000Z",
       updated_at: "2026-03-21T00:00:00.000Z",
     });
@@ -326,10 +357,38 @@ describe("CustomerDetailScreen", () => {
           name: "Alice Johnson",
           phone: null,
           email: "alice@example.com",
-          address: "1 Main St",
+          address_line1: "1 Main St",
+          address_line2: null,
+          city: null,
+          state: null,
+          postal_code: null,
         },
       );
     });
+  });
+
+  it("prefers formatted_address over legacy address in read view", async () => {
+    mockedCustomerService.getCustomer.mockResolvedValueOnce({
+      id: "cust-1",
+      name: "Alice Johnson",
+      phone: "555-0101",
+      email: "alice@example.com",
+      address: "legacy address",
+      address_line1: "1 Main St",
+      address_line2: null,
+      city: "Denver",
+      state: "CO",
+      postal_code: "80210",
+      formatted_address: "1 Main St\nDenver, CO 80210",
+      created_at: "2026-03-20T00:00:00.000Z",
+      updated_at: "2026-03-20T00:00:00.000Z",
+    });
+
+    renderScreen();
+
+    await screen.findByRole("heading", { level: 1, name: "Alice Johnson" });
+    expect(screen.getByText(/1 Main St\s+Denver, CO 80210/)).toBeInTheDocument();
+    expect(screen.queryByText("legacy address")).not.toBeInTheDocument();
   });
 
   it("shows em dash fallback for missing optional details in read view", async () => {
@@ -339,6 +398,12 @@ describe("CustomerDetailScreen", () => {
       phone: null,
       email: null,
       address: null,
+      address_line1: null,
+      address_line2: null,
+      city: null,
+      state: null,
+      postal_code: null,
+      formatted_address: null,
       created_at: "2026-03-20T00:00:00.000Z",
       updated_at: "2026-03-20T00:00:00.000Z",
     });

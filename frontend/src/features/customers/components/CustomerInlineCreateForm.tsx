@@ -3,17 +3,31 @@ import type { ChangeEvent, FormEvent } from "react";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
-import { CUSTOMER_ADDRESS_MAX_CHARS } from "@/shared/lib/inputLimits";
+import {
+  ADDRESS_CITY_MAX_CHARS,
+  ADDRESS_LINE_MAX_CHARS,
+  ADDRESS_POSTAL_CODE_MAX_CHARS,
+  ADDRESS_STATE_MAX_CHARS,
+  PHONE_NUMBER_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
 
 interface CustomerInlineCreateFormProps {
   name: string;
   phone: string;
   email: string;
-  address: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  postalCode: string;
   onNameChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onPhoneChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onEmailChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onAddressChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
+  onAddressLine1Change: (event: ChangeEvent<HTMLInputElement>) => void;
+  onAddressLine2Change: (event: ChangeEvent<HTMLInputElement>) => void;
+  onCityChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onStateChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onPostalCodeChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCancel: () => void;
   isCreating: boolean;
@@ -24,11 +38,19 @@ export function CustomerInlineCreateForm({
   name,
   phone,
   email,
-  address,
+  addressLine1,
+  addressLine2,
+  city,
+  state,
+  postalCode,
   onNameChange,
   onPhoneChange,
   onEmailChange,
-  onAddressChange,
+  onAddressLine1Change,
+  onAddressLine2Change,
+  onCityChange,
+  onStateChange,
+  onPostalCodeChange,
   onSubmit,
   onCancel,
   isCreating,
@@ -44,7 +66,13 @@ export function CustomerInlineCreateForm({
 
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         <Input id="customer-name" label="Full Name" value={name} onChange={onNameChange} />
-        <Input id="customer-phone" label="Phone Number" value={phone} onChange={onPhoneChange} />
+        <Input
+          id="customer-phone"
+          label="Phone Number"
+          value={phone}
+          maxLength={PHONE_NUMBER_MAX_CHARS}
+          onChange={onPhoneChange}
+        />
         <Input
           id="customer-email"
           label="Email Address"
@@ -53,17 +81,41 @@ export function CustomerInlineCreateForm({
           onChange={onEmailChange}
         />
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="customer-address" className="text-sm font-medium text-on-surface-variant">
-            Address
-          </label>
-          <textarea
-            id="customer-address"
-            rows={4}
-            maxLength={CUSTOMER_ADDRESS_MAX_CHARS}
-            value={address}
-            onChange={onAddressChange}
-            className="w-full rounded-[var(--radius-document)] bg-surface-container-high px-4 py-3 font-body text-sm text-on-surface placeholder:text-outline transition-all focus:bg-surface-container-lowest focus:ring-2 focus:ring-focus-ring focus:outline-none"
+        <Input
+          id="customer-address-line1"
+          label="Address Line 1"
+          value={addressLine1}
+          maxLength={ADDRESS_LINE_MAX_CHARS}
+          onChange={onAddressLine1Change}
+        />
+        <Input
+          id="customer-address-line2"
+          label="Address Line 2"
+          value={addressLine2}
+          maxLength={ADDRESS_LINE_MAX_CHARS}
+          onChange={onAddressLine2Change}
+        />
+        <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-3">
+          <Input
+            id="customer-city"
+            label="City"
+            value={city}
+            maxLength={ADDRESS_CITY_MAX_CHARS}
+            onChange={onCityChange}
+          />
+          <Input
+            id="customer-state"
+            label="State"
+            value={state}
+            maxLength={ADDRESS_STATE_MAX_CHARS}
+            onChange={onStateChange}
+          />
+          <Input
+            id="customer-postal-code"
+            label="Postal Code"
+            value={postalCode}
+            maxLength={ADDRESS_POSTAL_CODE_MAX_CHARS}
+            onChange={onPostalCodeChange}
           />
         </div>
 

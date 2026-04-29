@@ -3,6 +3,13 @@ import type { ChangeEvent } from "react";
 import type { TradeType } from "@/features/profile/types/profile.types";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
+import {
+  ADDRESS_CITY_MAX_CHARS,
+  ADDRESS_LINE_MAX_CHARS,
+  ADDRESS_POSTAL_CODE_MAX_CHARS,
+  ADDRESS_STATE_MAX_CHARS,
+  PHONE_NUMBER_MAX_CHARS,
+} from "@/shared/lib/inputLimits";
 import type { ThemePreference } from "@/shared/lib/theme";
 import { NumericField } from "@/ui/NumericField";
 import { Select } from "@/ui/Select";
@@ -21,6 +28,12 @@ interface SettingsBusinessProfileCardProps {
   businessName: string;
   firstName: string;
   lastName: string;
+  phoneNumber: string;
+  businessAddressLine1: string;
+  businessAddressLine2: string;
+  businessCity: string;
+  businessState: string;
+  businessPostalCode: string;
   tradeType: TradeType;
   timezone: string;
   defaultTaxRate: string;
@@ -37,6 +50,12 @@ interface SettingsBusinessProfileCardProps {
   onBusinessNameChange: (value: string) => void;
   onFirstNameChange: (value: string) => void;
   onLastNameChange: (value: string) => void;
+  onPhoneNumberChange: (value: string) => void;
+  onBusinessAddressLine1Change: (value: string) => void;
+  onBusinessAddressLine2Change: (value: string) => void;
+  onBusinessCityChange: (value: string) => void;
+  onBusinessStateChange: (value: string) => void;
+  onBusinessPostalCodeChange: (value: string) => void;
   onTradeTypeChange: (value: TradeType) => void;
   onTaxRateChange: (value: string) => void;
   onTimezoneChange: (value: string) => void;
@@ -54,6 +73,12 @@ export function SettingsBusinessProfileCard({
   businessName,
   firstName,
   lastName,
+  phoneNumber,
+  businessAddressLine1,
+  businessAddressLine2,
+  businessCity,
+  businessState,
+  businessPostalCode,
   tradeType,
   timezone,
   defaultTaxRate,
@@ -70,6 +95,12 @@ export function SettingsBusinessProfileCard({
   onBusinessNameChange,
   onFirstNameChange,
   onLastNameChange,
+  onPhoneNumberChange,
+  onBusinessAddressLine1Change,
+  onBusinessAddressLine2Change,
+  onBusinessCityChange,
+  onBusinessStateChange,
+  onBusinessPostalCodeChange,
   onTradeTypeChange,
   onTaxRateChange,
   onTimezoneChange,
@@ -195,6 +226,54 @@ export function SettingsBusinessProfileCard({
                 label="Last name"
                 value={lastName}
                 onChange={(event) => onLastNameChange(event.target.value)}
+              />
+            </div>
+
+            <Input
+              id="settings-business-phone-number"
+              label="Business phone"
+              value={phoneNumber}
+              maxLength={PHONE_NUMBER_MAX_CHARS}
+              onChange={(event) => onPhoneNumberChange(event.target.value)}
+            />
+
+            <Input
+              id="settings-business-address-line1"
+              label="Address line 1"
+              value={businessAddressLine1}
+              maxLength={ADDRESS_LINE_MAX_CHARS}
+              onChange={(event) => onBusinessAddressLine1Change(event.target.value)}
+            />
+
+            <Input
+              id="settings-business-address-line2"
+              label="Address line 2"
+              value={businessAddressLine2}
+              maxLength={ADDRESS_LINE_MAX_CHARS}
+              onChange={(event) => onBusinessAddressLine2Change(event.target.value)}
+            />
+
+            <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-3">
+              <Input
+                id="settings-business-city"
+                label="City"
+                value={businessCity}
+                maxLength={ADDRESS_CITY_MAX_CHARS}
+                onChange={(event) => onBusinessCityChange(event.target.value)}
+              />
+              <Input
+                id="settings-business-state"
+                label="State"
+                value={businessState}
+                maxLength={ADDRESS_STATE_MAX_CHARS}
+                onChange={(event) => onBusinessStateChange(event.target.value)}
+              />
+              <Input
+                id="settings-business-postal-code"
+                label="Postal code"
+                value={businessPostalCode}
+                maxLength={ADDRESS_POSTAL_CODE_MAX_CHARS}
+                onChange={(event) => onBusinessPostalCodeChange(event.target.value)}
               />
             </div>
 
