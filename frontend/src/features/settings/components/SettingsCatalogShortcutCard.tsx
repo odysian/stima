@@ -23,7 +23,7 @@ export function SettingsCatalogShortcutCard({
           className="shrink-0 whitespace-nowrap px-3 py-2 text-xs"
           onClick={onOpenLineItemCatalog}
         >
-          Line Item Catalog
+          Manage Items
         </Button>
       </div>
     </Card>

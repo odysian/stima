@@ -67,6 +67,7 @@ export function SettingsScreen(): React.ReactElement {
   const [businessCity, setBusinessCity] = useState("");
   const [businessState, setBusinessState] = useState("");
   const [businessPostalCode, setBusinessPostalCode] = useState("");
+  const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
   const [tradeType, setTradeType] = useState<TradeType>(TRADE_TYPES[0]);
   const [timezone, setTimezone] = useState("UTC");
   const [defaultTaxRate, setDefaultTaxRate] = useState("");
@@ -124,6 +125,7 @@ export function SettingsScreen(): React.ReactElement {
     setSavedProfileDraft(nextDraft);
     setEmail(profile.email);
     setHasLogo(profile.has_logo);
+    setFormattedAddress(profile.formatted_address);
   }, [applyDraft, toDraft]);
 
   useEffect(() => {
@@ -232,7 +234,7 @@ export function SettingsScreen(): React.ReactElement {
     setSaveSuccess(null);
     setIsSubmitting(true);
     try {
-      await profileService.updateProfile({
+      const updatedProfile = await profileService.updateProfile({
         business_name: businessName,
         first_name: firstName,
         last_name: lastName,
@@ -246,6 +248,7 @@ export function SettingsScreen(): React.ReactElement {
         timezone,
         default_tax_rate: parseTaxPercentInput(defaultTaxRate),
       });
+      setFormattedAddress(updatedProfile.formatted_address);
       try {
         await refreshUser();
       } catch {
@@ -311,6 +314,7 @@ export function SettingsScreen(): React.ReactElement {
               businessCity={businessCity}
               businessState={businessState}
               businessPostalCode={businessPostalCode}
+              formattedAddress={formattedAddress}
               tradeType={tradeType}
               timezone={timezone}
               defaultTaxRate={defaultTaxRate}

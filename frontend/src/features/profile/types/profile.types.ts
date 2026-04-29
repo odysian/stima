@@ -21,6 +21,7 @@ export interface ProfileResponse {
   business_city: string | null;
   business_state: string | null;
   business_postal_code: string | null;
+  formatted_address: string | null;
   trade_type: TradeType | null;
   timezone: string | null;
   default_tax_rate: number | null;
