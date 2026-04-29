@@ -8,7 +8,6 @@ import {
   ADDRESS_CITY_MAX_CHARS,
   ADDRESS_LINE_MAX_CHARS,
   ADDRESS_POSTAL_CODE_MAX_CHARS,
-  ADDRESS_STATE_MAX_CHARS,
   PHONE_NUMBER_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
 
@@ -57,27 +56,30 @@ describe("CustomerCreateScreen", () => {
       PHONE_NUMBER_MAX_CHARS.toString(),
     );
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/address line 1/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/address line 1/i)).toHaveAttribute(
+    expect(screen.getByText(/^address$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/street address or p\.o\. box/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/street address or p\.o\. box/i)).toHaveAttribute(
       "maxLength",
       ADDRESS_LINE_MAX_CHARS.toString(),
     );
-    expect(screen.getByLabelText(/address line 2/i)).toHaveAttribute(
+    expect(screen.getByPlaceholderText(/street address or p\.o\. box/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/apt, suite, unit, building \(optional\)/i)).toHaveAttribute(
       "maxLength",
       ADDRESS_LINE_MAX_CHARS.toString(),
     );
+    expect(screen.getByPlaceholderText(/apt, suite, unit, building \(optional\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^city$/i)).toHaveAttribute(
       "maxLength",
       ADDRESS_CITY_MAX_CHARS.toString(),
     );
-    expect(screen.getByLabelText(/^state$/i)).toHaveAttribute(
-      "maxLength",
-      ADDRESS_STATE_MAX_CHARS.toString(),
-    );
-    expect(screen.getByLabelText(/postal code/i)).toHaveAttribute(
+    expect(screen.getByLabelText(/^state$/i)).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Select" })).toHaveValue("");
+    expect(screen.getByLabelText(/zip code/i)).toHaveAttribute(
       "maxLength",
       ADDRESS_POSTAL_CODE_MAX_CHARS.toString(),
     );
+    expect(screen.getByPlaceholderText(/zip code/i)).toBeInTheDocument();
+    expect(screen.queryByText(/postal code/i)).not.toBeInTheDocument();
   });
 
   it("shows validation error when submitted with empty name", async () => {
@@ -117,16 +119,16 @@ describe("CustomerCreateScreen", () => {
     fireEvent.change(screen.getByLabelText(/email address/i), {
       target: { value: " new@example.com " },
     });
-    fireEvent.change(screen.getByLabelText(/address line 1/i), {
+    fireEvent.change(screen.getByLabelText(/street address or p\.o\. box/i), {
       target: { value: " 100 River Rd " },
     });
     fireEvent.change(screen.getByLabelText(/^city$/i), {
       target: { value: "  Denver " },
     });
     fireEvent.change(screen.getByLabelText(/^state$/i), {
-      target: { value: " CO " },
+      target: { value: "OH" },
     });
-    fireEvent.change(screen.getByLabelText(/postal code/i), {
+    fireEvent.change(screen.getByLabelText(/zip code/i), {
       target: { value: " 80210 " },
     });
 
@@ -139,7 +141,7 @@ describe("CustomerCreateScreen", () => {
         email: "new@example.com",
         address_line1: "100 River Rd",
         city: "Denver",
-        state: "CO",
+        state: "OH",
         postal_code: "80210",
       });
     });

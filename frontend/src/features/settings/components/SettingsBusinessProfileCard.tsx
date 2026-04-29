@@ -7,9 +7,9 @@ import {
   ADDRESS_CITY_MAX_CHARS,
   ADDRESS_LINE_MAX_CHARS,
   ADDRESS_POSTAL_CODE_MAX_CHARS,
-  ADDRESS_STATE_MAX_CHARS,
   PHONE_NUMBER_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
+import { US_STATE_OPTIONS } from "@/shared/lib/usStates";
 import type { ThemePreference } from "@/shared/lib/theme";
 import { NumericField } from "@/ui/NumericField";
 import { Select } from "@/ui/Select";
@@ -237,40 +237,54 @@ export function SettingsBusinessProfileCard({
               onChange={(event) => onPhoneNumberChange(event.target.value)}
             />
 
-            <Input
-              id="settings-business-address-line1"
-              label="Address line 1"
-              value={businessAddressLine1}
-              maxLength={ADDRESS_LINE_MAX_CHARS}
-              onChange={(event) => onBusinessAddressLine1Change(event.target.value)}
-            />
-
-            <Input
-              id="settings-business-address-line2"
-              label="Address line 2"
-              value={businessAddressLine2}
-              maxLength={ADDRESS_LINE_MAX_CHARS}
-              onChange={(event) => onBusinessAddressLine2Change(event.target.value)}
-            />
-
-            <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-3">
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium text-on-surface">Address</p>
               <Input
-                id="settings-business-city"
-                label="City"
-                value={businessCity}
-                maxLength={ADDRESS_CITY_MAX_CHARS}
-                onChange={(event) => onBusinessCityChange(event.target.value)}
+                id="settings-business-address-line1"
+                label="Street address or P.O. Box"
+                hideLabel
+                placeholder="Street address or P.O. Box"
+                value={businessAddressLine1}
+                maxLength={ADDRESS_LINE_MAX_CHARS}
+                onChange={(event) => onBusinessAddressLine1Change(event.target.value)}
               />
               <Input
+                id="settings-business-address-line2"
+                label="Apt, suite, unit, building (optional)"
+                hideLabel
+                placeholder="Apt, suite, unit, building (optional)"
+                value={businessAddressLine2}
+                maxLength={ADDRESS_LINE_MAX_CHARS}
+                onChange={(event) => onBusinessAddressLine2Change(event.target.value)}
+              />
+            </div>
+
+            <Input
+              id="settings-business-city"
+              label="City"
+              value={businessCity}
+              maxLength={ADDRESS_CITY_MAX_CHARS}
+              onChange={(event) => onBusinessCityChange(event.target.value)}
+            />
+
+            <div className="grid grid-cols-[minmax(96px,120px)_minmax(0,1fr)] gap-4">
+              <Select
                 id="settings-business-state"
                 label="State"
                 value={businessState}
-                maxLength={ADDRESS_STATE_MAX_CHARS}
                 onChange={(event) => onBusinessStateChange(event.target.value)}
-              />
+              >
+                <option value="">Select</option>
+                {US_STATE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
               <Input
                 id="settings-business-postal-code"
-                label="Postal code"
+                label="ZIP code"
+                placeholder="ZIP code"
                 value={businessPostalCode}
                 maxLength={ADDRESS_POSTAL_CODE_MAX_CHARS}
                 onChange={(event) => onBusinessPostalCodeChange(event.target.value)}
