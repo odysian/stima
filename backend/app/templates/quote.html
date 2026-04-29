@@ -95,8 +95,9 @@
       }
 
       .header-contact {
-        margin: 3px 0 0;
+        margin: 2px 0 0;
         font-size: 12px;
+        line-height: 1.35;
         color: #4b5563;
       }
 
@@ -399,6 +400,8 @@
       {% set business_name = (business_name or "").strip() %}
       {% set owner_name = ((first_name or "") ~ " " ~ (last_name or "")).strip() %}
       {% set display_name = business_name or owner_name %}
+      {% set business_phone = (phone_number or "").strip() %}
+      {% set business_email = (contractor_email or "").strip() %}
       <header class="header">
         <table class="header-grid">
           <tbody>
@@ -410,11 +413,16 @@
                 {% if business_name and owner_name %}
                 <p class="owner-name">{{ owner_name }}</p>
                 {% endif %}
-                {% if phone_number %}
-                <p class="header-contact">{{ phone_number }}</p>
-                {% endif %}
-                {% if contractor_email %}
-                <p class="header-contact">{{ contractor_email }}</p>
+                {% if business_phone or business_email %}
+                <p class="header-contact">
+                  {% if business_phone and business_email %}
+                  {{ business_phone }} • {{ business_email }}
+                  {% elif business_phone %}
+                  {{ business_phone }}
+                  {% else %}
+                  {{ business_email }}
+                  {% endif %}
+                </p>
                 {% endif %}
                 {% for line in business_address_lines %}
                 <p class="header-contact">{{ line }}</p>

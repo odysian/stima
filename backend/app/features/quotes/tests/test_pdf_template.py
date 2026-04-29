@@ -525,8 +525,91 @@ def test_render_includes_contractor_contact_details_in_header_only(
     rendered_html = captured_html[0]
     assert "Prepared By" not in rendered_html
     assert 'class="header-contact"' in rendered_html
-    assert "+1-555-111-2222" in rendered_html
-    assert "owner@example.com" in rendered_html
+    assert re.search(
+        r"<p class=\"header-contact\">\s*\+1-555-111-2222 • owner@example\.com\s*</p>",
+        rendered_html,
+        re.DOTALL,
+    )
+
+
+@pytest.mark.parametrize(
+    ("phone_number", "contractor_email", "expected"),
+    [
+        ("+1-555-111-2222", None, "+1-555-111-2222"),
+        (None, "owner@example.com", "owner@example.com"),
+    ],
+)
+def test_render_contractor_contact_header_omits_dangling_separator_when_partial(
+    monkeypatch: pytest.MonkeyPatch,
+    phone_number: str | None,
+    contractor_email: str | None,
+    expected: str,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            phone_number=phone_number,
+            contractor_email=contractor_email,
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert re.search(
+        rf"<p class=\"header-contact\">\s*{re.escape(expected)}\s*</p>",
+        rendered_html,
+        re.DOTALL,
+    )
+    assert "•" not in rendered_html
+
+
+def test_render_contractor_contact_header_omits_row_when_phone_and_email_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_html: list[str] = []
+
+    class _FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            del base_url
+            captured_html.append(string)
+
+        def write_pdf(self) -> bytes:
+            return b"fake-pdf"
+
+    monkeypatch.setattr("app.integrations.pdf.HTML", _FakeHTML)
+    template_dir = Path(__file__).resolve().parents[3] / "templates"
+    integration = PdfIntegration(template_dir=template_dir)
+
+    result = integration.render(
+        _make_context(
+            updated_at=datetime(2026, 3, 1, 12, 6, tzinfo=UTC),
+            line_item_price=Decimal("120.00"),
+            total=Decimal("120.00"),
+            phone_number=None,
+            contractor_email=None,
+            business_address_lines=[],
+        )
+    )
+
+    assert result == b"fake-pdf"
+    rendered_html = captured_html[0]
+    assert 'class="header-contact"' not in rendered_html
 
 
 def test_render_hides_owner_name_when_both_name_fields_are_null(
