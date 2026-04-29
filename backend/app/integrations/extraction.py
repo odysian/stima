@@ -1456,7 +1456,7 @@ def _log_result_trace(
     model_id: str,
     prompt_variant: str,
 ) -> None:
-    capture_segments = getattr(result, "capture_segments", ())
+    capture_segments = _segment_capture_input(result.transcript)
     spoken_money_hint_count = sum(
         len(segment.hints.spoken_money_hints) for segment in capture_segments
     )

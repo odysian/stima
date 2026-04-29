@@ -1264,3 +1264,56 @@ async def test_guard_applies_at_most_one_correction_per_spoken_hint() -> None:
     assert result.line_items[0].flag_reason == SPOKEN_MONEY_CORRECTION_FLAG_REASON
     assert result.line_items[1].price == 4.5
     assert result.line_items[1].flagged is False
+
+
+async def test_result_trace_includes_spoken_money_counts_when_guard_corrects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transcript = "Price is four fifty for front mulch."
+    trace_calls: list[dict[str, object]] = []
+
+    def _capture_trace(
+        event: str,
+        *,
+        stage: str,
+        outcome: str,
+        **fields: object,
+    ) -> None:
+        trace_calls.append(
+            {
+                "event": event,
+                "stage": stage,
+                "outcome": outcome,
+                **fields,
+            }
+        )
+
+    monkeypatch.setattr(extraction_module, "log_extraction_trace", _capture_trace)
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Front mulch",
+                                "details": "price is four fifty for front mulch",
+                                "price": 4.5,
+                            }
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    await integration.extract(transcript)
+
+    result_calls = [call for call in trace_calls if call["stage"] == "result"]
+    assert len(result_calls) == 1
+    assert result_calls[0]["spoken_money_hint_count"] == 1
+    assert result_calls[0]["spoken_money_correction_count"] == 1

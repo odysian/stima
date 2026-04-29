@@ -5,7 +5,11 @@ from __future__ import annotations
 import httpx
 import openai
 import pytest
-from app.integrations.transcription import TranscriptionError, TranscriptionIntegration
+from app.integrations.transcription import (
+    TRANSCRIPTION_PROMPT_CONTRACTOR_PRICE_SHORTHAND,
+    TranscriptionError,
+    TranscriptionIntegration,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -50,6 +54,23 @@ async def test_transcribe_returns_trimmed_text() -> None:
     assert transcript == "transcript"  # nosec B101
     assert client.transcriptions.calls  # nosec B101
     assert "prompt" in client.transcriptions.calls[0]  # nosec B101
+    assert (
+        client.transcriptions.calls[0]["prompt"] == TRANSCRIPTION_PROMPT_CONTRACTOR_PRICE_SHORTHAND
+    )  # nosec B101
+
+
+async def test_transcribe_uses_custom_prompt_when_provided() -> None:
+    client = _FakeClient()
+    integration = TranscriptionIntegration(
+        api_key="test",
+        model="whisper-1",
+        client=client,
+        prompt="Custom prompt",
+    )
+
+    await integration.transcribe(b"wav-bytes")
+
+    assert client.transcriptions.calls[0]["prompt"] == "Custom prompt"  # nosec B101
 
 
 async def test_transcribe_rejects_missing_text_response() -> None:
