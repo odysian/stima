@@ -562,7 +562,7 @@ class QuoteCreateRequest(BaseModel):
     discount_value: float | None = None
     deposit_amount: float | None = None
     notes: str | None = Field(default=None, max_length=DOCUMENT_NOTES_MAX_CHARS)
-    source_type: Literal["text", "voice"]
+    source_type: Literal["text", "voice", "voice+text"]
 
     _normalize_title = field_validator("title", mode="before")(_normalize_optional_title)
 
@@ -719,7 +719,7 @@ class QuoteResponse(BaseModel):
     doc_number: str
     title: str | None
     status: str
-    source_type: Literal["text", "voice"]
+    source_type: Literal["text", "voice", "voice+text"]
     transcript: str
     total_amount: float | None
     tax_rate: float | None

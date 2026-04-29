@@ -617,6 +617,7 @@ describe("CaptureScreen", () => {
       expect.objectContaining({
         quoteId: "quote-1",
         customerId: "cust-1",
+        sourceType: "voice+text",
       }),
     );
     expect(mockedQuoteService.createQuote).not.toHaveBeenCalled();

@@ -279,7 +279,7 @@ async def extract_combined(
     clip_inputs = await _parse_upload_clips(clips or [])
     clip_hashes = [sha256(clip.content).hexdigest() for clip in clip_inputs]
     capture_detail = _resolve_capture_detail(clip_inputs, notes)
-    source_type = _resolve_source_type(clip_inputs)
+    source_type = _resolve_source_type(clip_inputs, notes)
 
     try:
         await quote_service.ensure_customer_exists_for_user(
@@ -515,7 +515,13 @@ def _build_extraction_fingerprint(
     return sha256("|".join(normalized_parts).encode()).hexdigest()
 
 
-def _resolve_source_type(clips: list[CaptureAudioClip]) -> Literal["text", "voice"]:
+def _resolve_source_type(
+    clips: list[CaptureAudioClip],
+    notes: str | None,
+) -> Literal["text", "voice", "voice+text"]:
+    has_notes = bool((notes or "").strip())
+    if clips and has_notes:
+        return "voice+text"
     return "voice" if clips else "text"
 
 
@@ -586,7 +592,7 @@ async def get_quote(
         doc_number=quote.doc_number,
         title=quote.title,
         status=cast(str, quote.status),
-        source_type=cast(Literal["text", "voice"], quote.source_type),
+        source_type=cast(Literal["text", "voice", "voice+text"], quote.source_type),
         transcript=quote.transcript,
         extraction_tier=cast(Literal["primary", "degraded"] | None, quote.extraction_tier),
         extraction_degraded_reason_code=quote.extraction_degraded_reason_code,

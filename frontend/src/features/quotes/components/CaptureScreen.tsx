@@ -244,7 +244,7 @@ export function CaptureScreen(): React.ReactElement {
       if (!isMountedRef.current) {
         return;
       }
-      const sourceType: QuoteSourceType = clips.length > 0 ? "voice" : "text";
+      const sourceType: QuoteSourceType = hasClips ? (hasNotes ? "voice+text" : "voice") : "text";
       if (extraction.type === "sync") {
         await markOutboxJobSucceeded({
           sessionId: extractionSessionId,

@@ -130,7 +130,7 @@ class QuoteCreationService:
         user_id: UUID,
         customer_id: UUID | None,
         extraction_result: ExtractionResult,
-        source_type: Literal["text", "voice"],
+        source_type: Literal["text", "voice", "voice+text"],
         commit: bool = True,
     ) -> Document:
         """Persist one extraction result as a draft quote."""
@@ -343,7 +343,7 @@ class QuoteCreationService:
         discount_value: float | None,
         deposit_amount: float | None,
         notes: str | None,
-        source_type: Literal["text", "voice"],
+        source_type: Literal["text", "voice", "voice+text"],
         extraction_tier: str | None = None,
         extraction_degraded_reason_code: str | None = None,
         extraction_review_metadata: dict[str, object] | None = None,

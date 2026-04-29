@@ -241,7 +241,7 @@ class QuoteService:
         user_id: UUID,
         customer_id: UUID | None,
         extraction_result: ExtractionResult,
-        source_type: Literal["text", "voice"],
+        source_type: Literal["text", "voice", "voice+text"],
         commit: bool = True,
     ) -> Document:
         """Delegate extracted-draft persistence to the creation lifecycle slice."""
