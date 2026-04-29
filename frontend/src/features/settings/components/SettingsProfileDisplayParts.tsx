@@ -1,14 +1,5 @@
 import { Eyebrow } from "@/ui/Eyebrow";
 
-export function resolveDisplayValue(value: string | null | undefined): string {
-  if (typeof value !== "string") {
-    return "—";
-  }
-
-  const normalizedValue = value.trim();
-  return normalizedValue || "—";
-}
-
 export function ProfileDisplaySection({
   heading,
   children,

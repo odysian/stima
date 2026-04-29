@@ -4,7 +4,6 @@ import type { TradeType } from "@/features/profile/types/profile.types";
 import {
   ProfileDisplaySection,
   ProfileValueRow,
-  resolveDisplayValue,
 } from "@/features/settings/components/SettingsProfileDisplayParts";
 import { Button } from "@/shared/components/Button";
 import { Input } from "@/shared/components/Input";
@@ -66,6 +65,15 @@ interface SettingsBusinessProfileCardProps {
   onTaxRateChange: (value: string) => void;
   onTimezoneChange: (value: string) => void;
   onThemeChange: (value: ThemePreference) => void;
+}
+
+function resolveDisplayValue(value: string | null | undefined): string {
+  if (typeof value !== "string") {
+    return "—";
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue || "—";
 }
 
 export function SettingsBusinessProfileCard({
