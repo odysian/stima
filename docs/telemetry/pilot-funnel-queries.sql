@@ -1,6 +1,10 @@
 -- Pilot funnel visibility queries for founder read-only use.
 -- Safe-by-default: aggregate counts + IDs only, no raw customer content fields.
 
+
+-- 0) Show users
+select * from users;
+
 -- 1) Daily event counts (UTC day x event_name)
 SELECT
   date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS event_date_utc,
@@ -70,27 +74,27 @@ SELECT
 FROM event_logs;
 
 -- 5) Daily email volume with quote/invoice split when metadata supports it
-SELECT
-  date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS event_date_utc,
-  COUNT(*) FILTER (
-    WHERE event_name = 'email_sent'
-  ) AS email_sent_total,
-  COUNT(*) FILTER (
-    WHERE event_name = 'email_sent'
-      AND metadata_json ? 'quote_id'
-  ) AS email_sent_quote,
-  COUNT(*) FILTER (
-    WHERE event_name = 'email_sent'
-      AND metadata_json ? 'invoice_id'
-  ) AS email_sent_invoice,
-  COUNT(*) FILTER (
-    WHERE event_name = 'email_sent'
-      AND NOT (metadata_json ? 'quote_id')
-      AND NOT (metadata_json ? 'invoice_id')
-  ) AS email_sent_unclassified
-FROM event_logs
-GROUP BY event_date_utc
-ORDER BY event_date_utc DESC;
+--SELECT
+--  date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS event_date_utc,
+--  COUNT(*) FILTER (
+--    WHERE event_name = 'email_sent'
+--  ) AS email_sent_total,
+--  COUNT(*) FILTER (
+--    WHERE event_name = 'email_sent'
+--      AND metadata_json ? 'quote_id'
+--  ) AS email_sent_quote,
+--  COUNT(*) FILTER (
+--    WHERE event_name = 'email_sent'
+--      AND metadata_json ? 'invoice_id'
+--  ) AS email_sent_invoice,
+--  COUNT(*) FILTER (
+--    WHERE event_name = 'email_sent'
+--      AND NOT (metadata_json ? 'quote_id')
+--      AND NOT (metadata_json ? 'invoice_id')
+--  ) AS email_sent_unclassified
+--FROM event_logs
+--GROUP BY event_date_utc
+--ORDER BY event_date_utc DESC;
 
 -- 6) Weekly active users (WAU)
 SELECT
@@ -110,3 +114,4 @@ FROM event_logs
 WHERE event_name = 'draft_generation_failed'
 ORDER BY created_at DESC
 LIMIT 100;
+
