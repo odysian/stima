@@ -52,7 +52,9 @@ describe("TotalAmountSection", () => {
 
     expect(screen.getByText("Line Item Sum")).toBeInTheDocument();
     expect(screen.getByText("$100.00")).toBeInTheDocument();
-    expect(screen.getByLabelText(/total amount/i)).toHaveAttribute("id", "quote-total");
+    const totalInput = screen.getByLabelText(/total amount/i) as HTMLInputElement;
+    expect(totalInput).toHaveAttribute("id", "quote-total");
+    expect(totalInput.value).toBe("100.00");
   });
 
   it("forwards total amount edits through onTotalChange", () => {
@@ -76,6 +78,30 @@ describe("TotalAmountSection", () => {
 
     fireEvent.change(screen.getByLabelText(/total amount/i), { target: { value: "150" } });
     expect(onTotalChange).toHaveBeenLastCalledWith(150);
+  });
+
+  it("keeps partial total text while typing, then normalizes to two decimals on blur", () => {
+    renderSection();
+
+    const totalInput = screen.getByLabelText(/total amount/i) as HTMLInputElement;
+    fireEvent.focus(totalInput);
+    fireEvent.change(totalInput, { target: { value: "4." } });
+    expect(totalInput.value).toBe("4.");
+
+    fireEvent.blur(totalInput);
+    expect(totalInput.value).toBe("4.00");
+  });
+
+  it("normalizes decimal totals to two places after blur without injecting currency symbol", () => {
+    renderSection();
+
+    const totalInput = screen.getByLabelText(/total amount/i) as HTMLInputElement;
+    fireEvent.focus(totalInput);
+    fireEvent.change(totalInput, { target: { value: "4.5" } });
+    fireEvent.blur(totalInput);
+
+    expect(totalInput.value).toBe("4.50");
+    expect(totalInput.value.includes("$")).toBe(false);
   });
 
   it("keeps optional pricing discoverable while collapsed when nothing is active", () => {
