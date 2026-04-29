@@ -470,20 +470,53 @@ describe("DocumentEditScreen", () => {
     });
 
     expect(await screen.findByText("Review Required")).toBeInTheDocument();
-    expect(screen.getByText("No line items were found from this capture. Review capture details before continuing.")).toBeInTheDocument();
+    expect(screen.getByText("We saved your transcript, but extraction quality was degraded. Please review this draft before sharing.")).toBeInTheDocument();
   });
 
   it("shows the degraded-specific high-severity marker copy when a degraded reason code is present", async () => {
     renderScreen({
       document: makeQuote({
         extraction_tier: "degraded",
-        extraction_degraded_reason_code: "no_line_items_from_substantial_capture",
+        extraction_degraded_reason_code: "provider_retryable_error",
         line_items: [],
       }),
     });
 
     expect(await screen.findByText("Review Required")).toBeInTheDocument();
-    expect(screen.getByText("Extraction degraded and no line items were found. Review capture details before continuing.")).toBeInTheDocument();
+    expect(screen.getByText("We saved your transcript, but line item extraction was temporarily unavailable. Please review and complete this draft before sharing.")).toBeInTheDocument();
+  });
+
+  it("shows the review marker when extraction is degraded and line items were recovered", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_tier: "degraded",
+        extraction_degraded_reason_code: null,
+        line_items: [
+          {
+            id: "line-1",
+            description: "Brown mulch",
+            details: "5 yards",
+            price: 120,
+            sort_order: 0,
+          },
+        ],
+      }),
+    });
+
+    expect(await screen.findByText("Review Required")).toBeInTheDocument();
+    expect(screen.getByText("We saved your transcript, but extraction quality was degraded. Please review this draft before sharing.")).toBeInTheDocument();
+  });
+
+  it("does not show the review marker for non-degraded extraction", async () => {
+    renderScreen({
+      document: makeQuote({
+        extraction_tier: "primary",
+        extraction_degraded_reason_code: null,
+      }),
+    });
+
+    await screen.findByRole("button", { name: /continue to preview/i });
+    expect(screen.queryByText("Review Required")).not.toBeInTheDocument();
   });
 
   it("continues without a review modal when visible review markers remain", async () => {

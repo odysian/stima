@@ -1,4 +1,4 @@
-import type { QuoteDetail, QuoteStatus } from "@/features/quotes/types/quote.types";
+import type { ExtractionTier, QuoteDetail, QuoteStatus } from "@/features/quotes/types/quote.types";
 import type { OverflowMenuItem } from "@/shared/components/OverflowMenu";
 import { isHttpRequestError } from "@/shared/lib/http";
 
@@ -29,14 +29,24 @@ export function readOptionalQuoteText(
 }
 
 export function resolveExtractionDegradedCopy(quote: QuoteDetail | null): string | null {
-  if (!quote || quote.extraction_tier !== "degraded") {
+  return resolveExtractionDegradedCopyFromReasonCode(
+    quote?.extraction_tier ?? null,
+    quote?.extraction_degraded_reason_code ?? null,
+  );
+}
+
+export function resolveExtractionDegradedCopyFromReasonCode(
+  extractionTier: ExtractionTier | null,
+  degradedReasonCode: string | null,
+): string | null {
+  if (extractionTier !== "degraded") {
     return null;
   }
-  if (!quote.extraction_degraded_reason_code) {
+  if (!degradedReasonCode) {
     return "We saved your transcript, but extraction quality was degraded. Please review this draft before sharing.";
   }
   return (
-    DEGRADED_REASON_COPY[quote.extraction_degraded_reason_code]
+    DEGRADED_REASON_COPY[degradedReasonCode]
     ?? "We saved your transcript, but extraction quality was degraded. Please review this draft before sharing."
   );
 }
