@@ -728,7 +728,7 @@ describe("QuotePreview", () => {
     expect(screen.queryByRole("button", { name: /generate pdf/i })).not.toBeInTheDocument();
   });
 
-  it("renders amount and falls back to customer_id when customer details are unavailable", async () => {
+  it("renders amount and falls back to Unknown customer when customer details are unavailable", async () => {
     mockedQuoteService.getQuote.mockResolvedValueOnce(
       makeQuoteDetail({
         total_amount: 245.5,
@@ -740,7 +740,8 @@ describe("QuotePreview", () => {
 
     expect(await screen.findByText("$245.50")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Quote Preview" })).toBeInTheDocument();
-    expect(screen.getAllByText("cust-1")).toHaveLength(1);
+    expect(screen.getByText("Unknown customer")).toBeInTheDocument();
+    expect(screen.queryByText("cust-1")).not.toBeInTheDocument();
     expect(screen.getByText("No contact details")).toBeInTheDocument();
   });
 
