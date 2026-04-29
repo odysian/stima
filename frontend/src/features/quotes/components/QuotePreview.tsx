@@ -53,7 +53,7 @@ export function QuotePreview(): React.ReactElement {
   const headerSubtitle = quote
     ? (quoteTitle ? `${quote.doc_number} · ${quoteTitle}` : quote.doc_number)
     : undefined;
-  const clientName = readOptionalQuoteText(quote, "customer_name") ?? quote?.customer_id ?? "Unknown customer";
+  const clientName = readOptionalQuoteText(quote, "customer_name") ?? "Unknown customer";
   const clientContact = readOptionalQuoteText(quote, "customer_phone") ?? readOptionalQuoteText(quote, "customer_email") ?? "No contact details";
   const extractionDegradedCopy = resolveExtractionDegradedCopy(quote);
   const canEdit = Boolean(quote && id && isQuoteEditableStatus(actionState));
