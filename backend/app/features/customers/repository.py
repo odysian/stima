@@ -44,6 +44,11 @@ class CustomerRepository:
         phone: str | None,
         email: str | None,
         address: str | None,
+        address_line1: str | None,
+        address_line2: str | None,
+        city: str | None,
+        state: str | None,
+        postal_code: str | None,
     ) -> Customer:
         """Create a customer record for the user."""
         customer = Customer(
@@ -52,6 +57,11 @@ class CustomerRepository:
             phone=phone,
             email=email,
             address=address,
+            address_line1=address_line1,
+            address_line2=address_line2,
+            city=city,
+            state=state,
+            postal_code=postal_code,
         )
         self._session.add(customer)
         await self._session.flush()

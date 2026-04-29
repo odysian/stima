@@ -523,6 +523,73 @@ async def test_profile_update_invalidates_ready_quote_pdf_artifact_and_bumps_rev
     assert next_job["document_revision"] == initial_job["document_revision"] + 1
 
 
+async def test_profile_phone_update_invalidates_ready_quote_pdf_artifact_and_bumps_revision(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    baseline_profile_response = await client.patch(
+        "/api/profile",
+        json={
+            "business_name": "Summit Exterior Care",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "trade_type": "Landscaper",
+            "timezone": "America/New_York",
+            "default_tax_rate": 0.0825,
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert baseline_profile_response.status_code == 200
+
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    initial_job = await _generate_ready_quote_pdf(
+        client,
+        db_session,
+        csrf_token=csrf_token,
+        quote_id=quote["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+    assert initial_job["document_revision"] is not None
+
+    profile_response = await client.patch(
+        "/api/profile",
+        json={
+            "business_name": "Summit Exterior Care",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "trade_type": "Landscaper",
+            "timezone": "America/New_York",
+            "default_tax_rate": 0.0825,
+            "phone_number": "+1-555-111-2222",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert profile_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["pdf_artifact"] == {
+        "status": "missing",
+        "job_id": None,
+        "download_url": None,
+        "terminal_error": None,
+    }
+
+    next_job_response = await client.post(
+        f"/api/quotes/{quote['id']}/pdf",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    next_job = _assert_async_pdf_job_response(next_job_response, document_id=quote["id"])
+    assert next_job["document_revision"] == initial_job["document_revision"] + 1
+
+
 async def test_logo_upload_invalidates_ready_quote_pdf_artifact_and_bumps_revision(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -663,6 +730,46 @@ async def test_customer_update_invalidates_ready_quote_pdf_artifact_and_bumps_re
     )
     next_job = _assert_async_pdf_job_response(next_job_response, document_id=quote["id"])
     assert next_job["document_revision"] == initial_job["document_revision"] + 1
+
+
+async def test_customer_phone_update_does_not_invalidate_ready_quote_pdf_artifact(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    _arq_pool_dependency: _MockArqPool,
+    _storage_service_dependency: _FakeStorageService,
+    _override_quote_service_dependency: _ConfigurablePdfIntegration,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+
+    await _generate_ready_quote_pdf(
+        client,
+        db_session,
+        csrf_token=csrf_token,
+        quote_id=quote["id"],
+        pdf_integration=_override_quote_service_dependency,
+        storage_service=_storage_service_dependency,
+    )
+
+    customer_response = await client.patch(
+        f"/api/customers/{customer_id}",
+        json={"phone": "555-123-4567"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert customer_response.status_code == 200
+
+    detail_response = await client.get(f"/api/quotes/{quote['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["pdf_artifact"] == {
+        "status": "ready",
+        "job_id": None,
+        "download_url": f"http://testserver/api/quotes/{quote['id']}/pdf",
+        "terminal_error": None,
+    }
+
+    artifact_response = await client.get(f"/api/quotes/{quote['id']}/pdf")
+    assert artifact_response.status_code == 200
 
 
 async def test_generate_pdf_handles_sparse_quote_context(

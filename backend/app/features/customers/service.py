@@ -40,6 +40,11 @@ class CustomerRepositoryProtocol(Protocol):
         phone: str | None,
         email: str | None,
         address: str | None,
+        address_line1: str | None,
+        address_line2: str | None,
+        city: str | None,
+        state: str | None,
+        postal_code: str | None,
     ) -> Customer: ...
 
     async def update(self, customer: Customer, **fields: str | None) -> Customer: ...
@@ -99,6 +104,11 @@ class CustomerService:
             phone=data.phone,
             email=data.email,
             address=data.address,
+            address_line1=data.address_line1,
+            address_line2=data.address_line2,
+            city=data.city,
+            state=data.state,
+            postal_code=data.postal_code,
         )
         await self._repository.commit()
         log_event("customer.created", user_id=user.id, customer_id=customer.id)
@@ -170,5 +180,13 @@ def _customer_render_inputs_changed(
 ) -> bool:
     return any(
         field in update_fields and getattr(customer, field) != update_fields[field]
-        for field in ("name", "phone", "address")
+        for field in (
+            "name",
+            "address",
+            "address_line1",
+            "address_line2",
+            "city",
+            "state",
+            "postal_code",
+        )
     )

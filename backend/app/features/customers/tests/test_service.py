@@ -126,7 +126,7 @@ class _OrderedStorageService(_StorageService):
         self.deleted_paths.append(object_path)
 
 
-async def test_update_customer_invalidates_artifacts_before_in_place_mutation() -> None:
+async def test_update_customer_structured_address_invalidates_artifacts() -> None:
     user = User(
         email="owner@example.com",
         password_hash="hash",  # nosec B106 - test-only stub value
@@ -138,6 +138,11 @@ async def test_update_customer_invalidates_artifacts_before_in_place_mutation() 
         name="Alice Johnson",
         phone="555-0100",
         address="1 Main St",
+        address_line1=None,
+        address_line2=None,
+        city=None,
+        state=None,
+        postal_code=None,
     )
     pdf_artifact_repository = _PdfArtifactRepository()
     storage_service = _StorageService()
@@ -150,12 +155,49 @@ async def test_update_customer_invalidates_artifacts_before_in_place_mutation() 
     updated_customer = await service.update_customer(
         user,
         customer.id,
-        CustomerUpdateRequest(name="Alice Smith"),
+        CustomerUpdateRequest(address_line1="2 Main St"),
     )
 
-    assert updated_customer.name == "Alice Smith"  # nosec B101 - pytest assertion
+    assert updated_customer.address_line1 == "2 Main St"  # nosec B101 - pytest assertion
     assert pdf_artifact_repository.calls == [(user.id, customer.id)]  # nosec B101 - pytest assertion
     assert storage_service.deleted_paths == ["artifacts/customer.pdf"]  # nosec B101 - pytest assertion
+
+
+async def test_update_customer_phone_only_does_not_invalidate_pdf_artifacts() -> None:
+    user = User(
+        email="owner@example.com",
+        password_hash="hash",  # nosec B106 - test-only stub value
+    )
+    user.id = uuid4()
+    customer = SimpleNamespace(
+        id=uuid4(),
+        user_id=user.id,
+        name="Alice Johnson",
+        phone="555-0100",
+        address="1 Main St",
+        address_line1=None,
+        address_line2=None,
+        city=None,
+        state=None,
+        postal_code=None,
+    )
+    pdf_artifact_repository = _PdfArtifactRepository()
+    storage_service = _StorageService()
+    service = CustomerService(
+        _CustomerRepository(customer),
+        pdf_artifact_repository=pdf_artifact_repository,
+        storage_service=storage_service,
+    )
+
+    updated_customer = await service.update_customer(
+        user,
+        customer.id,
+        CustomerUpdateRequest(phone="555-0199"),
+    )
+
+    assert updated_customer.phone == "555-0199"  # nosec B101 - pytest assertion
+    assert pdf_artifact_repository.calls == []  # nosec B101 - pytest assertion
+    assert storage_service.deleted_paths == []  # nosec B101 - pytest assertion
 
 
 async def test_delete_customer_invalidates_artifacts_then_deletes_and_logs_counts(
@@ -179,6 +221,11 @@ async def test_delete_customer_invalidates_artifacts_then_deletes_and_logs_count
         name="Alice Johnson",
         phone="555-0100",
         address="1 Main St",
+        address_line1=None,
+        address_line2=None,
+        city=None,
+        state=None,
+        postal_code=None,
     )
     operation_log: list[str] = []
     repository = _DeleteCustomerRepository(customer, operation_log)
