@@ -7,6 +7,7 @@ from collections.abc import Sequence
 import pytest
 import sentry_sdk
 
+import app.features.quotes.extraction_service as extraction_service_module
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
 from app.features.quotes.schemas import ExtractionMode, ExtractionResult, PreparedCaptureInput
 from app.features.quotes.service import QuoteServiceError
@@ -149,6 +150,65 @@ async def test_extract_combined_allows_audio_and_notes_up_to_extraction_limit() 
     assert extraction_mode == "initial"
     assert result.transcript == expected_transcript
     assert len(result.transcript) == EXTRACTION_TRANSCRIPT_MAX_CHARS
+
+
+async def test_convert_notes_does_not_call_transcription_integration() -> None:
+    extraction = _SuccessfulExtractionIntegration()
+    transcription = _SuccessfulTranscriptionIntegration()
+    calls: list[bytes] = []
+
+    async def _capture(audio_wav: bytes) -> str:
+        calls.append(audio_wav)
+        return "should-not-be-used"
+
+    transcription.transcribe = _capture  # type: ignore[method-assign]
+    service = ExtractionService(
+        extraction_integration=extraction,
+        audio_integration=_SuccessfulAudioIntegration(),
+        transcription_integration=transcription,
+    )
+
+    result = await service.convert_notes("hardware fee 3.25")
+
+    assert calls == []
+    assert result.transcript == "hardware fee 3.25"
+
+
+async def test_prepare_capture_input_logs_metadata_without_raw_transcript_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    traces: list[dict[str, object]] = []
+
+    def _capture_trace(
+        event: str,
+        *,
+        stage: str,
+        outcome: str,
+        **fields: object,
+    ) -> None:
+        traces.append({"event": event, "stage": stage, "outcome": outcome, **fields})
+
+    monkeypatch.setattr(extraction_service_module, "log_extraction_trace", _capture_trace)
+    service = ExtractionService(
+        extraction_integration=_SuccessfulExtractionIntegration(),
+        audio_integration=_SuccessfulAudioIntegration(),
+        transcription_integration=_SuccessfulTranscriptionIntegration("River Rock price is $4.50."),
+        transcription_model="whisper-1",
+        transcription_prompt_enabled=True,
+    )
+
+    prepared_capture_input = await service.prepare_capture_input([_clip()], "typed")
+
+    assert prepared_capture_input.source_type == "voice+text"
+    assert traces
+    metadata_trace = traces[-1]
+    assert metadata_trace["stage"] == "capture_input"
+    assert metadata_trace["outcome"] == "prepared"
+    assert metadata_trace["source_type"] == "voice+text"
+    assert metadata_trace["transcription_model"] == "whisper-1"
+    assert metadata_trace["transcription_prompt_enabled"] is True
+    assert metadata_trace["raw_transcript_currency_decimal_count"] == 1
+    assert "raw_transcript" not in metadata_trace
 
 
 def _clip() -> CaptureAudioClip:

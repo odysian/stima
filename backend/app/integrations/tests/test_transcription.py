@@ -14,8 +14,10 @@ class _FakeTranscriptions:
     def __init__(self) -> None:
         self.response: object = type("Response", (), {"text": " transcript "})()
         self.should_raise = False
+        self.calls: list[dict[str, object]] = []
 
-    async def create(self, **_: object) -> object:
+    async def create(self, **kwargs: object) -> object:
+        self.calls.append(kwargs)
         if self.should_raise:
             raise RuntimeError("provider unavailable")
         return self.response
@@ -40,11 +42,14 @@ async def test_transcribe_rejects_empty_audio_payload() -> None:
 
 
 async def test_transcribe_returns_trimmed_text() -> None:
-    integration = TranscriptionIntegration(api_key="test", model="whisper-1", client=_FakeClient())
+    client = _FakeClient()
+    integration = TranscriptionIntegration(api_key="test", model="whisper-1", client=client)
 
     transcript = await integration.transcribe(b"wav-bytes")
 
     assert transcript == "transcript"  # nosec B101
+    assert client.transcriptions.calls  # nosec B101
+    assert "prompt" in client.transcriptions.calls[0]  # nosec B101
 
 
 async def test_transcribe_rejects_missing_text_response() -> None:

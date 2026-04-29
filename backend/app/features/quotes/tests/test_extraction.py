@@ -1171,6 +1171,64 @@ async def test_guard_noops_when_provider_price_already_matches_spoken_hint() -> 
     assert result.line_items[0].flag_reason is None
 
 
+async def test_guard_does_not_correct_explicit_dollars_and_cents_phrase() -> None:
+    transcript = "Add three dollars and twenty five cents for a small hardware fee."
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {
+                                "description": "Small hardware fee",
+                                "details": transcript,
+                                "price": 3.25,
+                            }
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert result.line_items[0].price == 3.25
+    assert result.line_items[0].flag_reason is None
+
+
+async def test_guard_leaves_provider_normalized_decimal_failure_shape_unchanged() -> None:
+    transcript = "River Rock price is $4.50, Mulch price is $1.25, Mow Grass price is $3.75."
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript,
+                        "line_items": [
+                            {"description": "River Rock", "details": None, "price": 4.5},
+                            {"description": "Mulch", "details": None, "price": 1.25},
+                            {"description": "Mow Grass", "details": None, "price": 3.75},
+                        ],
+                        "total": None,
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript)
+
+    assert [item.price for item in result.line_items] == [4.5, 1.25, 3.75]
+    assert all(item.flag_reason is None for item in result.line_items)
+
+
 async def test_guard_applies_at_most_one_correction_per_spoken_hint() -> None:
     transcript = "Price is four fifty for front mulch."
     client = _FakeClient(
