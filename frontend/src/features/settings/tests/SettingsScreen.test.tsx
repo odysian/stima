@@ -149,9 +149,6 @@ describe("SettingsScreen", () => {
 
     expect(await screen.findByText("Bright Lawn Care")).toBeInTheDocument();
     expect(screen.getByText("Jordan Hill")).toBeInTheDocument();
-    expect(screen.getByText("Contact")).toBeInTheDocument();
-    expect(screen.getByText("Business Defaults")).toBeInTheDocument();
-    expect(screen.getByText("Preferences")).toBeInTheDocument();
     expect(screen.getByText("Business phone")).toBeInTheDocument();
     expect(screen.getByText("(555) 123-4567")).toBeInTheDocument();
     expect(screen.getByText("Business address")).toBeInTheDocument();

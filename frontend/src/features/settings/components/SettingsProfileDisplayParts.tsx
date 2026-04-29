@@ -4,12 +4,12 @@ export function ProfileDisplaySection({
   heading,
   children,
 }: {
-  heading: string;
+  heading?: string;
   children: React.ReactNode;
 }): React.ReactElement {
   return (
     <section className="space-y-2">
-      <Eyebrow>{heading}</Eyebrow>
+      {heading ? <Eyebrow>{heading}</Eyebrow> : null}
       <div className="space-y-2">{children}</div>
     </section>
   );

@@ -408,7 +408,7 @@ export function SettingsBusinessProfileCard({
               </div>
             </div>
 
-            <ProfileDisplaySection heading="Contact">
+            <ProfileDisplaySection>
               <ProfileValueRow label="Business phone" value={resolveDisplayValue(phoneNumber)} />
               <ProfileValueRow
                 label="Business address"
@@ -417,7 +417,7 @@ export function SettingsBusinessProfileCard({
               />
             </ProfileDisplaySection>
 
-            <ProfileDisplaySection heading="Business Defaults">
+            <ProfileDisplaySection>
               <ProfileValueRow label="Trade" value={resolveDisplayValue(tradeType)} />
               <ProfileValueRow
                 label="Tax rate"
@@ -429,7 +429,7 @@ export function SettingsBusinessProfileCard({
               />
             </ProfileDisplaySection>
 
-            <ProfileDisplaySection heading="Preferences">
+            <ProfileDisplaySection>
               <ProfileValueRow label="Timezone" value={resolveDisplayValue(timezone)} />
               <ProfileValueRow label="Theme" value={resolvedThemePreference} />
             </ProfileDisplaySection>
