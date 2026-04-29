@@ -7,9 +7,10 @@ import {
   ADDRESS_CITY_MAX_CHARS,
   ADDRESS_LINE_MAX_CHARS,
   ADDRESS_POSTAL_CODE_MAX_CHARS,
-  ADDRESS_STATE_MAX_CHARS,
   PHONE_NUMBER_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
+import { US_STATE_OPTIONS } from "@/shared/lib/usStates";
+import { Select } from "@/ui/Select";
 
 interface CustomerInlineCreateFormProps {
   name: string;
@@ -26,7 +27,7 @@ interface CustomerInlineCreateFormProps {
   onAddressLine1Change: (event: ChangeEvent<HTMLInputElement>) => void;
   onAddressLine2Change: (event: ChangeEvent<HTMLInputElement>) => void;
   onCityChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onStateChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onStateChange: (event: ChangeEvent<HTMLSelectElement>) => void;
   onPostalCodeChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCancel: () => void;
@@ -69,6 +70,9 @@ export function CustomerInlineCreateForm({
         <Input
           id="customer-phone"
           label="Phone Number"
+          type="tel"
+          inputMode="tel"
+          placeholder="(555) 123-4567"
           value={phone}
           maxLength={PHONE_NUMBER_MAX_CHARS}
           onChange={onPhoneChange}
@@ -81,38 +85,47 @@ export function CustomerInlineCreateForm({
           onChange={onEmailChange}
         />
 
-        <Input
-          id="customer-address-line1"
-          label="Address Line 1"
-          value={addressLine1}
-          maxLength={ADDRESS_LINE_MAX_CHARS}
-          onChange={onAddressLine1Change}
-        />
-        <Input
-          id="customer-address-line2"
-          label="Address Line 2"
-          value={addressLine2}
-          maxLength={ADDRESS_LINE_MAX_CHARS}
-          onChange={onAddressLine2Change}
-        />
-        <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-3">
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium text-on-surface">Address</p>
           <Input
-            id="customer-city"
-            label="City"
-            value={city}
-            maxLength={ADDRESS_CITY_MAX_CHARS}
-            onChange={onCityChange}
+            id="customer-address-line1"
+            label="Street address or P.O. Box"
+            hideLabel
+            placeholder="Street address or P.O. Box"
+            value={addressLine1}
+            maxLength={ADDRESS_LINE_MAX_CHARS}
+            onChange={onAddressLine1Change}
           />
           <Input
-            id="customer-state"
-            label="State"
-            value={state}
-            maxLength={ADDRESS_STATE_MAX_CHARS}
-            onChange={onStateChange}
+            id="customer-address-line2"
+            label="Apt, suite, unit, building (optional)"
+            hideLabel
+            placeholder="Apt, suite, unit, building (optional)"
+            value={addressLine2}
+            maxLength={ADDRESS_LINE_MAX_CHARS}
+            onChange={onAddressLine2Change}
           />
+        </div>
+        <Input
+          id="customer-city"
+          label="City"
+          value={city}
+          maxLength={ADDRESS_CITY_MAX_CHARS}
+          onChange={onCityChange}
+        />
+        <div className="grid grid-cols-[minmax(96px,120px)_minmax(0,1fr)] gap-4">
+          <Select id="customer-state" label="State" value={state} onChange={onStateChange}>
+            <option value="">Select</option>
+            {US_STATE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
           <Input
             id="customer-postal-code"
-            label="Postal Code"
+            label="ZIP code"
+            placeholder="ZIP code"
             value={postalCode}
             maxLength={ADDRESS_POSTAL_CODE_MAX_CHARS}
             onChange={onPostalCodeChange}

@@ -269,16 +269,16 @@ describe("CustomerDetailScreen", () => {
     fireEvent.change(screen.getByLabelText(/^email$/i), {
       target: { value: " alice+new@example.com " },
     });
-    fireEvent.change(screen.getByLabelText(/address line 1/i), {
+    fireEvent.change(screen.getByLabelText(/street address or p\.o\. box/i), {
       target: { value: " 2 Main St " },
     });
     fireEvent.change(screen.getByLabelText(/^city$/i), {
       target: { value: "  Denver " },
     });
     fireEvent.change(screen.getByLabelText(/^state$/i), {
-      target: { value: " CO " },
+      target: { value: "OH" },
     });
-    fireEvent.change(screen.getByLabelText(/postal code/i), {
+    fireEvent.change(screen.getByLabelText(/zip code/i), {
       target: { value: " 80210 " },
     });
 
@@ -294,7 +294,7 @@ describe("CustomerDetailScreen", () => {
           address_line1: "2 Main St",
           address_line2: null,
           city: "Denver",
-          state: "CO",
+          state: "OH",
           postal_code: "80210",
         },
       );
@@ -323,6 +323,22 @@ describe("CustomerDetailScreen", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Unable to save customer",
     );
+  });
+
+  it("renders grouped address fields and state select in edit mode", async () => {
+    renderScreen();
+    await openEditForm();
+
+    expect(screen.getByLabelText(/^phone$/i)).toHaveAttribute("placeholder", "(555) 123-4567");
+    expect(screen.getByLabelText(/^phone$/i)).toHaveAttribute("type", "tel");
+    expect(screen.getByLabelText(/^phone$/i)).toHaveAttribute("inputMode", "tel");
+    expect(screen.getByText(/^address$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/street address or p\.o\. box/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/apt, suite, unit, building \(optional\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^state$/i)).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Select" })).toHaveValue("");
+    expect(screen.getByLabelText(/zip code/i)).toBeInTheDocument();
+    expect(screen.queryByText(/postal code/i)).not.toBeInTheDocument();
   });
 
   it("sends null for optional fields when user clears them", async () => {

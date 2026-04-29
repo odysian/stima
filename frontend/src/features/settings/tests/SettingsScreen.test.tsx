@@ -16,7 +16,6 @@ import {
   ADDRESS_CITY_MAX_CHARS,
   ADDRESS_LINE_MAX_CHARS,
   ADDRESS_POSTAL_CODE_MAX_CHARS,
-  ADDRESS_STATE_MAX_CHARS,
   MAX_LOGO_SIZE_BYTES,
   PHONE_NUMBER_MAX_CHARS,
 } from "@/shared/lib/inputLimits";
@@ -175,26 +174,34 @@ describe("SettingsScreen", () => {
       "maxLength",
       PHONE_NUMBER_MAX_CHARS.toString(),
     );
-    expect(screen.getByLabelText(/address line 1/i)).toHaveAttribute(
+    expect(screen.getByLabelText(/business phone/i)).toHaveAttribute(
+      "placeholder",
+      "(555) 123-4567",
+    );
+    expect(screen.getByLabelText(/business phone/i)).toHaveAttribute("type", "tel");
+    expect(screen.getByLabelText(/business phone/i)).toHaveAttribute("inputMode", "tel");
+    expect(screen.getByText(/^address$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/street address or p\.o\. box/i)).toHaveAttribute(
       "maxLength",
       ADDRESS_LINE_MAX_CHARS.toString(),
     );
-    expect(screen.getByLabelText(/address line 2/i)).toHaveAttribute(
+    expect(screen.getByPlaceholderText(/street address or p\.o\. box/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/apt, suite, unit, building \(optional\)/i)).toHaveAttribute(
       "maxLength",
       ADDRESS_LINE_MAX_CHARS.toString(),
     );
+    expect(screen.getByPlaceholderText(/apt, suite, unit, building \(optional\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^city$/i)).toHaveAttribute(
       "maxLength",
       ADDRESS_CITY_MAX_CHARS.toString(),
     );
-    expect(screen.getByLabelText(/^state$/i)).toHaveAttribute(
-      "maxLength",
-      ADDRESS_STATE_MAX_CHARS.toString(),
-    );
-    expect(screen.getByLabelText(/postal code/i)).toHaveAttribute(
+    expect(screen.getByLabelText(/^state$/i)).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Select" })).toHaveValue("");
+    expect(screen.getByLabelText(/zip code/i)).toHaveAttribute(
       "maxLength",
       ADDRESS_POSTAL_CODE_MAX_CHARS.toString(),
     );
+    expect(screen.queryByText(/postal code/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/upload logo/i)).toBeInTheDocument();
   });
 
