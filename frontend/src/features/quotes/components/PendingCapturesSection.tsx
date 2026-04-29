@@ -93,10 +93,12 @@ export function PendingCapturesSection({
   onRetry,
   onDelete,
 }: PendingCapturesSectionProps): React.ReactElement {
+  const hasBodyContent = Boolean(error) || isLoading || captures.length > 0;
+
   return (
     <section aria-label="Pending captures" className="mb-4 px-4">
       <div className="ghost-shadow rounded-[var(--radius-document)] border border-outline-variant/20 bg-surface-container-low p-4">
-        <div className="mb-3 flex items-center justify-between">
+        <div className={`${hasBodyContent ? "mb-3 " : ""}flex items-center justify-between`}>
           <Eyebrow className="text-on-surface">PENDING CAPTURES</Eyebrow>
           <Eyebrow
             as="span"
@@ -112,9 +114,6 @@ export function PendingCapturesSection({
         ) : null}
         {isLoading ? (
           <p className="text-sm text-on-surface-variant">Loading pending captures...</p>
-        ) : null}
-        {!isLoading && captures.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">No pending captures yet.</p>
         ) : null}
         {!isLoading && captures.length > 0 ? (
           <ul className="space-y-3">

@@ -426,6 +426,30 @@ describe("QuoteList", () => {
     });
   });
 
+  it("keeps pending captures header and count, without empty-state body text, when captures are empty", async () => {
+    mockedUseRecoverableCaptures.mockReturnValue({
+      captures: [],
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(async () => undefined),
+      deleteCapture: vi.fn(async () => undefined),
+    });
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    const pendingCapturesRegion = screen.getByRole("region", { name: "Pending captures" });
+    expect(within(pendingCapturesRegion).getByText("PENDING CAPTURES")).toBeInTheDocument();
+    expect(within(pendingCapturesRegion).getByText("0")).toBeInTheDocument();
+    expect(within(pendingCapturesRegion).queryByText("No pending captures yet.")).not.toBeInTheDocument();
+    expect(within(pendingCapturesRegion).queryByText("Loading pending captures...")).not.toBeInTheDocument();
+
+    const headerContainer = pendingCapturesRegion.querySelector("div > div");
+    expect(headerContainer).not.toBeNull();
+    expect(headerContainer).not.toHaveClass("mb-3");
+  });
+
   it("sanitizes IndexedDB errors from pending-capture delete actions", async () => {
     const deleteCaptureMock = vi.fn(async () => {
       throw new Error("Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.");
