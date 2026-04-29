@@ -174,6 +174,12 @@ describe("SettingsScreen", () => {
       "maxLength",
       PHONE_NUMBER_MAX_CHARS.toString(),
     );
+    expect(screen.getByLabelText(/business phone/i)).toHaveAttribute(
+      "placeholder",
+      "(555) 123-4567",
+    );
+    expect(screen.getByLabelText(/business phone/i)).toHaveAttribute("type", "tel");
+    expect(screen.getByLabelText(/business phone/i)).toHaveAttribute("inputMode", "tel");
     expect(screen.getByText(/^address$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/street address or p\.o\. box/i)).toHaveAttribute(
       "maxLength",

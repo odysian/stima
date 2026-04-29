@@ -73,6 +73,9 @@ export function CustomerInfoForm({
         <Input
           id="customer-detail-phone"
           label="Phone"
+          type="tel"
+          inputMode="tel"
+          placeholder="(555) 123-4567"
           value={phone}
           maxLength={PHONE_NUMBER_MAX_CHARS}
           onChange={onPhoneChange}

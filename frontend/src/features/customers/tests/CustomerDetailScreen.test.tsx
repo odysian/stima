@@ -329,6 +329,9 @@ describe("CustomerDetailScreen", () => {
     renderScreen();
     await openEditForm();
 
+    expect(screen.getByLabelText(/^phone$/i)).toHaveAttribute("placeholder", "(555) 123-4567");
+    expect(screen.getByLabelText(/^phone$/i)).toHaveAttribute("type", "tel");
+    expect(screen.getByLabelText(/^phone$/i)).toHaveAttribute("inputMode", "tel");
     expect(screen.getByText(/^address$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/street address or p\.o\. box/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/apt, suite, unit, building \(optional\)/i)).toBeInTheDocument();

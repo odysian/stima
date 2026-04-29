@@ -90,6 +90,9 @@ export function CustomerCreateScreen(): React.ReactElement {
             <Input
               id="customer-phone"
               label="Phone Number"
+              type="tel"
+              inputMode="tel"
+              placeholder="(555) 123-4567"
               value={phone}
               maxLength={PHONE_NUMBER_MAX_CHARS}
               onChange={(event) => setPhone(event.target.value)}

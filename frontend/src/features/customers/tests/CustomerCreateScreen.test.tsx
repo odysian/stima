@@ -55,6 +55,9 @@ describe("CustomerCreateScreen", () => {
       "maxLength",
       PHONE_NUMBER_MAX_CHARS.toString(),
     );
+    expect(screen.getByLabelText(/phone number/i)).toHaveAttribute("placeholder", "(555) 123-4567");
+    expect(screen.getByLabelText(/phone number/i)).toHaveAttribute("type", "tel");
+    expect(screen.getByLabelText(/phone number/i)).toHaveAttribute("inputMode", "tel");
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByText(/^address$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/street address or p\.o\. box/i)).toBeInTheDocument();

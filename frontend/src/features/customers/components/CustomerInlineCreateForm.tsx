@@ -70,6 +70,9 @@ export function CustomerInlineCreateForm({
         <Input
           id="customer-phone"
           label="Phone Number"
+          type="tel"
+          inputMode="tel"
+          placeholder="(555) 123-4567"
           value={phone}
           maxLength={PHONE_NUMBER_MAX_CHARS}
           onChange={onPhoneChange}

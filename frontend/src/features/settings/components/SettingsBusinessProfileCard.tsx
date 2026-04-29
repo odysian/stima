@@ -232,6 +232,9 @@ export function SettingsBusinessProfileCard({
             <Input
               id="settings-business-phone-number"
               label="Business phone"
+              type="tel"
+              inputMode="tel"
+              placeholder="(555) 123-4567"
               value={phoneNumber}
               maxLength={PHONE_NUMBER_MAX_CHARS}
               onChange={(event) => onPhoneNumberChange(event.target.value)}
