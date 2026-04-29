@@ -99,7 +99,7 @@ export type QuoteStatus =
   | "viewed"
   | "approved"
   | "declined";
-export type QuoteSourceType = "text" | "voice";
+export type QuoteSourceType = "text" | "voice" | "voice+text";
 export type ExtractionTier = "primary" | "degraded";
 
 export interface QuotePricingFields {

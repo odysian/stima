@@ -674,6 +674,34 @@ async def test_extract_combined_enqueues_async_job_when_arq_pool_is_available(
     ]
 
 
+async def test_extract_combined_enqueues_async_job_with_mixed_source(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    pool = _MockArqPool()
+    app.state.arq_pool = pool
+
+    response = await client.post(
+        "/api/quotes/extract",
+        files=[
+            ("clips", ("clip-1.webm", b"clip-a", "audio/webm")),
+            ("notes", (None, "add 10 percent travel surcharge")),
+        ],
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    jobs = (await db_session.scalars(select(JobRecord))).all()
+
+    assert response.status_code == 202
+    assert len(jobs) == 1
+    assert pool.calls[0]["kwargs"]["source_type"] == "voice+text"
+    assert pool.calls[0]["kwargs"]["capture_detail"] == "audio+notes"
+    prepared_capture_input = pool.calls[0]["kwargs"]["prepared_capture_input"]
+    assert isinstance(prepared_capture_input, dict)
+    assert prepared_capture_input["source_type"] == "voice+text"
+
+
 async def test_extract_combined_preserves_trusted_ingress_correlation_id_in_queue_payload(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -1035,6 +1063,12 @@ async def test_extract_combined_clips_and_notes_success(client: AsyncClient) -> 
         "transcript from stitched-1\n\nadd 10 percent travel surcharge"
     )
     assert payload["line_items"]
+    quote_response = await client.get(
+        f"/api/quotes/{payload['quote_id']}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert quote_response.status_code == 200
+    assert quote_response.json()["source_type"] == "voice+text"
 
 
 async def test_extract_combined_requires_clip_or_notes(client: AsyncClient) -> None:

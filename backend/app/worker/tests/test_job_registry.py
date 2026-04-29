@@ -97,6 +97,43 @@ async def test_extraction_job_accepts_legacy_enqueued_payload_without_source_met
     assert legacy_input.raw_transcript is None  # nosec B101 - pytest assertion
 
 
+async def test_extraction_job_persists_voice_plus_text_source_type(
+    db_session: AsyncSession,
+) -> None:
+    user = await _seed_user(db_session)
+    repository = JobRepository(db_session)
+    record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await db_session.commit()
+
+    mixed_capture_input = PreparedCaptureInput(
+        transcript="voice transcript text\n\ntyped note text",
+        source_type="voice+text",
+        raw_typed_notes="typed note text",
+        raw_transcript="voice transcript text",
+    )
+
+    await extraction_job(
+        _worker_context(
+            db_session,
+            extraction_integration=_SuccessfulExtractionIntegration(),
+        ),
+        str(record.id),
+        prepared_capture_input=mixed_capture_input.model_dump(mode="json"),
+        source_type="voice+text",
+        capture_detail="audio+notes",
+    )
+
+    refreshed = await _load_job_record(db_session, record.id)
+    assert refreshed is not None  # nosec B101 - pytest assertion
+    assert refreshed.status == JobStatus.SUCCESS  # nosec B101 - pytest assertion
+    assert refreshed.document_id is not None  # nosec B101 - pytest assertion
+
+    persisted_quote = await db_session.get(Document, refreshed.document_id)
+    assert persisted_quote is not None  # nosec B101 - pytest assertion
+    assert persisted_quote.source_type == "voice+text"  # nosec B101 - pytest assertion
+    assert persisted_quote.transcript == mixed_capture_input.transcript  # nosec B101 - pytest assertion
+
+
 async def test_extraction_job_rejects_removed_append_mode(
     db_session: AsyncSession,
 ) -> None:

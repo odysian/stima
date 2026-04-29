@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
@@ -343,6 +344,40 @@ async def test_optional_pricing_persists_on_quotes_public_payloads_and_converted
     assert invoice_payload["discount_value"] == 10
     assert invoice_payload["tax_rate"] == 0.1
     assert invoice_payload["deposit_amount"] == 30
+
+
+async def test_convert_quote_to_invoice_preserves_voice_plus_text_source_type(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+
+    quote_response = await client.post(
+        "/api/quotes",
+        json={
+            "customer_id": customer_id,
+            "transcript": "voice transcript\n\ntyped notes",
+            "line_items": [{"description": "line item", "details": None, "price": 55}],
+            "total_amount": 55,
+            "notes": "typed notes",
+            "source_type": "voice+text",
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert quote_response.status_code == 201
+    quote_id = quote_response.json()["id"]
+
+    convert_response = await client.post(
+        f"/api/quotes/{quote_id}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+
+    persisted_invoice = await db_session.get(Document, UUID(invoice_id))
+    assert persisted_invoice is not None
+    assert persisted_invoice.source_type == "voice+text"
 
 
 @pytest.mark.parametrize(

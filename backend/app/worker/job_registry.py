@@ -494,10 +494,10 @@ class _UnusedWorkerStorageService:
         raise RuntimeError("Storage is not available in extraction persistence")
 
 
-def _validate_extraction_source_type(source_type: str) -> Literal["text", "voice"]:
-    if source_type not in {"text", "voice"}:
+def _validate_extraction_source_type(source_type: str) -> Literal["text", "voice", "voice+text"]:
+    if source_type not in {"text", "voice", "voice+text"}:
         raise NonRetryableJobError("Extraction job missing valid source_type")
-    return cast(Literal["text", "voice"], source_type)
+    return cast(Literal["text", "voice", "voice+text"], source_type)
 
 
 def _validate_extraction_mode(extraction_mode: str) -> ExtractionMode:
@@ -516,6 +516,8 @@ def _resolve_worker_capture_detail(*, source_type: str, capture_detail: str | No
     normalized_capture_detail = (capture_detail or "").strip()
     if normalized_capture_detail:
         return normalized_capture_detail
+    if source_type == "voice+text":
+        return "audio+notes"
     if source_type == "voice":
         return "audio"
     return "notes"
@@ -550,7 +552,9 @@ def _resolve_prepared_capture_input(
         raise NonRetryableJobError(
             "Extraction job requires transcript or prepared_capture_input payload"
         )
-    prepared_source_type: Literal["text", "voice"] = "voice" if source_type == "voice" else "text"
+    prepared_source_type: Literal["text", "voice"] = (
+        "voice" if source_type in {"voice", "voice+text"} else "text"
+    )
     return PreparedCaptureInput.from_legacy_transcript(
         transcript=normalized_transcript,
         source_type=prepared_source_type,

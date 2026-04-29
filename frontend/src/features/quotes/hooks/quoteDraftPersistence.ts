@@ -68,7 +68,9 @@ function parseDraftFromValue(value: unknown): QuoteDraft | null {
   }
 
   const parsedSourceType: QuoteSourceType =
-    sourceType === "voice" || sourceType === "text" ? sourceType : "text";
+    sourceType === "voice" || sourceType === "text" || sourceType === "voice+text"
+      ? sourceType
+      : "text";
 
   return {
     customerId,
