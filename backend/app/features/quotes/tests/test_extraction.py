@@ -1052,13 +1052,13 @@ async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> 
     assert request_payload["prepared_capture_input"]["raw_typed_notes"] == "typed note text"
     assert request_payload["prepared_capture_input"]["raw_transcript"] == "voice transcript text"
     assert (
-        "Treat aggregate totals as pricing_candidates.explicit_total"
-        in request_payload["instructions"]["pricing_rule"]
+        "Set pricing_candidates.explicit_total only when the transcript clearly states a whole-job "
+        "or whole-quote total" in request_payload["instructions"]["pricing_rule"]
     )
     assert captured_system_prompts
     assert (
-        "Treat aggregate total language as pricing_candidates.explicit_total"
-        in captured_system_prompts[0]
+        "Set pricing_candidates.explicit_total only when the transcript clearly states a whole-job "
+        "or whole-quote total" in captured_system_prompts[0]
     )
 
 
