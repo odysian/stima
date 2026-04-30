@@ -1,14 +1,13 @@
 # UI System — Stima Frontend
 
 **For:** Agents and humans working on `area:frontend` scope.  
-**Canonical source:** [`frontend/src/index.css`](src/index.css) for tokens; [`frontend/src/ui/`](src/ui/) + [`frontend/src/shared/components/`](src/shared/components/) for primitives.  
-**Historical record:** [`stima-design-system/Stima_Design_Adoption_Spec_revised.md`](../stima-design-system/Stima_Design_Adoption_Spec_revised.md) (read for context, not contracts).
+**Canonical source:** [`frontend/src/index.css`](src/index.css) for tokens; [`frontend/src/ui/`](src/ui/) + [`frontend/src/shared/components/`](src/shared/components/) for primitives.
 
 ---
 
 ## 1. Token Catalog
 
-Canonical CSS custom properties live in `frontend/src/index.css`. `stima-design-system/*` is reference only.
+Canonical CSS custom properties live in `frontend/src/index.css`.
 
 | Token | Value | Purpose | When to use |
 |-------|-------|---------|-------------|
@@ -501,7 +500,6 @@ I need to show...
 ## 6. Token Governance
 
 - **Canonical source:** `frontend/src/index.css`. This is the only file that defines production tokens.
-- **Reference only:** `stima-design-system/colors_and_type.css` and `stima-design-system/ui_kits/` are design references, not contracts.
 - **Migration rule:** Redefining `@theme --radius-lg` or any other global Tailwind theme token is banned without a migration plan that audits every existing usage.
 - **Adding tokens:** New tokens land in `:root` (not `@theme`) when they must not remap existing Tailwind utilities. Document them in this file.
 
