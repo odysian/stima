@@ -59,7 +59,7 @@ export function LineItemCatalogTabPanel({
       ) : null}
 
       {loadState === "loaded" && items.length > 0 ? (
-        <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
+        <ul className="space-y-2 overflow-y-auto pr-1">
           {items.map((item) => (
             <li key={item.id}>
               <Card className="border border-outline-variant/20 bg-surface-container-high p-3">
