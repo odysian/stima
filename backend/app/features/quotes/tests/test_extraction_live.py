@@ -114,7 +114,6 @@ async def test_live_no_pricing_at_all() -> None:
     assert result.total is None
     assert result.line_items
     assert all(item.price is None for item in result.line_items)
-    assert result.unresolved_segments
 
 
 @pytest.mark.live

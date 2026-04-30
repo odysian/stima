@@ -170,6 +170,14 @@ EXTRACTION_SYSTEM_PROMPT = (
     "Extract quote line items, pricing candidates, and unresolved capture details from structured "
     "capture input. "
     "Do not invent pricing. Use null for missing values. "
+    "Set pricing_candidates.explicit_total only when the transcript clearly states a whole-job "
+    "or whole-quote total (for example: total, grand total, overall, all-in, or for everything). "
+    "Hedged or approximate amounts belong in explicit_total only when tied to whole-job or "
+    "whole-quote total language. "
+    "Amounts tied to a specific item, material, labor component, or job part belong on that "
+    "line item when attribution is clear. "
+    "If pricing attribution is unclear, leave explicit_total null and use unresolved_items rather "
+    "than treating the amount as a quote total. "
     "Set line-item flagged=true only for strong review signals: likely audio mishears, "
     "clearly implausible single-item prices, or critically ambiguous quantity/unit phrasing. "
     "When flagged=true, include a short flag_reason. Keep flagged false otherwise. "
@@ -906,6 +914,15 @@ def _build_extraction_request(
             ),
             "pricing_rule": (
                 "Do not invent pricing. "
+                "Set pricing_candidates.explicit_total only when the transcript clearly states a "
+                "whole-job or whole-quote total (for example: total, grand total, overall, "
+                "all-in, or for everything). "
+                "Hedged or approximate amounts belong in explicit_total only when tied to "
+                "whole-job or whole-quote total language. "
+                "Amounts tied to a specific item, material, labor component, or job part belong "
+                "on that line item when attribution is clear. "
+                "If pricing attribution is unclear, leave explicit_total null and use "
+                "unresolved_items rather than treating the amount as a quote total. "
                 "Use pricing_candidates for explicit pricing directives only."
             ),
             "notes_candidate_rule": (
