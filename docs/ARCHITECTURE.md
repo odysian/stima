@@ -296,8 +296,7 @@ Rules:
 Rules:
 - Successful unified extraction is now a persistence boundary: both the async worker and the sync fallback create the draft quote before reporting success.
 - `quote_id` is the persisted draft quote id the frontend should navigate to.
-- `/quotes/convert-notes` and `/quotes/capture-audio` remain extraction-only endpoints for now; they still return plain `ExtractionResult` and do not create drafts.
-- `POST /quotes/{id}/append-extraction` reuses the same response shape in sync fallback mode; `quote_id` is the target persisted quote id from the path parameter.
+- `/quotes/convert-notes` remains an extraction-only endpoint; it returns plain `ExtractionResult` and does not create drafts. Audio clips are now submitted through `/quotes/extract`.
 
 #### `JobRecordResponse` extraction extension
 
@@ -309,9 +308,7 @@ For `job_type = "extraction"`:
 | Endpoint | Method | CSRF | Auth | Request | Response |
 |---|---|---|---|---|---|
 | `/quotes/convert-notes` | POST | yes | cookie | `{ notes }` | `200 ExtractionResult` |
-| `/quotes/capture-audio` | POST | yes | cookie | multipart form-data `clips` files | `200 ExtractionResult` |
 | `/quotes/extract` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string + `customer_id?` UUID | `202 JobRecordResponse` when ARQ is available, otherwise `200 PersistedExtractionResponse` sync fallback; both success paths persist the draft quote before returning success, `429` when active extraction jobs are at the per-user limit, and `503 { detail: "Unable to start extraction right now. Please try again." }` if enqueue fails after the durable job row is created |
-| `/quotes/{id}/append-extraction` | POST | yes | cookie | multipart form-data `clips?` files + `notes?` string | `202 JobRecordResponse` when ARQ is available, otherwise `200 PersistedExtractionResponse`; appends extracted line items to the existing owned quote, preserves existing rows/order, recomputes totals from the full line-item list, and appends transcript entries under one `Added later:` bullet-list section; returns `404` for unknown or foreign-owned quotes, `429` on extraction guard exhaustion, and `503 { detail: "Unable to start extraction right now. Please try again." }` when enqueue fails |
 | `/jobs/{job_id}` | GET | no | cookie | — | `200 JobRecordResponse` for owned jobs, with `quote_id` populated on successful extraction jobs and `extraction_result` retained for backward compatibility; `404 { detail: "Not found" }` for unknown or foreign-owned jobs |
 | `/quotes` | POST | yes | cookie | `{ customer_id, title?, transcript, line_items, total_amount, notes, source_type, tax_rate?, discount_type?, discount_value?, deposit_amount? }` | `201 Quote` with `doc_number` (`Q-001`) and `status: "draft"`; this route remains customer-required, while extraction-created unassigned drafts are reserved for the extraction worker flow |
 | `/quotes/manual-draft` | POST | yes | cookie | `{ customer_id? }` | `201 Quote` with `status: "draft"`, no extraction required, emits structured `manual_draft_created` event |
@@ -326,11 +323,11 @@ For `job_type = "extraction"`:
 | `/quotes/{id}/convert-to-invoice` | POST | yes | cookie | — | `201 Invoice`, `404 { detail: "Not found" }`, `409 { detail: "Assign a customer before continuing." }` for unassigned quotes, or `409 { detail: "An invoice already exists for this quote" }` |
 
 Quote extraction guardrails:
-- `POST /quotes/convert-notes`, `POST /quotes/capture-audio`, and `POST /quotes/extract` use user-keyed rate limits when a valid access cookie is present, with IP fallback only for unauthenticated resolution failures.
+- `POST /quotes/convert-notes` and `POST /quotes/extract` use user-keyed rate limits when a valid access cookie is present, with IP fallback only for unauthenticated resolution failures.
 - Extraction integration can be configured with an optional fallback model tier that runs only after primary attempts are exhausted; `ExtractionResult` and persisted `documents.extraction_tier` remain `primary|degraded` for storage compatibility.
 - `POST /quotes/convert-notes` and the sync fallback path of `POST /quotes/extract` return `429 { "detail": "Extraction quota or concurrency exhausted. Please retry later." }` when the per-user daily quota or concurrent in-flight extraction limit is exhausted before provider work starts.
 - The async `POST /quotes/extract` path uses durable `job_records` plus a count of user-owned extraction jobs in `pending|running` state to reject new enqueue attempts with the same `429` detail when the active-job cap is already reached.
-- `POST /quotes/{id}/append-extraction` inherits the same user-keyed limiter and extraction capacity/concurrency behavior as `/quotes/extract` (sync and async paths), and emits `quote_append_extracted` after successful append persistence.
+- `POST /quotes/extract` is the canonical capture-to-draft boundary; it accepts audio clips, typed notes, or both, and persists a draft quote before reporting success.
 - Extraction worker security logs include segmentation metadata (`last_model_id`, `extraction_invocation_tier`, and `extraction_prompt_variant`) for primary vs fallback analysis.
 - `POST /quotes/{id}/pdf`, `POST /quotes/{id}/send-email`, `POST /invoices/{id}/pdf`, and `POST /invoices/{id}/send-email` are also user-keyed and rate-limited.
 
