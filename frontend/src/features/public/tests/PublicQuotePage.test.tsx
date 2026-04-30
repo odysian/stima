@@ -114,11 +114,16 @@ describe("PublicQuotePage", () => {
 
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Spring Cleanup" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Quote" })).toBeInTheDocument();
+    expect(screen.getByText("Q-001 · Issued Mar 28, 2026")).toBeInTheDocument();
+    expect(screen.queryByText("Quote Q-001 · Issued Mar 28, 2026")).not.toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveClass("screen-radial-backdrop");
     expect(mockedPublicService.getDocument).toHaveBeenCalledWith("token-1");
     expect(screen.getByText("This quote has been accepted")).toBeInTheDocument();
     expect(screen.getByText("Northline Landscaping")).toHaveClass("text-on-primary/70");
+    const logo = screen.getByRole("img", { name: /northline landscaping logo/i });
+    expect(logo.parentElement).toHaveClass("bg-[#f8fafc]");
+    expect(logo.parentElement).toHaveClass("border-[rgba(15,23,42,0.12)]");
     expect(screen.getByText("Taylor Morgan")).toBeInTheDocument();
     expect(screen.getByText("$425.00")).toBeInTheDocument();
     expect(screen.getByText("Mulch refresh")).toBeInTheDocument();
@@ -157,7 +162,7 @@ describe("PublicQuotePage", () => {
   it("falls back cleanly when the public logo request fails", async () => {
     renderScreen();
 
-    await screen.findByRole("heading", { name: "Spring Cleanup" });
+    await screen.findByRole("heading", { name: "Quote" });
     const logo = screen.getByRole("img", { name: /northline landscaping logo/i });
     fireEvent.error(logo);
 
@@ -287,7 +292,7 @@ describe("PublicQuotePage", () => {
       .mockResolvedValueOnce(makePublicInvoice());
 
     const quoteView = renderScreen("/doc/token-quote-grid");
-    await screen.findByRole("heading", { name: "Spring Cleanup" });
+    await screen.findByRole("heading", { name: "Quote" });
     const quoteSummarySection = screen
       .getByText("Customer")
       .closest("section");
@@ -329,7 +334,7 @@ describe("PublicQuotePage", () => {
 
     renderScreen();
 
-    expect(await screen.findByRole("heading", { name: "Spring Cleanup" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Quote" })).toBeInTheDocument();
     expect(screen.queryByText("Northline Landscaping")).not.toBeInTheDocument();
     expect(screen.queryByText("Taylor Owner")).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: /quote logo/i })).toBeInTheDocument();

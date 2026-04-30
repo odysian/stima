@@ -37,6 +37,13 @@ function getDisplayTitle(documentData: PublicDocument | null): string {
   return documentData.title?.trim() || documentData.doc_number;
 }
 
+function getPrimaryHeading(documentData: PublicDocument): string {
+  if (documentData.doc_type === "quote") {
+    return "Quote";
+  }
+  return getDisplayTitle(documentData);
+}
+
 function getDisplayBusinessName(documentData: PublicDocument | null): string | null {
   if (!documentData) {
     return null;
@@ -55,6 +62,13 @@ function getDocumentLabel(documentData: PublicDocument | null): string {
     return "Invoice";
   }
   return "Quote";
+}
+
+function getMetadataHeading(documentData: PublicDocument): string {
+  if (documentData.doc_type === "quote") {
+    return documentData.doc_number;
+  }
+  return `${getDocumentLabel(documentData)} ${documentData.doc_number}`;
 }
 
 export function PublicQuotePage(): React.ReactElement {
@@ -208,7 +222,7 @@ export function PublicQuotePage(): React.ReactElement {
         <section className="overflow-hidden rounded-[var(--radius-document)] border border-surface-container-high bg-surface-container-lowest ghost-shadow">
           <div className="forest-gradient px-5 py-6 text-on-primary sm:px-8 sm:py-8">
             <div className="flex items-start gap-3 sm:gap-4">
-              <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-document)] bg-on-primary/15 text-xl font-semibold uppercase text-on-primary ring-1 ring-on-primary/20 sm:h-20 sm:w-24 sm:text-2xl">
+              <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-document)] border border-[rgba(15,23,42,0.12)] bg-[#f8fafc] text-xl font-semibold uppercase text-primary shadow-[0_1px_2px_rgba(15,23,42,0.08)] sm:h-20 sm:w-24 sm:text-2xl">
                 {showLogo ? (
                   <img
                     src={documentData.logo_url}
@@ -225,10 +239,10 @@ export function PublicQuotePage(): React.ReactElement {
                   <Eyebrow className="text-on-primary/70">{displayBusinessName}</Eyebrow>
                 ) : null}
                 <h1 className="mt-2 text-2xl font-semibold leading-tight sm:mt-3 sm:text-3xl">
-                  {getDisplayTitle(documentData)}
+                  {getPrimaryHeading(documentData)}
                 </h1>
                 <p className="mt-2 text-sm text-on-primary/80">
-                  {getDocumentLabel(documentData)} {documentData.doc_number} · Issued {documentData.issued_date}
+                  {getMetadataHeading(documentData)} · Issued {documentData.issued_date}
                 </p>
               </div>
             </div>
