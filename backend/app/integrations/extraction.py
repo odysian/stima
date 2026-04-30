@@ -170,6 +170,9 @@ EXTRACTION_SYSTEM_PROMPT = (
     "Extract quote line items, pricing candidates, and unresolved capture details from structured "
     "capture input. "
     "Do not invent pricing. Use null for missing values. "
+    "Treat aggregate total language as pricing_candidates.explicit_total, "
+    "not as a line-item price, "
+    "unless the transcript explicitly assigns that amount to a specific line item. "
     "Set line-item flagged=true only for strong review signals: likely audio mishears, "
     "clearly implausible single-item prices, or critically ambiguous quantity/unit phrasing. "
     "When flagged=true, include a short flag_reason. Keep flagged false otherwise. "
@@ -906,6 +909,8 @@ def _build_extraction_request(
             ),
             "pricing_rule": (
                 "Do not invent pricing. "
+                "Treat aggregate totals as pricing_candidates.explicit_total and keep line-item "
+                "prices null unless explicitly stated per item. "
                 "Use pricing_candidates for explicit pricing directives only."
             ),
             "notes_candidate_rule": (

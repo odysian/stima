@@ -1011,8 +1011,12 @@ async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> 
         raw_transcript="voice transcript text",
     )
     captured_messages: list[str] = []
+    captured_system_prompts: list[str] = []
 
     def _factory(kwargs: dict[str, object]) -> _FakeResponse:
+        system_prompt = kwargs["system"]
+        assert isinstance(system_prompt, str)
+        captured_system_prompts.append(system_prompt)
         messages = kwargs["messages"]
         assert isinstance(messages, list)
         assert messages
@@ -1047,6 +1051,15 @@ async def test_extract_preserves_mixed_provenance_in_model_request_payload() -> 
     assert request_payload["prepared_capture_input"]["source_type"] == "voice+text"
     assert request_payload["prepared_capture_input"]["raw_typed_notes"] == "typed note text"
     assert request_payload["prepared_capture_input"]["raw_transcript"] == "voice transcript text"
+    assert (
+        "Treat aggregate totals as pricing_candidates.explicit_total"
+        in request_payload["instructions"]["pricing_rule"]
+    )
+    assert captured_system_prompts
+    assert (
+        "Treat aggregate total language as pricing_candidates.explicit_total"
+        in captured_system_prompts[0]
+    )
 
 
 @pytest.mark.parametrize(
