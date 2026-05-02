@@ -33,6 +33,11 @@ class _RetryingInvoiceRepository:
         del user_id
         return None
 
+    async def get_owned_document_by_id(self, document_id, user_id):  # noqa: ANN001
+        del document_id
+        del user_id
+        return None
+
     async def customer_exists_for_user(self, *, user_id, customer_id):  # noqa: ANN001
         del user_id
         del customer_id
@@ -110,6 +115,11 @@ class _RetryingInvoiceRepository:
         del invoice
         return None
 
+    async def archive_by_id(self, *, invoice_id, user_id):  # noqa: ANN001
+        del invoice_id
+        del user_id
+        return False
+
     async def mark_ready_if_draft(self, *, invoice_id, user_id):  # noqa: ANN001
         del invoice_id
         del user_id
@@ -181,6 +191,11 @@ class _DirectInvoiceCollisionRepository:
         del user_id
         return None
 
+    async def get_owned_document_by_id(self, document_id, user_id):  # noqa: ANN001
+        del document_id
+        del user_id
+        return None
+
     async def get_by_source_document_id(self, *, source_document_id, user_id):  # noqa: ANN001
         del source_document_id
         del user_id
@@ -242,6 +257,11 @@ class _DirectInvoiceCollisionRepository:
     async def invalidate_pdf_artifact(self, invoice):  # noqa: ANN001
         del invoice
         return None
+
+    async def archive_by_id(self, *, invoice_id, user_id):  # noqa: ANN001
+        del invoice_id
+        del user_id
+        return False
 
     async def mark_ready_if_draft(self, *, invoice_id, user_id):  # noqa: ANN001
         del invoice_id
@@ -352,6 +372,11 @@ class _UpdatingInvoiceRepository:
             return self._invoice
         return None
 
+    async def get_owned_document_by_id(self, document_id, user_id):  # noqa: ANN001
+        if document_id == self._invoice.id and user_id == self._invoice.user_id:
+            return self._invoice
+        return None
+
     async def update(self, **kwargs):  # noqa: ANN001
         invoice = kwargs["invoice"]
         if kwargs["update_title"]:
@@ -379,6 +404,11 @@ class _UpdatingInvoiceRepository:
         invoice.pdf_artifact_path = None
         invoice.pdf_artifact_revision += 1
         return "artifacts/invoice.pdf"
+
+    async def archive_by_id(self, *, invoice_id, user_id):  # noqa: ANN001
+        del invoice_id
+        del user_id
+        return False
 
     async def commit(self) -> None:
         self.commit_calls += 1

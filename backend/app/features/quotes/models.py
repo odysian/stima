@@ -68,7 +68,7 @@ class Document(Base):
     doc_number: Mapped[str] = mapped_column(sa.String(20), nullable=False)
     title: Mapped[str | None] = mapped_column(sa.String(120), nullable=True)
     source_document_id: Mapped[UUID | None] = mapped_column(
-        sa.ForeignKey("documents.id", ondelete="SET NULL"),
+        sa.ForeignKey("documents.id", ondelete="RESTRICT"),
         nullable=True,
     )
     status: Mapped[DocumentStatus] = mapped_column(

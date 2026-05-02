@@ -214,6 +214,18 @@ class InvoiceRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_owned_document_by_id(self, document_id: UUID, user_id: UUID) -> Document | None:
+        """Return one owned document of any type, including line items."""
+        result = await self._session.execute(
+            select(Document)
+            .where(
+                Document.id == document_id,
+                Document.user_id == user_id,
+            )
+            .options(selectinload(Document.line_items))
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_source_document_id(
         self,
         *,
