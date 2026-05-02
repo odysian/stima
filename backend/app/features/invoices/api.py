@@ -156,6 +156,7 @@ async def get_invoice(
 @router.post(
     "/bulk-action",
     response_model=InvoiceBulkActionResponse,
+    response_model_exclude_none=True,
     dependencies=[Depends(require_csrf)],
 )
 async def bulk_action_invoices(

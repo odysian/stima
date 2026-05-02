@@ -108,7 +108,6 @@ async def test_bulk_archive_quotes_deduplicates_ids_and_blocks_rearchive(
                 "id": quote["id"],
                 "reason": "already_archived",
                 "message": "Quote is already archived.",
-                "suggested_action": None,
             }
         ],
     }
@@ -151,19 +150,16 @@ async def test_bulk_delete_quotes_reports_not_found_status_and_doc_type_blocks(
             "id": shared_quote["id"],
             "reason": "quote_status_not_deletable",
             "message": "Shared, viewed, approved, and declined quotes cannot be deleted.",
-            "suggested_action": None,
         },
         {
             "id": invoice["id"],
             "reason": "unsupported_document_type",
             "message": "Only quotes can be changed from this endpoint.",
-            "suggested_action": None,
         },
         {
             "id": missing_id,
             "reason": "not_found",
             "message": "Document not found.",
-            "suggested_action": None,
         },
     ]
 

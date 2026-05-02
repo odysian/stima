@@ -578,6 +578,7 @@ async def list_quote_reuse_candidates(
 @router.post(
     "/bulk-action",
     response_model=BulkActionResponse,
+    response_model_exclude_none=True,
     dependencies=[Depends(require_csrf)],
 )
 async def bulk_action_quotes(

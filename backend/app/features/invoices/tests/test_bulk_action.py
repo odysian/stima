@@ -65,7 +65,6 @@ async def test_bulk_archive_invoices_deduplicates_ids_and_blocks_rearchive(
                 "id": invoice["id"],
                 "reason": "already_archived",
                 "message": "Invoice is already archived.",
-                "suggested_action": None,
             }
         ],
     }
@@ -102,19 +101,16 @@ async def test_bulk_delete_invoices_reports_blocked_per_document(
                 "id": invoice["id"],
                 "reason": "invoice_delete_not_supported",
                 "message": "Invoices cannot be deleted in this version.",
-                "suggested_action": None,
             },
             {
                 "id": quote["id"],
                 "reason": "unsupported_document_type",
                 "message": "Only invoices can be changed from this endpoint.",
-                "suggested_action": None,
             },
             {
                 "id": missing_id,
                 "reason": "not_found",
                 "message": "Document not found.",
-                "suggested_action": None,
             },
         ],
     }

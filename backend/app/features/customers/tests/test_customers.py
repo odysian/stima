@@ -6,8 +6,11 @@ from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.auth.service import CSRF_COOKIE_NAME
+from app.features.quotes.models import QuoteStatus
+from app.features.quotes.tests.support.helpers import _set_quote_status
 
 pytestmark = pytest.mark.asyncio
 
@@ -215,6 +218,57 @@ async def test_delete_customer_deletes_owned_customer_and_cascades_documents(
     invoice_response = await client.get(f"/api/invoices/{invoice['id']}")
     assert invoice_response.status_code == 404
     assert invoice_response.json() == {"detail": "Not found"}
+
+
+async def test_delete_customer_with_linked_quote_invoice_cascades_successfully(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    created_customer = await _create_customer(
+        client,
+        csrf_token,
+        {"name": "Linked Pair Customer"},
+    )
+    quote = await _create_quote_for_customer(
+        client,
+        csrf_token,
+        customer_id=str(created_customer["id"]),
+    )
+    quote_id = str(quote["id"])
+    await _set_quote_status(db_session, quote_id, QuoteStatus.APPROVED)
+
+    convert_response = await client.post(
+        f"/api/quotes/{quote_id}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice = convert_response.json()
+
+    archive_invoice_response = await client.post(
+        "/api/invoices/bulk-action",
+        json={"action": "archive", "ids": [invoice["id"]]},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert archive_invoice_response.status_code == 200
+    assert archive_invoice_response.json()["applied"] == [{"id": invoice["id"]}]
+
+    response = await client.delete(
+        f"/api/customers/{created_customer['id']}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    customer_response = await client.get(f"/api/customers/{created_customer['id']}")
+    assert customer_response.status_code == 404
+
+    quote_response = await client.get(f"/api/quotes/{quote_id}")
+    assert quote_response.status_code == 404
+
+    invoice_response = await client.get(f"/api/invoices/{invoice['id']}")
+    assert invoice_response.status_code == 404
 
 
 async def test_delete_customer_returns_404_for_nonexistent_id(client: AsyncClient) -> None:
