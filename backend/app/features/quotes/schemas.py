@@ -606,6 +606,47 @@ class QuoteUpdateRequest(BaseModel):
         return self
 
 
+BulkActionType = Literal["archive", "delete"]
+BulkBlockedReason = Literal[
+    "not_found",
+    "already_archived",
+    "quote_status_not_deletable",
+    "linked_invoice",
+    "unsupported_document_type",
+    "invoice_delete_not_supported",
+]
+
+
+class BulkActionRequest(BaseModel):
+    """Request payload for route-scoped quote/invoice bulk actions."""
+
+    action: BulkActionType
+    ids: list[UUID] = Field(min_length=1)
+
+
+class BulkActionAppliedItem(BaseModel):
+    """One document id that was successfully mutated by a bulk action."""
+
+    id: UUID
+
+
+class BulkActionBlockedItem(BaseModel):
+    """One document id blocked by policy or ownership checks."""
+
+    id: UUID
+    reason: BulkBlockedReason
+    message: str
+    suggested_action: BulkActionType | None = None
+
+
+class BulkActionResponse(BaseModel):
+    """Best-effort bulk action result with per-document outcomes."""
+
+    action: BulkActionType
+    applied: list[BulkActionAppliedItem] = Field(default_factory=list)
+    blocked: list[BulkActionBlockedItem] = Field(default_factory=list)
+
+
 class ExtractionReviewStateClearRequest(BaseModel):
     """Request payload for clearing grouped extraction review state flags."""
 

@@ -50,6 +50,11 @@ _reset_rate_limiter = quotes_test_module._reset_rate_limiter
             "/api/quotes/00000000-0000-0000-0000-000000000000",
             {"notes": "updated"},
         ),
+        (
+            "post",
+            "/api/quotes/bulk-action",
+            {"action": "archive", "ids": ["00000000-0000-0000-0000-000000000000"]},
+        ),
         ("delete", "/api/quotes/00000000-0000-0000-0000-000000000000", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/duplicate", None),
         ("post", "/api/quotes/00000000-0000-0000-0000-000000000000/pdf", None),
@@ -94,6 +99,11 @@ async def test_all_quote_endpoints_require_authentication(
             },
         ),
         ("get", "/api/invoices/00000000-0000-0000-0000-000000000000", None),
+        (
+            "post",
+            "/api/invoices/bulk-action",
+            {"action": "archive", "ids": ["00000000-0000-0000-0000-000000000000"]},
+        ),
         (
             "patch",
             "/api/invoices/00000000-0000-0000-0000-000000000000",
@@ -233,6 +243,18 @@ async def test_delete_quote_requires_csrf(client: AsyncClient) -> None:
     assert response.json() == {"detail": "CSRF token missing"}
 
 
+async def test_quote_bulk_action_requires_csrf(client: AsyncClient) -> None:
+    await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/quotes/bulk-action",
+        json={"action": "archive", "ids": ["00000000-0000-0000-0000-000000000000"]},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
 async def test_duplicate_quote_requires_csrf(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
@@ -335,6 +357,18 @@ async def test_create_invoice_requires_csrf(client: AsyncClient) -> None:
             "notes": None,
             "source_type": "text",
         },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "CSRF token missing"}
+
+
+async def test_invoice_bulk_action_requires_csrf(client: AsyncClient) -> None:
+    await _register_and_login(client, _credentials())
+
+    response = await client.post(
+        "/api/invoices/bulk-action",
+        json={"action": "archive", "ids": ["00000000-0000-0000-0000-000000000000"]},
     )
 
     assert response.status_code == 403

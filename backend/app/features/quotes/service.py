@@ -9,6 +9,7 @@ from uuid import UUID
 
 from arq.connections import ArqRedis
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import IntegrityError
 
 from app.features.auth.models import User
 from app.features.jobs.models import JobRecord
@@ -29,6 +30,10 @@ from app.features.quotes.repository import (
     QuoteViewTransition,
 )
 from app.features.quotes.schemas import (
+    BulkActionAppliedItem,
+    BulkActionBlockedItem,
+    BulkActionRequest,
+    BulkActionResponse,
     ExtractionResult,
     ExtractionReviewMetadataUpdateRequest,
     ExtractionReviewMetadataV1,
@@ -42,6 +47,15 @@ from app.integrations.storage import StorageServiceProtocol
 LOGGER = logging.getLogger(__name__)
 _TERMINAL_QUOTE_STATUSES = frozenset({QuoteStatus.APPROVED, QuoteStatus.DECLINED})
 _CUSTOMER_ASSIGNMENT_REQUIRED_DETAIL = "Assign a customer before continuing."
+_QUOTE_DOC_TYPE = "quote"
+_NON_DELETABLE_QUOTE_STATUSES = frozenset(
+    {
+        QuoteStatus.SHARED,
+        QuoteStatus.VIEWED,
+        QuoteStatus.APPROVED,
+        QuoteStatus.DECLINED,
+    }
+)
 
 
 class QuoteRepositoryProtocol(Protocol):
@@ -63,6 +77,11 @@ class QuoteRepositoryProtocol(Protocol):
     ) -> list[QuoteReuseCandidateSummary]: ...
 
     async def get_by_id(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
+    async def get_owned_document_by_id(
+        self,
+        document_id: UUID,
+        user_id: UUID,
+    ) -> Document | None: ...
     async def get_by_id_for_update(self, quote_id: UUID, user_id: UUID) -> Document | None: ...
 
     async def get_detail_by_id(self, quote_id: UUID, user_id: UUID) -> QuoteDetailRow | None: ...
@@ -169,6 +188,7 @@ class QuoteRepositoryProtocol(Protocol):
     ) -> Document: ...
 
     async def delete(self, document_id: UUID) -> None: ...
+    async def archive_by_id(self, *, quote_id: UUID, user_id: UUID) -> bool: ...
 
     async def commit(self) -> None: ...
 
@@ -344,6 +364,107 @@ class QuoteService:
             quote_id=quote_id,
         )
 
+    async def execute_bulk_action(
+        self,
+        user: User,
+        payload: BulkActionRequest,
+    ) -> BulkActionResponse:
+        """Execute one quote-scoped bulk archive/delete action with per-id outcomes."""
+        user_id = _resolve_user_id(user)
+        unique_ids = _dedupe_ids(payload.ids)
+        applied: list[BulkActionAppliedItem] = []
+        blocked: list[BulkActionBlockedItem] = []
+
+        for document_id in unique_ids:
+            document = await self._repository.get_owned_document_by_id(document_id, user_id)
+            if document is None:
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="not_found",
+                        message="Document not found.",
+                    )
+                )
+                continue
+            if document.doc_type != _QUOTE_DOC_TYPE:
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="unsupported_document_type",
+                        message="Only quotes can be changed from this endpoint.",
+                    )
+                )
+                continue
+
+            if payload.action == "archive":
+                if document.archived_at is not None:
+                    blocked.append(
+                        BulkActionBlockedItem(
+                            id=document_id,
+                            reason="already_archived",
+                            message="Quote is already archived.",
+                        )
+                    )
+                    continue
+                archived = await self._repository.archive_by_id(
+                    quote_id=document_id,
+                    user_id=user_id,
+                )
+                if not archived:
+                    blocked.append(
+                        BulkActionBlockedItem(
+                            id=document_id,
+                            reason="already_archived",
+                            message="Quote is already archived.",
+                        )
+                    )
+                    continue
+                await self._repository.commit()
+                applied.append(BulkActionAppliedItem(id=document_id))
+                continue
+
+            if document.status in _NON_DELETABLE_QUOTE_STATUSES:
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="quote_status_not_deletable",
+                        message="Shared, viewed, approved, and declined quotes cannot be deleted.",
+                    )
+                )
+                continue
+            has_linked_invoice = await self._repository.has_linked_invoice(
+                source_document_id=document_id,
+                user_id=user_id,
+            )
+            if has_linked_invoice:
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="linked_invoice",
+                        message="Quotes with a linked invoice cannot be deleted.",
+                        suggested_action="archive",
+                    )
+                )
+                continue
+
+            try:
+                await self._repository.delete(document_id)
+                await self._repository.commit()
+            except IntegrityError:
+                await self._repository.rollback()
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="linked_invoice",
+                        message="Quotes with a linked invoice cannot be deleted.",
+                        suggested_action="archive",
+                    )
+                )
+                continue
+            applied.append(BulkActionAppliedItem(id=document_id))
+
+        return BulkActionResponse(action=payload.action, applied=applied, blocked=blocked)
+
     async def start_pdf_generation(
         self,
         user: User,
@@ -426,6 +547,17 @@ def _resolve_user_id(user: User) -> UUID:
     if identity and identity[0] is not None:
         return cast(UUID, identity[0])
     return user.id
+
+
+def _dedupe_ids(ids: list[UUID]) -> list[UUID]:
+    seen: set[UUID] = set()
+    deduped: list[UUID] = []
+    for document_id in ids:
+        if document_id in seen:
+            continue
+        seen.add(document_id)
+        deduped.append(document_id)
+    return deduped
 
 
 def ensure_quote_customer_assigned(quote: Document) -> None:

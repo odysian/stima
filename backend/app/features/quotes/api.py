@@ -41,6 +41,8 @@ from app.features.quotes.extraction_outcomes import (
 from app.features.quotes.extraction_service import CaptureAudioClip, ExtractionService
 from app.features.quotes.review_metadata import normalize_extraction_review_metadata
 from app.features.quotes.schemas import (
+    BulkActionRequest,
+    BulkActionResponse,
     ConvertNotesRequest,
     DiscountType,
     ExtractionResponse,
@@ -571,6 +573,20 @@ async def list_quote_reuse_candidates(
         q=q,
     )
     return [QuoteReuseCandidateResponse.model_validate(candidate) for candidate in candidates]
+
+
+@router.post(
+    "/bulk-action",
+    response_model=BulkActionResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def bulk_action_quotes(
+    payload: BulkActionRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    quote_service: Annotated[QuoteService, Depends(get_quote_service)],
+) -> BulkActionResponse:
+    """Execute one quote-scoped bulk archive/delete action."""
+    return await quote_service.execute_bulk_action(user, payload)
 
 
 @router.get("/{quote_id}", response_model=QuoteDetailResponse)

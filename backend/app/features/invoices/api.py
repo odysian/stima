@@ -16,6 +16,8 @@ from app.core.database import get_db
 from app.features.auth.models import User
 from app.features.invoices.email_delivery_service import InvoiceEmailDeliveryService
 from app.features.invoices.schemas import (
+    InvoiceBulkActionRequest,
+    InvoiceBulkActionResponse,
     InvoiceCreateRequest,
     InvoiceCustomerResponse,
     InvoiceDetailResponse,
@@ -149,6 +151,20 @@ async def get_invoice(
             terminal_error=invoice.pdf_artifact_terminal_error,
         ),
     )
+
+
+@router.post(
+    "/bulk-action",
+    response_model=InvoiceBulkActionResponse,
+    dependencies=[Depends(require_csrf)],
+)
+async def bulk_action_invoices(
+    payload: InvoiceBulkActionRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
+) -> InvoiceBulkActionResponse:
+    """Execute one invoice-scoped bulk archive/delete action."""
+    return await invoice_service.execute_bulk_action(user, payload)
 
 
 @router.patch(

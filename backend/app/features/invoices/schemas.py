@@ -9,6 +9,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.features.quotes.schemas import (
+    BulkActionRequest,
+    BulkActionResponse,
     DiscountType,
     LineItemDraft,
     LineItemResponse,
@@ -141,3 +143,11 @@ class InvoiceUpdateRequest(BaseModel):
         if "doc_type" in self.model_fields_set and self.doc_type is None:
             raise ValueError("doc_type cannot be null")
         return self
+
+
+class InvoiceBulkActionRequest(BulkActionRequest):
+    """Invoice bulk action request payload."""
+
+
+class InvoiceBulkActionResponse(BulkActionResponse):
+    """Invoice bulk action response payload."""

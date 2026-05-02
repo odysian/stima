@@ -27,15 +27,22 @@ from app.features.invoices.repository import (
     InvoicePublicShareRecord,
     InvoiceRepository,
 )
-from app.features.invoices.schemas import InvoiceCreateRequest, InvoiceUpdateRequest
+from app.features.invoices.schemas import (
+    InvoiceBulkActionRequest,
+    InvoiceBulkActionResponse,
+    InvoiceCreateRequest,
+    InvoiceUpdateRequest,
+)
 from app.features.invoices.share import InvoiceShareService
 from app.features.jobs.models import JobRecord
 from app.features.jobs.service import JobService
 from app.features.quotes.models import Document
 from app.features.quotes.repository import QuoteRenderContext
-from app.features.quotes.schemas import LineItemDraft
+from app.features.quotes.schemas import BulkActionAppliedItem, BulkActionBlockedItem, LineItemDraft
 from app.features.quotes.service import QuoteRepositoryProtocol, QuoteServiceError
 from app.integrations.storage import StorageServiceProtocol
+
+_INVOICE_DOC_TYPE = "invoice"
 
 
 class InvoiceRepositoryProtocol(Protocol):
@@ -44,6 +51,11 @@ class InvoiceRepositoryProtocol(Protocol):
     async def customer_exists_for_user(self, *, user_id: UUID, customer_id: UUID) -> bool: ...
 
     async def get_by_id(self, invoice_id: UUID, user_id: UUID) -> Document | None: ...
+    async def get_owned_document_by_id(
+        self,
+        document_id: UUID,
+        user_id: UUID,
+    ) -> Document | None: ...
 
     async def list_by_user(
         self,
@@ -144,6 +156,7 @@ class InvoiceRepositoryProtocol(Protocol):
     ) -> Document: ...
 
     async def invalidate_pdf_artifact(self, invoice: Document) -> str | None: ...
+    async def archive_by_id(self, *, invoice_id: UUID, user_id: UUID) -> bool: ...
 
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None: ...
 
@@ -258,6 +271,77 @@ class InvoiceService:
             data=data,
         )
 
+    async def execute_bulk_action(
+        self,
+        user: User,
+        payload: InvoiceBulkActionRequest,
+    ) -> InvoiceBulkActionResponse:
+        """Execute one invoice-scoped bulk archive/delete action."""
+        user_id = _resolve_user_id(user)
+        unique_ids = _dedupe_ids(payload.ids)
+        applied: list[BulkActionAppliedItem] = []
+        blocked: list[BulkActionBlockedItem] = []
+
+        for document_id in unique_ids:
+            document = await self._invoice_repository.get_owned_document_by_id(document_id, user_id)
+            if document is None:
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="not_found",
+                        message="Document not found.",
+                    )
+                )
+                continue
+            if document.doc_type != _INVOICE_DOC_TYPE:
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="unsupported_document_type",
+                        message="Only invoices can be changed from this endpoint.",
+                    )
+                )
+                continue
+
+            if payload.action == "delete":
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="invoice_delete_not_supported",
+                        message="Invoices cannot be deleted in this version.",
+                    )
+                )
+                continue
+
+            if document.archived_at is not None:
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="already_archived",
+                        message="Invoice is already archived.",
+                    )
+                )
+                continue
+
+            archived = await self._invoice_repository.archive_by_id(
+                invoice_id=document_id,
+                user_id=user_id,
+            )
+            if not archived:
+                blocked.append(
+                    BulkActionBlockedItem(
+                        id=document_id,
+                        reason="already_archived",
+                        message="Invoice is already archived.",
+                    )
+                )
+                continue
+
+            await self._invoice_repository.commit()
+            applied.append(BulkActionAppliedItem(id=document_id))
+
+        return InvoiceBulkActionResponse(action=payload.action, applied=applied, blocked=blocked)
+
     async def start_pdf_generation(
         self,
         user: User,
@@ -325,3 +409,14 @@ def _resolve_user_id(user: User) -> UUID:
     if identity and identity[0] is not None:
         return cast(UUID, identity[0])
     return user.id
+
+
+def _dedupe_ids(ids: list[UUID]) -> list[UUID]:
+    seen: set[UUID] = set()
+    deduped: list[UUID] = []
+    for document_id in ids:
+        if document_id in seen:
+            continue
+        seen.add(document_id)
+        deduped.append(document_id)
+    return deduped

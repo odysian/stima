@@ -1699,6 +1699,51 @@ async def test_delete_non_editable_quote_statuses_return_409(
     assert delete_response.json() == {"detail": "Shared quotes cannot be deleted"}
 
 
+async def test_delete_quote_with_linked_invoice_returns_409_even_if_linked_invoice_archived(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    quote = await _create_quote(client, csrf_token, customer_id)
+    quote_id = quote["id"]
+
+    await _set_quote_status(db_session, quote_id, QuoteStatus.APPROVED)
+    convert_response = await client.post(
+        f"/api/quotes/{quote_id}/convert-to-invoice",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert convert_response.status_code == 201
+    invoice_id = convert_response.json()["id"]
+    await _set_quote_status(db_session, quote_id, QuoteStatus.READY)
+
+    first_delete_response = await client.delete(
+        f"/api/quotes/{quote_id}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert first_delete_response.status_code == 409
+    assert first_delete_response.json() == {
+        "detail": "Quotes with a linked invoice cannot be deleted."
+    }
+
+    archive_invoice_response = await client.post(
+        "/api/invoices/bulk-action",
+        json={"action": "archive", "ids": [invoice_id]},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert archive_invoice_response.status_code == 200
+    assert archive_invoice_response.json()["applied"] == [{"id": invoice_id}]
+
+    second_delete_response = await client.delete(
+        f"/api/quotes/{quote_id}",
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert second_delete_response.status_code == 409
+    assert second_delete_response.json() == {
+        "detail": "Quotes with a linked invoice cannot be deleted."
+    }
+
+
 async def test_create_quote_persists_voice_source_type(client: AsyncClient) -> None:
     csrf_token = await _register_and_login(client, _credentials())
     customer_id = await _create_customer(client, csrf_token)
