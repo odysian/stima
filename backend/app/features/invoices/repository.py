@@ -175,6 +175,7 @@ class InvoiceRepository:
             .where(
                 Document.user_id == user_id,
                 Document.doc_type == _INVOICE_DOC_TYPE,
+                Document.archived_at.is_(None),
             )
             .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
         )
@@ -629,6 +630,21 @@ class InvoiceRepository:
         invoice.pdf_artifact_revision += 1
         await self._session.flush()
         return previous_path
+
+    async def archive_by_id(self, *, invoice_id: UUID, user_id: UUID) -> bool:
+        """Archive one owned invoice when it is not already archived."""
+        row = await self._session.execute(
+            update(Document)
+            .where(
+                Document.id == invoice_id,
+                Document.user_id == user_id,
+                Document.doc_type == _INVOICE_DOC_TYPE,
+                Document.archived_at.is_(None),
+            )
+            .values(archived_at=func.now())
+            .returning(Document.id)
+        )
+        return row.scalar_one_or_none() is not None
 
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None:
         """Transition invoice status to ready when previewing a draft invoice."""
