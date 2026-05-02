@@ -35,6 +35,7 @@ plans/*
 !plans/2026-04-22
 plans/2026-04-24
 plans/follow-ups
+!plans/react-native/
 
 stima-design-system/
 # Added by code-review-graph
