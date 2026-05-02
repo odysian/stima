@@ -16,6 +16,7 @@ from app.features.quotes.schemas import LineItemDraft
 from app.features.quotes.tests import test_quotes as quotes_test_module
 from app.features.quotes.tests.support.helpers import (
     _create_customer,
+    _create_direct_invoice,
     _create_quote,
     _credentials,
     _get_user_by_email,
@@ -1551,6 +1552,29 @@ async def test_delete_quote_returns_404_for_different_users_quote(
     response = await client.delete(
         f"/api/quotes/{quote_id}",
         headers={"X-CSRF-Token": csrf_token_user_b},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
+async def test_delete_quote_returns_404_for_owned_invoice_document(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Owned invoice",
+        transcript="invoice transcript",
+        total_amount=55,
+    )
+
+    response = await client.delete(
+        f"/api/quotes/{invoice['id']}",
+        headers={"X-CSRF-Token": csrf_token},
     )
 
     assert response.status_code == 404
