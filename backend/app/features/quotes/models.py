@@ -139,6 +139,11 @@ class Document(Base):
         sa.DateTime(timezone=True),
         nullable=True,
     )
+    archived_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True),
         nullable=False,

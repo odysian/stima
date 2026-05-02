@@ -285,6 +285,7 @@ class QuoteRepository:
             .where(
                 Document.user_id == user_id,
                 Document.doc_type == _QUOTE_DOC_TYPE,
+                Document.archived_at.is_(None),
             )
             .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
         )
@@ -339,6 +340,7 @@ class QuoteRepository:
             .where(
                 Document.user_id == user_id,
                 Document.doc_type == _QUOTE_DOC_TYPE,
+                Document.archived_at.is_(None),
             )
             .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
         )
@@ -799,6 +801,21 @@ class QuoteRepository:
     async def delete(self, document_id: UUID) -> None:
         """Hard-delete a quote document; line items are removed by cascade."""
         await self._session.execute(delete(Document).where(Document.id == document_id))
+
+    async def archive_by_id(self, *, quote_id: UUID, user_id: UUID) -> bool:
+        """Archive one owned quote when it is not already archived."""
+        row = await self._session.execute(
+            update(Document)
+            .where(
+                Document.id == quote_id,
+                Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
+                Document.archived_at.is_(None),
+            )
+            .values(archived_at=func.now())
+            .returning(Document.id)
+        )
+        return row.scalar_one_or_none() is not None
 
     async def update(
         self,
