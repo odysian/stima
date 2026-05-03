@@ -17,16 +17,17 @@ import { getJobForSession, updateJobStatus } from "@/features/quotes/offline/out
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
-import { Button } from "@/shared/components/Button";
 import { DocumentCardSkeleton } from "@/shared/components/DocumentCardSkeleton";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
-import { Input } from "@/shared/components/Input";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { formatDate } from "@/shared/lib/formatters";
 import { Banner } from "@/ui/Banner";
 import { EmptyState } from "@/ui/EmptyState";
 import { AppIcon } from "@/ui/Icon";
+import { DocumentSelectionFooter } from "./DocumentSelectionFooter";
+import { QuoteListControls } from "./QuoteListControls";
 import { buildInvoiceSubtitle, buildPendingCaptureError, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
+import { useDocumentSelection } from "../hooks/useDocumentSelection";
 type DocumentMode = "quotes" | "invoices";
 
 export function QuoteList(): React.ReactElement {
@@ -43,6 +44,14 @@ export function QuoteList(): React.ReactElement {
   const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
   const [pendingCaptureActionError, setPendingCaptureActionError] = useState<string | null>(null);
   const [capturePendingDelete, setCapturePendingDelete] = useState<LocalCaptureSummary | null>(null);
+  const {
+    isSelectionMode,
+    selectedCount,
+    enterSelectionMode,
+    cancelSelection,
+    toggleSelection,
+    isSelected,
+  } = useDocumentSelection({ activeMode: documentMode });
   const {
     captures: recoverableCaptures,
     isLoading: isLoadingRecoverableCaptures,
@@ -166,6 +175,7 @@ export function QuoteList(): React.ReactElement {
   const draftQuoteRows = useMemo<DocumentRow[]>(
     () => draftQuotes.map((quote) => ({
       id: quote.id,
+      doc_type: "quote",
       customerLabel: quote.customer_name ?? "Unassigned",
       titleLabel: quote.title ?? null,
       docAndDate: [quote.doc_number, formatDate(quote.created_at, timezone)].join(" · "),
@@ -181,6 +191,7 @@ export function QuoteList(): React.ReactElement {
   const nonDraftQuoteRows = useMemo<DocumentRow[]>(
     () => nonDraftQuotes.map((quote) => ({
       id: quote.id,
+      doc_type: "quote",
       customerLabel: quote.customer_name ?? "Unassigned",
       titleLabel: quote.title ?? null,
       docAndDate: [quote.doc_number, formatDate(quote.created_at, timezone)].join(" · "),
@@ -193,6 +204,7 @@ export function QuoteList(): React.ReactElement {
   const invoiceRows = useMemo<DocumentRow[]>(
     () => filteredInvoices.map((invoice) => ({
       id: invoice.id,
+      doc_type: "invoice",
       customerLabel: invoice.customer_name,
       titleLabel: invoice.title ?? null,
       docAndDate: [invoice.doc_number, formatDate(invoice.created_at, timezone)].join(" · "),
@@ -258,78 +270,24 @@ export function QuoteList(): React.ReactElement {
     <main className="min-h-screen bg-background pb-24">
       <ScreenHeader title={headerTitle} subtitle={headerSubtitle} layout="top-level" />
       <section className="mx-auto w-full max-w-3xl pb-2 pt-20">
-        <div className="mb-4 px-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div
-              aria-label="Document type filter"
-              className="inline-flex rounded-full bg-surface-container-low p-1"
-            >
-              <button
-                type="button"
-                aria-pressed={documentMode === "quotes"}
-                className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  documentMode === "quotes"
-                    ? "ghost-shadow bg-surface-container-lowest text-primary ring-1 ring-selection-ring"
-                    : "text-on-surface-variant"
-                }`}
-                onClick={() => setDocumentMode("quotes")}
-              >
-                Quotes
-              </button>
-              <button
-                type="button"
-                aria-pressed={documentMode === "invoices"}
-                className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  documentMode === "invoices"
-                    ? "ghost-shadow bg-surface-container-lowest text-primary ring-1 ring-selection-ring"
-                    : "text-on-surface-variant"
-                }`}
-                onClick={() => setDocumentMode("invoices")}
-              >
-                Invoices
-              </button>
-            </div>
-            <Button
-              type="button"
-              variant="iconButton"
-              size="sm"
-              aria-label={isSearchOpen ? "Close search" : "Open search"}
-              className={isSearchOpen
-                ? "border border-primary/70 bg-primary text-on-primary ghost-shadow hover:bg-primary/90"
-                : "border border-outline-variant/30 bg-surface-container-lowest text-on-surface ghost-shadow"}
-              onClick={() => {
-                if (isSearchOpen) {
-                  setSearchQuery("");
-                }
-                setIsSearchOpen((open) => !open);
-              }}
-            >
-              <AppIcon name="search" className="block text-[1.125rem] leading-none" />
-            </Button>
-          </div>
-          {isSearchOpen ? (
-            <Input
-              label={searchLabel}
-              id="document-search"
-              placeholder={searchPlaceholder}
-              hideLabel
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              endAdornment={(
-                <Button
-                  type="button"
-                  variant="iconButton"
-                  size="xs"
-                  aria-label="Clear search text"
-                  className="text-outline"
-                  onClick={() => setSearchQuery("")}
-                >
-                  <AppIcon name="close" className="block text-base leading-none" />
-                </Button>
-              )}
-            />
-          ) : null}
-        </div>
+        <QuoteListControls
+          documentMode={documentMode}
+          isSelectionMode={isSelectionMode}
+          isSearchOpen={isSearchOpen}
+          searchQuery={searchQuery}
+          searchLabel={searchLabel}
+          searchPlaceholder={searchPlaceholder}
+          onDocumentModeChange={setDocumentMode}
+          onSearchToggle={() => {
+            if (isSearchOpen) {
+              setSearchQuery("");
+            }
+            setIsSearchOpen((open) => !open);
+          }}
+          onSearchChange={setSearchQuery}
+          onSearchClear={() => setSearchQuery("")}
+          onEnterSelectionMode={enterSelectionMode}
+        />
 
         {documentMode === "quotes" ? (
           <>
@@ -389,7 +347,15 @@ export function QuoteList(): React.ReactElement {
                   <DocumentRowsSection
                     label="DRAFTS"
                     rows={draftQuoteRows}
-                    onRowClick={(row) => navigate(row.destination, { state: row.destinationState })}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={(row) => isSelected(row.id)}
+                    onRowClick={(row) => {
+                      if (isSelectionMode) {
+                        toggleSelection(row.id);
+                        return;
+                      }
+                      navigate(row.destination, { state: row.destinationState });
+                    }}
                   />
                 ) : null}
                 {nonDraftQuoteRows.length > 0 ? (
@@ -397,7 +363,15 @@ export function QuoteList(): React.ReactElement {
                     <DocumentRowsSection
                       label="PAST QUOTES"
                       rows={nonDraftQuoteRows}
-                      onRowClick={(row) => navigate(row.destination)}
+                      isSelectionMode={isSelectionMode}
+                      isSelected={(row) => isSelected(row.id)}
+                      onRowClick={(row) => {
+                        if (isSelectionMode) {
+                          toggleSelection(row.id);
+                          return;
+                        }
+                        navigate(row.destination);
+                      }}
                     />
                   </div>
                 ) : null}
@@ -406,21 +380,37 @@ export function QuoteList(): React.ReactElement {
               <DocumentRowsSection
                 label="PAST INVOICES"
                 rows={invoiceRows}
-                onRowClick={(row) => navigate(row.destination)}
+                isSelectionMode={isSelectionMode}
+                isSelected={(row) => isSelected(row.id)}
+                onRowClick={(row) => {
+                  if (isSelectionMode) {
+                    toggleSelection(row.id);
+                    return;
+                  }
+                  navigate(row.destination);
+                }}
               />
             )}
           </>
         ) : null}
       </section>
 
-      <button
-        type="button"
-        aria-label="New quote"
-        className="fixed bottom-20 right-4 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
-        onClick={quoteCreateFlow.openCreateEntry}
-      >
-        <AppIcon name="description" />
-      </button>
+      {!isSelectionMode ? (
+        <button
+          type="button"
+          aria-label="New quote"
+          className="fixed bottom-20 right-4 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full forest-gradient text-on-primary ghost-shadow transition-all active:scale-95"
+          onClick={quoteCreateFlow.openCreateEntry}
+        >
+          <AppIcon name="description" />
+        </button>
+      ) : null}
+      {isSelectionMode ? (
+        <DocumentSelectionFooter
+          selectedCount={selectedCount}
+          onCancelSelection={cancelSelection}
+        />
+      ) : null}
       <PendingCaptureDeleteDialog
         capture={capturePendingDelete}
         onCancel={() => setCapturePendingDelete(null)}

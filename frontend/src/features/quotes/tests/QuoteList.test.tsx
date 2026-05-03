@@ -261,6 +261,68 @@ describe("QuoteList", () => {
     expect(await screen.findByRole("button", { name: /bob brown/i })).toBeInTheDocument();
   });
 
+  it("enters selection mode from overflow menu and renders row checkboxes", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem({ status: "ready" })]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    fireEvent.click(screen.getByRole("button", { name: "List actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Select" }));
+
+    const rowCheckbox = screen.getByRole("checkbox", { name: "Select Alice Johnson" });
+    expect(rowCheckbox).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /alice johnson/i }));
+    expect(rowCheckbox).toHaveAttribute("aria-checked", "true");
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("locks tab switch, preserves search, and clears selection via cancel", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([
+      makeQuoteListItem({ id: "quote-1", customer_name: "Alice Johnson", status: "ready" }),
+      makeQuoteListItem({
+        id: "quote-2",
+        customer_id: "cust-2",
+        customer_name: "Bob Brown",
+        doc_number: "Q-002",
+        status: "ready",
+      }),
+    ]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    const searchInput = await openSearch();
+    fireEvent.change(searchInput, { target: { value: "alice" } });
+    expect(searchInput).toHaveValue("alice");
+
+    fireEvent.click(screen.getByRole("button", { name: "List actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Select" }));
+
+    expect(screen.getByLabelText("Search quotes")).toHaveValue("alice");
+    const documentTypeFilter = screen.getByLabelText("Document type filter");
+    expect(within(documentTypeFilter).getByRole("button", { name: "Quotes" })).toBeDisabled();
+    expect(within(documentTypeFilter).getByRole("button", { name: "Invoices" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "New quote" })).not.toBeInTheDocument();
+    expect(screen.getByText("0 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /alice johnson/i }));
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("menuitem", { name: "Delete permanently..." })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Cancel selection" }));
+
+    expect(screen.queryByText("0 selected")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New quote" })).toBeInTheDocument();
+    expect(within(documentTypeFilter).getByRole("button", { name: "Invoices" })).not.toBeDisabled();
+    expect(screen.queryByRole("checkbox", { name: "Select Alice Johnson" })).not.toBeInTheDocument();
+  });
+
   it("uses token-backed emphasis for the active filter and create button", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem()]);
 
