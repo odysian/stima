@@ -4,6 +4,7 @@ import type { StatusPillVariant } from "@/ui/StatusPill";
 
 export interface DocumentRow {
   id: string;
+  doc_type: "quote" | "invoice";
   customerLabel: string;
   titleLabel?: string | null;
   docAndDate: string;
@@ -21,12 +22,16 @@ interface DocumentRowsSectionProps {
   label: string;
   rows: DocumentRow[];
   onRowClick: (row: DocumentRow) => void;
+  isSelectionMode?: boolean;
+  isSelected?: (row: DocumentRow) => boolean;
 }
 
 export function DocumentRowsSection({
   label,
   rows,
   onRowClick,
+  isSelectionMode = false,
+  isSelected,
 }: DocumentRowsSectionProps): React.ReactElement {
   return (
     <section aria-label={label}>
@@ -45,6 +50,8 @@ export function DocumentRowsSection({
                 status={row.status}
                 isDraft={row.isDraft}
                 needsCustomerAssignment={row.needsCustomerAssignment}
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected?.(row)}
                 onClick={() => onRowClick(row)}
               />
             </li>
