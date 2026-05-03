@@ -155,13 +155,15 @@ export function buildOverflowItems({
 
   if (actionState === "draft") {
     items = [
-      {
-        label: "Delete Quote",
-        icon: "delete",
-        tone: "destructive",
-        disabled: isBusy,
-        onSelect: onDeleteRequest,
-      },
+      ...(!hasLinkedInvoice
+        ? [{
+          label: "Delete Quote",
+          icon: "delete",
+          tone: "destructive" as const,
+          disabled: isBusy,
+          onSelect: onDeleteRequest,
+        }]
+        : []),
       {
         label: "Mark as Won",
         icon: "check_circle",
@@ -178,13 +180,15 @@ export function buildOverflowItems({
     ];
   } else if (actionState === "ready") {
     items = [
-      {
-        label: "Delete Quote",
-        icon: "delete",
-        tone: "destructive",
-        disabled: isBusy,
-        onSelect: onDeleteRequest,
-      },
+      ...(!hasLinkedInvoice
+        ? [{
+          label: "Delete Quote",
+          icon: "delete",
+          tone: "destructive" as const,
+          disabled: isBusy,
+          onSelect: onDeleteRequest,
+        }]
+        : []),
       {
         label: "Mark as Won",
         icon: "check_circle",

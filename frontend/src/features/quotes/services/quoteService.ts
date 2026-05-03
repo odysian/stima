@@ -1,5 +1,7 @@
 import type { Invoice } from "@/features/invoices/types/invoice.types";
 import type {
+  BulkActionRequest,
+  BulkActionResponse,
   ExtractionResult,
   ExtractionReviewMetadata,
   ExtractionReviewMetadataUpdateRequest,
@@ -239,6 +241,13 @@ function convertToInvoice(id: string): Promise<Invoice> {
   });
 }
 
+function bulkAction(payload: BulkActionRequest): Promise<BulkActionResponse> {
+  return request<BulkActionResponse>("/api/quotes/bulk-action", {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export const quoteService = {
   extract,
   createManualDraft,
@@ -258,4 +267,5 @@ export const quoteService = {
   markQuoteWon,
   markQuoteLost,
   convertToInvoice,
+  bulkAction,
 };

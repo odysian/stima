@@ -6,14 +6,14 @@ import { invoiceService } from "@/features/invoices/services/invoiceService";
 import type { InvoiceListItem } from "@/features/invoices/types/invoice.types";
 import { PendingCaptureDeleteDialog } from "@/features/quotes/components/PendingCaptureDeleteDialog";
 import { PendingCapturesSection } from "@/features/quotes/components/PendingCapturesSection";
+import { QuoteListSelectionOverlays } from "@/features/quotes/components/QuoteListSelectionOverlays";
+import { useDocumentBulkActions } from "@/features/quotes/hooks/useDocumentBulkActions";
+import { useQuoteListPendingCaptureActions } from "@/features/quotes/hooks/useQuoteListPendingCaptureActions";
 import { useReconnectRefresh } from "@/features/quotes/components/useReconnectRefresh";
 import { useOutboxSuccessQuoteRefresh } from "@/features/quotes/components/useOutboxSuccessQuoteRefresh";
 import { useQuoteCreateFlow } from "@/features/quotes/hooks/useQuoteCreateFlow";
-import { getStorageErrorMessage } from "@/features/quotes/offline/captureDb";
 import type { LocalCaptureSummary } from "@/features/quotes/offline/captureTypes";
 import { useRecoverableCaptures } from "@/features/quotes/offline/useRecoverableCaptures";
-import { runOutboxPass } from "@/features/quotes/offline/outboxEngine";
-import { getJobForSession, updateJobStatus } from "@/features/quotes/offline/outboxRepository";
 import { quoteService } from "@/features/quotes/services/quoteService";
 import type { QuoteListItem } from "@/features/quotes/types/quote.types";
 import { BottomNav } from "@/shared/components/BottomNav";
@@ -24,12 +24,10 @@ import { formatDate } from "@/shared/lib/formatters";
 import { Banner } from "@/ui/Banner";
 import { EmptyState } from "@/ui/EmptyState";
 import { AppIcon } from "@/ui/Icon";
-import { DocumentSelectionFooter } from "./DocumentSelectionFooter";
 import { QuoteListControls } from "./QuoteListControls";
 import { buildInvoiceSubtitle, buildPendingCaptureError, buildQuoteSubtitle, matchesSearch } from "./QuoteList.helpers";
 import { useDocumentSelection } from "../hooks/useDocumentSelection";
 type DocumentMode = "quotes" | "invoices";
-
 export function QuoteList(): React.ReactElement {
   const navigate = useNavigate();
   const { authMode, user } = useAuth();
@@ -42,16 +40,38 @@ export function QuoteList(): React.ReactElement {
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [quoteLoadError, setQuoteLoadError] = useState<string | null>(null);
   const [invoiceLoadError, setInvoiceLoadError] = useState<string | null>(null);
-  const [pendingCaptureActionError, setPendingCaptureActionError] = useState<string | null>(null);
   const [capturePendingDelete, setCapturePendingDelete] = useState<LocalCaptureSummary | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
   const {
     isSelectionMode,
+    selectedIds,
     selectedCount,
     enterSelectionMode,
     cancelSelection,
     toggleSelection,
     isSelected,
   } = useDocumentSelection({ activeMode: documentMode });
+  const {
+    bulkActionError,
+    bulkActionFeedback,
+    isBulkActionPending,
+    showArchiveConfirm,
+    showDeleteConfirm,
+    openArchiveConfirm,
+    openDeleteConfirm,
+    closeArchiveConfirm,
+    closeDeleteConfirm,
+    closeSelectionActionDialogs,
+    clearBulkActionFeedback,
+    executeBulkAction,
+  } = useDocumentBulkActions({
+    documentMode,
+    selectedIds,
+    onComplete: () => {
+      cancelSelection();
+      setRefreshTick((current) => current + 1);
+    },
+  });
   const {
     captures: recoverableCaptures,
     isLoading: isLoadingRecoverableCaptures,
@@ -60,6 +80,17 @@ export function QuoteList(): React.ReactElement {
     deleteCapture,
   } = useRecoverableCaptures(user?.id);
   const { isOnline, reconnectTick } = useReconnectRefresh(refreshRecoverableCaptures);
+  const {
+    pendingCaptureActionError,
+    clearPendingCaptureActionError,
+    navigateToLocalCapture,
+    onDeleteCapture,
+    onRetryCapture,
+  } = useQuoteListPendingCaptureActions({
+    userId: user?.id,
+    deleteCapture,
+    refreshRecoverableCaptures,
+  });
   useOutboxSuccessQuoteRefresh({
     userId: user?.id,
     onQuotesLoaded: setQuotes,
@@ -117,12 +148,11 @@ export function QuoteList(): React.ReactElement {
         }
       }
     }
-
     void fetchDocuments();
     return () => {
       isActive = false;
     };
-  }, [authMode, documentMode, reconnectTick]);
+  }, [authMode, documentMode, reconnectTick, refreshTick]);
 
   useEffect(() => {
     if (!isSearchOpen) {
@@ -167,11 +197,9 @@ export function QuoteList(): React.ReactElement {
   const headerSubtitle = documentMode === "quotes" ? quoteSubtitle : invoiceSubtitle;
   const searchLabel = documentMode === "quotes" ? "Search quotes" : "Search invoices";
   const searchPlaceholder = documentMode === "quotes" ? "Search customer, title, or quote ID..." : "Search customer, title, or invoice ID...";
-  const emptyStateMessage = totalRows === 0
-    ? documentMode === "quotes"
-      ? "No quotes yet. Tap New Quote to create your first."
-      : "No invoices yet. Convert a quote to an invoice from Preview."
-    : `No ${documentMode} match your search.`;
+  const emptyStateMessage = totalRows === 0 ? (documentMode === "quotes"
+    ? "No quotes yet. Tap New Quote to create your first."
+    : "No invoices yet. Convert a quote to an invoice from Preview.") : `No ${documentMode} match your search.`;
   const draftQuoteRows = useMemo<DocumentRow[]>(
     () => draftQuotes.map((quote) => ({
       id: quote.id,
@@ -224,48 +252,6 @@ export function QuoteList(): React.ReactElement {
     recoverableCapturesError,
     pendingCaptureActionError,
   });
-  function navigateToLocalCapture(sessionId: string, options?: { autoExtract?: boolean }): void {
-    const nextSearchParams = new URLSearchParams({ localSession: sessionId });
-    if (options?.autoExtract) {
-      nextSearchParams.set("autoExtract", "1");
-    }
-    navigate(`/quotes/capture?${nextSearchParams.toString()}`);
-  }
-
-  async function onDeleteCapture(sessionId: string): Promise<void> {
-    setPendingCaptureActionError(null);
-    try {
-      await deleteCapture(sessionId);
-    } catch (deleteError) {
-      const message = getStorageErrorMessage(deleteError, "Unable to delete pending capture.");
-      setPendingCaptureActionError(message);
-    }
-  }
-
-  async function onRetryCapture(sessionId: string): Promise<void> {
-    if (!user?.id) {
-      return;
-    }
-
-    setPendingCaptureActionError(null);
-    try {
-      const outboxJob = await getJobForSession(sessionId);
-      if (!outboxJob || outboxJob.status === "running") {
-        return;
-      }
-
-      await updateJobStatus(outboxJob.jobId, {
-        status: "queued",
-        nextRetryAt: null,
-      });
-      await runOutboxPass(user.id);
-      await refreshRecoverableCaptures();
-    } catch (retryError) {
-      const message = getStorageErrorMessage(retryError, "Unable to retry pending capture.");
-      setPendingCaptureActionError(message);
-    }
-  }
-
   return (
     <main className="min-h-screen bg-background pb-24">
       <ScreenHeader title={headerTitle} subtitle={headerSubtitle} layout="top-level" />
@@ -289,6 +275,16 @@ export function QuoteList(): React.ReactElement {
           onEnterSelectionMode={enterSelectionMode}
         />
 
+        {bulkActionFeedback ? (
+          <div className="mb-4 px-4">
+            <Banner kind={bulkActionFeedback.kind} title={bulkActionFeedback.title} message={bulkActionFeedback.message} onDismiss={clearBulkActionFeedback} />
+          </div>
+        ) : null}
+        {bulkActionError ? (
+          <div className="mb-4 px-4">
+            <FeedbackMessage variant="error">{bulkActionError}</FeedbackMessage>
+          </div>
+        ) : null}
         {documentMode === "quotes" ? (
           <>
             {authMode === "offline_recovered" ? (
@@ -302,10 +298,20 @@ export function QuoteList(): React.ReactElement {
               isOnline={isOnline}
               timezone={timezone}
               error={pendingCaptureError}
-              onResume={(sessionId) => navigateToLocalCapture(sessionId)}
-              onExtract={(sessionId) => navigateToLocalCapture(sessionId, { autoExtract: true })}
-              onRetry={(sessionId) => { void onRetryCapture(sessionId); }}
+              onResume={(sessionId) => {
+                clearPendingCaptureActionError();
+                navigateToLocalCapture(sessionId);
+              }}
+              onExtract={(sessionId) => {
+                clearPendingCaptureActionError();
+                navigateToLocalCapture(sessionId, { autoExtract: true });
+              }}
+              onRetry={(sessionId) => {
+                clearPendingCaptureActionError();
+                void onRetryCapture(sessionId);
+              }}
               onDelete={(sessionId) => {
+                clearPendingCaptureActionError();
                 const capture = recoverableCaptures.find((item) => item.sessionId === sessionId) ?? null;
                 setCapturePendingDelete(capture);
               }}
@@ -405,12 +411,27 @@ export function QuoteList(): React.ReactElement {
           <AppIcon name="description" />
         </button>
       ) : null}
-      {isSelectionMode ? (
-        <DocumentSelectionFooter
-          selectedCount={selectedCount}
-          onCancelSelection={cancelSelection}
-        />
-      ) : null}
+      <QuoteListSelectionOverlays
+        isSelectionMode={isSelectionMode}
+        selectedCount={selectedCount}
+        isBulkActionPending={isBulkActionPending}
+        showArchiveConfirm={showArchiveConfirm}
+        showDeleteConfirm={showDeleteConfirm}
+        onCancelSelection={() => {
+          closeSelectionActionDialogs();
+          cancelSelection();
+        }}
+        onArchiveSelection={openArchiveConfirm}
+        onDeleteSelectionPermanently={openDeleteConfirm}
+        onArchiveConfirmCancel={closeArchiveConfirm}
+        onDeleteConfirmCancel={closeDeleteConfirm}
+        onArchiveConfirm={() => {
+          void executeBulkAction("archive");
+        }}
+        onDeleteConfirm={() => {
+          void executeBulkAction("delete");
+        }}
+      />
       <PendingCaptureDeleteDialog
         capture={capturePendingDelete}
         onCancel={() => setCapturePendingDelete(null)}

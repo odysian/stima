@@ -101,6 +101,36 @@ export type QuoteStatus =
   | "declined";
 export type QuoteSourceType = "text" | "voice" | "voice+text";
 export type ExtractionTier = "primary" | "degraded";
+export type BulkActionType = "archive" | "delete";
+export type BulkBlockedReason =
+  | "not_found"
+  | "already_archived"
+  | "quote_status_not_deletable"
+  | "linked_invoice"
+  | "unsupported_document_type"
+  | "invoice_delete_not_supported";
+
+export interface BulkActionRequest {
+  action: BulkActionType;
+  ids: string[];
+}
+
+export interface BulkActionAppliedItem {
+  id: string;
+}
+
+export interface BulkActionBlockedItem {
+  id: string;
+  reason: BulkBlockedReason;
+  message: string;
+  suggested_action?: BulkActionType | null;
+}
+
+export interface BulkActionResponse {
+  action: BulkActionType;
+  applied: BulkActionAppliedItem[];
+  blocked: BulkActionBlockedItem[];
+}
 
 export interface QuotePricingFields {
   total_amount: number | null;
