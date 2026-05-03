@@ -74,9 +74,19 @@ async def test_archived_invoice_hidden_from_default_lists_and_public_share_still
     assert list_response.status_code == 200
     assert list_response.json() == []
 
+    archived_list_response = await client.get("/api/invoices?archived=true")
+    assert archived_list_response.status_code == 200
+    assert [item["id"] for item in archived_list_response.json()] == [invoice["id"]]
+
     customer_list_response = await client.get(f"/api/invoices?customer_id={customer_id}")
     assert customer_list_response.status_code == 200
     assert customer_list_response.json() == []
+
+    archived_customer_list_response = await client.get(
+        f"/api/invoices?archived=true&customer_id={customer_id}"
+    )
+    assert archived_customer_list_response.status_code == 200
+    assert [item["id"] for item in archived_customer_list_response.json()] == [invoice["id"]]
 
     detail_response = await client.get(f"/api/invoices/{invoice['id']}")
     assert detail_response.status_code == 200
@@ -132,6 +142,57 @@ async def test_archive_invoice_rejects_other_user_and_rearchive(
     await db_session.refresh(persisted_invoice)
     assert persisted_invoice.archived_at is not None
     assert persisted_invoice.status == original_status
+
+
+async def test_archived_invoice_list_filters_by_customer_when_archived_true(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token, name="Archived Invoice Customer")
+    other_customer_id = await _create_customer(client, csrf_token, name="Active Invoice Customer")
+    archived_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Archived invoice",
+        transcript="invoice transcript",
+        total_amount=180,
+    )
+    await _create_direct_invoice(
+        client,
+        csrf_token,
+        other_customer_id,
+        title="Active invoice",
+        transcript="invoice transcript",
+        total_amount=180,
+    )
+
+    repository = InvoiceRepository(db_session)
+    persisted_invoice = await db_session.get(Document, UUID(str(archived_invoice["id"])))
+    assert persisted_invoice is not None
+    archived = await repository.archive_by_id(
+        invoice_id=persisted_invoice.id,
+        user_id=persisted_invoice.user_id,
+    )
+    assert archived
+    await repository.commit()
+
+    archived_response = await client.get("/api/invoices?archived=true")
+    assert archived_response.status_code == 200
+    assert [item["id"] for item in archived_response.json()] == [archived_invoice["id"]]
+
+    archived_customer_response = await client.get(
+        f"/api/invoices?archived=true&customer_id={customer_id}"
+    )
+    assert archived_customer_response.status_code == 200
+    assert [item["id"] for item in archived_customer_response.json()] == [archived_invoice["id"]]
+
+    archived_other_customer_response = await client.get(
+        f"/api/invoices?archived=true&customer_id={other_customer_id}"
+    )
+    assert archived_other_customer_response.status_code == 200
+    assert archived_other_customer_response.json() == []
 
 
 async def test_source_document_relationship_survives_quote_archiving(

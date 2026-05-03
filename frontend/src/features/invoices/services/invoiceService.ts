@@ -22,9 +22,16 @@ function getInvoice(id: string): Promise<InvoiceDetail> {
   return request<InvoiceDetail>(`/api/invoices/${id}`);
 }
 
-function listInvoices(params?: { customer_id?: string }): Promise<InvoiceListItem[]> {
-  const query = params?.customer_id ? `?customer_id=${params.customer_id}` : "";
-  return request<InvoiceListItem[]>(`/api/invoices${query}`);
+function listInvoices(params?: { customer_id?: string; archived?: boolean }): Promise<InvoiceListItem[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.customer_id) {
+    queryParams.set("customer_id", params.customer_id);
+  }
+  if (params?.archived === true) {
+    queryParams.set("archived", "true");
+  }
+  const query = queryParams.toString();
+  return request<InvoiceListItem[]>(`/api/invoices${query ? `?${query}` : ""}`);
 }
 
 function updateInvoice(id: string, data: InvoiceUpdateRequest): Promise<Invoice> {

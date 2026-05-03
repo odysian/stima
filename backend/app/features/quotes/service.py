@@ -67,6 +67,7 @@ class QuoteRepositoryProtocol(Protocol):
         self,
         user_id: UUID,
         customer_id: UUID | None = None,
+        archived: bool = False,
     ) -> list[QuoteListItemSummary]: ...
     async def list_reuse_candidates(
         self,
@@ -189,6 +190,7 @@ class QuoteRepositoryProtocol(Protocol):
 
     async def delete(self, document_id: UUID) -> None: ...
     async def archive_by_id(self, *, quote_id: UUID, user_id: UUID) -> bool: ...
+    async def unarchive_by_id(self, *, quote_id: UUID, user_id: UUID) -> bool: ...
 
     async def commit(self) -> None: ...
 
@@ -296,11 +298,13 @@ class QuoteService:
         self,
         user: User,
         customer_id: UUID | None = None,
+        archived: bool = False,
     ) -> list[QuoteListItemSummary]:
         """List quotes for the authenticated user."""
         return await self._repository.list_by_user(
             _resolve_user_id(user),
             customer_id=customer_id,
+            archived=archived,
         )
 
     async def list_quote_reuse_candidates(
@@ -369,7 +373,7 @@ class QuoteService:
         user: User,
         payload: BulkActionRequest,
     ) -> BulkActionResponse:
-        """Execute one quote-scoped bulk archive/delete action with per-id outcomes."""
+        """Execute one quote-scoped bulk archive/unarchive/delete action with per-id outcomes."""
         user_id = _resolve_user_id(user)
         unique_ids = _dedupe_ids(payload.ids)
         applied: list[BulkActionAppliedItem] = []
@@ -416,6 +420,33 @@ class QuoteService:
                             id=document_id,
                             reason="already_archived",
                             message="Quote is already archived.",
+                        )
+                    )
+                    continue
+                await self._repository.commit()
+                applied.append(BulkActionAppliedItem(id=document_id))
+                continue
+
+            if payload.action == "unarchive":
+                if document.archived_at is None:
+                    blocked.append(
+                        BulkActionBlockedItem(
+                            id=document_id,
+                            reason="not_archived",
+                            message="Quote is not archived.",
+                        )
+                    )
+                    continue
+                unarchived = await self._repository.unarchive_by_id(
+                    quote_id=document_id,
+                    user_id=user_id,
+                )
+                if not unarchived:
+                    blocked.append(
+                        BulkActionBlockedItem(
+                            id=document_id,
+                            reason="not_archived",
+                            message="Quote is not archived.",
                         )
                     )
                     continue

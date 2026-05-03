@@ -43,9 +43,10 @@ class _RetryingInvoiceRepository:
         del customer_id
         return False
 
-    async def list_by_user(self, user_id, customer_id=None):  # noqa: ANN001
+    async def list_by_user(self, user_id, customer_id=None, archived=False):  # noqa: ANN001
         del user_id
         del customer_id
+        del archived
         return []
 
     async def get_by_source_document_id(self, *, source_document_id, user_id):  # noqa: ANN001
@@ -120,6 +121,11 @@ class _RetryingInvoiceRepository:
         del user_id
         return False
 
+    async def unarchive_by_id(self, *, invoice_id, user_id):  # noqa: ANN001
+        del invoice_id
+        del user_id
+        return False
+
     async def mark_ready_if_draft(self, *, invoice_id, user_id):  # noqa: ANN001
         del invoice_id
         del user_id
@@ -181,9 +187,10 @@ class _DirectInvoiceCollisionRepository:
         del customer_id
         return True
 
-    async def list_by_user(self, user_id, customer_id=None):  # noqa: ANN001
+    async def list_by_user(self, user_id, customer_id=None, archived=False):  # noqa: ANN001
         del user_id
         del customer_id
+        del archived
         return []
 
     async def get_by_id(self, invoice_id, user_id):  # noqa: ANN001
@@ -259,6 +266,11 @@ class _DirectInvoiceCollisionRepository:
         return None
 
     async def archive_by_id(self, *, invoice_id, user_id):  # noqa: ANN001
+        del invoice_id
+        del user_id
+        return False
+
+    async def unarchive_by_id(self, *, invoice_id, user_id):  # noqa: ANN001
         del invoice_id
         del user_id
         return False

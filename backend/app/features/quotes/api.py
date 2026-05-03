@@ -553,9 +553,15 @@ async def list_quotes(
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
     customer_id: Annotated[UUID | None, Query()] = None,
+    archived: Annotated[str | None, Query()] = None,
 ) -> list[QuoteListItemResponse]:
     """List quotes for the authenticated user."""
-    quotes = await quote_service.list_quotes(user, customer_id=customer_id)
+    show_archived = (archived or "").lower() == "true"
+    quotes = await quote_service.list_quotes(
+        user,
+        customer_id=customer_id,
+        archived=show_archived,
+    )
     return [QuoteListItemResponse.model_validate(quote) for quote in quotes]
 
 
@@ -586,7 +592,7 @@ async def bulk_action_quotes(
     user: Annotated[User, Depends(get_current_user)],
     quote_service: Annotated[QuoteService, Depends(get_quote_service)],
 ) -> BulkActionResponse:
-    """Execute one quote-scoped bulk archive/delete action."""
+    """Execute one quote-scoped bulk archive/unarchive/delete action."""
     return await quote_service.execute_bulk_action(user, payload)
 
 

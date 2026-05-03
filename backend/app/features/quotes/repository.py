@@ -250,6 +250,7 @@ class QuoteRepository:
         self,
         user_id: UUID,
         customer_id: UUID | None = None,
+        archived: bool = False,
     ) -> list[QuoteListItemSummary]:
         """Return quote summaries for a user ordered newest-first."""
         linked_invoice = aliased(Document)
@@ -268,6 +269,9 @@ class QuoteRepository:
             )
             .exists()
         )
+        archived_filter = (
+            Document.archived_at.is_not(None) if archived else Document.archived_at.is_(None)
+        )
         statement = (
             select(
                 Document.id,
@@ -285,7 +289,7 @@ class QuoteRepository:
             .where(
                 Document.user_id == user_id,
                 Document.doc_type == _QUOTE_DOC_TYPE,
-                Document.archived_at.is_(None),
+                archived_filter,
             )
             .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
         )
@@ -825,6 +829,21 @@ class QuoteRepository:
                 Document.archived_at.is_(None),
             )
             .values(archived_at=func.now())
+            .returning(Document.id)
+        )
+        return row.scalar_one_or_none() is not None
+
+    async def unarchive_by_id(self, *, quote_id: UUID, user_id: UUID) -> bool:
+        """Unarchive one owned quote when it is currently archived."""
+        row = await self._session.execute(
+            update(Document)
+            .where(
+                Document.id == quote_id,
+                Document.user_id == user_id,
+                Document.doc_type == _QUOTE_DOC_TYPE,
+                Document.archived_at.is_not(None),
+            )
+            .values(archived_at=None)
             .returning(Document.id)
         )
         return row.scalar_one_or_none() is not None

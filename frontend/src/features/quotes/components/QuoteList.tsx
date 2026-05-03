@@ -273,6 +273,7 @@ export function QuoteList(): React.ReactElement {
           onSearchChange={setSearchQuery}
           onSearchClear={() => setSearchQuery("")}
           onEnterSelectionMode={enterSelectionMode}
+          onViewArchived={() => navigate("/archived")}
         />
 
         {bulkActionFeedback ? (

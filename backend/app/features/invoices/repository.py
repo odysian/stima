@@ -156,8 +156,12 @@ class InvoiceRepository:
         self,
         user_id: UUID,
         customer_id: UUID | None = None,
+        archived: bool = False,
     ) -> list[InvoiceListItemSummary]:
         """Return invoice summaries for a user ordered newest-first."""
+        archived_filter = (
+            Document.archived_at.is_not(None) if archived else Document.archived_at.is_(None)
+        )
         statement = (
             select(
                 Document.id,
@@ -175,7 +179,7 @@ class InvoiceRepository:
             .where(
                 Document.user_id == user_id,
                 Document.doc_type == _INVOICE_DOC_TYPE,
-                Document.archived_at.is_(None),
+                archived_filter,
             )
             .order_by(Document.created_at.desc(), Document.doc_sequence.desc())
         )
@@ -654,6 +658,21 @@ class InvoiceRepository:
                 Document.archived_at.is_(None),
             )
             .values(archived_at=func.now())
+            .returning(Document.id)
+        )
+        return row.scalar_one_or_none() is not None
+
+    async def unarchive_by_id(self, *, invoice_id: UUID, user_id: UUID) -> bool:
+        """Unarchive one owned invoice when it is currently archived."""
+        row = await self._session.execute(
+            update(Document)
+            .where(
+                Document.id == invoice_id,
+                Document.user_id == user_id,
+                Document.doc_type == _INVOICE_DOC_TYPE,
+                Document.archived_at.is_not(None),
+            )
+            .values(archived_at=None)
             .returning(Document.id)
         )
         return row.scalar_one_or_none() is not None

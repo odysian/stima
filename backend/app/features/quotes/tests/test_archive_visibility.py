@@ -68,9 +68,19 @@ async def test_archived_quote_hidden_from_default_lists_and_public_share_still_w
     assert list_response.status_code == 200
     assert list_response.json() == []
 
+    archived_list_response = await client.get("/api/quotes?archived=true")
+    assert archived_list_response.status_code == 200
+    assert [item["id"] for item in archived_list_response.json()] == [quote["id"]]
+
     customer_list_response = await client.get(f"/api/quotes?customer_id={customer_id}")
     assert customer_list_response.status_code == 200
     assert customer_list_response.json() == []
+
+    archived_customer_list_response = await client.get(
+        f"/api/quotes?archived=true&customer_id={customer_id}"
+    )
+    assert archived_customer_list_response.status_code == 200
+    assert [item["id"] for item in archived_customer_list_response.json()] == [quote["id"]]
 
     reuse_response = await client.get("/api/quotes/reuse-candidates")
     assert reuse_response.status_code == 200
@@ -123,6 +133,43 @@ async def test_archive_quote_rejects_other_user_and_rearchive(
     await db_session.refresh(persisted_quote)
     assert persisted_quote.archived_at is not None
     assert persisted_quote.status == original_status
+
+
+async def test_archived_quote_list_filters_by_customer_when_archived_true(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token, name="Archived Customer")
+    other_customer_id = await _create_customer(client, csrf_token, name="Active Customer")
+    archived_quote = await _create_quote(client, csrf_token, customer_id)
+    await _create_quote(client, csrf_token, other_customer_id)
+
+    repository = QuoteRepository(db_session)
+    persisted_quote = await db_session.get(Document, UUID(archived_quote["id"]))
+    assert persisted_quote is not None
+    archived = await repository.archive_by_id(
+        quote_id=persisted_quote.id,
+        user_id=persisted_quote.user_id,
+    )
+    assert archived
+    await repository.commit()
+
+    archived_response = await client.get("/api/quotes?archived=true")
+    assert archived_response.status_code == 200
+    assert [item["id"] for item in archived_response.json()] == [archived_quote["id"]]
+
+    archived_customer_response = await client.get(
+        f"/api/quotes?archived=true&customer_id={customer_id}"
+    )
+    assert archived_customer_response.status_code == 200
+    assert [item["id"] for item in archived_customer_response.json()] == [archived_quote["id"]]
+
+    archived_other_customer_response = await client.get(
+        f"/api/quotes?archived=true&customer_id={other_customer_id}"
+    )
+    assert archived_other_customer_response.status_code == 200
+    assert archived_other_customer_response.json() == []
 
 
 async def test_has_linked_invoice_still_true_after_linked_invoice_archived(

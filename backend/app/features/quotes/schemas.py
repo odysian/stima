@@ -606,10 +606,11 @@ class QuoteUpdateRequest(BaseModel):
         return self
 
 
-BulkActionType = Literal["archive", "delete"]
+BulkActionType = Literal["archive", "unarchive", "delete"]
 BulkBlockedReason = Literal[
     "not_found",
     "already_archived",
+    "not_archived",
     "quote_status_not_deletable",
     "linked_invoice",
     "unsupported_document_type",
