@@ -14,6 +14,7 @@ import { RegisterForm } from "@/features/auth/components/RegisterForm";
 import { ResetPasswordPage } from "@/features/auth/components/ResetPasswordPage";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { LandingPage } from "@/features/marketing/components/LandingPage";
+import { ArchiveList } from "@/features/quotes/components/ArchiveList";
 import { QuoteList } from "@/features/quotes/components/QuoteList";
 import { OutboxSyncCoordinator } from "@/features/quotes/offline/OutboxSyncCoordinator";
 import { PwaUpdatePrompt } from "@/shared/components/PwaUpdatePrompt";
@@ -177,6 +178,7 @@ export default function App(): React.ReactElement {
             <Route path="/invoices/:id/edit" element={<InvoiceEditRedirect />} />
             <Route path="/invoices/:id/edit/line-items/:lineItemIndex/edit" element={<InvoiceEditRedirect />} />
             <Route path="/quotes/new" element={<Navigate to="/quotes/capture" replace />} />
+            <Route path="/archived" element={<ArchiveList />} />
             <Route path="/quotes/capture" element={withRouteSuspense(<CaptureScreen />)} />
             <Route path="/quotes/capture/:customerId" element={withRouteSuspense(<CaptureScreen />)} />
             <Route path="/documents/:id/edit" element={withRouteSuspense(<DocumentEditScreen />)} />

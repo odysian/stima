@@ -8,6 +8,7 @@ interface DocumentSelectionFooterProps {
   onCancelSelection: () => void;
   onArchiveSelection?: () => void;
   onDeleteSelectionPermanently?: () => void;
+  archiveLabel?: string;
 }
 
 export function DocumentSelectionFooter({
@@ -15,6 +16,7 @@ export function DocumentSelectionFooter({
   onCancelSelection,
   onArchiveSelection,
   onDeleteSelectionPermanently,
+  archiveLabel = "Archive",
 }: DocumentSelectionFooterProps): React.ReactElement {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ export function DocumentSelectionFooter({
         ) : (
           <div ref={containerRef} className="relative flex items-center gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={onArchiveSelection}>
-              Archive
+              {archiveLabel}
             </Button>
             <Button
               type="button"

@@ -61,6 +61,7 @@ class InvoiceRepositoryProtocol(Protocol):
         self,
         user_id: UUID,
         customer_id: UUID | None = None,
+        archived: bool = False,
     ) -> list[InvoiceListItemSummary]: ...
 
     async def get_by_source_document_id(
@@ -157,6 +158,7 @@ class InvoiceRepositoryProtocol(Protocol):
 
     async def invalidate_pdf_artifact(self, invoice: Document) -> str | None: ...
     async def archive_by_id(self, *, invoice_id: UUID, user_id: UUID) -> bool: ...
+    async def unarchive_by_id(self, *, invoice_id: UUID, user_id: UUID) -> bool: ...
 
     async def mark_ready_if_draft(self, *, invoice_id: UUID, user_id: UUID) -> None: ...
 
@@ -220,11 +222,13 @@ class InvoiceService:
         self,
         user: User,
         customer_id: UUID | None = None,
+        archived: bool = False,
     ) -> list[InvoiceListItemSummary]:
         """List invoices for the authenticated user."""
         return await self._invoice_repository.list_by_user(
             _resolve_user_id(user),
             customer_id=customer_id,
+            archived=archived,
         )
 
     async def convert_quote_to_invoice(self, user: User, quote_id: UUID) -> Document:
@@ -276,7 +280,7 @@ class InvoiceService:
         user: User,
         payload: InvoiceBulkActionRequest,
     ) -> InvoiceBulkActionResponse:
-        """Execute one invoice-scoped bulk archive/delete action."""
+        """Execute one invoice-scoped bulk archive/unarchive/delete action."""
         user_id = _resolve_user_id(user)
         unique_ids = _dedupe_ids(payload.ids)
         applied: list[BulkActionAppliedItem] = []
@@ -313,29 +317,54 @@ class InvoiceService:
                 )
                 continue
 
-            if document.archived_at is not None:
-                blocked.append(
-                    BulkActionBlockedItem(
-                        id=document_id,
-                        reason="already_archived",
-                        message="Invoice is already archived.",
+            if payload.action == "archive":
+                if document.archived_at is not None:
+                    blocked.append(
+                        BulkActionBlockedItem(
+                            id=document_id,
+                            reason="already_archived",
+                            message="Invoice is already archived.",
+                        )
                     )
-                )
-                continue
+                    continue
 
-            archived = await self._invoice_repository.archive_by_id(
-                invoice_id=document_id,
-                user_id=user_id,
-            )
-            if not archived:
-                blocked.append(
-                    BulkActionBlockedItem(
-                        id=document_id,
-                        reason="already_archived",
-                        message="Invoice is already archived.",
-                    )
+                archived = await self._invoice_repository.archive_by_id(
+                    invoice_id=document_id,
+                    user_id=user_id,
                 )
-                continue
+                if not archived:
+                    blocked.append(
+                        BulkActionBlockedItem(
+                            id=document_id,
+                            reason="already_archived",
+                            message="Invoice is already archived.",
+                        )
+                    )
+                    continue
+            else:
+                if document.archived_at is None:
+                    blocked.append(
+                        BulkActionBlockedItem(
+                            id=document_id,
+                            reason="not_archived",
+                            message="Invoice is not archived.",
+                        )
+                    )
+                    continue
+
+                unarchived = await self._invoice_repository.unarchive_by_id(
+                    invoice_id=document_id,
+                    user_id=user_id,
+                )
+                if not unarchived:
+                    blocked.append(
+                        BulkActionBlockedItem(
+                            id=document_id,
+                            reason="not_archived",
+                            message="Invoice is not archived.",
+                        )
+                    )
+                    continue
 
             await self._invoice_repository.commit()
             applied.append(BulkActionAppliedItem(id=document_id))

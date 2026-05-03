@@ -17,6 +17,7 @@ interface QuoteListControlsProps {
   onSearchChange: (nextQuery: string) => void;
   onSearchClear: () => void;
   onEnterSelectionMode: () => void;
+  onViewArchived?: () => void;
 }
 
 export function QuoteListControls({
@@ -31,7 +32,26 @@ export function QuoteListControls({
   onSearchChange,
   onSearchClear,
   onEnterSelectionMode,
+  onViewArchived,
 }: QuoteListControlsProps): React.ReactElement {
+  const menuItems = [
+    {
+      label: "Select",
+      icon: "check",
+      onSelect: onEnterSelectionMode,
+      disabled: isSelectionMode,
+    },
+  ];
+
+  if (onViewArchived) {
+    menuItems.push({
+      label: "View archived",
+      icon: "inventory_2",
+      onSelect: onViewArchived,
+      disabled: isSelectionMode,
+    });
+  }
+
   return (
     <div className="mb-4 px-4">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -81,14 +101,7 @@ export function QuoteListControls({
           </Button>
           <OverflowMenu
             triggerLabel="List actions"
-            items={[
-              {
-                label: "Select",
-                icon: "check",
-                onSelect: onEnterSelectionMode,
-                disabled: isSelectionMode,
-              },
-            ]}
+            items={menuItems}
           />
         </div>
       </div>

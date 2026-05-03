@@ -101,10 +101,11 @@ export type QuoteStatus =
   | "declined";
 export type QuoteSourceType = "text" | "voice" | "voice+text";
 export type ExtractionTier = "primary" | "degraded";
-export type BulkActionType = "archive" | "delete";
+export type BulkActionType = "archive" | "unarchive" | "delete";
 export type BulkBlockedReason =
   | "not_found"
   | "already_archived"
+  | "not_archived"
   | "quote_status_not_deletable"
   | "linked_invoice"
   | "unsupported_document_type"

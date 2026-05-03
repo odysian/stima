@@ -140,9 +140,16 @@ function createQuote(data: QuoteCreateRequest): Promise<Quote> {
   });
 }
 
-function listQuotes(params?: { customer_id?: string }): Promise<QuoteListItem[]> {
-  const query = params?.customer_id ? `?customer_id=${params.customer_id}` : "";
-  return request<QuoteListItem[]>(`/api/quotes${query}`);
+function listQuotes(params?: { customer_id?: string; archived?: boolean }): Promise<QuoteListItem[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.customer_id) {
+    queryParams.set("customer_id", params.customer_id);
+  }
+  if (params?.archived === true) {
+    queryParams.set("archived", "true");
+  }
+  const query = queryParams.toString();
+  return request<QuoteListItem[]>(`/api/quotes${query ? `?${query}` : ""}`);
 }
 
 function listReuseCandidates(params?: { customer_id?: string; q?: string }): Promise<QuoteReuseCandidate[]> {

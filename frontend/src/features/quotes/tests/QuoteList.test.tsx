@@ -280,6 +280,18 @@ describe("QuoteList", () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
+  it("navigates to archived view from list actions overflow", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem({ status: "ready" })]);
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    fireEvent.click(screen.getByRole("button", { name: "List actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View archived" }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/archived");
+  });
+
   it("locks tab switch, preserves search, and clears selection via cancel", async () => {
     mockedQuoteService.listQuotes.mockResolvedValueOnce([
       makeQuoteListItem({ id: "quote-1", customer_name: "Alice Johnson", status: "ready" }),

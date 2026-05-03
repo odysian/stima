@@ -113,6 +113,49 @@ async def test_bulk_archive_quotes_deduplicates_ids_and_blocks_rearchive(
     }
 
 
+async def test_bulk_unarchive_quotes_applies_owned_archived_and_blocks_others(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    archived_quote = await _create_quote(client, csrf_token, customer_id)
+    active_quote = await _create_quote(client, csrf_token, customer_id)
+
+    archive_response = await client.post(
+        "/api/quotes/bulk-action",
+        json={"action": "archive", "ids": [archived_quote["id"]]},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert archive_response.status_code == 200
+
+    missing_id = str(uuid4())
+    unarchive_response = await client.post(
+        "/api/quotes/bulk-action",
+        json={
+            "action": "unarchive",
+            "ids": [archived_quote["id"], active_quote["id"], missing_id],
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert unarchive_response.status_code == 200
+    assert unarchive_response.json() == {
+        "action": "unarchive",
+        "applied": [{"id": archived_quote["id"]}],
+        "blocked": [
+            {
+                "id": active_quote["id"],
+                "reason": "not_archived",
+                "message": "Quote is not archived.",
+            },
+            {
+                "id": missing_id,
+                "reason": "not_found",
+                "message": "Document not found.",
+            },
+        ],
+    }
+
+
 async def test_bulk_delete_quotes_reports_not_found_status_and_doc_type_blocks(
     client: AsyncClient,
 ) -> None:

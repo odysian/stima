@@ -33,7 +33,33 @@ function formatBlockedSummary(blocked: BulkActionBlockedItem[]): string {
 }
 
 function actionPastTense(action: BulkActionType): string {
-  return action === "archive" ? "archived" : "deleted";
+  if (action === "archive") {
+    return "archived";
+  }
+  if (action === "unarchive") {
+    return "unarchived";
+  }
+  return "deleted";
+}
+
+function actionCompletionTitle(action: BulkActionType): string {
+  if (action === "archive") {
+    return "Archive complete";
+  }
+  if (action === "unarchive") {
+    return "Unarchive complete";
+  }
+  return "Delete complete";
+}
+
+function actionNoopTitle(action: BulkActionType): string {
+  if (action === "archive") {
+    return "No documents archived";
+  }
+  if (action === "unarchive") {
+    return "No documents unarchived";
+  }
+  return "No documents deleted";
 }
 
 export function buildBulkActionFeedback(response: BulkActionResponse): BulkActionFeedback {
@@ -45,7 +71,7 @@ export function buildBulkActionFeedback(response: BulkActionResponse): BulkActio
   if (appliedCount > 0 && blockedCount === 0) {
     return {
       kind: "success",
-      title: response.action === "archive" ? "Archive complete" : "Delete complete",
+      title: actionCompletionTitle(response.action),
       message: `${pluralize("document", appliedCount)} ${actionVerb}.`,
     };
   }
@@ -60,7 +86,7 @@ export function buildBulkActionFeedback(response: BulkActionResponse): BulkActio
 
   return {
     kind: "warn",
-    title: response.action === "archive" ? "No documents archived" : "No documents deleted",
+    title: actionNoopTitle(response.action),
     message: blockedSummary || `No documents were ${actionVerb}.`,
   };
 }

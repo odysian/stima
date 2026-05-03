@@ -70,6 +70,63 @@ async def test_bulk_archive_invoices_deduplicates_ids_and_blocks_rearchive(
     }
 
 
+async def test_bulk_unarchive_invoices_applies_owned_archived_and_blocks_others(
+    client: AsyncClient,
+) -> None:
+    csrf_token = await _register_and_login(client, _credentials())
+    customer_id = await _create_customer(client, csrf_token)
+    archived_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Archived invoice",
+        transcript="invoice transcript",
+        total_amount=100,
+    )
+    active_invoice = await _create_direct_invoice(
+        client,
+        csrf_token,
+        customer_id,
+        title="Active invoice",
+        transcript="invoice transcript",
+        total_amount=120,
+    )
+
+    archive_response = await client.post(
+        "/api/invoices/bulk-action",
+        json={"action": "archive", "ids": [archived_invoice["id"]]},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert archive_response.status_code == 200
+
+    missing_id = str(uuid4())
+    unarchive_response = await client.post(
+        "/api/invoices/bulk-action",
+        json={
+            "action": "unarchive",
+            "ids": [archived_invoice["id"], active_invoice["id"], missing_id],
+        },
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    assert unarchive_response.status_code == 200
+    assert unarchive_response.json() == {
+        "action": "unarchive",
+        "applied": [{"id": archived_invoice["id"]}],
+        "blocked": [
+            {
+                "id": active_invoice["id"],
+                "reason": "not_archived",
+                "message": "Invoice is not archived.",
+            },
+            {
+                "id": missing_id,
+                "reason": "not_found",
+                "message": "Document not found.",
+            },
+        ],
+    }
+
+
 async def test_bulk_delete_invoices_reports_blocked_per_document(
     client: AsyncClient,
 ) -> None:

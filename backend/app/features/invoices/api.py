@@ -88,9 +88,15 @@ async def list_invoices(
     user: Annotated[User, Depends(get_current_user)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
     customer_id: Annotated[UUID | None, Query()] = None,
+    archived: Annotated[str | None, Query()] = None,
 ) -> list[InvoiceListItemResponse]:
     """List invoices for the authenticated user."""
-    invoices = await invoice_service.list_invoices(user, customer_id=customer_id)
+    show_archived = (archived or "").lower() == "true"
+    invoices = await invoice_service.list_invoices(
+        user,
+        customer_id=customer_id,
+        archived=show_archived,
+    )
     return [InvoiceListItemResponse.model_validate(invoice) for invoice in invoices]
 
 
@@ -164,7 +170,7 @@ async def bulk_action_invoices(
     user: Annotated[User, Depends(get_current_user)],
     invoice_service: Annotated[InvoiceService, Depends(get_invoice_service)],
 ) -> InvoiceBulkActionResponse:
-    """Execute one invoice-scoped bulk archive/delete action."""
+    """Execute one invoice-scoped bulk archive/unarchive/delete action."""
     return await invoice_service.execute_bulk_action(user, payload)
 
 
