@@ -44,12 +44,14 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
     markQuoteWon: vi.fn(),
     markQuoteLost: vi.fn(),
     convertToInvoice: vi.fn(),
+    bulkAction: vi.fn(),
   },
 }));
 
 vi.mock("@/features/invoices/services/invoiceService", () => ({
   invoiceService: {
     listInvoices: vi.fn(),
+    bulkAction: vi.fn(),
   },
 }));
 
@@ -321,6 +323,103 @@ describe("QuoteList", () => {
     expect(screen.getByRole("button", { name: "New quote" })).toBeInTheDocument();
     expect(within(documentTypeFilter).getByRole("button", { name: "Invoices" })).not.toBeDisabled();
     expect(screen.queryByRole("checkbox", { name: "Select Alice Johnson" })).not.toBeInTheDocument();
+  });
+
+  it("archives selected quotes via bulk endpoint and clears selection after confirmation", async () => {
+    mockedQuoteService.listQuotes
+      .mockResolvedValueOnce([
+        makeQuoteListItem({ id: "quote-1", customer_name: "Alice Johnson", status: "ready" }),
+      ])
+      .mockResolvedValueOnce([
+        makeQuoteListItem({ id: "quote-1", customer_name: "Alice Johnson", status: "ready" }),
+      ]);
+    mockedQuoteService.bulkAction.mockResolvedValueOnce({
+      action: "archive",
+      applied: [{ id: "quote-1" }],
+      blocked: [],
+    });
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+
+    fireEvent.click(screen.getByRole("button", { name: "List actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Select" }));
+    fireEvent.click(screen.getByRole("button", { name: /alice johnson/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    const archiveDialog = screen.getByRole("dialog", { name: /archive 1 selected document\?/i });
+    fireEvent.click(within(archiveDialog).getByRole("button", { name: "Archive" }));
+
+    await waitFor(() => {
+      expect(mockedQuoteService.bulkAction).toHaveBeenCalledWith({
+        action: "archive",
+        ids: ["quote-1"],
+      });
+    });
+    expect(mockedInvoiceService.bulkAction).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockedQuoteService.listQuotes).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByText("1 document archived.")).toBeInTheDocument();
+    expect(screen.queryByText("1 selected")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New quote" })).toBeInTheDocument();
+  });
+
+  it("routes invoice delete to invoice bulk endpoint and shows blocked feedback", async () => {
+    mockedQuoteService.listQuotes.mockResolvedValueOnce([makeQuoteListItem({ status: "ready" })]);
+    mockedInvoiceService.listInvoices
+      .mockResolvedValueOnce([
+        makeInvoiceListItem({
+          id: "invoice-1",
+          doc_number: "I-001",
+          customer_name: "Alice Johnson",
+          status: "sent",
+        }),
+      ])
+      .mockResolvedValueOnce([
+        makeInvoiceListItem({
+          id: "invoice-1",
+          doc_number: "I-001",
+          customer_name: "Alice Johnson",
+          status: "sent",
+        }),
+      ]);
+    mockedInvoiceService.bulkAction.mockResolvedValueOnce({
+      action: "delete",
+      applied: [],
+      blocked: [
+        {
+          id: "invoice-1",
+          reason: "invoice_delete_not_supported",
+          message: "Invoices cannot be deleted in this version.",
+        },
+      ],
+    });
+
+    renderScreen();
+    await screen.findByText(/Q-001/);
+    fireEvent.click(screen.getByRole("button", { name: "Invoices" }));
+    await screen.findByText(/I-001/);
+
+    fireEvent.click(screen.getByRole("button", { name: "List actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Select" }));
+    fireEvent.click(screen.getByRole("button", { name: /alice johnson/i }));
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete permanently..." }));
+
+    const deleteDialog = screen.getByRole("dialog", { name: /delete 1 selected document permanently\?/i });
+    fireEvent.click(within(deleteDialog).getByRole("button", { name: "Delete permanently" }));
+
+    await waitFor(() => {
+      expect(mockedInvoiceService.bulkAction).toHaveBeenCalledWith({
+        action: "delete",
+        ids: ["invoice-1"],
+      });
+    });
+    expect(mockedQuoteService.bulkAction).toHaveBeenCalledTimes(0);
+    expect(await screen.findByText("No documents deleted")).toBeInTheDocument();
+    expect(screen.getByText("Invoices cannot be deleted in this version.")).toBeInTheDocument();
+    expect(screen.queryByText("1 selected")).not.toBeInTheDocument();
   });
 
   it("uses token-backed emphasis for the active filter and create button", async () => {

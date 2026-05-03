@@ -1,5 +1,7 @@
 import type { InvoiceStatus } from "@/features/invoices/types/invoice-status";
 import type {
+  BulkActionRequest,
+  BulkActionResponse,
   LineItem,
   LineItemDraft,
   PdfArtifact,
@@ -80,3 +82,6 @@ export interface InvoiceUpdateRequest {
   due_date?: string;
   doc_type?: "quote" | "invoice";
 }
+
+export type InvoiceBulkActionRequest = BulkActionRequest;
+export type InvoiceBulkActionResponse = BulkActionResponse;

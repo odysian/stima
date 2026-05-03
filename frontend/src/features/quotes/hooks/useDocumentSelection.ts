@@ -8,6 +8,7 @@ interface UseDocumentSelectionArgs {
 
 interface UseDocumentSelectionResult {
   isSelectionMode: boolean;
+  selectedIds: string[];
   selectedCount: number;
   enterSelectionMode: () => void;
   cancelSelection: () => void;
@@ -52,6 +53,7 @@ export function useDocumentSelection({
 
   return {
     isSelectionMode,
+    selectedIds,
     selectedCount: selectedIds.length,
     enterSelectionMode,
     cancelSelection,

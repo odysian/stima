@@ -340,6 +340,7 @@ describe("QuotePreview", () => {
       expect(screen.queryByText("Sent")).not.toBeInTheDocument();
       await openOverflowMenu();
       expect(screen.queryByRole("menuitem", { name: /convert to invoice/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: /delete quote/i })).not.toBeInTheDocument();
     },
   );
 

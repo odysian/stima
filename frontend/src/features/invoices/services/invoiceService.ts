@@ -1,4 +1,6 @@
 import type {
+  InvoiceBulkActionRequest,
+  InvoiceBulkActionResponse,
   InvoiceCreateRequest,
   Invoice,
   InvoiceDetail,
@@ -73,6 +75,13 @@ async function sendInvoiceEmail(id: string, idempotencyKey?: string): Promise<Jo
   return response.data;
 }
 
+function bulkAction(payload: InvoiceBulkActionRequest): Promise<InvoiceBulkActionResponse> {
+  return request<InvoiceBulkActionResponse>("/api/invoices/bulk-action", {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export const invoiceService = {
   createInvoice,
   getInvoice,
@@ -84,4 +93,5 @@ export const invoiceService = {
   markInvoicePaid,
   markInvoiceVoid,
   sendInvoiceEmail,
+  bulkAction,
 };
