@@ -20,6 +20,8 @@ interface QuoteReuseChooserProps {
 type ChooserTab = "recent" | "all";
 
 const RECENT_LIMIT = 6;
+// Trailing debounce keeps search responsive while reducing network chatter.
+const SEARCH_DEBOUNCE_MS = 275;
 
 function buildLoadErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -65,6 +67,7 @@ export function QuoteReuseChooser({
 }: QuoteReuseChooserProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<ChooserTab>("recent");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [candidates, setCandidates] = useState<QuoteReuseCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -87,13 +90,31 @@ export function QuoteReuseChooser({
       return;
     }
 
+    if (normalizedSearchQuery === debouncedSearchQuery) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchQuery(normalizedSearchQuery);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [debouncedSearchQuery, normalizedSearchQuery, open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     let isActive = true;
     setIsLoading(true);
     setLoadError(null);
 
     void quoteService.listReuseCandidates({
       customer_id: customerId,
-      q: normalizedSearchQuery || undefined,
+      q: debouncedSearchQuery || undefined,
     })
       .then((nextCandidates) => {
         if (isActive) {
@@ -115,7 +136,7 @@ export function QuoteReuseChooser({
     return () => {
       isActive = false;
     };
-  }, [customerId, normalizedSearchQuery, open]);
+  }, [customerId, debouncedSearchQuery, open]);
 
   useEffect(() => {
     if (open) {
@@ -124,6 +145,7 @@ export function QuoteReuseChooser({
 
     setActiveTab("recent");
     setSearchQuery("");
+    setDebouncedSearchQuery("");
     setCandidates([]);
     setIsLoading(false);
     setLoadError(null);
