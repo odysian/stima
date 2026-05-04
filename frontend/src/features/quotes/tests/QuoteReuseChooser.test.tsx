@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { QuoteReuseChooser } from "@/features/quotes/components/QuoteReuseChooser";
@@ -13,10 +13,10 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
 
 const mockedQuoteService = vi.mocked(quoteService);
 
-function makeReuseCandidate() {
+function makeReuseCandidate(id = "quote-1", title = "Backyard Refresh") {
   return {
-    id: "quote-1",
-    title: "Backyard Refresh",
+    id,
+    title,
     doc_number: "Q-001",
     customer_id: "cust-1",
     customer_name: "Evergreen Landscaping",
@@ -33,8 +33,17 @@ function makeReuseCandidate() {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 afterEach(() => {
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 describe("QuoteReuseChooser", () => {
@@ -62,6 +71,7 @@ describe("QuoteReuseChooser", () => {
   });
 
   it("passes customer scope and search query to reuse-candidates API", async () => {
+    vi.useFakeTimers();
     mockedQuoteService.listReuseCandidates.mockResolvedValue([]);
 
     render(
@@ -74,22 +84,32 @@ describe("QuoteReuseChooser", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
-        customer_id: "cust-1",
-        q: undefined,
-      });
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
+      customer_id: "cust-1",
+      q: undefined,
     });
 
     fireEvent.change(screen.getByLabelText("Search existing quotes"), {
       target: { value: "evergreen" },
     });
 
-    await waitFor(() => {
-      expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
-        customer_id: "cust-1",
-        q: "evergreen",
-      });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(274);
+    });
+    expect(mockedQuoteService.listReuseCandidates).not.toHaveBeenCalledWith({
+      customer_id: "cust-1",
+      q: "evergreen",
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
+      customer_id: "cust-1",
+      q: "evergreen",
     });
   });
 
@@ -133,5 +153,100 @@ describe("QuoteReuseChooser", () => {
       expect(mockedQuoteService.duplicateQuote).toHaveBeenCalledWith("quote-1");
     });
     expect(onQuoteDuplicated).toHaveBeenCalledWith("quote-2");
+  });
+
+  it("keeps only latest search results when slower older response resolves last", async () => {
+    vi.useFakeTimers();
+    const initial = deferred<ReturnType<typeof makeReuseCandidate>[]>();
+    const oldSearch = deferred<ReturnType<typeof makeReuseCandidate>[]>();
+    const newSearch = deferred<ReturnType<typeof makeReuseCandidate>[]>();
+
+    mockedQuoteService.listReuseCandidates.mockImplementation((params) => {
+      const q = params?.q;
+      if (q === "old") {
+        return oldSearch.promise;
+      }
+      if (q === "new") {
+        return newSearch.promise;
+      }
+      return initial.promise;
+    });
+
+    render(
+      <QuoteReuseChooser
+        open
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    initial.resolve([]);
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+    expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledWith({
+      customer_id: undefined,
+      q: undefined,
+    });
+
+    fireEvent.change(screen.getByLabelText("Search existing quotes"), {
+      target: { value: "old" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(275);
+    });
+
+    fireEvent.change(screen.getByLabelText("Search existing quotes"), {
+      target: { value: "new" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(275);
+    });
+
+    await act(async () => {
+      newSearch.resolve([makeReuseCandidate("quote-new", "Newest Quote")]);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("button", { name: /newest quote/i })).toBeInTheDocument();
+
+    await act(async () => {
+      oldSearch.resolve([makeReuseCandidate("quote-old", "Older Quote")]);
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("button", { name: /older quote/i })).not.toBeInTheDocument();
+  });
+
+  it("ignores late responses after the sheet closes", async () => {
+    const pending = deferred<ReturnType<typeof makeReuseCandidate>[]>();
+    mockedQuoteService.listReuseCandidates.mockReturnValue(pending.promise);
+
+    const { rerender } = render(
+      <QuoteReuseChooser
+        open
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockedQuoteService.listReuseCandidates).toHaveBeenCalledTimes(1);
+    });
+
+    rerender(
+      <QuoteReuseChooser
+        open={false}
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    pending.resolve([makeReuseCandidate("quote-late", "Late Quote")]);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /late quote/i })).not.toBeInTheDocument();
+    });
   });
 });
