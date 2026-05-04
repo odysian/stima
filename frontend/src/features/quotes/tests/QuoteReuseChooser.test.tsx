@@ -8,6 +8,9 @@ vi.mock("@/features/quotes/services/quoteService", () => ({
   quoteService: {
     listReuseCandidates: vi.fn(),
     duplicateQuote: vi.fn(),
+    getQuote: vi.fn(() =>
+      Promise.reject(new Error("getQuote should not be called in QuoteReuseChooser")),
+    ),
   },
 }));
 
@@ -152,7 +155,24 @@ describe("QuoteReuseChooser", () => {
     await waitFor(() => {
       expect(mockedQuoteService.duplicateQuote).toHaveBeenCalledWith("quote-1");
     });
+    expect(mockedQuoteService.getQuote).toHaveBeenCalledTimes(0);
     expect(onQuoteDuplicated).toHaveBeenCalledWith("quote-2");
+  });
+
+  it("does not fetch quote details during list load", async () => {
+    mockedQuoteService.listReuseCandidates.mockResolvedValueOnce([makeReuseCandidate()]);
+
+    render(
+      <QuoteReuseChooser
+        open
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: /backyard refresh/i })).toBeInTheDocument();
+    expect(mockedQuoteService.getQuote).toHaveBeenCalledTimes(0);
   });
 
   it("keeps only latest search results when slower older response resolves last", async () => {
