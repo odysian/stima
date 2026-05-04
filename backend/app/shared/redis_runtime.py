@@ -56,8 +56,6 @@ async def resolve_redis_runtime_state(settings: Settings) -> RedisRuntimeState:
     if settings.redis_url is None:
         if settings.environment.lower() != "production":
             return RedisRuntimeState(mode="degraded_memory", degraded_reason="redis_missing")
-        if settings.allow_redis_degraded_mode:
-            return RedisRuntimeState(mode="degraded_memory", degraded_reason="redis_missing")
         raise RedisRuntimeResolutionError("REDIS_URL is required in production")
 
     is_healthy, reason = await probe_redis(
@@ -67,6 +65,10 @@ async def resolve_redis_runtime_state(settings: Settings) -> RedisRuntimeState:
     if is_healthy:
         return RedisRuntimeState(mode="redis")
     if settings.allow_redis_degraded_mode:
+        if settings.environment.lower() == "production":
+            raise RedisRuntimeResolutionError(
+                "Redis unavailable at startup and production degraded mode is disabled"
+            )
         return RedisRuntimeState(mode="degraded_memory", degraded_reason=reason)
 
     degraded_reason = reason or "redis_probe_failed"

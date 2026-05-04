@@ -136,7 +136,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
             arq_pool = await create_pool(build_arq_redis_settings(settings))
         except Exception:
-            if settings.allow_redis_degraded_mode:
+            if settings.allow_redis_degraded_mode and settings.environment.lower() != "production":
                 runtime_state = RedisRuntimeState(
                     mode="degraded_memory",
                     degraded_reason="redis_probe_failed",

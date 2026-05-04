@@ -206,40 +206,89 @@ def test_gcs_bucket_name_is_required(monkeypatch) -> None:
         Settings(_env_file=None)  # type: ignore[call-arg]
 
 
-def test_production_requires_secure_cookies(monkeypatch) -> None:
+def _set_production_safe_defaults(monkeypatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("COOKIE_SECURE", "false")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    monkeypatch.setenv("COOKIE_HTTPONLY", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.stima.dev")
     monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("ALLOW_REDIS_DEGRADED_MODE", "false")
+
+
+@pytest.mark.parametrize("wildcard_origin", ["*", "http://*", "https://*"])
+def test_production_rejects_wildcard_allowed_origins(monkeypatch, wildcard_origin: str) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("ALLOWED_ORIGINS", wildcard_origin)
+
+    with pytest.raises(
+        ValidationError,
+        match="ALLOWED_ORIGINS must not contain wildcard values",
+    ):
+        get_settings()
+
+
+def test_production_allows_explicit_https_allowed_origins(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv(
+        "ALLOWED_ORIGINS",
+        "https://stima.example.com,https://www.stima.example.com",
+    )
+
+    settings = get_settings()
+
+    assert settings.allowed_origins == [
+        "https://stima.example.com",
+        "https://www.stima.example.com",
+    ]
+
+
+def test_production_rejects_non_https_allowed_origins(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("ALLOWED_ORIGINS", "http://stima.example.com")
+
+    with pytest.raises(
+        ValidationError,
+        match="ALLOWED_ORIGINS entries must be explicit https origins",
+    ):
+        get_settings()
+
+
+def test_production_rejects_cookie_httponly_false(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("COOKIE_HTTPONLY", "false")
+
+    with pytest.raises(ValidationError, match="COOKIE_HTTPONLY must be true"):
+        get_settings()
+
+
+def test_production_requires_secure_cookies(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("COOKIE_SECURE", "false")
 
     with pytest.raises(ValidationError):
         get_settings()
 
 
 def test_production_requires_non_localhost_frontend_url(monkeypatch) -> None:
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("COOKIE_SECURE", "true")
+    _set_production_safe_defaults(monkeypatch)
     monkeypatch.setenv("FRONTEND_URL", "http://localhost:5173")
-    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
 
     with pytest.raises(ValidationError):
         get_settings()
 
 
 def test_production_rejects_ipv6_loopback_frontend_url(monkeypatch) -> None:
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("COOKIE_SECURE", "true")
+    _set_production_safe_defaults(monkeypatch)
     monkeypatch.setenv("FRONTEND_URL", "http://[::1]:5173")
-    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
 
     with pytest.raises(ValidationError):
         get_settings()
 
 
 def test_production_requires_allowed_hosts(monkeypatch) -> None:
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("COOKIE_SECURE", "true")
-    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    _set_production_safe_defaults(monkeypatch)
     monkeypatch.delenv("ALLOWED_HOSTS", raising=False)
 
     with pytest.raises(ValidationError):
@@ -247,35 +296,82 @@ def test_production_requires_allowed_hosts(monkeypatch) -> None:
 
 
 def test_production_rejects_wildcard_allowed_hosts(monkeypatch) -> None:
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("COOKIE_SECURE", "true")
-    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    _set_production_safe_defaults(monkeypatch)
     monkeypatch.setenv("ALLOWED_HOSTS", "*")
 
     with pytest.raises(ValidationError):
         get_settings()
 
 
+def test_production_rejects_raw_content_extraction_trace(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("EXTRACTION_TRACE_INCLUDE_RAW_CONTENT", "true")
+
+    with pytest.raises(
+        ValidationError,
+        match="EXTRACTION_TRACE_INCLUDE_RAW_CONTENT must be false",
+    ):
+        get_settings()
+
+
 def test_production_requires_redis_url(monkeypatch) -> None:
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("COOKIE_SECURE", "true")
-    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
-    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+    _set_production_safe_defaults(monkeypatch)
     monkeypatch.setenv("REDIS_URL", "")
 
     with pytest.raises(ValidationError, match="REDIS_URL must be set"):
         get_settings()
 
 
-def test_production_allows_missing_redis_url_when_degraded_mode_enabled(monkeypatch) -> None:
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("COOKIE_SECURE", "true")
-    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
-    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
+def test_production_rejects_redis_degraded_mode(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
     monkeypatch.setenv("ALLOW_REDIS_DEGRADED_MODE", "true")
-    monkeypatch.setenv("REDIS_URL", "")
+
+    with pytest.raises(
+        ValidationError,
+        match="ALLOW_REDIS_DEGRADED_MODE must be false",
+    ):
+        get_settings()
+
+
+@pytest.mark.parametrize(
+    "admin_key",
+    [
+        "admin",
+        "changeme",
+        "change-me",
+        "dev",
+        "development",
+        "test",
+        "secret",
+        "password",
+    ],
+)
+def test_production_rejects_placeholder_admin_api_key(monkeypatch, admin_key: str) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("ADMIN_API_KEY", admin_key)
+
+    with pytest.raises(
+        ValidationError,
+        match="ADMIN_API_KEY cannot use placeholder/dev values",
+    ):
+        get_settings()
+
+
+def test_production_rejects_short_admin_api_key(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("ADMIN_API_KEY", "a" * 31)
+
+    with pytest.raises(
+        ValidationError,
+        match="ADMIN_API_KEY must be at least 32 characters",
+    ):
+        get_settings()
+
+
+def test_production_allows_strong_admin_api_key(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("ADMIN_API_KEY", "a" * 48)
 
     settings = get_settings()
 
-    assert settings.redis_url is None
-    assert settings.allow_redis_degraded_mode is True
+    assert settings.admin_api_key == "a" * 48

@@ -11,6 +11,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 MIN_SECRET_KEY_LENGTH = 32
+MIN_ADMIN_API_KEY_LENGTH = 32
 LOCALHOST_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1"})  # nosec B104
 FORBIDDEN_SECRET_KEY_VALUES = frozenset(
     {
@@ -20,6 +21,18 @@ FORBIDDEN_SECRET_KEY_VALUES = frozenset(
         "replace-me",
         "replace-with-strong-random-value",
         "your-secret-key",
+    }
+)
+FORBIDDEN_ADMIN_API_KEY_VALUES = frozenset(
+    {
+        "admin",
+        "changeme",
+        "change-me",
+        "dev",
+        "development",
+        "test",
+        "secret",
+        "password",
     }
 )
 
@@ -443,16 +456,58 @@ class Settings(BaseSettings):
 
         if not self.cookie_secure:
             raise ValueError("COOKIE_SECURE must be true when ENVIRONMENT is 'production'")
+        if not self.cookie_httponly:
+            raise ValueError("COOKIE_HTTPONLY must be true when ENVIRONMENT is 'production'")
+        if not self.allowed_origins:
+            raise ValueError("ALLOWED_ORIGINS must be non-empty when ENVIRONMENT is 'production'")
+        for allowed_origin in self.allowed_origins:
+            if "*" in allowed_origin:
+                raise ValueError(
+                    "ALLOWED_ORIGINS must not contain wildcard values "
+                    "when ENVIRONMENT is 'production'"
+                )
+            parsed_allowed_origin = urlparse(allowed_origin)
+            if parsed_allowed_origin.scheme != "https" or not parsed_allowed_origin.netloc:
+                raise ValueError(
+                    "ALLOWED_ORIGINS entries must be explicit https origins "
+                    "when ENVIRONMENT is 'production'"
+                )
+            if parsed_allowed_origin.hostname in LOCALHOST_HOSTS:
+                raise ValueError(
+                    "ALLOWED_ORIGINS entries must not use localhost "
+                    "when ENVIRONMENT is 'production'"
+                )
         if not self.allowed_hosts:
             raise ValueError("ALLOWED_HOSTS must be non-empty when ENVIRONMENT is 'production'")
         if "*" in self.allowed_hosts:
             raise ValueError("ALLOWED_HOSTS must not contain '*' when ENVIRONMENT is 'production'")
 
+        if self.extraction_trace_include_raw_content:
+            raise ValueError(
+                "EXTRACTION_TRACE_INCLUDE_RAW_CONTENT must be false "
+                "when ENVIRONMENT is 'production'"
+            )
+        if self.allow_redis_degraded_mode:
+            raise ValueError(
+                "ALLOW_REDIS_DEGRADED_MODE must be false when ENVIRONMENT is 'production'"
+            )
         parsed_frontend_url = urlparse(self.frontend_url)
         if parsed_frontend_url.hostname in LOCALHOST_HOSTS:
             raise ValueError("FRONTEND_URL must not use localhost when ENVIRONMENT is 'production'")
-        if self.redis_url is None and not self.allow_redis_degraded_mode:
+        if self.redis_url is None:
             raise ValueError("REDIS_URL must be set when ENVIRONMENT is 'production'")
+        if self.admin_api_key is not None:
+            if self.admin_api_key.lower() in FORBIDDEN_ADMIN_API_KEY_VALUES:
+                raise ValueError(
+                    "ADMIN_API_KEY cannot use placeholder/dev values "
+                    "when ENVIRONMENT is 'production'"
+                )
+            if len(self.admin_api_key) < MIN_ADMIN_API_KEY_LENGTH:
+                raise ValueError(
+                    "ADMIN_API_KEY must be at least "
+                    f"{MIN_ADMIN_API_KEY_LENGTH} characters "
+                    "when ENVIRONMENT is 'production'"
+                )
 
         return self
 
