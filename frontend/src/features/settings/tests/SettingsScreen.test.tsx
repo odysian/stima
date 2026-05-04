@@ -180,6 +180,11 @@ describe("SettingsScreen", () => {
     expect(screen.queryByRole("button", { name: /back/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /settings/i })).toHaveClass("text-primary");
     expect(screen.queryByText("Appearance")).not.toBeInTheDocument();
+    expect(screen.getByText("Reusable Line Items")).toBeInTheDocument();
+    expect(
+      screen.getByText("Create and manage reusable line item presets you can insert while editing quotes."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /manage catalog/i })).toBeInTheDocument();
 
     await openBusinessProfileEditMode();
     expect(screen.getByDisplayValue("Bright Lawn Care")).toBeInTheDocument();

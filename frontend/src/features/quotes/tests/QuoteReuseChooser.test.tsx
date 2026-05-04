@@ -50,6 +50,24 @@ afterEach(() => {
 });
 
 describe("QuoteReuseChooser", () => {
+  it("renders duplicate-draft framing copy and actionable empty state guidance", async () => {
+    mockedQuoteService.listReuseCandidates.mockResolvedValueOnce([]);
+
+    render(
+      <QuoteReuseChooser
+        open
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Duplicate an existing quote")).toBeInTheDocument();
+    expect(screen.getByText("Choose a quote to copy into a new editable draft.")).toBeInTheDocument();
+    expect(await screen.findByText("No quotes found")).toBeInTheDocument();
+    expect(screen.getByText("No recent quotes yet. Try All Quotes or create a new quote.")).toBeInTheDocument();
+  });
+
   it("renders reuse candidates with preview rows and overflow count", async () => {
     mockedQuoteService.listReuseCandidates.mockResolvedValueOnce([makeReuseCandidate()]);
 

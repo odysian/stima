@@ -2,6 +2,7 @@ import type { LineItemCatalogItem } from "@/features/line-item-catalog/types/lin
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Card } from "@/ui/Card";
+import { EmptyState } from "@/ui/EmptyState";
 import { Eyebrow } from "@/ui/Eyebrow";
 
 interface LineItemCatalogTabPanelProps {
@@ -32,7 +33,7 @@ export function LineItemCatalogTabPanel({
   return (
     <div id="line-item-tabpanel-catalog" role="tabpanel" className={className}>
       {loadState === "loading" ? (
-        <p role="status" className="text-sm text-on-surface-variant">Loading catalog items...</p>
+        <p role="status" className="text-sm text-on-surface-variant">Loading reusable items...</p>
       ) : null}
 
       {loadState === "error" && loadError ? (
@@ -51,11 +52,11 @@ export function LineItemCatalogTabPanel({
       ) : null}
 
       {loadState === "loaded" && items.length === 0 ? (
-        <Card className="bg-surface-container-high">
-          <p className="text-sm text-on-surface-variant">
-            No catalog items yet. Save one from the Manual tab or from another line item.
-          </p>
-        </Card>
+        <EmptyState
+          icon="folder_off"
+          title="No reusable items yet"
+          body="Save your first reusable item from the Manual tab or from an existing line item."
+        />
       ) : null}
 
       {loadState === "loaded" && items.length > 0 ? (
