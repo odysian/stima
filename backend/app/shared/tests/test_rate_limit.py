@@ -242,6 +242,7 @@ def test_production_settings_require_redis_url(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("COOKIE_SECURE", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.stima.dev")
     monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
     monkeypatch.setenv("REDIS_URL", "")
     get_settings.cache_clear()
@@ -257,17 +258,15 @@ def test_resolve_limiter_backend_rejects_production_without_redis_url() -> None:
         resolve_limiter_backend(settings)
 
 
-def test_resolve_limiter_backend_allows_production_memory_when_degraded_enabled() -> None:
+def test_resolve_limiter_backend_rejects_production_memory_when_degraded_enabled() -> None:
     settings = Settings.model_construct(
         environment="production",
         redis_url=None,
         allow_redis_degraded_mode=True,
     )
 
-    backend = resolve_limiter_backend(settings)
-
-    assert backend.mode == "memory"
-    assert backend.storage_uri == "memory://"
+    with pytest.raises(ValueError, match="REDIS_URL must be set"):
+        resolve_limiter_backend(settings)
 
 
 def test_resolve_limiter_backend_for_runtime_mode_forces_memory() -> None:

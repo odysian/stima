@@ -413,7 +413,7 @@ def resolve_limiter_backend_for_runtime_mode(
     if settings.redis_url:
         return LimiterBackendConfig(storage_uri=settings.redis_url, mode="redis")
 
-    if settings.environment.lower() == "production" and not settings.allow_redis_degraded_mode:
+    if settings.environment.lower() == "production":
         raise ValueError("REDIS_URL must be set when ENVIRONMENT is 'production'")
 
     fallback_reason = (

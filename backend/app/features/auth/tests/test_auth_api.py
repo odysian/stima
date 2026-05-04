@@ -192,6 +192,24 @@ async def test_login_sets_auth_cookies_and_returns_csrf(client: AsyncClient) -> 
     assert "Path=/" in csrf_cookie
 
 
+async def test_login_sets_httponly_only_for_auth_cookies(client: AsyncClient) -> None:
+    credentials = _credentials()
+    register_response = await client.post("/api/auth/register", json=credentials)
+    assert register_response.status_code == 201
+
+    login_response = await client.post("/api/auth/login", json=credentials)
+    assert login_response.status_code == 200
+
+    set_cookie_values = login_response.headers.get_list("set-cookie")
+    access_cookie = _cookie_header(set_cookie_values, ACCESS_COOKIE_NAME)
+    refresh_cookie = _cookie_header(set_cookie_values, REFRESH_COOKIE_NAME)
+    csrf_cookie = _cookie_header(set_cookie_values, CSRF_COOKIE_NAME)
+
+    assert "HttpOnly" in access_cookie
+    assert "HttpOnly" in refresh_cookie
+    assert "HttpOnly" not in csrf_cookie
+
+
 async def test_login_uses_env_configured_prod_cookie_domain(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,

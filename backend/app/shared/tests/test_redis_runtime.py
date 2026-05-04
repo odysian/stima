@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from unittest.mock import AsyncMock
 
 import pytest
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.shared.redis_runtime import (
     RedisRuntimeResolutionError,
     probe_redis,
@@ -60,20 +60,15 @@ async def test_probe_redis_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_runtime_state_uses_degraded_memory_when_missing_redis_and_allowed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("COOKIE_SECURE", "true")
-    monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
-    monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
-    monkeypatch.setenv("ALLOW_REDIS_DEGRADED_MODE", "true")
-    monkeypatch.setenv("REDIS_URL", "")
+async def test_resolve_runtime_state_rejects_missing_redis_url_in_production() -> None:
+    settings = Settings.model_construct(
+        environment="production",
+        redis_url=None,
+        allow_redis_degraded_mode=False,
+    )
 
-    runtime_state = await resolve_redis_runtime_state(get_settings())
-
-    assert runtime_state.mode == "degraded_memory"
-    assert runtime_state.degraded_reason == "redis_missing"
+    with pytest.raises(RedisRuntimeResolutionError, match="REDIS_URL is required in production"):
+        await resolve_redis_runtime_state(settings)
 
 
 @pytest.mark.asyncio
@@ -83,6 +78,7 @@ async def test_resolve_runtime_state_rejects_unhealthy_redis_when_degraded_disab
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("COOKIE_SECURE", "true")
     monkeypatch.setenv("FRONTEND_URL", "https://app.stima.dev")
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.stima.dev")
     monkeypatch.setenv("ALLOWED_HOSTS", "api.stima.dev")
     monkeypatch.setenv("ALLOW_REDIS_DEGRADED_MODE", "false")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
