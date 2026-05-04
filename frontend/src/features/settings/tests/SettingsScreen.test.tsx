@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getTimezoneOptions } from "@/features/profile/lib/timezones";
 import { profileService } from "@/features/profile/services/profileService";
+import { supportContactService } from "@/features/settings/services/supportContactService";
 import {
   TRADE_TYPES,
   type ProfileResponse,
@@ -35,12 +36,19 @@ vi.mock("@/features/profile/services/profileService", () => ({
   },
 }));
 
+vi.mock("@/features/settings/services/supportContactService", () => ({
+  supportContactService: {
+    submit: vi.fn(),
+  },
+}));
+
 vi.mock("@/features/profile/lib/timezones", () => ({
   getTimezoneOptions: vi.fn(),
 }));
 
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedProfileService = vi.mocked(profileService);
+const mockedSupportContactService = vi.mocked(supportContactService);
 const mockedGetTimezoneOptions = vi.mocked(getTimezoneOptions);
 
 function makeProfileResponse(overrides: Partial<ProfileResponse> = {}): ProfileResponse {
@@ -553,6 +561,90 @@ describe("SettingsScreen", () => {
     fireEvent.click(within(confirmDialog).getByRole("button", { name: /^sign out$/i }));
 
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
+  });
+
+  it("opens support sheet and allows cancel without side effects", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /contact support/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Contact support")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        "Tell us what happened. Please do not include sensitive customer details unless necessary.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^cancel$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(mockedSupportContactService.submit).not.toHaveBeenCalled();
+  });
+
+  it("validates support message before submit", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /contact support/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /^send$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Please enter a message.");
+    expect(mockedSupportContactService.submit).not.toHaveBeenCalled();
+  });
+
+  it("submits support message successfully and shows success feedback", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+    mockedSupportContactService.submit.mockResolvedValueOnce({
+      message: "Thanks — your message was sent.",
+    });
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /contact support/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/category/i), {
+      target: { value: "security_privacy" },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/message/i), {
+      target: { value: "  Something looks wrong in account access.  " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^send$/i }));
+
+    await waitFor(() =>
+      expect(mockedSupportContactService.submit).toHaveBeenCalledWith({
+        category: "security_privacy",
+        message: "Something looks wrong in account access.",
+      }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent("Thanks — your message was sent.");
+  });
+
+  it("shows support failure feedback when submit fails", async () => {
+    mockedProfileService.getProfile.mockResolvedValueOnce(makeProfileResponse());
+    mockedSupportContactService.submit.mockRejectedValueOnce(
+      new Error("Message could not be sent. Please try again."),
+    );
+
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole("button", { name: /contact support/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/message/i), {
+      target: { value: "Need help with a broken flow." },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^send$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Message could not be sent. Please try again.",
+    );
   });
 
   it("renders compact logo preview in display mode and full controls in edit mode", async () => {

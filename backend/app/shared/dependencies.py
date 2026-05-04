@@ -38,6 +38,7 @@ from app.features.quotes.email_delivery_service import QuoteEmailDeliveryService
 from app.features.quotes.extraction_service import ExtractionService
 from app.features.quotes.repository import QuoteRepository
 from app.features.quotes.service import QuoteService
+from app.features.support.service import SupportContactService
 from app.integrations.audio import AudioIntegration
 from app.integrations.email import EmailService
 from app.integrations.extraction import ExtractionIntegration
@@ -259,6 +260,17 @@ def get_extraction_service() -> ExtractionService:
         transcription_integration=get_transcription_integration(),
         transcription_model=settings.transcription_model,
         transcription_prompt_enabled=True,
+    )
+
+
+def get_support_contact_service(
+    email_service: Annotated[EmailService, Depends(get_email_service)],
+) -> SupportContactService:
+    """Build a request-scoped support contact service."""
+    settings = get_settings()
+    return SupportContactService(
+        email_service=email_service,
+        recipient_email=settings.support_contact_recipient_email,
     )
 
 

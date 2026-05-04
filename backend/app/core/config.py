@@ -190,6 +190,10 @@ class Settings(BaseSettings):
         validation_alias="EMAIL_FROM_ADDRESS",
     )
     email_from_name: str | None = Field(default=None, validation_alias="EMAIL_FROM_NAME")
+    support_contact_recipient_email: str | None = Field(
+        default=None,
+        validation_alias="SUPPORT_CONTACT_RECIPIENT_EMAIL",
+    )
     anthropic_api_key: str = Field(
         default="",
         validation_alias="ANTHROPIC_API_KEY",
@@ -269,6 +273,7 @@ class Settings(BaseSettings):
         "resend_api_key",
         "email_from_address",
         "email_from_name",
+        "support_contact_recipient_email",
         "extraction_fallback_model",
         mode="before",
     )
