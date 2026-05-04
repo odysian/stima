@@ -11,10 +11,10 @@ export function SettingsCatalogShortcutCard({
 }: SettingsCatalogShortcutCardProps): React.ReactElement {
   return (
     <Card className="bg-surface-container-low p-4">
-      <Eyebrow>Catalog</Eyebrow>
+      <Eyebrow>Reusable Line Items</Eyebrow>
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-sm text-on-surface-variant">
-          Save and manage reusable line item presets.
+          Create and manage reusable line item presets you can insert while editing quotes.
         </p>
         <Button
           type="button"
@@ -23,7 +23,7 @@ export function SettingsCatalogShortcutCard({
           className="shrink-0 whitespace-nowrap px-3 py-2 text-xs"
           onClick={onOpenLineItemCatalog}
         >
-          Manage Items
+          Manage Catalog
         </Button>
       </div>
     </Card>

@@ -5,6 +5,7 @@ import type { QuoteReuseCandidate } from "@/features/quotes/types/quote.types";
 import { Button } from "@/shared/components/Button";
 import { FeedbackMessage } from "@/shared/components/FeedbackMessage";
 import { Input } from "@/shared/components/Input";
+import { EmptyState } from "@/ui/EmptyState";
 import { StatusPill } from "@/ui/StatusPill";
 import { Sheet, SheetBody, SheetCloseButton, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/ui/Sheet";
 import { formatCurrency, formatDate } from "@/shared/lib/formatters";
@@ -27,14 +28,14 @@ function buildLoadErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
   }
-  return "Unable to load quotes";
+  return "Could not load quotes. Try again.";
 }
 
 function buildDuplicateErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
   }
-  return "Unable to duplicate quote";
+  return "Could not duplicate this quote. Try again.";
 }
 
 function resolveVisibleCandidates(candidates: QuoteReuseCandidate[], activeTab: ChooserTab): QuoteReuseCandidate[] {
@@ -50,12 +51,16 @@ function buildEmptyStateMessage(
   hasCustomerScope: boolean,
 ): string {
   if (normalizedSearchQuery) {
-    return "No quotes match your search.";
+    return "No matches yet. Change or clear your search to see more quotes.";
   }
   if (activeTab === "recent") {
-    return hasCustomerScope ? "No recent quotes for this customer." : "No recent quotes yet.";
+    return hasCustomerScope
+      ? "No recent quotes for this customer yet. Try All Quotes or create a new quote."
+      : "No recent quotes yet. Try All Quotes or create a new quote.";
   }
-  return hasCustomerScope ? "No quotes found for this customer." : "No quotes available.";
+  return hasCustomerScope
+    ? "No quotes found for this customer. Clear the customer filter or create a new quote."
+    : "No quotes available yet. Create a new quote to get started.";
 }
 
 export function QuoteReuseChooser({
@@ -176,8 +181,8 @@ export function QuoteReuseChooser({
     >
       <SheetHeader>
         <div>
-          <SheetTitle>Create from existing</SheetTitle>
-          <SheetDescription>Pick a quote to duplicate into a new draft.</SheetDescription>
+          <SheetTitle>Duplicate an existing quote</SheetTitle>
+          <SheetDescription>Choose a quote to copy into a new editable draft.</SheetDescription>
         </div>
         <SheetCloseButton />
       </SheetHeader>
@@ -224,7 +229,7 @@ export function QuoteReuseChooser({
             <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-1">
               {isLoading ? (
                 <div role="status" aria-label="Loading quotes" className="rounded-[var(--radius-document)] bg-surface-container-low p-4 text-sm text-on-surface-variant">
-                  Loading quotes...
+                  Loading quotes to duplicate...
                 </div>
               ) : null}
 
@@ -237,9 +242,11 @@ export function QuoteReuseChooser({
               ) : null}
 
               {!isLoading && !loadError && visibleCandidates.length === 0 ? (
-                <section className="rounded-[var(--radius-document)] bg-surface-container-low p-4 text-sm text-on-surface-variant">
-                  {emptyStateMessage}
-                </section>
+                <EmptyState
+                  icon="search"
+                  title="No quotes found"
+                  body={emptyStateMessage}
+                />
               ) : null}
 
               {!isLoading && !loadError ? (
