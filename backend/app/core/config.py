@@ -140,6 +140,10 @@ class Settings(BaseSettings):
         default="10/day",
         validation_alias="INVOICE_EMAIL_SEND_RATE_LIMIT",
     )
+    support_contact_rate_limit: str = Field(
+        default="5/hour",
+        validation_alias="SUPPORT_CONTACT_RATE_LIMIT",
+    )
     quote_email_duplicate_send_window_seconds: int = Field(
         default=60,
         ge=1,
@@ -190,6 +194,10 @@ class Settings(BaseSettings):
         validation_alias="EMAIL_FROM_ADDRESS",
     )
     email_from_name: str | None = Field(default=None, validation_alias="EMAIL_FROM_NAME")
+    support_contact_recipient_email: str | None = Field(
+        default=None,
+        validation_alias="SUPPORT_CONTACT_RECIPIENT_EMAIL",
+    )
     anthropic_api_key: str = Field(
         default="",
         validation_alias="ANTHROPIC_API_KEY",
@@ -269,6 +277,7 @@ class Settings(BaseSettings):
         "resend_api_key",
         "email_from_address",
         "email_from_name",
+        "support_contact_recipient_email",
         "extraction_fallback_model",
         mode="before",
     )

@@ -31,6 +31,7 @@ from app.features.line_item_catalog.api import router as line_item_catalog_route
 from app.features.profile.api import router as profile_router
 from app.features.quotes.api import public_router as quote_public_router
 from app.features.quotes.api import router as quote_router
+from app.features.support.api import router as support_router
 from app.shared.event_logger import configure_event_logging
 from app.shared.extraction_logger import configure_extraction_logging
 from app.shared.idempotency import IdempotencyStore, build_idempotency_store
@@ -257,6 +258,7 @@ def create_app() -> FastAPI:
     app.include_router(invoice_router, prefix="/api", dependencies=[Depends(bind_request_context)])
     app.include_router(jobs_router, prefix="/api", dependencies=[Depends(bind_request_context)])
     app.include_router(quote_router, prefix="/api", dependencies=[Depends(bind_request_context)])
+    app.include_router(support_router, prefix="/api", dependencies=[Depends(bind_request_context)])
     app.include_router(quote_public_router, dependencies=[Depends(bind_request_context)])
     if settings.admin_api_key is not None:
         app.include_router(

@@ -6,6 +6,7 @@ import { getTimezoneOptions } from "@/features/profile/lib/timezones";
 import { profileService } from "@/features/profile/services/profileService";
 import { SettingsBusinessProfileCard } from "@/features/settings/components/SettingsBusinessProfileCard";
 import { SettingsCatalogShortcutCard } from "@/features/settings/components/SettingsCatalogShortcutCard";
+import { SettingsSupportCard } from "@/features/settings/components/SettingsSupportCard";
 import {
   TRADE_TYPES,
   type ProfileResponse,
@@ -346,6 +347,8 @@ export function SettingsScreen(): React.ReactElement {
             <SettingsCatalogShortcutCard
               onOpenLineItemCatalog={() => navigate("/settings/line-item-catalog")}
             />
+
+            <SettingsSupportCard />
 
             <Card className="bg-surface-container-low p-4">
               <Eyebrow>Account</Eyebrow>
