@@ -53,7 +53,7 @@ export function LineItemCatalogTabPanel({
 
       {loadState === "loaded" && items.length === 0 ? (
         <EmptyState
-          icon="description"
+          icon="folder_off"
           title="No reusable items yet"
           body="Save your first reusable item from the Manual tab or from an existing line item."
         />
