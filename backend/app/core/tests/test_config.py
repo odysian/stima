@@ -263,6 +263,28 @@ def test_production_rejects_cookie_httponly_false(monkeypatch) -> None:
         get_settings()
 
 
+def test_production_rejects_empty_allowed_origins(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("ALLOWED_ORIGINS", "")
+
+    with pytest.raises(
+        ValidationError,
+        match="ALLOWED_ORIGINS must be non-empty",
+    ):
+        get_settings()
+
+
+def test_production_rejects_localhost_allowed_origins(monkeypatch) -> None:
+    _set_production_safe_defaults(monkeypatch)
+    monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:5173")
+
+    with pytest.raises(
+        ValidationError,
+        match="ALLOWED_ORIGINS entries must be explicit https origins",
+    ):
+        get_settings()
+
+
 def test_production_requires_secure_cookies(monkeypatch) -> None:
     _set_production_safe_defaults(monkeypatch)
     monkeypatch.setenv("COOKIE_SECURE", "false")
