@@ -183,6 +183,33 @@ async def test_support_contact_maps_provider_failure_to_generic_error(
     assert response.json() == {"detail": "Message could not be sent. Please try again."}  # nosec B101 - pytest assertion
 
 
+async def test_support_contact_rate_limit_returns_429(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app.state.limiter, "enabled", True)
+    monkeypatch.setenv("SUPPORT_CONTACT_RATE_LIMIT", "1/minute")
+    get_settings.cache_clear()
+    await _register_and_login(client, _credentials())
+    csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
+    assert csrf_token is not None  # nosec B101 - pytest assertion
+
+    first_response = await client.post(
+        "/api/support/contact",
+        json={"category": "bug", "message": "first"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+    second_response = await client.post(
+        "/api/support/contact",
+        json={"category": "bug", "message": "second"},
+        headers={"X-CSRF-Token": csrf_token},
+    )
+
+    assert first_response.status_code == 200  # nosec B101 - pytest assertion
+    assert second_response.status_code == 429  # nosec B101 - pytest assertion
+    assert "Rate limit exceeded" in second_response.json()["error"]  # nosec B101 - pytest assertion
+
+
 async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) -> None:
     register_response = await client.post("/api/auth/register", json=credentials)
     assert register_response.status_code == 201  # nosec B101 - pytest assertion

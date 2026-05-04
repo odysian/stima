@@ -140,6 +140,10 @@ class Settings(BaseSettings):
         default="10/day",
         validation_alias="INVOICE_EMAIL_SEND_RATE_LIMIT",
     )
+    support_contact_rate_limit: str = Field(
+        default="5/hour",
+        validation_alias="SUPPORT_CONTACT_RATE_LIMIT",
+    )
     quote_email_duplicate_send_window_seconds: int = Field(
         default=60,
         ge=1,
