@@ -11,6 +11,9 @@ import { usePendingPdfArtifactResume } from "@/shared/hooks/usePendingPdfArtifac
 import { jobService } from "@/shared/lib/jobService";
 import { pollJobUntilSuccess } from "@/shared/lib/jobPolling";
 
+export const SHARE_SHEET_FAILED_USE_MANUAL_LINK =
+  "Couldn't share from this device. Copy the link below.";
+
 interface UseQuoteDocumentActionsArgs {
   quoteId: string | undefined;
   quote: QuoteDetail | null;
@@ -162,7 +165,9 @@ export function useQuoteDocumentActions({
           if (isShareAbortError(error)) {
             return;
           }
-          throw error;
+          setManualCopyUrl(nextSharedUrl);
+          setShareError(SHARE_SHEET_FAILED_USE_MANUAL_LINK);
+          return;
         }
       }
 
