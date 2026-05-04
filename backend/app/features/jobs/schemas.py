@@ -36,6 +36,8 @@ class JobRecordResponse(BaseModel):
 def job_record_to_response(record: JobRecord) -> JobRecordResponse:
     """Serialize durable job records, decoding extraction results when present."""
     response = JobRecordResponse.model_validate(record)
+    if record.job_type in (JobType.EMAIL, JobType.PDF):
+        return response.model_copy(update={"terminal_error": None})
     if record.job_type != JobType.EXTRACTION:
         return response
 

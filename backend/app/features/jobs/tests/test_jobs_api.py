@@ -101,6 +101,64 @@ async def test_get_job_status_returns_404_for_foreign_or_unknown_jobs(
     assert unknown_response.json() == {"detail": "Not found"}  # nosec B101 - pytest assertion
 
 
+async def test_get_job_status_redacts_terminal_error_for_email_and_pdf_only(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    credentials = _credentials()
+    await _register_and_login(client, credentials)
+    user = await _get_user_by_email(db_session, credentials["email"])
+
+    repository = JobRepository(db_session)
+
+    email_record = await repository.create(user_id=user.id, job_type=JobType.EMAIL)
+    await repository.set_running(email_record.id, expected_job_type=JobType.EMAIL)
+    await repository.set_terminal(
+        email_record.id,
+        reason="smtp provider rejected recipient",
+        expected_job_type=JobType.EMAIL,
+    )
+
+    pdf_record = await repository.create(user_id=user.id, job_type=JobType.PDF)
+    await repository.set_running(pdf_record.id, expected_job_type=JobType.PDF)
+    await repository.set_terminal(
+        pdf_record.id,
+        reason="pdf render timeout",
+        expected_job_type=JobType.PDF,
+    )
+
+    extraction_record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
+    await repository.set_running(extraction_record.id, expected_job_type=JobType.EXTRACTION)
+    await repository.set_terminal(
+        extraction_record.id,
+        reason="extraction provider overloaded",
+        expected_job_type=JobType.EXTRACTION,
+    )
+    await db_session.commit()
+
+    email_response = await client.get(f"/api/jobs/{email_record.id}")
+    pdf_response = await client.get(f"/api/jobs/{pdf_record.id}")
+    extraction_response = await client.get(f"/api/jobs/{extraction_record.id}")
+
+    assert email_response.status_code == 200  # nosec B101 - pytest assertion
+    assert pdf_response.status_code == 200  # nosec B101 - pytest assertion
+    assert extraction_response.status_code == 200  # nosec B101 - pytest assertion
+
+    assert email_response.json()["terminal_error"] is None  # nosec B101 - pytest assertion
+    assert pdf_response.json()["terminal_error"] is None  # nosec B101 - pytest assertion
+    assert extraction_response.json()["terminal_error"] == "extraction provider overloaded"  # nosec B101 - pytest assertion
+
+    refreshed_email = await repository.get_by_id(email_record.id)
+    refreshed_pdf = await repository.get_by_id(pdf_record.id)
+    refreshed_extraction = await repository.get_by_id(extraction_record.id)
+    assert refreshed_email is not None  # nosec B101 - pytest assertion
+    assert refreshed_pdf is not None  # nosec B101 - pytest assertion
+    assert refreshed_extraction is not None  # nosec B101 - pytest assertion
+    assert refreshed_email.terminal_error == "smtp provider rejected recipient"  # nosec B101 - pytest assertion
+    assert refreshed_pdf.terminal_error == "pdf render timeout"  # nosec B101 - pytest assertion
+    assert refreshed_extraction.terminal_error == "extraction provider overloaded"  # nosec B101 - pytest assertion
+
+
 async def _register_and_login(client: AsyncClient, credentials: dict[str, str]) -> str:
     register_response = await client.post("/api/auth/register", json=credentials)
     assert register_response.status_code == 201  # nosec B101 - pytest assertion
