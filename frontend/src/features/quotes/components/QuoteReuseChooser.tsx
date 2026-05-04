@@ -75,6 +75,7 @@ export function QuoteReuseChooser({
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [candidates, setCandidates] = useState<QuoteReuseCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
@@ -89,6 +90,8 @@ export function QuoteReuseChooser({
     activeTab,
     Boolean(customerId),
   );
+  const showInitialLoading = isLoading && !hasLoadedOnce;
+  const showRefreshIndicator = isLoading && hasLoadedOnce;
 
   useEffect(() => {
     if (!open) {
@@ -124,6 +127,7 @@ export function QuoteReuseChooser({
       .then((nextCandidates) => {
         if (isActive) {
           setCandidates(nextCandidates);
+          setHasLoadedOnce(true);
         }
       })
       .catch((error: unknown) => {
@@ -153,6 +157,7 @@ export function QuoteReuseChooser({
     setDebouncedSearchQuery("");
     setCandidates([]);
     setIsLoading(false);
+    setHasLoadedOnce(false);
     setLoadError(null);
     setDuplicateError(null);
     setDuplicatingId(null);
@@ -227,10 +232,15 @@ export function QuoteReuseChooser({
             </div>
 
             <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-1">
-              {isLoading ? (
+              {showInitialLoading ? (
                 <div role="status" aria-label="Loading quotes" className="rounded-[var(--radius-document)] bg-surface-container-low p-4 text-sm text-on-surface-variant">
                   Loading quotes to duplicate...
                 </div>
+              ) : null}
+              {showRefreshIndicator ? (
+                <p role="status" className="text-xs text-on-surface-variant">
+                  Searching quotes...
+                </p>
               ) : null}
 
               {loadError ? (
@@ -241,7 +251,7 @@ export function QuoteReuseChooser({
                 <FeedbackMessage variant="error">{duplicateError}</FeedbackMessage>
               ) : null}
 
-              {!isLoading && !loadError && visibleCandidates.length === 0 ? (
+              {!showInitialLoading && !loadError && visibleCandidates.length === 0 ? (
                 <EmptyState
                   icon="search"
                   title="No quotes found"
@@ -249,7 +259,7 @@ export function QuoteReuseChooser({
                 />
               ) : null}
 
-              {!isLoading && !loadError ? (
+              {!showInitialLoading && !loadError ? (
                 <ul className="space-y-3">
                   {visibleCandidates.map((candidate) => (
                     <li key={candidate.id}>

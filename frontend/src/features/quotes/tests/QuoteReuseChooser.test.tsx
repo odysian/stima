@@ -255,6 +255,95 @@ describe("QuoteReuseChooser", () => {
     expect(screen.queryByRole("button", { name: /older quote/i })).not.toBeInTheDocument();
   });
 
+  it("keeps existing results visible while a debounced search refresh is pending", async () => {
+    vi.useFakeTimers();
+    const initial = deferred<ReturnType<typeof makeReuseCandidate>[]>();
+    const refresh = deferred<ReturnType<typeof makeReuseCandidate>[]>();
+
+    mockedQuoteService.listReuseCandidates.mockImplementation((params) => {
+      if (params?.q === "updated") {
+        return refresh.promise;
+      }
+      return initial.promise;
+    });
+
+    render(
+      <QuoteReuseChooser
+        open
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    await act(async () => {
+      initial.resolve([makeReuseCandidate("quote-1", "Original Quote")]);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("button", { name: /original quote/i })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search existing quotes"), {
+      target: { value: "updated" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(275);
+    });
+
+    expect(screen.getByRole("button", { name: /original quote/i })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Searching quotes...");
+    expect(screen.queryByText("Loading quotes to duplicate...")).not.toBeInTheDocument();
+
+    await act(async () => {
+      refresh.resolve([makeReuseCandidate("quote-2", "Updated Quote")]);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("button", { name: /updated quote/i })).toBeInTheDocument();
+  });
+
+  it("shows empty search state only after refresh resolves with no matches", async () => {
+    vi.useFakeTimers();
+    const initial = deferred<ReturnType<typeof makeReuseCandidate>[]>();
+    const emptyRefresh = deferred<ReturnType<typeof makeReuseCandidate>[]>();
+
+    mockedQuoteService.listReuseCandidates.mockImplementation((params) => {
+      if (params?.q === "missing") {
+        return emptyRefresh.promise;
+      }
+      return initial.promise;
+    });
+
+    render(
+      <QuoteReuseChooser
+        open
+        timezone="UTC"
+        onClose={vi.fn()}
+        onQuoteDuplicated={vi.fn()}
+      />,
+    );
+
+    await act(async () => {
+      initial.resolve([makeReuseCandidate("quote-1", "Original Quote")]);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("button", { name: /original quote/i })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search existing quotes"), {
+      target: { value: "missing" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(275);
+    });
+
+    expect(screen.getByRole("button", { name: /original quote/i })).toBeInTheDocument();
+    expect(screen.queryByText("No quotes found")).not.toBeInTheDocument();
+
+    await act(async () => {
+      emptyRefresh.resolve([]);
+      await Promise.resolve();
+    });
+    expect(screen.getByText("No quotes found")).toBeInTheDocument();
+  });
+
   it("ignores late responses after the sheet closes", async () => {
     const pending = deferred<ReturnType<typeof makeReuseCandidate>[]>();
     mockedQuoteService.listReuseCandidates.mockReturnValue(pending.promise);
