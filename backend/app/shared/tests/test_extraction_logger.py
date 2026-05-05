@@ -49,7 +49,7 @@ def test_log_extraction_trace_excludes_raw_fields_by_default(monkeypatch) -> Non
         captured.append((level, message))
 
     monkeypatch.setattr(extraction_logger._EXTRACTION_LOGGER, "log", _capture)  # noqa: SLF001
-    extraction_logger.configure_extraction_logging(include_raw_content=False)
+    extraction_logger.configure_extraction_logging()
 
     extraction_logger.log_extraction_trace(
         "extraction.trace",
@@ -77,7 +77,7 @@ def test_log_extraction_trace_excludes_raw_fields_by_default(monkeypatch) -> Non
     assert "PROVIDER_SECRET_SENTINEL_DO_NOT_LOG" not in captured[0][1]
 
 
-def test_log_extraction_trace_drops_sensitive_fields_when_raw_mode_requested(monkeypatch) -> None:
+def test_log_extraction_trace_drops_sensitive_fields_by_name(monkeypatch) -> None:
     captured: list[tuple[int, str]] = []
     monkeypatch.setattr(extraction_logger, "current_correlation_id", lambda: "corr-456")
     transcript_sentinel = "TRANSCRIPT_SENTINEL_DO_NOT_LOG"
@@ -87,7 +87,7 @@ def test_log_extraction_trace_drops_sensitive_fields_when_raw_mode_requested(mon
         captured.append((level, message))
 
     monkeypatch.setattr(extraction_logger._EXTRACTION_LOGGER, "log", _capture)  # noqa: SLF001
-    extraction_logger.configure_extraction_logging(include_raw_content=True)
+    extraction_logger.configure_extraction_logging()
 
     extraction_logger.log_extraction_trace(
         "extraction.trace",

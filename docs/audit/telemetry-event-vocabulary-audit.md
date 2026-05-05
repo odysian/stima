@@ -10,7 +10,7 @@
 - Only **12 events** are in the `_PILOT_EVENT_NAMES` allowlist; of those, **11 are actually persisted** under normal conditions and **1 is intentionally skipped** (`email_sent` uses `persist_async=False`).
 - **8 events** are stdout-only because they are outside the allowlist.
 - **No frontend telemetry** exists; there are zero `log_event`, analytics, or telemetry calls in the frontend codebase.
-- A **confirmed sensitive payload risk** exists in `backend/app/integrations/extraction.py` where `log_extraction_trace` passes `raw_transcript` and `raw_tool_payload` into the logger. These fields are currently stripped by a global `_INCLUDE_RAW_CONTENT = False` toggle, but the surface remains exposed.
+- A **confirmed sensitive payload risk** previously existed in `backend/app/integrations/extraction.py` where `log_extraction_trace` passed `raw_transcript` and `raw_tool_payload` into the logger. That path is now metadata-only.
 - The **existing backend events are sufficient for core P1 pilot visibility** (quote intake → draft → share → view → outcome, plus invoice creation and viewing). **However, `email_sent` for invoices currently omits `invoice_id`**, so invoice email traceability is incomplete until this is fixed. The smallest founder visibility path is a SQL/query doc or tiny report script against the existing `event_logs` table.
 - No client-event endpoint is required for P1.
 
@@ -74,9 +74,9 @@
 - `stage="repair", outcome="succeeded"` (lines 719–740: `raw_transcript` at 738, `raw_tool_payload` at 739)
 - `_log_result_trace` → `stage="result", outcome="succeeded"` (lines 1459–1474: `raw_transcript` at 1472, `raw_tool_payload` at 1473)
 
-**Current mitigation:** `app/shared/extraction_logger.py` defaults `_INCLUDE_RAW_CONTENT = False`, so these fields are stripped from the JSON payload before logging.
+**Current mitigation:** `app/shared/extraction_logger.py` emits metadata-only extraction traces, so raw fields are not included in the JSON payload.
 
-**Risk:** If `configure_extraction_logging(include_raw_content=True)` is ever called (e.g., in a debugging session or misconfigured environment), raw voice transcripts and structured extraction output would be written to stdout/logs. This violates the hard guardrail: *No raw notes, transcripts, audio, LLM prompts/responses, raw tool payloads … in telemetry/log payloads.*
+**Risk:** Future changes that add raw-content fields back into extraction traces would need to preserve the hard guardrail: *No raw notes, transcripts, audio, LLM prompts/responses, raw tool payloads … in telemetry/log payloads.*
 
 **Decision:** Route the fix to **Spec 9** (production security & LLM safety) per project convention. This PR documents the finding only.
 

@@ -28,7 +28,7 @@ The current codebase reflects that boundary:
 - Public quote responses expose a limited customer-facing contract, not private authenticated quote detail.
 - Extraction schemas validate and normalize model output before persistence.
 - Review metadata and flags surface uncertainty without automatically deciding for the user.
-- Production config and logging defaults are moving toward privacy-safe behavior; extraction raw content logging is gated behind `EXTRACTION_TRACE_INCLUDE_RAW_CONTENT`, default false.
+- Production config and logging defaults are moving toward privacy-safe behavior; extraction tracing is metadata-only.
 
 This ADR documents the product and safety boundary so future AI features do not weaken it.
 

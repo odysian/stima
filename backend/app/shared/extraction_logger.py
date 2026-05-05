@@ -15,9 +15,8 @@ _HANDLER_SENTINEL = "_stima_extraction_handler"
 _EXTRACTION_LOGGER = logging.getLogger(EXTRACTION_LOGGER_NAME)
 
 
-def configure_extraction_logging(*, include_raw_content: bool = False) -> None:
+def configure_extraction_logging() -> None:
     """Attach stdout extraction trace logging once."""
-    del include_raw_content
     _EXTRACTION_LOGGER.setLevel(logging.INFO)
     _EXTRACTION_LOGGER.propagate = False
     if any(getattr(handler, _HANDLER_SENTINEL, False) for handler in _EXTRACTION_LOGGER.handlers):

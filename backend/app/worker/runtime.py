@@ -95,9 +95,7 @@ async def on_worker_startup(ctx: dict[str, Any]) -> None:
         raise ValueError("REDIS_URL must be set for worker execution")
 
     configure_security_logging()
-    configure_extraction_logging(
-        include_raw_content=settings.extraction_trace_include_raw_content,
-    )
+    configure_extraction_logging()
     await ping_worker_redis(redis_url)
     ctx["worker_runtime"] = WorkerRuntimeSettings(
         session_maker=get_session_maker(),
