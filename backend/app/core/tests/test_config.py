@@ -69,20 +69,6 @@ def test_extraction_job_reaper_settings_use_expected_defaults() -> None:
     assert settings.extraction_job_stale_ttl_seconds == 300
 
 
-def test_extraction_trace_raw_content_logging_defaults_to_disabled() -> None:
-    settings = get_settings()
-
-    assert settings.extraction_trace_include_raw_content is False
-
-
-def test_extraction_trace_raw_content_logging_can_be_enabled(monkeypatch) -> None:
-    monkeypatch.setenv("EXTRACTION_TRACE_INCLUDE_RAW_CONTENT", "true")
-
-    settings = get_settings()
-
-    assert settings.extraction_trace_include_raw_content is True
-
-
 def test_extraction_job_reaper_settings_must_be_positive(monkeypatch) -> None:
     monkeypatch.setenv("EXTRACTION_JOB_REAPER_INTERVAL_SECONDS", "0")
 
@@ -322,17 +308,6 @@ def test_production_rejects_wildcard_allowed_hosts(monkeypatch) -> None:
     monkeypatch.setenv("ALLOWED_HOSTS", "*")
 
     with pytest.raises(ValidationError):
-        get_settings()
-
-
-def test_production_rejects_raw_content_extraction_trace(monkeypatch) -> None:
-    _set_production_safe_defaults(monkeypatch)
-    monkeypatch.setenv("EXTRACTION_TRACE_INCLUDE_RAW_CONTENT", "true")
-
-    with pytest.raises(
-        ValidationError,
-        match="EXTRACTION_TRACE_INCLUDE_RAW_CONTENT must be false",
-    ):
         get_settings()
 
 

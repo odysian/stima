@@ -206,9 +206,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     init_sentry(dsn=settings.sentry_dsn, environment=settings.environment)
     configure_event_logging(session_factory=get_session_maker())
-    configure_extraction_logging(
-        include_raw_content=settings.extraction_trace_include_raw_content,
-    )
+    configure_extraction_logging()
     configure_security_logging()
 
     app = FastAPI(title="Stima API", lifespan=_lifespan)

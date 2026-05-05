@@ -235,10 +235,6 @@ class Settings(BaseSettings):
         default="fallback_default",
         validation_alias="EXTRACTION_FALLBACK_PROMPT_VARIANT",
     )
-    extraction_trace_include_raw_content: bool = Field(
-        default=False,
-        validation_alias="EXTRACTION_TRACE_INCLUDE_RAW_CONTENT",
-    )
     transcription_model: str = Field(
         default="whisper-1",
         validation_alias="TRANSCRIPTION_MODEL",
@@ -481,12 +477,6 @@ class Settings(BaseSettings):
             raise ValueError("ALLOWED_HOSTS must be non-empty when ENVIRONMENT is 'production'")
         if "*" in self.allowed_hosts:
             raise ValueError("ALLOWED_HOSTS must not contain '*' when ENVIRONMENT is 'production'")
-
-        if self.extraction_trace_include_raw_content:
-            raise ValueError(
-                "EXTRACTION_TRACE_INCLUDE_RAW_CONTENT must be false "
-                "when ENVIRONMENT is 'production'"
-            )
         if self.allow_redis_degraded_mode:
             raise ValueError(
                 "ALLOW_REDIS_DEGRADED_MODE must be false when ENVIRONMENT is 'production'"

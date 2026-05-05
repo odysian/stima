@@ -8,19 +8,15 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
-from app.shared.observability import current_correlation_id
+from app.shared.observability import current_correlation_id, sanitize_log_fields
 
 EXTRACTION_LOGGER_NAME = "stima.extraction"
 _HANDLER_SENTINEL = "_stima_extraction_handler"
 _EXTRACTION_LOGGER = logging.getLogger(EXTRACTION_LOGGER_NAME)
-_INCLUDE_RAW_CONTENT = False
 
 
-def configure_extraction_logging(*, include_raw_content: bool = False) -> None:
-    """Attach stdout extraction trace logging once and refresh raw-content settings."""
-    global _INCLUDE_RAW_CONTENT
-
-    _INCLUDE_RAW_CONTENT = include_raw_content
+def configure_extraction_logging() -> None:
+    """Attach stdout extraction trace logging once."""
     _EXTRACTION_LOGGER.setLevel(logging.INFO)
     _EXTRACTION_LOGGER.propagate = False
     if any(getattr(handler, _HANDLER_SENTINEL, False) for handler in _EXTRACTION_LOGGER.handlers):
@@ -38,8 +34,6 @@ def log_extraction_trace(
     stage: str,
     outcome: str,
     level: int = logging.INFO,
-    raw_transcript: str | None = None,
-    raw_tool_payload: Any = None,
     **fields: Any,
 ) -> None:
     """Emit one structured extraction trace event."""
@@ -52,15 +46,6 @@ def log_extraction_trace(
         "stage": stage,
         "outcome": outcome,
     }
-    for key, value in fields.items():
-        if value is None:
-            continue
-        payload[key] = value
-
-    if _INCLUDE_RAW_CONTENT:
-        if raw_transcript is not None:
-            payload["raw_transcript"] = raw_transcript
-        if raw_tool_payload is not None:
-            payload["raw_tool_payload"] = raw_tool_payload
+    payload.update(sanitize_log_fields(fields))
 
     _EXTRACTION_LOGGER.log(level, json.dumps(payload, default=str, sort_keys=True))

@@ -42,19 +42,22 @@ def test_configure_extraction_logging_uses_stdout_and_does_not_duplicate_handler
 def test_log_extraction_trace_excludes_raw_fields_by_default(monkeypatch) -> None:
     captured: list[tuple[int, str]] = []
     monkeypatch.setattr(extraction_logger, "current_correlation_id", lambda: "corr-123")
+    transcript_sentinel = "TRANSCRIPT_SENTINEL_DO_NOT_LOG"
+    payload_sentinel = "TOOL_PAYLOAD_SENTINEL_DO_NOT_LOG"
 
     def _capture(level: int, message: str) -> None:
         captured.append((level, message))
 
     monkeypatch.setattr(extraction_logger._EXTRACTION_LOGGER, "log", _capture)  # noqa: SLF001
-    extraction_logger.configure_extraction_logging(include_raw_content=False)
+    extraction_logger.configure_extraction_logging()
 
     extraction_logger.log_extraction_trace(
         "extraction.trace",
         stage="primary",
         outcome="started",
-        raw_transcript="operator notes",
-        raw_tool_payload={"line_items": [{"description": "trim"}]},
+        raw_transcript=transcript_sentinel,
+        raw_tool_payload={"line_items": [{"description": payload_sentinel}]},
+        error_message="PROVIDER_SECRET_SENTINEL_DO_NOT_LOG",
         extraction_model_id="test-model",
     )
 
@@ -68,24 +71,31 @@ def test_log_extraction_trace_excludes_raw_fields_by_default(monkeypatch) -> Non
     assert payload["extraction_model_id"] == "test-model"
     assert "raw_transcript" not in payload
     assert "raw_tool_payload" not in payload
+    assert "error_message" not in payload
+    assert transcript_sentinel not in captured[0][1]
+    assert payload_sentinel not in captured[0][1]
+    assert "PROVIDER_SECRET_SENTINEL_DO_NOT_LOG" not in captured[0][1]
 
 
-def test_log_extraction_trace_includes_raw_fields_when_opted_in(monkeypatch) -> None:
+def test_log_extraction_trace_drops_sensitive_fields_by_name(monkeypatch) -> None:
     captured: list[tuple[int, str]] = []
     monkeypatch.setattr(extraction_logger, "current_correlation_id", lambda: "corr-456")
+    transcript_sentinel = "TRANSCRIPT_SENTINEL_DO_NOT_LOG"
+    payload_sentinel = "TOOL_PAYLOAD_SENTINEL_DO_NOT_LOG"
 
     def _capture(level: int, message: str) -> None:
         captured.append((level, message))
 
     monkeypatch.setattr(extraction_logger._EXTRACTION_LOGGER, "log", _capture)  # noqa: SLF001
-    extraction_logger.configure_extraction_logging(include_raw_content=True)
+    extraction_logger.configure_extraction_logging()
 
     extraction_logger.log_extraction_trace(
         "extraction.trace",
         stage="repair",
         outcome="succeeded",
-        raw_transcript="full transcript",
-        raw_tool_payload={"line_items": [{"description": "edging"}]},
+        raw_transcript=transcript_sentinel,
+        raw_tool_payload={"line_items": [{"description": payload_sentinel}]},
+        prompt="PROMPT_SENTINEL_DO_NOT_LOG",
         extraction_model_id="test-model",
     )
 
@@ -94,5 +104,10 @@ def test_log_extraction_trace_includes_raw_fields_when_opted_in(monkeypatch) -> 
     assert payload["stage"] == "repair"
     assert payload["outcome"] == "succeeded"
     assert payload["correlation_id"] == "corr-456"
-    assert payload["raw_transcript"] == "full transcript"
-    assert payload["raw_tool_payload"] == {"line_items": [{"description": "edging"}]}
+    assert payload["extraction_model_id"] == "test-model"
+    assert "raw_transcript" not in payload
+    assert "raw_tool_payload" not in payload
+    assert "prompt" not in payload
+    assert transcript_sentinel not in captured[0][1]
+    assert payload_sentinel not in captured[0][1]
+    assert "PROMPT_SENTINEL_DO_NOT_LOG" not in captured[0][1]

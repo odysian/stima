@@ -869,6 +869,72 @@ async def test_extract_emits_trace_events_for_primary_repair_and_result_stages(
     assert ("result", "succeeded") in {(call["stage"], call["outcome"]) for call in trace_calls}
 
 
+async def test_extract_trace_events_never_include_raw_sensitive_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transcript_sentinel = "TRANSCRIPT_SENTINEL_DO_NOT_LOG"
+    payload_sentinel = "TOOL_PAYLOAD_SENTINEL_DO_NOT_LOG"
+    trace_calls: list[dict[str, object]] = []
+
+    def _capture_trace(
+        event: str,
+        *,
+        stage: str,
+        outcome: str,
+        **fields: object,
+    ) -> None:
+        trace_calls.append(
+            {
+                "event": event,
+                "stage": stage,
+                "outcome": outcome,
+                **fields,
+            }
+        )
+
+    monkeypatch.setattr(extraction_module, "log_extraction_trace", _capture_trace)
+    client = _FakeClient(
+        lambda _: _FakeResponse(
+            content=[
+                {
+                    "type": "tool_use",
+                    "input": {
+                        "transcript": transcript_sentinel,
+                        "line_items": [
+                            {
+                                "description": payload_sentinel,
+                                "details": None,
+                                "price": 125,
+                            }
+                        ],
+                        "pricing_hints": {"explicit_total": 125},
+                    },
+                }
+            ]
+        )
+    )
+    integration = ExtractionIntegration(api_key="test", model="test-model", client=client)
+
+    result = await integration.extract(transcript_sentinel)
+
+    assert result.total == 125
+    serialized_traces = json.dumps(trace_calls, sort_keys=True, default=str)
+    assert transcript_sentinel not in serialized_traces
+    assert payload_sentinel not in serialized_traces
+    provider_response = next(
+        call
+        for call in trace_calls
+        if call["stage"] == "primary" and call["outcome"] == "provider_response"
+    )
+    assert provider_response["transcript_chars"] == len(transcript_sentinel)
+    assert provider_response["line_item_count"] == 1
+    result_trace = next(
+        call for call in trace_calls if call["stage"] == "result" and call["outcome"] == "succeeded"
+    )
+    assert result_trace["line_item_count"] == 1
+    assert result_trace["transcript_chars"] == len(transcript_sentinel)
+
+
 async def test_guard_flags_line_items_with_price_in_description() -> None:
     transcript = TRANSCRIPTS["clean_with_total"]
     client = _FakeClient(

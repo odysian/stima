@@ -46,6 +46,7 @@ from app.worker.runtime import (
     DEFAULT_MAX_TRIES,
     DEFAULT_RETRY_BASE_SECONDS,
     DEFAULT_RETRY_JITTER_SECONDS,
+    TERMINAL_ERROR_UNEXPECTED,
     NonRetryableJobError,
     WorkerRuntimeSettings,
 )
@@ -994,7 +995,7 @@ async def test_generate_pdf_returns_422_when_render_fails(
     )
 
     job_payload = _assert_async_pdf_job_response(response, document_id=quote["id"])
-    with pytest.raises(NonRetryableJobError, match="Unable to render quote PDF"):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_UNEXPECTED):
         await _run_pdf_job(
             db_session,
             job_id=job_payload["id"],
@@ -1052,7 +1053,7 @@ async def test_generate_pdf_rejects_documents_that_exceed_render_limits(
     )
 
     job_payload = _assert_async_pdf_job_response(response, document_id=quote["id"])
-    with pytest.raises(NonRetryableJobError, match="Document exceeds supported render limits"):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_UNEXPECTED):
         await _run_pdf_job(
             db_session,
             job_id=job_payload["id"],

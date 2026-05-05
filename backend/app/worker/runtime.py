@@ -61,6 +61,11 @@ class NonRetryableJobError(RuntimeError):
         self.terminal_reason = terminal_reason
 
 
+def _raise_sanitized_terminal_error(*, reason: str) -> None:
+    """Raise an ARQ-facing terminal exception without leaking the original error text."""
+    raise NonRetryableJobError(reason, terminal_reason=reason) from None
+
+
 def build_arq_redis_settings(settings: Settings) -> RedisSettings:
     """Translate the app REDIS_URL into ARQ Redis settings."""
     redis_url = settings.redis_url
@@ -90,9 +95,7 @@ async def on_worker_startup(ctx: dict[str, Any]) -> None:
         raise ValueError("REDIS_URL must be set for worker execution")
 
     configure_security_logging()
-    configure_extraction_logging(
-        include_raw_content=settings.extraction_trace_include_raw_content,
-    )
+    configure_extraction_logging()
     await ping_worker_redis(redis_url)
     ctx["worker_runtime"] = WorkerRuntimeSettings(
         session_maker=get_session_maker(),
@@ -148,10 +151,13 @@ async def process_job[T](
     except RetryableJobError as exc:
         if attempt_number >= runtime.max_tries:
             await _set_failed(runtime, job_id=job_id, job_type=job_type)
-            logger.warning(
-                "Job %s exhausted retry budget and is transitioning to terminal state.",
-                job_id,
-                exc_info=True,
+            _log_terminal_transition(
+                level=logging.WARNING,
+                job_id=job_id,
+                job_name=resolved_job_name,
+                reason=_terminal_error_code(exc),
+                error_class=_error_class_name(exc),
+                message="Job exhausted retry budget and is transitioning to terminal state.",
             )
             log_security_event(
                 "jobs.terminal_failure",
@@ -168,7 +174,7 @@ async def process_job[T](
                 job_type=job_type,
                 reason=_terminal_error_code(exc),
             )
-            raise
+            _raise_sanitized_terminal_error(reason=_terminal_error_code(exc))
 
         await _set_failed(runtime, job_id=job_id, job_type=job_type)
         raise Retry(
@@ -180,7 +186,14 @@ async def process_job[T](
             )
         ) from exc
     except NonRetryableJobError as exc:
-        logger.warning("Job %s failed with a non-retryable exception: %s", job_id, exc)
+        _log_terminal_transition(
+            level=logging.WARNING,
+            job_id=job_id,
+            job_name=resolved_job_name,
+            reason=_terminal_error_code(exc),
+            error_class=_error_class_name(exc),
+            message="Job failed with a non-retryable exception.",
+        )
         log_security_event(
             "jobs.terminal_failure",
             outcome="terminal",
@@ -196,9 +209,16 @@ async def process_job[T](
             job_type=job_type,
             reason=_terminal_error_code(exc),
         )
-        raise
+        _raise_sanitized_terminal_error(reason=_terminal_error_code(exc))
     except Exception as exc:
-        logger.exception("Job %s failed with a terminal exception.", job_id)
+        _log_terminal_transition(
+            level=logging.ERROR,
+            job_id=job_id,
+            job_name=resolved_job_name,
+            reason=_terminal_error_code(exc),
+            error_class=_error_class_name(exc),
+            message="Job failed with a terminal exception.",
+        )
         log_security_event(
             "jobs.terminal_failure",
             outcome="terminal",
@@ -214,7 +234,7 @@ async def process_job[T](
             job_type=job_type,
             reason=_terminal_error_code(exc),
         )
-        raise
+        _raise_sanitized_terminal_error(reason=_terminal_error_code(exc))
     finally:
         reset_request_context(request_context_token)
         reset_correlation(correlation_token)
@@ -309,3 +329,23 @@ def _terminal_error_code(exc: Exception) -> str:
 def _error_class_name(exc: Exception) -> str:
     cause = exc.__cause__
     return type(cause if isinstance(cause, Exception) else exc).__name__
+
+
+def _log_terminal_transition(
+    *,
+    level: int,
+    job_id: UUID,
+    job_name: str,
+    reason: str,
+    error_class: str,
+    message: str,
+) -> None:
+    logger.log(
+        level,
+        "%s job_id=%s job_name=%s reason=%s error_class=%s",
+        message,
+        job_id,
+        job_name,
+        reason,
+        error_class,
+    )

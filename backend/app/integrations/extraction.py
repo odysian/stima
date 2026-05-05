@@ -460,7 +460,6 @@ class ExtractionIntegration:
                     extraction_model_id=tier.model_id,
                     extraction_prompt_variant=tier.prompt_variant,
                     error_class=type(exc).__name__,
-                    error_message=str(exc),
                 )
                 continue
 
@@ -474,7 +473,6 @@ class ExtractionIntegration:
             extraction_mode=mode,
             reason="all_tiers_failed",
             error_class=type(last_error).__name__,
-            error_message=str(last_error),
         )
         raise last_error
 
@@ -527,7 +525,6 @@ class ExtractionIntegration:
             extraction_model_id=tier.model_id,
             extraction_prompt_variant=tier.prompt_variant,
             transcript_chars=len(prepared_input.transcript),
-            raw_transcript=prepared_input.transcript,
         )
         _set_last_call_metadata(
             model_id=tier.model_id,
@@ -582,8 +579,7 @@ class ExtractionIntegration:
                 )
                 is not None
             ),
-            raw_transcript=prepared_input.transcript,
-            raw_tool_payload=candidate_payload,
+            transcript_chars=len(prepared_input.transcript),
         )
 
         try:
@@ -624,8 +620,7 @@ class ExtractionIntegration:
                 extraction_model_id=response_model_id,
                 extraction_prompt_variant=repair_prompt_variant,
                 validation_error_count=len(validation_errors),
-                raw_transcript=prepared_input.transcript,
-                raw_tool_payload=candidate_payload,
+                transcript_chars=len(prepared_input.transcript),
             )
             try:
                 repair_response = await self._request_with_retry(
@@ -702,8 +697,7 @@ class ExtractionIntegration:
                     reason="repair_invalid",
                     token_input_tokens=_token_usage_value(repair_usage, "input_tokens"),
                     token_output_tokens=_token_usage_value(repair_usage, "output_tokens"),
-                    raw_transcript=prepared_input.transcript,
-                    raw_tool_payload=repair_candidate_payload,
+                    transcript_chars=len(prepared_input.transcript),
                 )
                 degraded_result = _build_validation_repair_failed_result(
                     transcript=prepared_input.transcript
@@ -743,8 +737,7 @@ class ExtractionIntegration:
                     ).get("explicit_total")
                     is not None
                 ),
-                raw_transcript=prepared_input.transcript,
-                raw_tool_payload=repair_candidate_payload,
+                transcript_chars=len(prepared_input.transcript),
             )
             if mode == "append":
                 result = _build_extraction_result_from_append_candidate(
@@ -1493,10 +1486,9 @@ def _log_result_trace(
         flagged_line_item_count=sum(1 for item in result.line_items if item.flagged),
         spoken_money_hint_count=spoken_money_hint_count,
         spoken_money_correction_count=spoken_money_correction_count,
+        transcript_chars=len(result.transcript),
         unresolved_segment_count=len(result.unresolved_segments),
         total_present=result.pricing_hints.explicit_total is not None,
-        raw_transcript=result.transcript,
-        raw_tool_payload=result.model_dump(mode="json"),
     )
 
 
@@ -1633,8 +1625,7 @@ def _apply_spoken_money_correction_guard(
                 _TRACE_EVENT_NAME,
                 stage="semantic_guard",
                 outcome="spoken_money_orphan_hint",
-                spoken_money_phrase=hint.phrase,
-                spoken_money_amount=hint.amount,
+                spoken_money_orphan_hint_count=1,
             )
             continue
 

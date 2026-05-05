@@ -22,7 +22,6 @@ from app.worker.runtime import (
     TERMINAL_ERROR_RETRY_EXHAUSTED,
     TERMINAL_ERROR_UNEXPECTED,
     NonRetryableJobError,
-    RetryableJobError,
     WorkerRuntimeSettings,
 )
 from arq.worker import Retry
@@ -93,7 +92,7 @@ async def test_pdf_job_retries_transient_render_failure_then_marks_retry_exhaust
     assert after_first_failure is not None  # nosec B101 - pytest assertion
     assert after_first_failure.status == JobStatus.FAILED  # nosec B101 - pytest assertion
 
-    with pytest.raises(RetryableJobError):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_RETRY_EXHAUSTED):
         await pdf_job(
             _worker_context(
                 db_session,
