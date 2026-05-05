@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -9,6 +11,7 @@ from app.core.config import get_settings
 from app.features.auth.models import User
 from app.features.jobs.models import JobRecord, JobStatus, JobType
 from app.features.jobs.repository import JobRepository
+from app.worker import runtime as runtime_module
 from app.worker.runtime import (
     TERMINAL_ERROR_RETRY_EXHAUSTED,
     RetryableJobError,
@@ -143,6 +146,84 @@ async def test_process_job_marks_failed_before_terminal_on_final_retryable_error
         )
 
     assert call_order == ["failed", "terminal"]  # nosec B101 - pytest assertion
+
+
+async def test_process_job_terminal_logs_omit_raw_exception_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rendered_messages: list[str] = []
+    security_events: list[dict[str, object]] = []
+    terminal_reasons: list[str] = []
+    sentinel = "PROVIDER_SECRET_SENTINEL_DO_NOT_LOG"
+    job_id = uuid4()
+
+    def _capture_log(level: int, message: str, *args: object, **kwargs: object) -> None:
+        del kwargs
+        rendered_messages.append(message % args if args else message)
+
+    def _capture_security_event(
+        event: str,
+        *,
+        outcome: str,
+        level: int = logging.INFO,
+        **fields: object,
+    ) -> None:
+        security_events.append(
+            {
+                "event": event,
+                "outcome": outcome,
+                "level": level,
+                **fields,
+            }
+        )
+
+    async def _noop_set_running(*args, **kwargs) -> None:  # noqa: ANN002, ANN003
+        del args, kwargs
+
+    async def _capture_set_terminal(
+        runtime: WorkerRuntimeSettings,
+        *,
+        job_id: UUID,
+        job_type: JobType,
+        reason: str,
+    ) -> None:
+        del runtime, job_id, job_type
+        terminal_reasons.append(reason)
+
+    runtime = WorkerRuntimeSettings(
+        session_maker=cast(async_sessionmaker[AsyncSession], object()),
+        max_tries=3,
+        retry_base_seconds=5.0,
+        retry_jitter_seconds=3.0,
+    )
+
+    monkeypatch.setattr(runtime_module.logger, "log", _capture_log)
+    monkeypatch.setattr(runtime_module, "log_security_event", _capture_security_event)
+    monkeypatch.setattr(runtime_module, "_set_running", _noop_set_running)
+    monkeypatch.setattr(runtime_module, "_set_terminal", _capture_set_terminal)
+
+    async def _terminal_failure_handler() -> None:
+        raise RuntimeError(sentinel)
+
+    with pytest.raises(RuntimeError, match=sentinel):
+        await process_job(
+            {"job_try": 1, "worker_runtime": runtime},
+            job_id=job_id,
+            job_type=JobType.EXTRACTION,
+            job_name="jobs.extraction",
+            handler=_terminal_failure_handler,
+        )
+
+    assert rendered_messages  # nosec B101 - pytest assertion
+    assert all(sentinel not in message for message in rendered_messages)  # nosec B101 - pytest assertion
+    assert terminal_reasons == ["unexpected_error"]  # nosec B101 - pytest assertion
+    terminal_event = security_events[-1]
+    assert terminal_event["event"] == "jobs.terminal_failure"  # nosec B101 - pytest assertion
+    assert terminal_event["reason"] == "unexpected_error"  # nosec B101 - pytest assertion
+    assert terminal_event["job_id"] == str(job_id)  # nosec B101 - pytest assertion
+    assert terminal_event["job_name"] == "jobs.extraction"  # nosec B101 - pytest assertion
+    assert terminal_event["error_class"] == "RuntimeError"  # nosec B101 - pytest assertion
+    assert sentinel not in str(terminal_event)  # nosec B101 - pytest assertion
 
 
 async def test_worker_startup_raises_when_redis_is_unreachable(

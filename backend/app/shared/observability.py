@@ -6,6 +6,7 @@ import contextvars
 import hmac
 import json
 import logging
+import re
 import string
 import sys
 import time
@@ -53,12 +54,59 @@ _request_context_var: contextvars.ContextVar[RequestLogContext | None] = context
     default=None,
 )
 _rate_limited_events: dict[str, float] = {}
-_FORBIDDEN_FIELDS = frozenset(
+_SENSITIVE_FIELD_NAMES = frozenset(
     {
+        "access_token",
+        "api_key",
+        "auth_token",
+        "authorization",
         "authorization_header",
+        "connection_string",
+        "cookie",
+        "cookies",
+        "error_message",
+        "message_body",
+        "model_output",
+        "model_response",
+        "notes",
+        "prompt",
+        "prompt_body",
+        "prompt_text",
         "provider_api_key",
         "raw_share_token",
         "raw_token",
+        "raw_tool_payload",
+        "raw_transcript",
+        "raw_typed_notes",
+        "refresh_token",
+        "response",
+        "response_body",
+        "response_text",
+        "secret",
+        "share_token",
+        "spoken_money_amount",
+        "spoken_money_phrase",
+        "token",
+        "tool_payload",
+        "tool_response",
+        "transcript",
+        "typed_notes",
+    }
+)
+_SENSITIVE_FIELD_SUFFIXES = (
+    "_api_key",
+    "_authorization",
+    "_cookie",
+    "_prompt",
+    "_response",
+    "_secret",
+    "_token",
+)
+_SAFE_SUFFIX_EXCEPTIONS = frozenset(
+    {
+        "token_input_tokens",
+        "token_output_tokens",
+        "token_usage",
     }
 )
 
@@ -282,10 +330,7 @@ def log_security_event(
     if token_ref is not None:
         payload["token_ref_hash"] = hash_token_reference(token_ref)
 
-    for key, value in fields.items():
-        if value is None or key in _FORBIDDEN_FIELDS:
-            continue
-        payload[key] = value
+    payload.update(sanitize_log_fields(fields))
 
     _emit_security_payload(payload, level=level)
 
@@ -369,6 +414,28 @@ def hash_client_ip(client_ip: str | None) -> str | None:
     if client_ip is None:
         return None
     return _hmac_reference("client_ip", client_ip)
+
+
+def sanitize_log_fields(fields: dict[str, Any]) -> dict[str, Any]:
+    """Drop obviously sensitive structured log fields by key."""
+    sanitized: dict[str, Any] = {}
+    for key, value in fields.items():
+        if value is None or is_sensitive_log_field(key):
+            continue
+        sanitized[key] = value
+    return sanitized
+
+
+def is_sensitive_log_field(field_name: str) -> bool:
+    """Return True when a structured log field name should never emit raw content."""
+    normalized = re.sub(r"[^a-z0-9]+", "_", field_name.strip().lower()).strip("_")
+    if not normalized:
+        return False
+    if normalized in _SENSITIVE_FIELD_NAMES:
+        return True
+    if normalized in _SAFE_SUFFIX_EXCEPTIONS:
+        return False
+    return normalized.endswith(_SENSITIVE_FIELD_SUFFIXES)
 
 
 def sanitize_route_template(path: str) -> str:

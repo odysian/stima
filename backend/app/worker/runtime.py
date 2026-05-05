@@ -148,10 +148,13 @@ async def process_job[T](
     except RetryableJobError as exc:
         if attempt_number >= runtime.max_tries:
             await _set_failed(runtime, job_id=job_id, job_type=job_type)
-            logger.warning(
-                "Job %s exhausted retry budget and is transitioning to terminal state.",
-                job_id,
-                exc_info=True,
+            _log_terminal_transition(
+                level=logging.WARNING,
+                job_id=job_id,
+                job_name=resolved_job_name,
+                reason=_terminal_error_code(exc),
+                error_class=_error_class_name(exc),
+                message="Job exhausted retry budget and is transitioning to terminal state.",
             )
             log_security_event(
                 "jobs.terminal_failure",
@@ -180,7 +183,14 @@ async def process_job[T](
             )
         ) from exc
     except NonRetryableJobError as exc:
-        logger.warning("Job %s failed with a non-retryable exception: %s", job_id, exc)
+        _log_terminal_transition(
+            level=logging.WARNING,
+            job_id=job_id,
+            job_name=resolved_job_name,
+            reason=_terminal_error_code(exc),
+            error_class=_error_class_name(exc),
+            message="Job failed with a non-retryable exception.",
+        )
         log_security_event(
             "jobs.terminal_failure",
             outcome="terminal",
@@ -198,7 +208,14 @@ async def process_job[T](
         )
         raise
     except Exception as exc:
-        logger.exception("Job %s failed with a terminal exception.", job_id)
+        _log_terminal_transition(
+            level=logging.ERROR,
+            job_id=job_id,
+            job_name=resolved_job_name,
+            reason=_terminal_error_code(exc),
+            error_class=_error_class_name(exc),
+            message="Job failed with a terminal exception.",
+        )
         log_security_event(
             "jobs.terminal_failure",
             outcome="terminal",
@@ -309,3 +326,23 @@ def _terminal_error_code(exc: Exception) -> str:
 def _error_class_name(exc: Exception) -> str:
     cause = exc.__cause__
     return type(cause if isinstance(cause, Exception) else exc).__name__
+
+
+def _log_terminal_transition(
+    *,
+    level: int,
+    job_id: UUID,
+    job_name: str,
+    reason: str,
+    error_class: str,
+    message: str,
+) -> None:
+    logger.log(
+        level,
+        "%s job_id=%s job_name=%s reason=%s error_class=%s",
+        message,
+        job_id,
+        job_name,
+        reason,
+        error_class,
+    )

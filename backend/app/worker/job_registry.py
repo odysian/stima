@@ -421,7 +421,6 @@ async def _attach_logo_data_uri(ctx: dict[str, Any], context: Any) -> None:
     except Exception:  # noqa: BLE001
         logger.warning(
             "Failed to load document logo for PDF render; omitting logo",
-            exc_info=True,
         )
         context.logo_data_uri = None
         return
@@ -601,9 +600,9 @@ async def _store_extraction_result(
             except QuoteServiceError as exc:
                 await session.rollback()
                 logger.warning(
-                    "Extraction draft persistence failed for job %s",
+                    "Extraction draft persistence failed for job %s error_class=%s",
                     job_id,
-                    exc_info=True,
+                    type(exc).__name__,
                 )
                 log_security_event(
                     "quotes.extract_persist_failed",
@@ -621,9 +620,9 @@ async def _store_extraction_result(
             except Exception as exc:  # noqa: BLE001
                 await session.rollback()
                 logger.warning(
-                    "Extraction draft persistence failed for job %s",
+                    "Extraction draft persistence failed for job %s error_class=%s",
                     job_id,
-                    exc_info=True,
+                    type(exc).__name__,
                 )
                 log_security_event(
                     "quotes.extract_persist_failed",
@@ -704,7 +703,7 @@ async def _store_pdf_artifact(
             try:
                 await asyncio.to_thread(storage_service.delete, artifact_path)
             except Exception:  # noqa: BLE001
-                logger.warning("Failed to delete stale PDF artifact upload", exc_info=True)
+                logger.warning("Failed to delete stale PDF artifact upload")
             raise NonRetryableJobError(
                 "PDF job became stale before persistence completed",
                 terminal_reason=TERMINAL_ERROR_STALE_DOCUMENT_REVISION,
@@ -725,7 +724,7 @@ async def _store_pdf_artifact(
         try:
             await asyncio.to_thread(storage_service.delete, persistence_result.previous_path)
         except Exception:  # noqa: BLE001
-            logger.warning("Failed to delete superseded PDF artifact", exc_info=True)
+            logger.warning("Failed to delete superseded PDF artifact")
 
 
 async def _log_extraction_terminal_failure(

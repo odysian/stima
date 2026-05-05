@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 from hashlib import sha256
+from types import SimpleNamespace
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -21,6 +23,7 @@ from app.features.quotes.schemas import (
 from app.features.quotes.service import QuoteServiceError
 from app.integrations.extraction import ExtractionCallMetadata, ExtractionError
 from app.shared import event_logger, observability
+from app.worker import job_registry as job_registry_module
 from app.worker.job_registry import TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED, extraction_job
 from app.worker.runtime import (
     NonRetryableJobError,
@@ -196,6 +199,105 @@ async def test_extraction_job_marks_terminal_when_draft_persistence_fails(
     assert refreshed.terminal_error == TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED  # nosec B101 - pytest assertion
     assert refreshed.document_id is None  # nosec B101 - pytest assertion
     assert refreshed.result_json is None  # nosec B101 - pytest assertion
+
+
+async def test_extraction_job_persistence_failure_warning_omits_raw_exception_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rendered_warnings: list[str] = []
+    sentinel = "PROVIDER_SECRET_SENTINEL_DO_NOT_LOG"
+    job_id = uuid4()
+    user_id = uuid4()
+
+    class _FakeSession:
+        def __init__(self) -> None:
+            self.rolled_back = False
+            self.committed = False
+
+        async def rollback(self) -> None:
+            self.rolled_back = True
+
+        async def commit(self) -> None:
+            self.committed = True
+
+    class _FakeSessionContext:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        async def __aenter__(self) -> _FakeSession:
+            return self._session
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            del exc_type, exc, tb
+
+    class _FakeSessionFactory:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        def __call__(self) -> _FakeSessionContext:
+            return _FakeSessionContext(self._session)
+
+    class _FakeJobRepository:
+        def __init__(self, session: _FakeSession) -> None:
+            self._session = session
+
+        async def get_by_id(self, candidate_job_id: UUID) -> SimpleNamespace | None:
+            del self._session
+            if candidate_job_id != job_id:
+                return None
+            return SimpleNamespace(
+                id=job_id,
+                user_id=user_id,
+                document_id=None,
+            )
+
+        async def set_extraction_success(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+            del args, kwargs
+            raise AssertionError("set_extraction_success should not run on persistence failure")
+
+    class _FailingQuoteService:
+        def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+            del args, kwargs
+
+        async def create_extracted_draft(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            del args, kwargs
+            raise QuoteServiceError(detail=sentinel, status_code=503)
+
+    def _capture_warning(message: str, *args: object, **kwargs: object) -> None:
+        del kwargs
+        rendered_warnings.append(message % args if args else message)
+
+    fake_session = _FakeSession()
+    runtime = WorkerRuntimeSettings(
+        session_maker=cast(async_sessionmaker[AsyncSession], _FakeSessionFactory(fake_session)),
+        max_tries=3,
+        retry_base_seconds=5.0,
+        retry_jitter_seconds=3.0,
+    )
+
+    monkeypatch.setattr(job_registry_module, "JobRepository", _FakeJobRepository)
+    monkeypatch.setattr(job_registry_module, "QuoteService", _FailingQuoteService)
+    monkeypatch.setattr(job_registry_module.logger, "warning", _capture_warning)
+
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED):
+        await job_registry_module._store_extraction_result(  # noqa: SLF001
+            runtime,
+            job_id=job_id,
+            result=ExtractionResult(
+                transcript="mulch the front beds",
+                line_items=[],
+                pricing_hints=PricingHints(),
+            ),
+            source_type="text",
+            capture_detail="notes",
+            customer_id=None,
+        )
+
+    assert fake_session.rolled_back is True  # nosec B101 - pytest assertion
+    assert fake_session.committed is False  # nosec B101 - pytest assertion
+    assert rendered_warnings  # nosec B101 - pytest assertion
+    assert all(sentinel not in warning for warning in rendered_warnings)  # nosec B101 - pytest assertion
+    assert any("error_class=QuoteServiceError" in warning for warning in rendered_warnings)  # nosec B101 - pytest assertion
 
 
 async def test_extraction_job_retries_provider_429_then_persists_degraded_on_final_attempt(
