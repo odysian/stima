@@ -26,6 +26,7 @@ from app.shared import event_logger, observability
 from app.worker import job_registry as job_registry_module
 from app.worker.job_registry import TERMINAL_ERROR_DRAFT_PERSISTENCE_FAILED, extraction_job
 from app.worker.runtime import (
+    TERMINAL_ERROR_UNEXPECTED,
     NonRetryableJobError,
     WorkerRuntimeSettings,
 )
@@ -145,7 +146,7 @@ async def test_extraction_job_rejects_removed_append_mode(
     record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
     await db_session.commit()
 
-    with pytest.raises(NonRetryableJobError, match="valid extraction_mode"):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_UNEXPECTED):
         await extraction_job(
             _worker_context(
                 db_session,
@@ -421,7 +422,7 @@ async def test_extraction_job_logs_draft_generation_failed_on_terminal_failure(
     record = await repository.create(user_id=user.id, job_type=JobType.EXTRACTION)
     await db_session.commit()
 
-    with pytest.raises(ExtractionError):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_UNEXPECTED):
         await extraction_job(
             _worker_context(
                 db_session,
@@ -458,7 +459,7 @@ async def test_extraction_job_uses_enqueued_correlation_id_and_logs_failure_meta
 
     ingress_correlation_id = "ingress-correlation-id-123"
     transcript = "mulch the front beds"
-    with pytest.raises(ExtractionError, match="Claude request failed: malformed payload"):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_UNEXPECTED):
         await extraction_job(
             _worker_context(
                 db_session,
