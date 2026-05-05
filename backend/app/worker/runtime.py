@@ -61,6 +61,11 @@ class NonRetryableJobError(RuntimeError):
         self.terminal_reason = terminal_reason
 
 
+def _raise_sanitized_terminal_error(*, reason: str) -> None:
+    """Raise an ARQ-facing terminal exception without leaking the original error text."""
+    raise NonRetryableJobError(reason, terminal_reason=reason) from None
+
+
 def build_arq_redis_settings(settings: Settings) -> RedisSettings:
     """Translate the app REDIS_URL into ARQ Redis settings."""
     redis_url = settings.redis_url
@@ -171,7 +176,7 @@ async def process_job[T](
                 job_type=job_type,
                 reason=_terminal_error_code(exc),
             )
-            raise
+            _raise_sanitized_terminal_error(reason=_terminal_error_code(exc))
 
         await _set_failed(runtime, job_id=job_id, job_type=job_type)
         raise Retry(
@@ -206,7 +211,7 @@ async def process_job[T](
             job_type=job_type,
             reason=_terminal_error_code(exc),
         )
-        raise
+        _raise_sanitized_terminal_error(reason=_terminal_error_code(exc))
     except Exception as exc:
         _log_terminal_transition(
             level=logging.ERROR,
@@ -231,7 +236,7 @@ async def process_job[T](
             job_type=job_type,
             reason=_terminal_error_code(exc),
         )
-        raise
+        _raise_sanitized_terminal_error(reason=_terminal_error_code(exc))
     finally:
         reset_request_context(request_context_token)
         reset_correlation(correlation_token)

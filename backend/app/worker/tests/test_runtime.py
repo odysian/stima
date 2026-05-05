@@ -14,6 +14,8 @@ from app.features.jobs.repository import JobRepository
 from app.worker import runtime as runtime_module
 from app.worker.runtime import (
     TERMINAL_ERROR_RETRY_EXHAUSTED,
+    TERMINAL_ERROR_UNEXPECTED,
+    NonRetryableJobError,
     RetryableJobError,
     WorkerRuntimeSettings,
     calculate_retry_delay_seconds,
@@ -98,7 +100,7 @@ async def test_process_job_retries_transient_failures_before_terminal(
     assert after_second_failure.attempts == 2  # nosec B101 - pytest assertion
     assert second_retry.value.defer_score == int(expected_second_retry_delay * 1000)  # nosec B101 - pytest assertion
 
-    with pytest.raises(RetryableJobError, match="temporary upstream outage"):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_RETRY_EXHAUSTED):
         await process_job(
             _worker_context(db_session, job_try=3),
             job_id=record.id,
@@ -137,7 +139,7 @@ async def test_process_job_marks_failed_before_terminal_on_final_retryable_error
     monkeypatch.setattr("app.worker.runtime._set_failed", _tracking_set_failed)
     monkeypatch.setattr("app.worker.runtime._set_terminal", _tracking_set_terminal)
 
-    with pytest.raises(RetryableJobError, match="temporary upstream outage"):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_RETRY_EXHAUSTED):
         await process_job(
             _worker_context(db_session, job_try=3),
             job_id=record.id,
@@ -205,7 +207,7 @@ async def test_process_job_terminal_logs_omit_raw_exception_text(
     async def _terminal_failure_handler() -> None:
         raise RuntimeError(sentinel)
 
-    with pytest.raises(RuntimeError, match=sentinel):
+    with pytest.raises(NonRetryableJobError, match=TERMINAL_ERROR_UNEXPECTED) as exc_info:
         await process_job(
             {"job_try": 1, "worker_runtime": runtime},
             job_id=job_id,
@@ -217,6 +219,8 @@ async def test_process_job_terminal_logs_omit_raw_exception_text(
     assert rendered_messages  # nosec B101 - pytest assertion
     assert all(sentinel not in message for message in rendered_messages)  # nosec B101 - pytest assertion
     assert terminal_reasons == ["unexpected_error"]  # nosec B101 - pytest assertion
+    assert str(exc_info.value) == TERMINAL_ERROR_UNEXPECTED  # nosec B101 - pytest assertion
+    assert sentinel not in f"{type(exc_info.value).__name__}: {exc_info.value}"  # nosec B101 - pytest assertion
     terminal_event = security_events[-1]
     assert terminal_event["event"] == "jobs.terminal_failure"  # nosec B101 - pytest assertion
     assert terminal_event["reason"] == "unexpected_error"  # nosec B101 - pytest assertion
