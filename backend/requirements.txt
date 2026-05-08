@@ -9,7 +9,7 @@ asyncpg==0.31.0
 psycopg2-binary==2.9.12
 
 # Validation / settings
-pydantic==2.13.3
+pydantic==2.13.4
 pydantic-settings==2.14.0
 python-dotenv==1.2.2
 email-validator==2.3.0
@@ -24,11 +24,11 @@ argon2-cffi==25.1.0
 slowapi==0.1.9
 redis==5.3.1
 arq==0.28.0
-sentry-sdk[fastapi]==2.58.0
+sentry-sdk[fastapi]==2.59.0
 
 # AI
-openai==2.33.0
-anthropic==0.97.0
+openai==2.36.0
+anthropic==0.100.0
 
 # PDF generation — WeasyPrint + Jinja2 template rendering
 weasyprint==68.1
