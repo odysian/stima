@@ -1,6 +1,6 @@
 # Web framework
 fastapi==0.136.1
-uvicorn[standard]==0.46.0
+uvicorn[standard]==0.47.0
 
 # Database
 SQLAlchemy==2.0.49
@@ -9,11 +9,11 @@ asyncpg==0.31.0
 psycopg2-binary==2.9.12
 
 # Validation / settings
-pydantic==2.13.3
-pydantic-settings==2.14.0
+pydantic==2.13.4
+pydantic-settings==2.14.1
 python-dotenv==1.2.2
 email-validator==2.3.0
-python-multipart==0.0.27
+python-multipart==0.0.28
 
 # Auth — PyJWT only. See exclusions table below.
 PyJWT==2.12.1
@@ -24,11 +24,11 @@ argon2-cffi==25.1.0
 slowapi==0.1.9
 redis==5.3.1
 arq==0.28.0
-sentry-sdk[fastapi]==2.58.0
+sentry-sdk[fastapi]==2.60.0
 
 # AI
-openai==2.33.0
-anthropic==0.97.0
+openai==2.36.0
+anthropic==0.102.0
 
 # PDF generation — WeasyPrint + Jinja2 template rendering
 weasyprint==68.1
@@ -46,7 +46,7 @@ pytest-asyncio==1.3.0
 pytest-cov==7.1.0
 
 # Linting / type checking / security
-ruff==0.15.12
+ruff==0.15.13
 mypy==1.20.2
 bandit==1.9.4
 # Transitive via bandit -> rich; pin for CVE-2026-4539 (pygments GHSA / PyPI advisory).
